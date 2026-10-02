@@ -2,7 +2,7 @@ interface Env { BAYAN_ENVIRONMENT?: string; BAYAN_VERSION?: string; BAYAN_COMMIT
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data,null,2),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 export default { async fetch(request:Request,env:Env):Promise<Response>{
 const url=new URL(request.url), path=url.pathname;
-if(path==="/health"||path==="/api/health") return json({status:"ok",service:"BAYAN",version:env.BAYAN_VERSION??"0.3.0",commit:env.BAYAN_COMMIT_SHA??"local",environment:env.BAYAN_ENVIRONMENT??"development",timestamp:new Date().toISOString()});
+if(path==="/health"||path==="/api/health") return json({status:"ok",service:"BAYAN",version:env.BAYAN_VERSION??"0.4.0",commit:env.BAYAN_COMMIT_SHA??"local",environment:env.BAYAN_ENVIRONMENT??"development",timestamp:new Date().toISOString()});
 if(path==="/api/tools") return json({tools:["search","knowledge","article","summary","verification","image-analysis","repair","file","code","live-weather","live-fx","ai"],provider:env.OPENAI_API_KEY?"configured":"not_configured",secrets:"server_only"});
 if(path==="/api/features") return json({features:{ai:!!env.OPENAI_API_KEY,weather:true,fx:true,search:false,news:false,knowledge:false},rule:"Features without a verified source remain disabled; no fabricated data."});
 if(path==="/api/search") { const q=url.searchParams.get("q")?.trim()??""; return json({query:q,items:[],pipeline:["normalize","intent","entity","keyword","semantic","rerank","evidence","synthesis","verification"],status:q?"ready_no_index":"empty_query"}); }
