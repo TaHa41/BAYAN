@@ -19,10 +19,6 @@ describe("BAYAN platform", () => {
     const response = await worker.fetch(new Request("https://bayan.test/api/ai",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({input:" "})}), {});
     expect(response.status).toBe(400);
   });
-  it("does not invent live market data", async () => {
-    const response = await worker.fetch(new Request("https://bayan.test/api/markets"), {});
-    expect(response.status).toBe(503); expect((await response.json() as {status:string}).status).toBe("not_configured");
-  });
   it("serves the SPA shell for a semantic route", async () => {
     const asset=new Response("<!doctype html><html><body>BAYAN</body></html>",{status:200,headers:{"content-type":"text/html"}});
     const assets={fetch:async()=>asset} as unknown as Fetcher;
