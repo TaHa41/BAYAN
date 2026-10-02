@@ -1,4 +1,4 @@
-import interface Env { BAYAN_ENVIRONMENT?: string; BAYAN_VERSION?: string; BAYAN_COMMIT_SHA?: string; OPENAI_API_KEY?: string; OPENAI_MODEL?: string; ASSETS?: Fetcher; }
+interface Env { BAYAN_ENVIRONMENT?: string; BAYAN_VERSION?: string; BAYAN_COMMIT_SHA?: string; OPENAI_API_KEY?: string; OPENAI_MODEL?: string; ASSETS?: Fetcher; }
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data,null,2),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});
 export default { async fetch(request:Request,env:Env):Promise<Response>{
 const url=new URL(request.url), path=url.pathname;
