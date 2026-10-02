@@ -1,0 +1,20 @@
+{
+  "name": "bayan",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BAYAN | بيان — Arabic/English information and knowledge platform",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260401.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0",
+    "wrangler": "^4.0.0"
+  }
+}
