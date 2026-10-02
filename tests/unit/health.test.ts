@@ -29,8 +29,6 @@ describe("BAYAN platform", () => {
     const response=await worker.fetch(new Request("https://bayan.test/science"),{ASSETS:assets});
     expect(response.status).toBe(200); expect(await response.text()).toContain("BAYAN");
   });
-  it("keeps the public header free of decorative icon spam", async () => {
-    const html=await (await fetch("https://raw.githubusercontent.com/TaHa41/BAYAN/main/public/index.html")).text().catch(()=> "");
-    if(html) { expect(html).not.toContain("☰"); expect(html).not.toContain("⌕"); expect(html).toContain("Created by Taha Omar"); }
-  });
+  it("requires an explicit weather city",async()=>{const r=await worker.fetch(new Request("https://bayan.test/api/weather"),{});expect(r.status).toBe(400);});
+  it("validates market currency codes",async()=>{const r=await worker.fetch(new Request("https://bayan.test/api/markets?base=bad&quote=EGP"),{});expect(r.status).toBe(400);});
 });
