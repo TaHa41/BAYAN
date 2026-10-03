@@ -301,7 +301,7 @@ const renderArticle=(k,isPersisted)=>{
   const sources=Array.isArray(k.sources)?k.sources:[];
   const sourceHtml=sources.length?"<section class=\"card article-sources\"><h2>المصادر المستخدمة</h2><p class=\"muted\">المصادر التالية استُخدمت للتحقق وبناء المقال، وليست بديلًا عن متن المقال.</p><ol>"+sources.slice(0,12).map(s=>"<li>"+escHtml(s.source||s.title||(isEn?"Source":"مصدر"))+(s.date?" · "+escHtml(s.date):"")+"</li>").join("")+"</ol></section>":"";
   const sourceLabel=isPersisted?(isEn?"Knowledge article saved in BAYAN":"مقال معرفة محفوظ داخل بيان"):(isEn?"BAYAN knowledge article":"مقال معرفي في بيان");
-  const actions='<div class="actions article-actions"><button class="secondary" type="button" data-bayan-save="'+escHtml(k.id||slug)+'">'+(saved?(isEn?"Saved":"محفوظ"):(isEn?"Save article":"حفظ المقال"))+'</button><button class="secondary" type="button" data-bayan-share="'+escHtml(k.title||"مقال بيان")+'">'+(isEn?"Share":"مشاركة")+'</button></div>';
+  const actions='<div class="actions article-actions"><button class="secondary" type="button" data-bayan-save="'+escHtml(k.id||slug)+'">'+(saved?(isEn?"Saved":"محفوظ"):(isEn?"Save article":"حفظ المقال"))+'</button><button class="secondary" type="button" data-bayan-share="'+escHtml(k.title||"مقال بيان")+'">'+(isEn?"Share":"مشاركة")+'</button><button class="secondary" type="button" data-bayan-correction="'+escHtml(k.id||slug)+'">'+(isEn?"Report correction":"طلب تصحيح")+'</button></div>';
   const relatedHtml=related.length?'<div class="section-head"><div><h2>'+(isEn?"Read also":"اقرأ أيضًا")+'</h2><p>'+(isEn?"Related material from the same field.":"مواد مرتبطة من نفس المجال.")+'</p></div></div><div class="grid">'+related.map(x=>'<a class="card article-card" href="'+withLang("/article/"+x.id)+'"><span class="article-section">'+sectionIcon(x.section)+(window.BAYAN_CONTENT?.sectionMeta?.[x.section]||x.section)+'</span><h3>'+escHtml(x.title)+'</h3><p>'+escHtml(x.summary)+'</p></a>').join("")+'</div>':"";
   const heroImage=k.image?'<img loading="eager" class="news-image article-hero-image" src="'+escHtml(k.image)+'" alt="" referrerpolicy="no-referrer">':"";
   let articleHtml="";
@@ -468,6 +468,16 @@ document.addEventListener("click",(event)=>{
     localStorage.setItem("bayan:saved-articles",JSON.stringify(list.slice(0,100)));
     fetch("/api/saved",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({visitorId,articleSlug:id,action:isRemoving?"remove":"save"})}).catch(()=>{});
     const article=(window.BAYAN_CONTENT?.articles||[]).find(x=>x.id===id);if(article)recordInterest(article.section,"save");
+    return;
+  }
+  const correction=event.target.closest("[data-bayan-correction]");
+  if(correction){
+    event.preventDefault(); event.stopPropagation();
+    const detail=window.prompt(isEn?"Describe the correction and, if possible, provide a source:":"اكتب التصحيح المقترح، وأضف مصدرًا إن أمكن:");
+    if(detail&&detail.trim().length>=10){
+      fetch("/api/requests",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({visitorId,type:"correction",title:"تصحيح للمقال "+correction.getAttribute("data-bayan-correction"),body:detail.trim(),source:""})})
+        .then(r=>r.json()).then(d=>{if(d.status==="received")alert(isEn?"Correction submitted for review.":"تم إرسال التصحيح للمراجعة.");else alert(isEn?"Could not submit the correction.":"تعذر إرسال التصحيح.");}).catch(()=>alert(isEn?"Could not submit the correction.":"تعذر إرسال التصحيح."));
+    }
     return;
   }
   const share=event.target.closest("[data-bayan-share]");
