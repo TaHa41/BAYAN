@@ -8,7 +8,7 @@ describe("BAYAN platform", () => {
     });
     expect(response.status).toBe(200);
     const body = await response.json() as unknown as { status: string; environment: string; version: string };
-    expect(body.status).toBe("ok"); expect(body.environment).toBe("test"); expect(body.version).toBe("0.6.0");
+    expect(body.status).toBe("ok"); expect(body.environment).toBe("test"); expect(body.version).toBe("0.7.0");
   });
   it("keeps the legacy health alias working for the runtime audit", async () => {
     const response = await worker.fetch(new Request("https://bayan.test/health"), {
