@@ -26,7 +26,8 @@ interface Env {
   DB?: D1Database;
 }
 
-const DEFAULT_OPENAI_MODEL = "gpt-5.6-luna";
+const DEFAULT_OPENAI_MODEL = "gpt-6-luna";
+const OPENAI_FALLBACK_MODELS = ["gpt-6-luna", "gpt-5.6-sol"];
 const DEFAULT_CLOUDFLARE_AI_MODEL = "@cf/google/gemma-4-26b-a4b-it";
 const CLOUDFLARE_AI_FALLBACK_MODELS = ["@cf/zai-org/glm-4.7-flash", "@cf/google/gemma-4-26b-a4b-it"];
 const DEFAULT_AI_GATEWAY = "default";
@@ -201,8 +202,14 @@ const sendBayanEmail = async (env: Env, subject: string, text: string) => {
       headers: { "content-type": "application/json", authorization: "Bearer " + env.RESEND_API_KEY },
       body: JSON.stringify({ from, to: [destination], subject: cleanText(subject, 180), text: cleanText(text, 12000) })
     });
+    if (!response.ok) {
+      console.error(JSON.stringify({ event: "bayan_email_failed", status: response.status, destination_configured: true }));
+    }
     return response.ok;
-  } catch { return false; }
+  } catch (error) {
+    console.error(JSON.stringify({ event: "bayan_email_exception", error: safeErrorMessage(error) }));
+    return false;
+  }
 };
 
 const diagnosticMemory = new Map<string, number>();
@@ -266,7 +273,8 @@ const reportBayanError = async (env: Env, context: string, error: unknown, extra
     "الحالة بعد المحاولة: تحتاج مراجعة إذا استمر الخطأ.",
     extra?.attempts ? "المحاولات: " + JSON.stringify(extra.attempts).slice(0, 2000) : "",
     extra?.repair ? "الإصلاح المنفذ: " + cleanText(extra.repair, 1200) : "",
-    "الخطوة التالية: راجع Workers Logs / Issues إذا تكرر الخطأ."
+    "الخطوة التالية: راجع Workers Logs / Issues إذا تكرر الخطأ.",
+    "البريد: الوجهة الافتراضية لإشعارات بيان هي bayan.contact@yahoo.com، ولا تُذكر مفاتيح أو أسرار في التقرير."
   ].filter(Boolean).join("\n");
   const diagnosis = await diagnoseTechnicalReport(env, report);
   report += "\n\nتشخيص الذكاء الاصطناعي:\n" + cleanText(diagnosis, 5000);
