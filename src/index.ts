@@ -17,9 +17,30 @@ interface Env {
   ADSENSE_SLOT_HOME_BOTTOM?: string;
   BAYAN_AI_MANAGER_TOKEN?: string;
   ASSETS?: Fetcher;
+  AI?: any;
 }
 
 const DEFAULT_OPENAI_MODEL = "gpt-5.6-luna";
+const DEFAULT_CLOUDFLARE_AI_MODEL = "@cf/google/gemma-4-26b-a4b-it";
+const DEFAULT_AI_GATEWAY = "default";
+
+const cloudflareAiRun = async (env: Env, model: string, messages: any[]) => {
+  if (!env.AI) throw new Error("cloudflare_ai_not_configured");
+  return env.AI.run(model, { messages }, { gateway: { id: DEFAULT_AI_GATEWAY } });
+};
+
+const cloudflareWebSearch = async (env: Env, query: string, provider = "exa") => {
+  if (!env.AI?.websearch) throw new Error("cloudflare_web_search_not_configured");
+  const response = await env.AI.websearch({
+    gatewayId: DEFAULT_AI_GATEWAY,
+    query,
+    provider,
+    limit: 8
+  });
+  if (!response.ok) throw new Error("cloudflare_web_search_failed");
+  return response.json();
+};
+
 
 const securityHeaders = (headers: Headers) => {
   headers.set("x-content-type-options", "nosniff");
@@ -172,6 +193,39 @@ export default {
       });
     }
 
+    if (path === "/api/ai/cloudflare" && request.method === "POST") {
+      try {
+        const body = await request.json() as any;
+        const messages = Array.isArray(body?.messages)
+          ? body.messages.slice(0, 20)
+          : [{ role: "user", content: cleanText(body?.prompt, 8000) }];
+        if (!messages.length || !messages.some((m: any) => m?.role === "user")) {
+          return json({ ok: false, error: "prompt_required" }, 400);
+        }
+        const model = typeof body?.model === "string" && body.model.length <= 160
+          ? body.model
+          : DEFAULT_CLOUDFLARE_AI_MODEL;
+        const result = await cloudflareAiRun(env, model, messages);
+        return json({ ok: true, provider: "cloudflare", gateway: DEFAULT_AI_GATEWAY, model, result });
+      } catch (error) {
+        return json({ ok: false, error: String(error?.message || "cloudflare_ai_error") }, 503);
+      }
+    }
+
+    if (path === "/api/search/web") {
+      const query = cleanText(url.searchParams.get("q"), 1024);
+      const provider = ["ceramic", "exa", "linkup"].includes(url.searchParams.get("provider") || "")
+        ? url.searchParams.get("provider")!
+        : "exa";
+      if (!query) return json({ ok: false, error: "query_required" }, 400);
+      try {
+        const result = await cloudflareWebSearch(env, query, provider);
+        return json({ ok: true, provider, results: result });
+      } catch (error) {
+        return json({ ok: false, error: String(error?.message || "cloudflare_web_search_error") }, 503);
+      }
+    }
+
     if (path === "/api/tools") {
       return json({
         tools: ["search", "knowledge-search", "evidence-synthesis", "news", "gold", "maps", "image-search", "article", "summary", "verification", "repair", "live-weather", "live-fx", "ads", "ai"],
@@ -211,6 +265,10 @@ export default {
       return json({
         features: {
           ads: env.ADSENSE_ENABLED === "true" && !!env.ADSENSE_CLIENT_ID,
+      cloudflareWorkersAI: !!env.AI,
+      cloudflareAIGateway: !!env.AI,
+      cloudflareWebSearch: !!env.AI?.websearch,
+      agentTracing: true,
           ai: !!env.OPENAI_API_KEY,
           webSearch: !!env.SEARCH_API_KEY,
           aiSearch: !!env.SEARCH_API_KEY && !!env.OPENAI_API_KEY,
