@@ -313,6 +313,19 @@ const sendBayanTelegram = async (env: Env, text: string, chatId?: string) => {
   }
 };
 
+const sendBayanOwnerNotification = async (env: Env, subject: string, text: string) => {
+  const telegram = await sendBayanTelegram(env, "🔔 " + cleanText(subject, 180) + "\n\n" + text.slice(0, 3600));
+  const email = await sendBayanEmail(env, subject, text);
+  console.log(JSON.stringify({
+    event: "bayan_owner_notification",
+    subject: cleanText(subject, 180),
+    telegramDelivered: telegram.ok,
+    emailDelivered: email.ok,
+    timestamp: new Date().toISOString()
+  }));
+  return { telegram, email };
+};
+
 const discoverTelegramChat = async (env: Env) => {
   const data = await telegramApi(env, "getUpdates");
   const updates = Array.isArray(data?.result) ? data.result : [];
@@ -962,7 +975,7 @@ export default {
         if (!env.DB || !visitorId || !title || contribution.length < 20) return json({ status: "invalid_contribution" }, 400);
         if (!await ensureContributionTable(env)) return json({ status: "database_unavailable" }, 503);
         await env.DB.prepare("INSERT INTO visitor_contributions(visitor_id,title,body,source,status,created_at) VALUES(?,?,?,?, 'PENDING_REVIEW',?)").bind(visitorId,title,contribution,source||null,new Date().toISOString()).run();
-        const notified = await sendBayanEmail(env, "مساهمة جديدة في بيان: " + title, "وصلت مساهمة جديدة وتحتاج مراجعة.\n\nالعنوان: " + title + "\n\nالمحتوى:\n" + contribution + "\n\nالمصدر: " + (source || "غير مذكور") + "\n\nالحالة: PENDING_REVIEW\n\nصفحة المراجعة: /review");
+        const notified = await sendBayanOwnerNotification(env, "مساهمة جديدة في بيان: " + title, "وصلت مساهمة جديدة وتحتاج مراجعة.\n\nالعنوان: " + title + "\n\nالمحتوى:\n" + contribution + "\n\nالمصدر: " + (source || "غير مذكور") + "\n\nالحالة: PENDING_REVIEW\n\nصفحة المراجعة: /review");
         return json({ status: "received", moderation: "PENDING_REVIEW", notification: notified }, 201);
       } catch { return json({ status: "invalid_request" }, 400); }
     }
@@ -1019,7 +1032,7 @@ export default {
       await env.DB!.prepare("UPDATE visitor_contributions SET status=?, reviewer_note=?, reviewed_at=? WHERE id=?")
         .bind(status, cleanText(body.note, 1000) || null, now, id).run();
       if (status === "VERIFIED") {
-        await sendBayanEmail(env, "تم التحقق من مساهمة في بيان", "تمت مراجعة المساهمة رقم " + id + " ونشرها في قاعدة المعرفة.\n\nالعنوان: " + String(current.title) + "\n\nالمقالة: /article/" + publishedArticle.id);
+        await sendBayanOwnerNotification(env, "تم التحقق من مساهمة في بيان", "تمت مراجعة المساهمة رقم " + id + " ونشرها في قاعدة المعرفة.\n\nالعنوان: " + String(current.title) + "\n\nالمقالة: /article/" + publishedArticle.id);
       }
       return json({ status: "updated", id, moderation: status, article: publishedArticle });
     }
@@ -1042,7 +1055,7 @@ export default {
           const fallbackSearch = await internalSearch(input, env);
           if (fallbackSearch.ok && fallbackSearch.results.length) {
             const fallbackAnswer = evidenceFallbackAnswer(input, fallbackSearch.results);
-            await sendBayanEmail(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان:\n\n" + input + "\n\nلم يتوفر مولد AI، فتم إرجاع الأدلة المسترجعة فقط:\n\n" + fallbackAnswer);
+            await sendBayanOwnerNotification(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان:\n\n" + input + "\n\nلم يتوفر مولد AI، فتم إرجاع الأدلة المسترجعة فقط:\n\n" + fallbackAnswer);
             return json({
               answer: fallbackAnswer,
               claims: [],
@@ -1052,7 +1065,7 @@ export default {
               provider: fallbackSearch.status
             });
           }
-          await sendBayanEmail(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان، لكن لم يتوفر مزود بحث أو AI لإجابته:\n\n" + input);
+          await sendBayanOwnerNotification(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان، لكن لم يتوفر مزود بحث أو AI لإجابته:\n\n" + input);
           return json({
             answer: "Insufficient Evidence: لا يتوفر حاليًا مزود بحث أو ذكاء اصطناعي يمكنه التحقق من هذا الطلب.",
             claims: [], evidence: [], confidence: 0,
@@ -1118,7 +1131,7 @@ export default {
               }
             } catch {}
           }
-          await sendBayanEmail(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان:\n\n" + input + "\n\nإجابة بيان:\n" + aiAnswer);
+          await sendBayanOwnerNotification(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان:\n\n" + input + "\n\nإجابة بيان:\n" + aiAnswer);
           return json({
             answer: aiAnswer, claims: [], evidence: results.map(withoutUrl),
             confidence: results.length ? 0.7 : 0.3, warnings: [],
@@ -1148,7 +1161,7 @@ export default {
                   }
                 } catch {}
               }
-              await sendBayanEmail(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان:\n\n" + input + "\n\nإجابة بيان:\n" + aiAnswer);
+              await sendBayanOwnerNotification(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان:\n\n" + input + "\n\nإجابة بيان:\n" + aiAnswer);
               return json({
                 answer: aiAnswer, claims: [], evidence: results.map(withoutUrl),
                 confidence: results.length ? 0.7 : 0.3,
@@ -1183,7 +1196,7 @@ export default {
             }
           } catch {}
         }
-        await sendBayanEmail(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان:\n\n" + input + "\n\nإجابة بيان:\n" + aiAnswer + "\n\nالمقالة المحفوظة: " + (article?.persisted ? "نعم" : "لا"));
+        await sendBayanOwnerNotification(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان:\n\n" + input + "\n\nإجابة بيان:\n" + aiAnswer + "\n\nالمقالة المحفوظة: " + (article?.persisted ? "نعم" : "لا"));
         return json({
           answer: aiAnswer, claims: [], evidence: results.map(withoutUrl),
           confidence: results.length ? 0.7 : 0.3, warnings: [],
