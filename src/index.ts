@@ -192,9 +192,9 @@ const ensureContributionTable = async (env: Env) => {
     return true;
   } catch { return false; }
 };
-const sendBayanEmail = async (env: Env, subject: string, text: string) => {
+const sendBayanEmail = async (env: Env, subject: string, text: string): Promise<{ok:boolean; error?:string}> => {
   const destination = env.BAYAN_NOTIFY_EMAIL || "bayan.contact@yahoo.com";
-  if (!env.RESEND_API_KEY) return false;
+  if (!env.RESEND_API_KEY) return { ok: false, error: "resend_api_key_missing" };
   const from = env.BAYAN_NOTIFY_FROM || "BAYAN <onboarding@resend.dev>";
   try {
     const response = await fetch("https://api.resend.com/emails", {
@@ -203,12 +203,16 @@ const sendBayanEmail = async (env: Env, subject: string, text: string) => {
       body: JSON.stringify({ from, to: [destination], subject: cleanText(subject, 180), text: cleanText(text, 12000) })
     });
     if (!response.ok) {
-      console.error(JSON.stringify({ event: "bayan_email_failed", status: response.status, destination_configured: true }));
+      let detail = "";
+      try { const body = await response.json() as any; detail = cleanText(body?.message || body?.error || body?.name || "", 300); } catch {}
+      const error = "resend_http_" + response.status + (detail ? ":" + detail : "");
+      console.error(JSON.stringify({ event: "bayan_email_failed", status: response.status, error }));
+      return { ok: false, error };
     }
-    return response.ok;
+    return { ok: true };
   } catch (error) {
     console.error(JSON.stringify({ event: "bayan_email_exception", error: safeErrorMessage(error) }));
-    return false;
+    return { ok: false, error: "resend_request_failed" };
   }
 };
 
@@ -1280,8 +1284,8 @@ export default {
         "حالة البريد: هذه الرسالة نفسها تُرسل عبر إعدادات إشعارات بيان.",
         "إذا ظهر FAILED، لا يتم اعتبار النظام سليمًا حتى ينجح الاختبار التالي."
       ].join("\n");
-      const delivered = await sendBayanDiagnostic(env, "بيان — رسالة اختبار وتشخيص شاملة", report);
-      return json({ status: failed.length ? "degraded" : "healthy", delivered, checks, failed, report });
+      const emailResult = await sendBayanDiagnostic(env, "بيان — رسالة اختبار وتشخيص شاملة", report);
+      return json({ status: failed.length || !emailResult.ok ? "degraded" : "healthy", delivered: emailResult.ok, emailError: emailResult.error || null, checks, failed, report });
     }
 
     if (path === "/api/news") {
