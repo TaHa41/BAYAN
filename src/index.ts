@@ -844,9 +844,12 @@ const runRuntimeAudit = async (env: Env) => {
   for (const route of publicRoutes) {
     await check("page:" + route, async () => {
       if (!env.ASSETS) throw new Error("assets_binding_missing");
-      const response = await env.ASSETS.fetch(new Request("https://bayan.internal" + route));
+      let response = await env.ASSETS.fetch(new Request("https://bayan.internal" + route));
+      if (response.status === 404 && !route.includes(".")) {
+        response = await env.ASSETS.fetch(new Request("https://bayan.internal/index.html"));
+      }
       if (!response.ok) throw new Error("page_http_" + response.status);
-      return { contentType: response.headers.get("content-type") || "" };
+      return { contentType: response.headers.get("content-type") || "", spaFallback: route !== "/" };
     });
   }
   await check("/database", async () => {
@@ -1858,11 +1861,28 @@ export default {
     if (path === "/api/gold") {
       if (!env.GOLD_API_KEY) return json({ status: "not_configured", provider: "GoldAPI", message: "Add GOLD_API_KEY as a Cloudflare Secret." }, 503);
       try {
-        const response = await fetch("https://www.goldapi.io/api/XAU/USD", {
-          headers: { "x-access-token": env.GOLD_API_KEY, "Content-Type": "application/json" }
-        });
-        if (!response.ok) return json({ status: "provider_error", provider: "GoldAPI" }, 502);
-        const data = await response.json() as any;
+        const requestGold = async (symbol: string) => {
+          const response = await fetch("https://www.goldapi.io/api/" + symbol, {
+            headers: { "x-access-token": env.GOLD_API_KEY, "Content-Type": "application/json" }
+          });
+          if (!response.ok) return null;
+          return await response.json() as any;
+        };
+        const local = await requestGold("XAU/EGP");
+        if (local) {
+          return json({
+            status: "ok", provider: "GoldAPI", currency: "EGP",
+            pricePerOunce: local.price || null, pricePerGram: local.price_gram_24k || null,
+            karat24: local.price_gram_24k || null, karat21: local.price_gram_21k || null, karat18: local.price_gram_18k || null,
+            localCurrency: "EGP",
+            karat24Egp: local.price_gram_24k || null,
+            karat21Egp: local.price_gram_21k || null,
+            karat18Egp: local.price_gram_18k || null,
+            updatedAt: typeof local.timestamp === "number" ? new Date(local.timestamp * 1000).toISOString() : (local.timestamp || null)
+          });
+        }
+        const data = await requestGold("XAU/USD");
+        if (!data) return json({ status: "provider_error", provider: "GoldAPI" }, 502);
         let egpPerUsd: number | null = null;
         try {
           const fx = await fetch("https://api.frankfurter.dev/v2/rate/USD/EGP");
@@ -1871,14 +1891,15 @@ export default {
             egpPerUsd = typeof fd.rate === "number" ? fd.rate : null;
           }
         } catch {}
+        if (!egpPerUsd) return json({ status: "provider_error", provider: "GoldAPI/FX", message: "تعذر الحصول على سعر USD/EGP للتحويل المحلي." }, 502);
         return json({
           status: "ok", provider: "GoldAPI", currency: "USD",
           pricePerOunce: data.price || null, pricePerGram: data.price_gram_24k || null,
           karat24: data.price_gram_24k || null, karat21: data.price_gram_21k || null, karat18: data.price_gram_18k || null,
           localCurrency: "EGP", usdToEgp: egpPerUsd,
-          karat24Egp: egpPerUsd && data.price_gram_24k ? egpPerUsd * data.price_gram_24k : null,
-          karat21Egp: egpPerUsd && data.price_gram_21k ? egpPerUsd * data.price_gram_21k : null,
-          karat18Egp: egpPerUsd && data.price_gram_18k ? egpPerUsd * data.price_gram_18k : null,
+          karat24Egp: data.price_gram_24k ? egpPerUsd * data.price_gram_24k : null,
+          karat21Egp: data.price_gram_21k ? egpPerUsd * data.price_gram_21k : null,
+          karat18Egp: data.price_gram_18k ? egpPerUsd * data.price_gram_18k : null,
           updatedAt: typeof data.timestamp === "number" ? new Date(data.timestamp * 1000).toISOString() : (data.timestamp || null)
         });
       } catch {
