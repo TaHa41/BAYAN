@@ -838,8 +838,10 @@ export default {
         if (!env.OPENAI_API_KEY && !env.AI) {
           const fallbackSearch = await internalSearch(input, env);
           if (fallbackSearch.ok && fallbackSearch.results.length) {
+            const fallbackAnswer = evidenceFallbackAnswer(input, fallbackSearch.results);
+            await sendBayanEmail(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان:\n\n" + input + "\n\nلم يتوفر مولد AI، فتم إرجاع الأدلة المسترجعة فقط:\n\n" + fallbackAnswer);
             return json({
-              answer: evidenceFallbackAnswer(input, fallbackSearch.results),
+              answer: fallbackAnswer,
               claims: [],
               evidence: fallbackSearch.results.map(withoutUrl),
               confidence: 0.5,
@@ -847,6 +849,7 @@ export default {
               provider: fallbackSearch.status
             });
           }
+          await sendBayanEmail(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان، لكن لم يتوفر مزود بحث أو AI لإجابته:\n\n" + input);
           return json({
             answer: "Insufficient Evidence: لا يتوفر حاليًا مزود بحث أو ذكاء اصطناعي يمكنه التحقق من هذا الطلب.",
             claims: [], evidence: [], confidence: 0,
