@@ -1207,7 +1207,8 @@ export default {
         senderConfigured: !!env.BAYAN_NOTIFY_FROM,
         senderNote: env.BAYAN_NOTIFY_FROM ? "configured" : "using Resend testing sender; production delivery to Yahoo may require a verified Resend domain/sender"
       }
-    });
+      });
+    }
 
     if (path === "/api/ai/manager/test-email" && request.method === "POST") {
       if (!managerAuthorized(request, env)) return json({ status: "forbidden" }, 403);
