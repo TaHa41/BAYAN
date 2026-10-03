@@ -19,7 +19,8 @@
   "ai_search_namespaces": [
     {
       "binding": "AI_SEARCH",
-      "namespace": "default"
+      "namespace": "default",
+      "remote": true
     }
   ],
   "d1_databases": [
