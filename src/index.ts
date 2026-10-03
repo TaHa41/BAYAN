@@ -315,7 +315,7 @@ export default {
         const api = "https://gnews.io/api/v4/" + endpoint + "?lang=" + lang + "&max=10&apikey=" + encodeURIComponent(env.GNEWS_API_KEY) + (q ? "&q=" + encodeURIComponent(q) : "&category=general");
         const response = await fetch(api);
         if (!response.ok) return json({ status: "provider_error", provider: "GNews" }, 502);
-        const data = await response.json();
+        const data = await response.json() as any;
         return json({ status: "ok", provider: "GNews", articles: data.articles || [], totalArticles: data.totalArticles || 0 });
       } catch {
         return json({ status: "provider_error", provider: "GNews" }, 502);
