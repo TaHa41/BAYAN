@@ -55,7 +55,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4"
-          command: deploy --strict --var BAYAN_COMMIT_SHA:${{ github.event.workflow_run.head_sha || github.sha }} --var BAYAN_VERSION:0.5.0 --var BAYAN_ENVIRONMENT:production
+          command: deploy --strict --var BAYAN_COMMIT_SHA:${{ github.event.workflow_run.head_sha || github.sha }} --var BAYAN_VERSION:0.6.0 --var BAYAN_ENVIRONMENT:production
 
       - name: Production smoke test
         if: steps.credentials.outputs.configured == 'true'
