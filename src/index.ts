@@ -1622,6 +1622,17 @@ export default {
       return json({ status: "ok", jobs: result.results || [] });
     }
 
+    if (path === "/api/ai/manager/repairs/retry" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      if (!env.DB) return json({ status: "database_unavailable" }, 503);
+      await ensureRepairQueue(env);
+      const body = await request.json() as any;
+      const id = Number(body?.id);
+      if (!Number.isInteger(id) || id < 1) return json({ status: "invalid_repair_id" }, 400);
+      const result = await env.DB.prepare("UPDATE repair_jobs SET status='QUEUED', next_attempt_at=NULL, updated_at=? WHERE id=?").bind(new Date().toISOString(), id).run();
+      return json({ status: result.meta?.changes ? "queued" : "not_found", id });
+    }
+
     if (path === "/api/ai/manager/telegram/setup" && request.method === "GET") {
       if (!managerAuthorized(request, env)) return json({ error: "unauthorized" }, 401);
       try {
