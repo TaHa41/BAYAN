@@ -204,10 +204,46 @@ const sendBayanEmail = async (env: Env, subject: string, text: string) => {
   } catch { return false; }
 };
 
-const reportBayanError = async (env: Env, context: string, error: unknown) => {
+const diagnosticMemory = new Map<string, number>();
+
+const safeErrorMessage = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error || "unknown_error");
-  const safe = message.replace(/(api[_-]?key|authorization|bearer|token|password|secret)\s*[:=]\s*\S+/gi, "$1=[REDACTED]").slice(0, 1200);
-  await sendBayanEmail(env, "تنبيه خطأ تقني مهم في بيان", "المكان: " + cleanText(context, 200) + "\nالخطأ: " + safe + "\nالوقت: " + new Date().toISOString() + "\nالإصدار: " + cleanText(env.BAYAN_VERSION || "unknown", 100));
+  return message.replace(/(api[_-]?key|authorization|bearer|token|password|secret)\s*[:=]\s*\S+/gi, "$1=[REDACTED]").slice(0, 1600);
+};
+
+const sendBayanDiagnostic = async (env: Env, subject: string, report: string) => {
+  const delivered = await sendBayanEmail(env, subject, report);
+  console.log(JSON.stringify({
+    event: "bayan_notification",
+    subject: cleanText(subject, 180),
+    delivered,
+    destination_configured: !!env.BAYAN_NOTIFY_EMAIL && !!env.RESEND_API_KEY,
+    timestamp: new Date().toISOString()
+  }));
+  return delivered;
+};
+
+const reportBayanError = async (env: Env, context: string, error: unknown, extra: any = {}) => {
+  const safe = safeErrorMessage(error);
+  const signature = context + "|" + safe;
+  const now = Date.now();
+  const last = diagnosticMemory.get(signature) || 0;
+  if (now - last < 300_000) return false;
+  diagnosticMemory.set(signature, now);
+  const report = [
+    "بيان — تقرير خطأ تقني تلقائي",
+    "المكان: " + cleanText(context, 240),
+    "المشكلة: " + safe,
+    "الوقت: " + new Date().toISOString(),
+    "الإصدار: " + cleanText(env.BAYAN_VERSION || "unknown", 100),
+    "Commit: " + cleanText(env.BAYAN_COMMIT_SHA || "unknown", 100),
+    "الإجراء التلقائي: تمت إعادة المحاولة واستخدام المسار البديل إن كان متاحًا.",
+    "الحالة بعد المحاولة: تحتاج مراجعة إذا استمر الخطأ.",
+    extra?.attempts ? "المحاولات: " + JSON.stringify(extra.attempts).slice(0, 2000) : "",
+    extra?.repair ? "الإصلاح المنفذ: " + cleanText(extra.repair, 1200) : "",
+    "الخطوة التالية: راجع Workers Logs / Issues إذا تكرر الخطأ."
+  ].filter(Boolean).join("\n");
+  return sendBayanDiagnostic(env, "تنبيه خطأ تقني مهم في بيان", report);
 };
 
 const managerAuthorized = (request: Request, env: Env) => {
@@ -374,6 +410,7 @@ const processContentQueue = async (env: Env) => {
   try {
     const search = await internalSearch(String(row.topic), env);
     if (!search.ok || !search.results?.length) throw new Error("evidence_unavailable");
+    if ((search.sourceCount || 0) < 2) throw new Error("insufficient_independent_sources");
     const generated = await generateKnowledgeArticle(env, String(row.language || "ar"), String(row.topic), search.results);
     if (!generated) throw new Error("generation_unavailable");
     const slug = await slugForQuery(String(row.topic));
@@ -519,46 +556,63 @@ const evidenceFallbackAnswer = (query: string, results: any[]) => {
 };
 
 const internalSearch = async (query: string, env: Env) => {
-  if (env.SEARCH_API_KEY) {
-    const endpoint =
-      "https://serpapi.com/search.json?engine=google&hl=en&gl=eg&safe=active&num=8&q=" +
-      encodeURIComponent(query) + "&api_key=" + encodeURIComponent(env.SEARCH_API_KEY);
+  const language = /[\u0600-\u06FF]/.test(query) ? "ar" : "en";
+  const providers = [
+    env.SEARCH_API_KEY ? "serpapi" : null,
+    env.AI?.websearch ? "cloudflare_web_search" : null,
+    "google_news_rss",
+    "wikipedia"
+  ].filter(Boolean) as string[];
+  const attempts: any[] = [];
+
+  const tasks = providers.map(async (provider) => {
     try {
-      const response = await fetch(endpoint);
-      if (response.ok) {
+      if (provider === "serpapi") {
+        const endpoint = "https://serpapi.com/search.json?engine=google&hl=en&gl=eg&safe=active&num=8&q=" +
+          encodeURIComponent(query) + "&api_key=" + encodeURIComponent(env.SEARCH_API_KEY || "");
+        const response = await fetch(endpoint);
+        if (!response.ok) throw new Error("http_" + response.status);
         const data = await response.json() as any;
-        const results = (data.organic_results || []).slice(0, 8).map((item: any, index: number) => ({
-          rank: index + 1, title: cleanText(item.title, 220), source: sourceName(item),
+        return (data.organic_results || []).slice(0, 8).map((item: any, index: number) => ({
+          rank: index + 1, provider: "serpapi", title: cleanText(item.title, 220), source: sourceName(item),
           date: cleanText(item.date, 80) || null, snippet: cleanText(item.snippet, 700),
           url: typeof item.link === "string" ? item.link : null
         }));
-        if (results.length) return { ok: true as const, status: "ok", results: rerankResults(query, results) };
       }
-    } catch {}
-  }
+      if (provider === "cloudflare_web_search") {
+        const raw = await cloudflareWebSearch(env, query, "exa");
+        const candidates = Array.isArray(raw?.results) ? raw.results : Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : [];
+        return candidates.slice(0, 8).map((item: any, index: number) => ({
+          rank: index + 1, provider: "cloudflare_web_search",
+          title: cleanText(item.title || item.name || item.headline, 220),
+          source: cleanText(item.source || item.domain || item.url || "Web Search", 160),
+          date: cleanText(item.date || item.published_at || item.publishedAt, 80) || null,
+          snippet: cleanText(item.snippet || item.text || item.description || item.content, 700),
+          url: typeof (item.url || item.link) === "string" ? (item.url || item.link) : null
+        })).filter((x: any) => x.title && x.snippet);
+      }
+      if (provider === "google_news_rss") return (await rssNewsSearch(query, language)).map((x: any) => ({ ...x, provider: "google_news_rss" }));
+      if (provider === "wikipedia") return (await wikipediaSearch(query, language)).map((x: any) => ({ ...x, provider: "wikipedia" }));
+      return [];
+    } catch (error) {
+      attempts.push({ provider, ok: false, error: safeErrorMessage(error) });
+      return [];
+    }
+  });
 
-  if (env.AI?.websearch) {
-    try {
-      const raw = await cloudflareWebSearch(env, query, "exa");
-      const candidates = Array.isArray(raw?.results) ? raw.results : Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : [];
-      const results = candidates.slice(0, 8).map((item: any, index: number) => ({
-        rank: index + 1,
-        title: cleanText(item.title || item.name || item.headline, 220),
-        source: cleanText(item.source || item.domain || item.url || "Web Search", 160),
-        date: cleanText(item.date || item.published_at || item.publishedAt, 80) || null,
-        snippet: cleanText(item.snippet || item.text || item.description || item.content, 700),
-        url: typeof (item.url || item.link) === "string" ? (item.url || item.link) : null
-      })).filter((x: any) => x.title && x.snippet);
-      if (results.length) return { ok: true as const, status: "cloudflare_web_search", results: rerankResults(query, results) };
-    } catch {}
+  const settled = await Promise.all(tasks);
+  const merged = settled.flat().filter((x: any) => x.title && x.snippet);
+  const unique = new Map<string, any>();
+  for (const item of merged) {
+    const key = item.url || (item.title + "|" + item.source).toLowerCase();
+    const current = unique.get(key);
+    if (!current) unique.set(key, item);
+    else current.provider = Array.from(new Set((String(current.provider) + "+" + String(item.provider)).split("+"))).join("+");
   }
-
-  const language = /[\u0600-\u06FF]/.test(query) ? "ar" : "en";
-  const rss = await rssNewsSearch(query, language);
-  if (rss.length) return { ok: true as const, status: "rss", results: rss };
-  const wiki = await wikipediaSearch(query, language);
-  if (wiki.length) return { ok: true as const, status: "wikipedia", results: wiki };
-  return { ok: false as const, status: "search_provider_not_configured", results: [] };
+  const results = rerankResults(query, Array.from(unique.values())).slice(0, 16);
+  const providerCount = new Set(results.flatMap((x: any) => String(x.provider || "").split("+").filter(Boolean))).size;
+  const sourceCount = new Set(results.map((x: any) => String(x.source || "").toLowerCase()).filter(Boolean)).size;
+  return { ok: results.length > 0, status: results.length ? "multi_source" : "search_provider_not_configured", results, providerCount, sourceCount, attempts };
 };
 
 const evidencePrompt = (language: string, query: string, results: any[]) => {
@@ -571,6 +625,8 @@ const evidencePrompt = (language: string, query: string, results: any[]) => {
     "User request: " + query + "\n\n" +
     "Use ONLY the supplied search evidence. Do not invent facts, dates, numbers, quotations, people, events, URLs, or sources.\n" +
     "If the evidence conflicts, say that it conflicts and distinguish the claims.\n" +
+    "Prefer evidence supported by at least two independent sources/providers. Never treat multiple copies of the same story as independent confirmation.\n" +
+    "If fewer than two independent sources are available, clearly label the answer as single-source/limited evidence and avoid presenting uncertain claims as established facts.\n" +
     "If evidence is insufficient for a complete answer, explicitly say Insufficient Evidence and explain what is missing.\n" +
     "Produce a complete, useful answer rather than a search-result list.\n" +
     "Do not tell the visitor to leave BAYAN or visit an external website.\n" +
@@ -584,6 +640,12 @@ export default {
     const baseUrl = "https://bayan.tahaomar411.workers.dev";
     try {
       const audit = await runRuntimeAudit(baseUrl);
+      if (!audit.healthy) {
+        await reportBayanError(env, "scheduled runtime audit", new Error("runtime_audit_degraded"), {
+          repair: "تمت إعادة المحاولة 3 مرات لكل مسار فاشل قبل إرسال التنبيه.",
+          attempts: audit.results.filter((x: any) => !x.ok)
+        });
+      }
       if (env.DB) {
         await env.DB.prepare("INSERT INTO runtime_audits (checked_at, healthy, details_json) VALUES (?, ?, ?)")
           .bind(audit.checkedAt, audit.healthy ? 1 : 0, JSON.stringify(audit.results)).run();
