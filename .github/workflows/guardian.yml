@@ -33,7 +33,7 @@ jobs:
           BAYAN_URL: https://bayan.tahaomar411.workers.dev
 
       - name: AI diagnosis
-        if: steps.smoke.outcome == 'failure'
+        if: steps.smoke.conclusion == 'failure'
         id: ai
         continue-on-error: true
         run: |
