@@ -1,8 +1,6 @@
 -- BAYAN schema drift repair and analytics
--- Safe on databases where these columns already exist because deployment-time
--- runtime guards also tolerate already-applied changes.
+-- The runtime guard also adds these columns when an older D1 schema is encountered.
 ALTER TABLE visitor_contributions ADD COLUMN reviewer_note TEXT;
-ALTER TABLE visitor_contributions ADD COLUMN reviewed_at TEXT;
 
 CREATE TABLE IF NOT EXISTS bayan_analytics_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
