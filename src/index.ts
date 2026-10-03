@@ -125,7 +125,7 @@ const json = (data: unknown, status = 200) => {
   return new Response(JSON.stringify(data, null, 2), { status, headers });
 };
 
-const renderHtml = async (response: Response, requestUrl: URL) => {
+const renderHtml = async (response: Response, requestUrl: URL, env?: Env) => {
   const headers = securityHeaders(new Headers(response.headers));
   if (!(headers.get("content-type") || "").includes("text/html")) {
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
@@ -156,11 +156,33 @@ const renderHtml = async (response: Response, requestUrl: URL) => {
     ar: ["BAYAN | بيان", "منصة للمعرفة والبحث الموثق والمعلومات المبنية على الأدلة."],
     en: ["BAYAN", "A knowledge and research platform focused on evidence-aware information."]
   });
-  const [seoTitle, seoDescription] = language === "en" ? seo.en : seo.ar;
+  let articleSeo: any = null;
+  if (cleanPath.startsWith("/article/") && env?.DB) {
+    try {
+      const slug = decodeURIComponent(cleanPath.slice("/article/".length));
+      const row = await env.DB.prepare("SELECT slug,title,summary,created_at,updated_at FROM knowledge_articles WHERE slug=? AND status='PUBLISHED' LIMIT 1").bind(slug).first<any>();
+      if (row) articleSeo = row;
+    } catch {}
+  }
+  const finalTitle = articleSeo?.title ? cleanText(articleSeo.title, 180) + " — BAYAN | بيان" : seoTitle;
+  const finalDescription = articleSeo?.summary ? cleanText(articleSeo.summary, 300) : seoDescription;
+  const [resolvedTitle, resolvedDescription] = [finalTitle, finalDescription];
+
   html = html.replace('<html lang="ar" dir="rtl">', '<html lang="' + language + '" dir="' + direction + '">');
   const indexable = !cleanPath.startsWith("/search") && !cleanPath.startsWith("/ai") && !cleanPath.startsWith("/saved");
   const robots = indexable ? "index,follow" : "noindex,follow";
-  const jsonLd = JSON.stringify({
+  const jsonLd = JSON.stringify(articleSeo ? {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: articleSeo.title,
+    description: articleSeo.summary,
+    datePublished: articleSeo.created_at,
+    dateModified: articleSeo.updated_at,
+    mainEntityOfPage: { "@type": "WebPage", "@id": canonical },
+    author: { "@type": "Organization", name: "BAYAN | بيان" },
+    publisher: { "@type": "Organization", name: "BAYAN | بيان" },
+    inLanguage: language
+  } : {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: "BAYAN | بيان",
@@ -172,16 +194,16 @@ const renderHtml = async (response: Response, requestUrl: URL) => {
       "query-input": "required name=search_term_string"
     }
   }).replace(/</g, "\\u003c");
-  html = html.replace(/<title>[^<]*<\/title>/i, "<title>" + seoTitle + "</title>");
-  html = html.replace(/<meta name="description" content="[^"]*">/i, '<meta name="description" content="' + seoDescription.replace(/"/g, "&quot;") + '">');
+  html = html.replace(/<title>[^<]*<\/title>/i, "<title>" + resolvedTitle.replace(/</g, "&lt;").replace(/>/g, "&gt;") + "</title>");
+  html = html.replace(/<meta name="description" content="[^"]*">/i, '<meta name="description" content="' + resolvedDescription.replace(/"/g, "&quot;") + '">');
   html = html.replace("</head>",
     '<link rel="canonical" href="' + canonical + '">' +
     '<link rel="alternate" hreflang="ar" href="' + alternateAr + '">' +
     '<link rel="alternate" hreflang="en" href="' + alternateEn + '">' +
     '<link rel="alternate" hreflang="x-default" href="' + alternateAr + '">' +
     '<meta name="robots" content="' + robots + '">' +
-    '<meta property="og:title" content="' + seoTitle.replace(/"/g, "&quot;") + '">' +
-    '<meta property="og:description" content="' + seoDescription.replace(/"/g, "&quot;") + '">' +
+    '<meta property="og:title" content="' + resolvedTitle.replace(/"/g, "&quot;") + '">' +
+    '<meta property="og:description" content="' + resolvedDescription.replace(/"/g, "&quot;") + '">' +
     '<meta property="og:url" content="' + canonical + '">' +
     '<meta property="og:type" content="' + (cleanPath.startsWith("/article/") ? "article" : "website") + '">' +
     '<meta name="google-site-verification" content="GNb6pX-28eMbpuOezfmi_N6hM9g_zvusJ4FvclLTFqw">' +
@@ -2591,7 +2613,7 @@ export default {
       if (asset.status === 404 && !path.includes(".")) {
         asset = await env.ASSETS.fetch(new Request(new URL("/index.html", request.url), request));
       }
-      return renderHtml(asset, url);
+      return renderHtml(asset, url, env);
     }
 
     return json({ error: "Not Found", path }, 404);
