@@ -71,3 +71,19 @@ CREATE TABLE IF NOT EXISTS bayan_analytics_events (
 );
 CREATE INDEX IF NOT EXISTS idx_bayan_analytics_time ON bayan_analytics_events(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_bayan_analytics_type_time ON bayan_analytics_events(event_type,created_at DESC);
+
+
+CREATE TABLE IF NOT EXISTS knowledge_searches (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  query TEXT NOT NULL,
+  language TEXT NOT NULL DEFAULT 'ar',
+  intent TEXT,
+  section TEXT,
+  status TEXT NOT NULL DEFAULT 'DISCOVERED',
+  article_slug TEXT,
+  source_count INTEGER NOT NULL DEFAULT 0,
+  provider_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_knowledge_searches_query_time ON knowledge_searches(query,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_knowledge_searches_time ON knowledge_searches(created_at DESC);
