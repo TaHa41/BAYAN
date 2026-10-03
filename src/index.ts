@@ -19,6 +19,7 @@ interface Env {
   ASSETS?: Fetcher;
   AI?: any;
   AI_SEARCH?: any;
+  BROWSER?: any;
   DB?: D1Database;
 }
 
@@ -321,7 +322,7 @@ export default {
         const result = await cloudflareAiRun(env, model, messages);
         return json({ ok: true, provider: "cloudflare", gateway: DEFAULT_AI_GATEWAY, model, result });
       } catch (error) {
-        return json({ ok: false, error: String(error?.message || "cloudflare_ai_error") }, 503);
+        return json({ ok: false, error: error instanceof Error ? error.message : "cloudflare_ai_error" }, 503);
       }
     }
 
@@ -335,7 +336,7 @@ export default {
         const result = await cloudflareWebSearch(env, query, provider);
         return json({ ok: true, provider, results: result });
       } catch (error) {
-        return json({ ok: false, error: String(error?.message || "cloudflare_web_search_error") }, 503);
+        return json({ ok: false, error: error instanceof Error ? error.message : "cloudflare_web_search_error" }, 503);
       }
     }
 
@@ -346,7 +347,7 @@ export default {
         const result = await cloudflareKnowledgeSearch(env, query);
         return json({ ok: true, provider: "cloudflare-ai-search", results: result });
       } catch (error) {
-        return json({ ok: false, error: String(error?.message || "cloudflare_ai_search_error") }, 503);
+        return json({ ok: false, error: error instanceof Error ? error.message : "cloudflare_ai_search_error" }, 503);
       }
     }
 
