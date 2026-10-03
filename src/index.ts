@@ -903,7 +903,9 @@ const rssItems = (xml: string) => {
     const source = pick("source") || pick("author") || "RSS";
     const date = pick("pubDate") || pick("published") || pick("updated") || null;
     const description = pick("description") || pick("summary") || pick("content");
-    items.push({ title, source, date, snippet: description || title, url: link || null });
+    const mediaMatch = raw.match(/<(?:media:content|media:thumbnail|enclosure)[^>]*(?:url|href)=["\x27]([^"\x27]+)["\x27][^>]*>/i);
+    const image = mediaMatch?.[1] || null;
+    items.push({ title, source, date, snippet: description || title, url: link || null, image });
   }
   return items;
 };
@@ -924,6 +926,26 @@ const fetchTextWithTimeout = async (endpoint: string, timeoutMs = 7000) => {
   } finally {
     clearTimeout(timer);
   }
+};
+
+const rssArticleImage = async (url: string | null) => {
+  if (!url || !/^https?:\/\//i.test(url)) return null;
+  try {
+    const response = await fetch(url, { headers: { "user-agent": "BAYAN/1.0 news reader", "accept": "text/html,application/xhtml+xml" }, signal: AbortSignal.timeout(4500) });
+    if (!response.ok) return null;
+    const html = (await response.text()).slice(0, 400000);
+    const patterns = [
+      /<meta[^>]+property=["\x27]og:image["\x27][^>]+content=["\x27]([^"\x27]+)["\x27][^>]*>/i,
+      /<meta[^>]+content=["\x27]([^"\x27]+)["\x27][^>]+property=["\x27]og:image["\x27][^>]*>/i,
+      /<meta[^>]+name=["\x27]twitter:image["\x27][^>]+content=["\x27]([^"\x27]+)["\x27][^>]*>/i,
+      /<meta[^>]+content=["\x27]([^"\x27]+)["\x27][^>]+name=["\x27]twitter:image["\x27][^>]*>/i
+    ];
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+      if (match?.[1]) return new URL(match[1], url).toString();
+    }
+  } catch {}
+  return null;
 };
 
 const rssNewsSearch = async (query = "", language = "ar") => {
@@ -1224,6 +1246,28 @@ export default {
       if (persistence.persisted) await refreshKnowledgeGraph(env, article);
       return json({ status: "ok", query: q, section, persisted: persistence.persisted, article: { id: slug, title: article.title, summary: article.summary, body: article.body, source: article.sources[0]?.source || "BAYAN evidence", date: article.sources[0]?.date || null, rank } });
     }
+    if (path === "/api/trending/article") {
+      try {
+        const title = cleanText(url.searchParams.get("title"), 500);
+        const sourceUrl = cleanText(url.searchParams.get("url"), 2000);
+        const image = cleanText(url.searchParams.get("image"), 2000) || null;
+        const lang = (url.searchParams.get("lang") || "ar").toLowerCase() === "en" ? "en" : "ar";
+        if (!title) return json({ error: "title_required" }, 400);
+        const search = await internalSearch(title, env);
+        if (!search.ok || !search.results.length) return json({ error: "article_source_unavailable", status: search.status }, 503);
+        const generated = await generateKnowledgeArticle(env, lang, title, search.results);
+        if (!generated) return json({ error: "full_article_generation_unavailable" }, 503);
+        const slug = await slugForQuery("trending:" + title);
+        const article = { slug, query: title, section: "news", title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 8).map(withoutUrl), createdAt: new Date().toISOString() };
+        const persistence = await saveKnowledgeArticle(env, article);
+        if (persistence.persisted) await refreshKnowledgeGraph(env, article);
+        return json({ status: "ok", article: { id: slug, title: article.title, summary: article.summary, body: article.body, sources: article.sources, sourceUrl, image } });
+      } catch (error) {
+        await reportBayanError(env, "api/trending/article", error);
+        return json({ error: "trending_article_failed" }, 502);
+      }
+    }
+
     if (path === "/api/search") {
       const q = url.searchParams.get("q")?.trim().slice(0, 500) ?? "";
       const lang = (url.searchParams.get("lang") || "ar").toLowerCase() === "en" ? "en" : "ar";
@@ -1794,6 +1838,9 @@ export default {
           title: item.title,
           source: item.source,
           date: item.date || null,
+          url: item.url || null,
+          image: item.image || null,
+          snippet: item.snippet || item.title,
           basis: "current_news_signal"
         }));
         return json({
