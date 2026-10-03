@@ -848,10 +848,10 @@ const generateKnowledgeArticle = async (env: Env, language: string, query: strin
       quality = articleQualityCheck(text, query, intent, evidence);
     }
     if (!text || !quality.ok) return buildEvidenceArticleFallback(query, results);
-    const lines = text.split(/\r?\n/).map((x) => normalizeGeneratedText(x)).filter(Boolean);
+    const lines = text.split(/\r?\n/).map((x: string) => normalizeGeneratedText(x)).filter(Boolean);
     const title = cleanText((lines[0] || query).replace(/^#+\s*/, ""), 240);
-    const body = lines.slice(1).filter((x) => !/^(المصادر|sources)\s*:??$/i.test(x));
-    const summaryIndex = body.findIndex((x) => !/^#{1,6}\s/.test(x) && !/^[-*]\s/.test(x));
+    const body = lines.slice(1).filter((x: string) => !/^(المصادر|sources)\s*:??$/i.test(x));
+    const summaryIndex = body.findIndex((x: string) => !/^#{1,6}\s/.test(x) && !/^[-*]\s/.test(x));
     const summary = cleanText(summaryIndex >= 0 ? body[summaryIndex] : "مقال تحريري مبني على أدلة مسترجعة.", 700);
     return { title, summary, body, evidenceOnly: false, intent };
   } catch {
