@@ -408,6 +408,17 @@ const processBayanRepairQueue = async (env: Env) => {
   for (const job of jobs.results || []) {
     const started = new Date().toISOString();
     try {
+      if (job.status === "WAITING_VERIFY") {
+        const verification = await verifyBayanRepair(env, job);
+        if (verification.ok) {
+          await env.DB.prepare("UPDATE repair_jobs SET status='RESOLVED', last_action=?, diagnosis=?, updated_at=?, resolved_at=? WHERE id=?")
+            .bind("verification_passed", verification.details, new Date().toISOString(), new Date().toISOString(), job.id).run();
+          continue;
+        }
+        await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI', last_action=?, diagnosis=?, next_attempt_at=?, updated_at=? WHERE id=?")
+          .bind("verification_failed", verification.details, new Date(Date.now() + 10 * 60_000).toISOString(), new Date().toISOString(), job.id).run();
+        continue;
+      }
       await env.DB.prepare("UPDATE repair_jobs SET status='DIAGNOSING', attempts=attempts+1, updated_at=? WHERE id=?")
         .bind(started, job.id).run();
 
