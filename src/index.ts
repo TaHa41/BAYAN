@@ -949,7 +949,15 @@ export default {
     if (path === "/sitemap.xml") {
       const routes = ["/", "/egypt", "/arab", "/world", "/science", "/economy", "/politics", "/technology", "/health", "/history-culture", "/people", "/sports", "/travel", "/arts", "/news", "/trending", "/prices", "/about", "/methodology", "/privacy", "/terms", "/contact", "/article/sky-blue", "/article/password-security", "/article/inflation-explained", "/article/health-information", "/article/sports-statistics", "/article/travel-checklist", "/article/ai-evidence", "/article/history-context"];
       const xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
-      const body = "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">" + routes.map((route) => "<url><loc>" + url.origin + route + "</loc></url>").join("") + "</urlset>";
+      let dynamicRoutes: string[] = [];
+      if (env.DB) {
+        try {
+          const rows = await env.DB.prepare("SELECT slug FROM knowledge_articles WHERE status='PUBLISHED' ORDER BY updated_at DESC LIMIT 500").all();
+          dynamicRoutes = (rows.results || []).map((row: any) => "/article/" + encodeURIComponent(String(row.slug)));
+        } catch {}
+      }
+      const allRoutes = [...new Set([...routes, ...dynamicRoutes])];
+      const body = "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">" + allRoutes.map((route) => "<url><loc>" + url.origin + route + "</loc></url>").join("") + "</urlset>";
       return new Response(xml + body, { headers: { "content-type": "application/xml; charset=utf-8" } });
     }
 
