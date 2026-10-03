@@ -931,12 +931,6 @@ export default {
           ? evidencePrompt(language, input, results)
           : "BAYAN knowledge answer.\nLanguage: " + language + "\nUser request: " + input +
             "\nNo live search evidence was available for this request. Answer from the model's general knowledge only when you are confident. Clearly distinguish established knowledge from uncertainty, do not invent citations or claim that live verification occurred, and say Insufficient Evidence when the question requires current or source-specific verification.";
-        /*
-        const prompt = shouldSearch
-          ? evidencePrompt(language, input, results)
-          : "BAYAN internal knowledge request.\nLanguage: " + language + "\nUser request: " + input +
-            "\nAnswer only from verified BAYAN content available to you. If that content is not sufficient, say Insufficient Evidence. Do not invent facts, sources, numbers, quotations, or events. Do not include external links.";
-
         let response: Response | null = null;
         if (env.OPENAI_API_KEY) {
           response = await fetch("https://api.openai.com/v1/responses", {
