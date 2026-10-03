@@ -25,15 +25,3 @@ CREATE TABLE IF NOT EXISTS repair_jobs (
 );
 CREATE INDEX IF NOT EXISTS idx_repair_jobs_status_next ON repair_jobs(status,next_attempt_at);
 CREATE INDEX IF NOT EXISTS idx_content_queue_retry ON content_queue(status,next_attempt_at,priority);
-
-CREATE TABLE IF NOT EXISTS bayan_analytics_events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  visitor_id TEXT NOT NULL,
-  event_type TEXT NOT NULL,
-  path TEXT NOT NULL,
-  query TEXT,
-  language TEXT NOT NULL DEFAULT 'ar',
-  created_at TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_bayan_analytics_time ON bayan_analytics_events(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_bayan_analytics_type_time ON bayan_analytics_events(event_type,created_at DESC);
