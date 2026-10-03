@@ -12,7 +12,7 @@ describe("BAYAN platform", () => {
   });
   it("keeps the legacy health alias working for the runtime audit", async () => {
     const response = await worker.fetch(new Request("https://bayan.test/health"), {
-      BAYAN_ENVIRONMENT: "test", BAYAN_VERSION: "0.6.0", BAYAN_COMMIT_SHA: "test",
+      BAYAN_ENVIRONMENT: "test", BAYAN_VERSION: "0.7.0", BAYAN_COMMIT_SHA: "test",
     });
     expect(response.status).toBe(200);
     expect((await response.json() as { status: string }).status).toBe("ok");
