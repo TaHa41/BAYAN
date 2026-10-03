@@ -1150,7 +1150,7 @@ const queueContentTopic = async (env: Env, topic: string, section: string, langu
 };
 
 
-const processContentQueue = async (env: Env, maxJobs = 3) => {
+// Process queued research articles in small, retry-safe batches.\nconst processContentQueue = async (env: Env, maxJobs = 3) => {
   if (!env.DB) return { ok: false, reason: "database_not_configured" };
   await ensureContentQueueRetryColumn(env);
   const processed: any[] = [];
