@@ -1881,6 +1881,7 @@ export default {
     }
 
     if (path === "/api/client-error" && request.method === "POST") {
+      if (!allowRequest(request, 20)) return json({ status: "rate_limited" }, 429);
       try {
         const body = await request.json() as any;
         const kind = cleanText(body?.kind, 80) || "client_error";
@@ -1895,17 +1896,12 @@ export default {
           "العمود: " + Number(body?.column || 0),
           "Stack: " + cleanText(body?.stack, 2600)
         ].join("\n");
-        await queueBayanRepair(env, context, new Error(detail));
-        const repair = await attemptBayanSelfRepair(env, context, new Error(detail));
-        await sendBayanDiagnostic(env, "خطأ في واجهة صفحة بيان", [
-          "المسار: " + context,
-          "الرسالة: " + message,
-          "الإجراء الآلي: " + cleanText(repair.result || repair.action, 1000),
-          "التشخيص: " + cleanText(repair.diagnosis || "", 1200)
-        ].join("\n"));
-        return json({ status: "received", repairQueued: true });
-      } catch {
-        return json({ status: "invalid_client_error" }, 400);
+        const result = await reportBayanError(env, context, new Error(detail), {
+          repair: "تم استقبال خطأ الواجهة ووضعه في طابور التشخيص والتحقق."
+        });
+        return json({ status: "received", repairQueued: true, diagnosticDelivered: !!result?.ok });
+      } catch (error) {
+        return json({ status: "invalid_client_error", error: safeErrorMessage(error) }, 400);
       }
     }
 
