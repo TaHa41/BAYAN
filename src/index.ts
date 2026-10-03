@@ -1139,7 +1139,7 @@ export default {
           answer: aiAnswer, claims: [], evidence: results.map(withoutUrl),
           confidence: results.length ? 0.7 : 0.3, warnings: [],
           provider: "openai", article,
-          notification: !!env.RESEND_API_KEY && !!env.BAYAN_NOTIFY_EMAIL,
+          notification: !!env.RESEND_API_KEY && !!(env.BAYAN_NOTIFY_EMAIL || "bayan.contact@yahoo.com"),
           policy: "external_sources_used_internally; no_external_links_to_visitor"
         });
       } catch {
@@ -1184,6 +1184,29 @@ export default {
         } catch {}
       }
       return json({ status: failed.length ? "degraded" : "healthy", checkedAt: new Date().toISOString(), results, diagnosis, automaticRepairPolicy: "Only allowlisted runtime retries/circuit recovery are automatic; source-code changes require CI validation before deployment." });
+    }
+
+    if (path === "/api/ai/manager/status" && request.method === "GET") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden" }, 403);
+      return json({
+        status: "ok",
+        checkedAt: new Date().toISOString(),
+        configuration: {
+          database: !!env.DB,
+          cloudflareAI: !!env.AI,
+          cloudflareAISearch: !!env.AI_SEARCH,
+          browser: !!env.BROWSER,
+          openAI: !!env.OPENAI_API_KEY,
+          searchApi: !!env.SEARCH_API_KEY,
+          gnews: !!env.GNEWS_API_KEY,
+          goldApi: !!env.GOLD_API_KEY,
+          resend: !!env.RESEND_API_KEY,
+          managerToken: !!env.BAYAN_AI_MANAGER_TOKEN
+        },
+        notificationDestination: env.BAYAN_NOTIFY_EMAIL || "bayan.contact@yahoo.com",
+        senderConfigured: !!env.BAYAN_NOTIFY_FROM,
+        senderNote: env.BAYAN_NOTIFY_FROM ? "configured" : "using Resend testing sender; production delivery to Yahoo may require a verified Resend domain/sender"
+      }
     }
 
     if (path === "/api/ai/manager/test-email" && request.method === "POST") {
