@@ -38,7 +38,7 @@ const cloudflareAiRun = async (env: Env, model: string, messages: any[]) => {
   let lastError: unknown = null;
   for (const candidate of models) {
     try {
-      return await env.AI.run(candidate, { messages, chat_template_kwargs: { enable_thinking: false } });
+      return await env.AI.run(candidate, { messages });
     } catch (error) {
       lastError = error;
     }
