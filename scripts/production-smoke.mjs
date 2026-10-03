@@ -25,5 +25,30 @@ try{
   console.log((ok?"PASS":"FAIL")+" "+res.status+" /api/search/article bytes="+body.length+" type="+(res.headers.get("content-type")||""));
   if(!ok)failed++;
 }catch(e){console.log("FAIL /api/search/article "+e.message);failed++;}
+
+// Deep contract checks for the endpoints that can appear healthy while returning the wrong payload.
+try{
+  const health=await fetch(base+"/health",{redirect:"follow"});
+  const data=await health.json();
+  const ok=health.ok && data?.status==="ok" && !!data?.service && !!data?.version && !!data?.commit &&
+    health.headers.get("x-content-type-options")==="nosniff";
+  console.log((ok?"PASS":"FAIL")+" /health contract commit="+String(data?.commit||"").slice(0,12));
+  if(!ok) failed++;
+}catch(e){console.log("FAIL /health contract "+e.message);failed++;}
+try{
+  const home=await fetch(base+"/",{redirect:"follow"});
+  const html=await home.text();
+  const ok=home.ok && /<link rel="canonical"/i.test(html) && /name="robots"/i.test(html) &&
+    /hreflang="en"/i.test(html) && /id="app"/i.test(html);
+  console.log((ok?"PASS":"FAIL")+" / HTML SEO/security contract");
+  if(!ok) failed++;
+}catch(e){console.log("FAIL / HTML SEO/security contract "+e.message);failed++;}
+try{
+  const features=await (await fetch(base+"/api/features",{redirect:"follow"})).json();
+  const f=features?.features||{};
+  const ok=f.pwa===true && f.savedArticles===true && f.selfHealing===true && f.runtimeAudit===true && f.sourceAwareAI===true;
+  console.log((ok?"PASS":"FAIL")+" /api/features capability contract");
+  if(!ok) failed++;
+}catch(e){console.log("FAIL /api/features capability contract "+e.message);failed++;}
 if(failed){console.error(`Production smoke failed: ${failed}`);process.exit(1);}
 console.log("Production smoke passed.");
