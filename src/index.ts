@@ -709,7 +709,7 @@ const editorialProfile = (intent: string) => {
 
 const buildArticleEvidence = async (env: Env, results: any[]) => {
   const materials: string[] = [];
-  for (const source of results.slice(0, 8)) {
+  for (const source of results.slice(0, 12)) {
     const title = cleanText(source?.title || "", 260);
     const provider = cleanText(source?.source || source?.domain || source?.provider || "مصدر غير محدد", 160);
     const date = cleanText(source?.date || "date unavailable", 80);
@@ -939,7 +939,7 @@ const processContentQueue = async (env: Env) => {
     const generated = await generateKnowledgeArticle(env, String(row.language || "ar"), String(row.topic), search.results);
     if (!generated) throw new Error("generation_unavailable");
     const slug = await slugForQuery(String(row.topic));
-    const article = { slug, query: String(row.topic), section: String(row.section), title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 8).map(withoutUrl), createdAt: now };
+    const article = { slug, query: String(row.topic), section: String(row.section), title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 12).map(withoutUrl), createdAt: now };
     const persistence = await saveKnowledgeArticle(env, article);
     if (!persistence.persisted) throw new Error("database_write_failed");
     await refreshKnowledgeGraph(env, article);
@@ -1192,8 +1192,34 @@ const evidenceFallbackAnswer = (query: string, results: any[]) => {
   ].join("\n");
 };
 
+const researchQueries = (query: string) => {
+  const intent = editorialIntent(query);
+  const variants = [query];
+  if (intent === "howto") {
+    variants.push(query + " المتطلبات والخطوات");
+    variants.push(query + " الأخطاء الشائعة وكيفية التحقق من الحل");
+  } else if (intent === "troubleshooting") {
+    variants.push(query + " الأسباب والتشخيص");
+    variants.push(query + " الحلول والتحقق من الإصلاح");
+  } else if (intent === "news") {
+    variants.push(query + " آخر التطورات");
+    variants.push(query + " الخلفية والتسلسل الزمني");
+  } else if (intent === "person") {
+    variants.push(query + " السيرة والتعليم والمسيرة والإنجازات");
+    variants.push(query + " أحدث المعلومات والحالة الحالية");
+  } else if (intent === "comparison") {
+    variants.push(query + " الفروق والمزايا والقيود");
+    variants.push(query + " الاستخدامات والنتائج");
+  } else {
+    variants.push(query + " الخلفية والتفاصيل الأساسية");
+    variants.push(query + " أحدث المعلومات والتطورات");
+  }
+  return Array.from(new Set(variants.map((x) => cleanText(x, 500)).filter(Boolean))).slice(0, 3);
+};
+
 const internalSearch = async (query: string, env: Env) => {
   const language = /[\u0600-\u06FF]/.test(query) ? "ar" : "en";
+  const research = researchQueries(query);
   const providers = [
     env.AI_SEARCH ? "cloudflare_ai_search" : null,
     env.SEARCH_API_KEY ? "serpapi" : null,
@@ -1203,14 +1229,13 @@ const internalSearch = async (query: string, env: Env) => {
   ].filter(Boolean) as string[];
   const attempts: any[] = [];
 
-  const tasks = providers.map(async (provider) => {
+  const searchOne = async (researchQuery: string, provider: string) => {
     try {
       if (provider === "cloudflare_ai_search") {
-        const raw = await cloudflareKnowledgeSearch(env, query);
+        const raw = await cloudflareKnowledgeSearch(env, researchQuery);
         const chunks = Array.isArray(raw?.chunks) ? raw.chunks : [];
         return chunks.slice(0, 8).map((item: any, index: number) => ({
-          rank: index + 1,
-          provider: "cloudflare_ai_search",
+          rank: index + 1, provider: "cloudflare_ai_search",
           title: cleanText(item?.item?.key || item?.item?.metadata?.title || "BAYAN Knowledge", 220),
           source: cleanText(item?.item?.metadata?.source || item?.item?.key || "BAYAN Knowledge", 160),
           date: item?.item?.timestamp ? new Date(Number(item.item.timestamp) * 1000).toISOString() : null,
@@ -1221,7 +1246,7 @@ const internalSearch = async (query: string, env: Env) => {
       }
       if (provider === "serpapi") {
         const endpoint = "https://serpapi.com/search.json?engine=google&hl=en&gl=eg&safe=active&num=8&q=" +
-          encodeURIComponent(query) + "&api_key=" + encodeURIComponent(env.SEARCH_API_KEY || "");
+          encodeURIComponent(researchQuery) + "&api_key=" + encodeURIComponent(env.SEARCH_API_KEY || "");
         const response = await fetch(endpoint);
         if (!response.ok) throw new Error("http_" + response.status);
         const data = await response.json() as any;
@@ -1232,7 +1257,7 @@ const internalSearch = async (query: string, env: Env) => {
         }));
       }
       if (provider === "cloudflare_web_search") {
-        const raw = await cloudflareWebSearch(env, query, "exa");
+        const raw = await cloudflareWebSearch(env, researchQuery, "exa");
         const candidates = Array.isArray(raw?.results) ? raw.results : Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : [];
         return candidates.slice(0, 8).map((item: any, index: number) => ({
           rank: index + 1, provider: "cloudflare_web_search",
@@ -1243,15 +1268,16 @@ const internalSearch = async (query: string, env: Env) => {
           url: typeof (item.url || item.link) === "string" ? (item.url || item.link) : null
         })).filter((x: any) => x.title && x.snippet);
       }
-      if (provider === "google_news_rss") return (await rssNewsSearch(query, language)).map((x: any) => ({ ...x, provider: "google_news_rss" }));
-      if (provider === "wikipedia") return (await wikipediaSearch(query, language)).map((x: any) => ({ ...x, provider: "wikipedia" }));
+      if (provider === "google_news_rss") return (await rssNewsSearch(researchQuery, language)).map((x: any) => ({ ...x, provider: "google_news_rss" }));
+      if (provider === "wikipedia") return (await wikipediaSearch(researchQuery, language)).map((x: any) => ({ ...x, provider: "wikipedia" }));
       return [];
     } catch (error) {
-      attempts.push({ provider, ok: false, error: safeErrorMessage(error) });
+      attempts.push({ provider, query: researchQuery, ok: false, error: safeErrorMessage(error) });
       return [];
     }
-  });
+  };
 
+  const tasks = research.flatMap((researchQuery) => providers.map((provider) => searchOne(researchQuery, provider)));
   const settled = await Promise.all(tasks);
   const merged = settled.flat().filter((x: any) => x.title && x.snippet);
   const unique = new Map<string, any>();
@@ -1261,12 +1287,20 @@ const internalSearch = async (query: string, env: Env) => {
     if (!current) unique.set(key, item);
     else current.provider = Array.from(new Set((String(current.provider) + "+" + String(item.provider)).split("+"))).join("+");
   }
-  let results = rerankResults(query, Array.from(unique.values())).slice(0, 16);
+  let results = rerankResults(query, Array.from(unique.values())).slice(0, 24);
   const strong = results.filter((x: any) => !/facebook|instagram|youtube|tiktok|reddit/i.test(String(x.source || "") + " " + String(x.url || "")));
-  if (strong.length >= 4) results = strong.slice(0, 12);
+  if (strong.length >= 8) results = strong.slice(0, 16);
   const providerCount = new Set(results.flatMap((x: any) => String(x.provider || "").split("+").filter(Boolean))).size;
   const sourceCount = new Set(results.map((x: any) => String(x.source || "").toLowerCase()).filter(Boolean)).size;
-  return { ok: results.length > 0, status: results.length ? "multi_source" : "search_provider_not_configured", results, providerCount, sourceCount, attempts };
+  return {
+    ok: results.length > 0,
+    status: results.length ? "multi_source" : "search_provider_not_configured",
+    results,
+    providerCount,
+    sourceCount,
+    researchQueries: research,
+    attempts
+  };
 };
 
 const evidencePrompt = (language: string, query: string, results: any[]) => {
