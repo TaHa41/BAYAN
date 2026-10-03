@@ -1610,7 +1610,7 @@ export default {
       const url = new URL(request.url);
     const path = url.pathname;
 
-    if (path === "/health" || path === "/api/health") {
+    if (path === "/api/health") {
       return json({
         status: "ok",
         service: "BAYAN",
