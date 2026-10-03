@@ -801,6 +801,20 @@ const ensureKnowledgeSearchTable = async (env: Env) => {
   } catch { return false; }
 };
 
+const ensureUserFeatureTables = async (env: Env) => {
+  if (!env.DB) return false;
+  try {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS saved_articles (visitor_id TEXT NOT NULL, article_slug TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(visitor_id, article_slug))`).run();
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS article_revisions (id INTEGER PRIMARY KEY AUTOINCREMENT, article_slug TEXT NOT NULL, title TEXT NOT NULL, summary TEXT NOT NULL, body TEXT NOT NULL, sources_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL)`).run();
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS user_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, visitor_id TEXT NOT NULL, request_type TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL, source TEXT, status TEXT NOT NULL DEFAULT 'PENDING_REVIEW', created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`).run();
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS notification_preferences (visitor_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0, language TEXT NOT NULL DEFAULT 'ar', topics_json TEXT NOT NULL DEFAULT '[]', updated_at TEXT NOT NULL)`).run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_saved_articles_visitor ON saved_articles(visitor_id,created_at DESC)").run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_article_revisions_slug_time ON article_revisions(article_slug,created_at DESC)").run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_user_requests_status_time ON user_requests(status,created_at DESC)").run();
+    return true;
+  } catch { return false; }
+};
+
 const recordKnowledgeSearch = async (env: Env, data: { query: string; language: string; intent?: string; section?: string; status?: string; articleSlug?: string; sourceCount?: number; providerCount?: number }) => {
   if (!env.DB) return false;
   try {
@@ -815,8 +829,14 @@ const saveKnowledgeArticle = async (env: Env, article: any) => {
   if (!env.DB) return { persisted: false, reason: "database_not_configured" };
   try {
     if (!await ensureKnowledgeTables(env)) return { persisted: false, reason: "knowledge_schema_unavailable" };
+    const bodyText = article.body.join("\n");
+    const sourcesJson = JSON.stringify(article.sources || []);
+    const existing = await env.DB.prepare("SELECT title,summary,body FROM knowledge_articles WHERE slug=?").bind(article.slug).first() as any;
     const sql = "INSERT INTO knowledge_articles (slug, query, section, title, summary, body, sources_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?) ON CONFLICT(slug) DO UPDATE SET section=excluded.section, title=excluded.title, summary=excluded.summary, body=excluded.body, sources_json=excluded.sources_json, status='PUBLISHED', updated_at=excluded.updated_at";
-    await env.DB.prepare(sql).bind(article.slug, article.query, article.section, article.title, article.summary, article.body.join("\n"), JSON.stringify(article.sources || []), article.createdAt, article.createdAt).run();
+    await env.DB.prepare(sql).bind(article.slug, article.query, article.section, article.title, article.summary, bodyText, sourcesJson, article.createdAt, article.createdAt).run();
+    if (await ensureUserFeatureTables(env) && (!existing || existing.title !== article.title || existing.body !== bodyText || existing.summary !== article.summary)) {
+      await env.DB.prepare("INSERT INTO article_revisions(article_slug,title,summary,body,sources_json,created_at) VALUES(?,?,?,?,?,?)").bind(article.slug,article.title,article.summary,bodyText,sourcesJson,article.createdAt).run();
+    }
     return { persisted: true };
   } catch { return { persisted: false, reason: "database_write_failed" }; }
 };
