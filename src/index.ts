@@ -1532,7 +1532,7 @@ export default {
 
     if (path === "/api/tools") {
       return json({
-        tools: ["search", "knowledge-search", "evidence-synthesis", "news", "gold", "maps", "image-search", "article", "summary", "verification", "repair", "live-weather", "live-fx", "ads", "ai"],
+        tools: ["search", "knowledge-search", "evidence-synthesis", "news", "gold", "maps", "image-search", "article", "summary", "verification", "repair", "live-weather", "live-fx", "ads", "ai", "ai-gateway", "browser-audit"],
         providers: {
           openai: !!env.OPENAI_API_KEY,
           search: !!env.SEARCH_API_KEY,
@@ -1570,10 +1570,10 @@ export default {
         features: {
           ads: env.ADSENSE_ENABLED === "true" && !!env.ADSENSE_CLIENT_ID,
       cloudflareWorkersAI: !!env.AI,
-      cloudflareAIGateway: false,
+      cloudflareAIGateway: !!env.AI,
       cloudflareWebSearch: !!env.AI?.websearch,
       cloudflareAISearch: !!env.AI_SEARCH,
-      agentTracing: true,
+      agentTracing: !!env.AI,
           ai: !!env.OPENAI_API_KEY,
           webSearch: !!env.SEARCH_API_KEY,
           aiSearch: !!env.AI_SEARCH,
