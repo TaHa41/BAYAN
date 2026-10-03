@@ -1885,57 +1885,78 @@ export default {
     }
 
     if (path === "/api/gold") {
-      if (!env.GOLD_API_KEY) return json({ status: "not_configured", provider: "GoldAPI", message: "Add GOLD_API_KEY as a Cloudflare Secret." }, 503);
       try {
-        const goldApiKey = env.GOLD_API_KEY;
-        const requestGold = async (symbol: string) => {
-          const response = await fetch("https://www.goldapi.io/api/" + symbol, {
-            headers: { "x-access-token": goldApiKey, "Content-Type": "application/json" }
-          });
-          if (!response.ok) return null;
-          return await response.json() as any;
-        };
         const validGold = (data: any) =>
           !!data &&
           [data.price_gram_24k, data.price_gram_21k, data.price_gram_18k].every((value: unknown) =>
             typeof value === "number" && Number.isFinite(value) && value > 0
           );
-        const local = await requestGold("XAU/EGP");
-        if (validGold(local)) {
-          return json({
-            status: "ok", provider: "GoldAPI", currency: "EGP",
-            pricePerOunce: local.price || null, pricePerGram: local.price_gram_24k || null,
-            karat24: local.price_gram_24k || null, karat21: local.price_gram_21k || null, karat18: local.price_gram_18k || null,
-            localCurrency: "EGP",
-            karat24Egp: local.price_gram_24k || null,
-            karat21Egp: local.price_gram_21k || null,
-            karat18Egp: local.price_gram_18k || null,
-            updatedAt: typeof local.timestamp === "number" ? new Date(local.timestamp * 1000).toISOString() : (local.timestamp || null)
-          });
-        }
-        const data = await requestGold("XAU/USD");
-        if (!validGold(data)) return json({ status: "provider_error", provider: "GoldAPI", message: "تعذر الحصول على بيانات ذهب مكتملة." }, 502);
-        let egpPerUsd: number | null = null;
-        try {
-          const fx = await fetch("https://api.frankfurter.dev/v2/rate/USD/EGP");
-          if (fx.ok) {
-            const fd = await fx.json() as any;
-            egpPerUsd = typeof fd.rate === "number" ? fd.rate : null;
+        const goldApiKey = env.GOLD_API_KEY;
+        if (goldApiKey) {
+          const requestGold = async (symbol: string) => {
+            const response = await fetch("https://www.goldapi.io/api/" + symbol, {
+              headers: { "x-access-token": goldApiKey, "Content-Type": "application/json" }
+            });
+            if (!response.ok) return null;
+            return await response.json() as any;
+          };
+          const local = await requestGold("XAU/EGP");
+          if (validGold(local)) {
+            return json({
+              status: "ok", provider: "GoldAPI", currency: "EGP",
+              pricePerOunce: local.price || null, pricePerGram: local.price_gram_24k || null,
+              karat24: local.price_gram_24k || null, karat21: local.price_gram_21k || null, karat18: local.price_gram_18k || null,
+              localCurrency: "EGP",
+              karat24Egp: local.price_gram_24k || null,
+              karat21Egp: local.price_gram_21k || null,
+              karat18Egp: local.price_gram_18k || null,
+              updatedAt: typeof local.timestamp === "number" ? new Date(local.timestamp * 1000).toISOString() : (local.timestamp || null)
+            });
           }
-        } catch {}
-        if (!egpPerUsd) return json({ status: "provider_error", provider: "GoldAPI/FX", message: "تعذر الحصول على سعر USD/EGP للتحويل المحلي." }, 502);
-        return json({
-          status: "ok", provider: "GoldAPI", currency: "USD",
-          pricePerOunce: data.price || null, pricePerGram: data.price_gram_24k || null,
-          karat24: data.price_gram_24k || null, karat21: data.price_gram_21k || null, karat18: data.price_gram_18k || null,
-          localCurrency: "EGP", usdToEgp: egpPerUsd,
-          karat24Egp: data.price_gram_24k ? egpPerUsd * data.price_gram_24k : null,
-          karat21Egp: data.price_gram_21k ? egpPerUsd * data.price_gram_21k : null,
-          karat18Egp: data.price_gram_18k ? egpPerUsd * data.price_gram_18k : null,
-          updatedAt: typeof data.timestamp === "number" ? new Date(data.timestamp * 1000).toISOString() : (data.timestamp || null)
-        });
+          const data = await requestGold("XAU/USD");
+          if (validGold(data)) {
+            let egpPerUsd: number | null = null;
+            try {
+              const fx = await fetch("https://api.frankfurter.dev/v2/rate/USD/EGP");
+              if (fx.ok) {
+                const fd = await fx.json() as any;
+                egpPerUsd = typeof fd.rate === "number" ? fd.rate : null;
+              }
+            } catch {}
+            if (egpPerUsd) {
+              return json({
+                status: "ok", provider: "GoldAPI", currency: "USD",
+                pricePerOunce: data.price || null, pricePerGram: data.price_gram_24k || null,
+                karat24: data.price_gram_24k || null, karat21: data.price_gram_21k || null, karat18: data.price_gram_18k || null,
+                localCurrency: "EGP", usdToEgp: egpPerUsd,
+                karat24Egp: data.price_gram_24k ? egpPerUsd * data.price_gram_24k : null,
+                karat21Egp: data.price_gram_21k ? egpPerUsd * data.price_gram_21k : null,
+                karat18Egp: data.price_gram_18k ? egpPerUsd * data.price_gram_18k : null,
+                updatedAt: typeof data.timestamp === "number" ? new Date(data.timestamp * 1000).toISOString() : (data.timestamp || null)
+              });
+            }
+          }
+        }
+        const fallback = await fetch("https://xaus.com/api/v1/spot?currency=EGP&unit=gram", { headers: { "accept": "application/json" } });
+        if (fallback.ok) {
+          const fd = await fallback.json() as any;
+          const gram24 = Number(fd?.xau?.price);
+          if (Number.isFinite(gram24) && gram24 > 0) {
+            const updatedAt = typeof fd?.updated_at === "string" ? fd.updated_at : null;
+            const stale = fd?.data_state?.status === "stale" || fd?.xau?.is_stale === true;
+            if (!stale) {
+              return json({
+                status: "ok", provider: "XAUS", currency: "EGP", localCurrency: "EGP",
+                pricePerGram: gram24, karat24: gram24, karat21: gram24 * 21 / 24, karat18: gram24 * 18 / 24,
+                karat24Egp: gram24, karat21Egp: gram24 * 21 / 24, karat18Egp: gram24 * 18 / 24,
+                pricePerOunce: gram24 * 31.1034768, updatedAt
+              });
+            }
+          }
+        }
+        return json({ status: "provider_unavailable", provider: "GoldAPI/XAUS", message: "تعذر الحصول على سعر ذهب حديث من المصادر المتاحة." }, 503);
       } catch {
-        return json({ status: "provider_error", provider: "GoldAPI" }, 502);
+        return json({ status: "provider_unavailable", provider: "GoldAPI/XAUS" }, 503);
       }
     }
 
