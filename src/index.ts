@@ -1515,6 +1515,75 @@ export default {
       const q = url.searchParams.get("q")?.trim().slice(0, 500) ?? "";
       const lang = (url.searchParams.get("lang") || "ar").toLowerCase() === "en" ? "en" : "ar";
       if (!q) return json({ query: "", items: [], status: "empty_query" });
+
+      // Weather questions are live-data requests, not ordinary web searches.
+      // Resolve the place first so queries such as "طقس الغردقة" / "weather Cairo"
+      // return the current weather even when search providers are unavailable.
+      if (queryIntent(q) === "weather") {
+        const weatherQuery = q
+          .replace(/(?:ما هو|ما هي|حالة|حالة الطقس|طقس|الجو|درجة الحرارة|درجة حراره|weather|temperature|humidity|forecast)/gi, " ")
+          .replace(/[؟?!،,.:;]/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+        const city = weatherQuery || (lang === "ar" ? "القاهرة" : "Cairo");
+        try {
+          const geo = await fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(city) + "&count=5&language=" + lang + "&format=json");
+          if (geo.ok) {
+            const gd = await geo.json() as any;
+            const place = gd.results?.[0];
+            if (place) {
+              const weather = await fetch("https://api.open-meteo.com/v1/forecast?latitude=" + place.latitude + "&longitude=" + place.longitude + "&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto");
+              if (weather.ok) {
+                const wd = await weather.json() as any;
+                const current = wd.current;
+                if (current) {
+                  const weatherItem = {
+                    rank: 1,
+                    title: lang === "ar" ? "الطقس الآن في " + place.name : "Current weather in " + place.name,
+                    source: "Open-Meteo",
+                    date: current.time || null,
+                    snippet: JSON.stringify({
+                      city: place.name,
+                      country: place.country || null,
+                      temperature: current.temperature_2m,
+                      humidity: current.relative_humidity_2m,
+                      weatherCode: current.weather_code,
+                      updatedAt: current.time,
+                      source: "Open-Meteo"
+                    }),
+                    weather: true
+                  };
+                  const answer = lang === "ar"
+                    ? "الطقس الآن في " + place.name + ": " + current.temperature_2m + "°C، والرطوبة " + current.relative_humidity_2m + "%."
+                    : "Current weather in " + place.name + ": " + current.temperature_2m + "°C, humidity " + current.relative_humidity_2m + "%.";
+                  return json({
+                    query: q,
+                    status: "ok",
+                    intent: "weather",
+                    answer,
+                    weather: {
+                      city: place.name,
+                      country: place.country || null,
+                      temperature: current.temperature_2m,
+                      humidity: current.relative_humidity_2m,
+                      weatherCode: current.weather_code,
+                      updatedAt: current.time,
+                      source: "Open-Meteo"
+                    },
+                    items: [weatherItem],
+                    sourceCount: 1,
+                    providerCount: 1,
+                    attempts: [{ provider: "open_meteo_weather", query: city, ok: true }]
+                  });
+                }
+              }
+            }
+          }
+        } catch (error) {
+          await reportBayanError(env, "api/search/weather", error);
+        }
+      }
+
       const search = await internalSearch(q, env);
       if (!search.ok) return json({ query: q, items: [], status: search.status }, 503);
       const intent = queryIntent(q);
