@@ -304,7 +304,8 @@ if(!routePath)home();else if(routePath==="ai")ai();else if(routePath==="search")
 }
 const safeRenderRoute=(routePath, routeParams)=>{try{renderRoute(routePath, routeParams);}catch(error){const app=document.querySelector("#app");if(app)app.innerHTML='<section class="page"><h1 class="page-title">تعذر عرض هذه الصفحة</h1><p class="page-lead">تم احتواء الخطأ حتى لا تظهر الصفحة فارغة.</p><button class="primary" type="button" onclick="location.reload()">إعادة المحاولة</button>';console.error("BAYAN route error",error);}};
 const updateWisdom=()=>{const wisdom=window.BAYAN_CONTENT?.wisdom||[];const w=document.querySelector("#wisdom");if(!w)return;const i=wisdom.length?Math.floor(Date.now()/30000)%wisdom.length:0;w.textContent=wisdom.length?(isEn?(wisdom[i].en||wisdom[i].ar):wisdom[i].ar):"السؤال الجيد بداية معرفة أفضل.";};
-safeRenderRoute(path,new URLSearchParams(location.search));\nif("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));}
+safeRenderRoute(path,new URLSearchParams(location.search));
+if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));}
 window.setInterval(updateWisdom,30000);
 document.addEventListener("click",(event)=>{
   const save=event.target.closest("[data-bayan-save]");
