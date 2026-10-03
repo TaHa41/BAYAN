@@ -13,6 +13,9 @@
   "ai": {
     "binding": "AI"
   },
+  "browser": {
+    "binding": "BROWSER"
+  },
   "ai_search_namespaces": [
     {
       "binding": "AI_SEARCH",
