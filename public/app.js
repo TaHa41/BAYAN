@@ -168,12 +168,23 @@ const renderArticle=(k,isPersisted)=>{
   const section=k.section||"news";
   const body=Array.isArray(k.body)?k.body:(String(k.body||"").split(/\n+/).filter(Boolean));
   const saved=(()=>{try{return JSON.parse(localStorage.getItem("bayan:saved-articles")||"[]").includes(k.id||slug)}catch{return false}})();
-  const related=(window.BAYAN_CONTENT?.articles||[]).filter(x=>x.section===section&&x.id!==(k.id||slug)).slice(0,3);const sources=Array.isArray(k.sources)?k.sources:[];const sourceHtml=sources.length?"<div class=\"card article-sources\"><h3>المصادر المستخدمة</h3><ul>"+sources.slice(0,8).map(s=>"<li>"+escHtml(s.source||s.title||"مصدر")+(s.date?" · "+escHtml(s.date):"")+"</li>").join("")+"</ul></div>":"";
+  const related=(window.BAYAN_CONTENT?.articles||[]).filter(x=>x.section===section&&x.id!==(k.id||slug)).slice(0,3);
+  const sources=Array.isArray(k.sources)?k.sources:[];
+  const sourceHtml=sources.length?"<section class=\"card article-sources\"><h2>المصادر المستخدمة</h2><p class=\"muted\">المصادر التالية استُخدمت للتحقق وبناء المقال، وليست بديلًا عن متن المقال.</p><ol>"+sources.slice(0,8).map(s=>"<li>"+escHtml(s.source||s.title||"مصدر")+(s.date?" · "+escHtml(s.date):"")+"</li>").join("")+"</ol></section>":"";
   const sourceLabel=isPersisted?"مقال معرفة محفوظ داخل بيان":"مقال معرفي في بيان";
   const actions='<div class="actions article-actions"><button class="secondary" type="button" data-bayan-save="'+escHtml(k.id||slug)+'">'+(saved?"★ محفوظ":"☆ حفظ المقال")+'</button><button class="secondary" type="button" data-bayan-share="'+escHtml(k.title||"مقال بيان")+'">↗ مشاركة</button></div>';
   const relatedHtml=related.length?'<div class="section-head"><div><h2>اقرأ أيضًا</h2><p>مواد مرتبطة من نفس المجال.</p></div></div><div class="grid">'+related.map(x=>'<a class="card article-card" href="'+withLang("/article/"+x.id)+'"><span class="article-section">'+sectionIcon(x.section)+(window.BAYAN_CONTENT?.sectionMeta?.[x.section]||x.section)+'</span><h3>'+escHtml(x.title)+'</h3><p>'+escHtml(x.summary)+'</p></a>').join("")+'</div>':"";
   const heroImage=k.image?'<img loading="eager" class="news-image article-hero-image" src="'+escHtml(k.image)+'" alt="" referrerpolicy="no-referrer">':"";
-  app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isPersisted?"مقال معرفة":(isEn?"Article":"مقال"))+'</div><div class="article-kicker">'+sectionIcon(section)+(window.BAYAN_CONTENT?.sectionMeta?.[section]||section)+'</div><h1 class="page-title">'+escHtml(k.title||"مقال بيان")+'</h1>'+heroImage+'<p class="page-lead">'+escHtml(k.summary||"")+'</p>'+summaryBlock([sourceLabel,"المحتوى مبني على الأدلة المتاحة، مع تجنب اختلاق معلومات غير مؤكدة."])+actions+evidence()+adSlot("article")+'<article class="article-body card">'+body.map(p=>"<p>"+escHtml(p)+"</p>").join("")+'</article>'+sourceHtml+relatedHtml+'</section>';
+  const articleHtml=body.map(line=>{
+    const value=String(line||"").trim();
+    if(!value)return "";
+    if(/^###\s+/.test(value))return "<h3>"+escHtml(value.replace(/^###\s+/,""))+"</h3>";
+    if(/^##\s+/.test(value))return "<h2>"+escHtml(value.replace(/^##\s+/,""))+"</h2>";
+    if(/^#\s+/.test(value))return "<h2>"+escHtml(value.replace(/^#\s+/,""))+"</h2>";
+    if(/^[-*]\s+/.test(value))return "<li>"+escHtml(value.replace(/^[-*]\s+/,""))+"</li>";
+    return "<p>"+escHtml(value)+"</p>";
+  }).join("");
+  app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isPersisted?"مقال معرفة":(isEn?"Article":"مقال"))+'</div><div class="article-kicker">'+sectionIcon(section)+(window.BAYAN_CONTENT?.sectionMeta?.[section]||section)+'</div><h1 class="page-title">'+escHtml(k.title||"مقال بيان")+'</h1>'+heroImage+'<p class="page-lead article-intro">'+escHtml(k.summary||"")+'</p>'+summaryBlock([sourceLabel,"المقال يشرح الموضوع في سياق مترابط، ثم يفصل الأدلة والمصادر في نهاية الصفحة."])+actions+adSlot("article")+'<article class="article-body card">'+articleHtml+'</article>'+sourceHtml+relatedHtml+'</section>';
 };
 const trendParams=new URLSearchParams(location.search);
 if(trendParams.get("trend")==="1"){
