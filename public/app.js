@@ -157,9 +157,6 @@ document.addEventListener("click",(event)=>{
   }
   const link=event.target.closest("a");
   if(!link)return;
-
-  const link=event.target.closest("a");
-  if(!link)return;
   const href=link.getAttribute("href");
   if(!href||!href.startsWith("/")||href.startsWith("//")||link.hasAttribute("download")||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
   event.preventDefault();
