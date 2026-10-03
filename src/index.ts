@@ -850,19 +850,47 @@ const rssItems = (xml: string) => {
   return items;
 };
 
+const fetchTextWithTimeout = async (endpoint: string, timeoutMs = 7000) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(endpoint, {
+      signal: controller.signal,
+      headers: {
+        "user-agent": "BAYAN/1.0 news reader",
+        "accept": "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8"
+      }
+    });
+    if (!response.ok) throw new Error("http_" + response.status);
+    return await response.text();
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
 const rssNewsSearch = async (query = "", language = "ar") => {
   const hl = language === "en" ? "en-US" : "ar";
   const gl = language === "en" ? "US" : "EG";
   const ceid = language === "en" ? "US:en" : "EG:ar";
-  const q = query ? "&q=" + encodeURIComponent(query) : "";
-  const endpoint = "https://news.google.com/rss?hl=" + encodeURIComponent(hl) + "&gl=" + gl + "&ceid=" + encodeURIComponent(ceid) + q;
-  try {
-    const response = await fetch(endpoint, { headers: { "user-agent": "BAYAN/1.0 news reader" } });
-    if (!response.ok) return [];
-    return rerankResults(query, rssItems(await response.text()).slice(0, 12)).slice(0, 8);
-  } catch {
-    return [];
+  const googleEndpoint = query
+    ? "https://news.google.com/rss/search?q=" + encodeURIComponent(query) + "&hl=" + encodeURIComponent(hl) + "&gl=" + gl + "&ceid=" + encodeURIComponent(ceid)
+    : "https://news.google.com/rss?hl=" + encodeURIComponent(hl) + "&gl=" + gl + "&ceid=" + encodeURIComponent(ceid);
+  const feeds = [
+    googleEndpoint,
+    language === "ar" ? "https://feeds.bbci.co.uk/arabic/rss.xml" : "https://feeds.bbci.co.uk/news/rss.xml"
+  ];
+  const settled = await Promise.allSettled(feeds.map((endpoint) => fetchTextWithTimeout(endpoint)));
+  const collected: any[] = [];
+  for (const item of settled) {
+    if (item.status !== "fulfilled") continue;
+    collected.push(...rssItems(item.value));
   }
+  const unique = new Map<string, any>();
+  for (const item of collected) {
+    const key = (item.url || item.title).toLowerCase();
+    if (!unique.has(key)) unique.set(key, item);
+  }
+  return rerankResults(query, Array.from(unique.values()).slice(0, 30)).slice(0, 12);
 };
 
 const wikipediaSearch = async (query: string, language = "ar") => {
@@ -1643,9 +1671,12 @@ export default {
     if (path === "/api/trending") {
       try {
         const lang = (url.searchParams.get("lang") || "ar").toLowerCase() === "en" ? "en" : "ar";
-        const items = await rssNewsSearch("", lang);
-        if (!items.length) return json({ status: "provider_unavailable", signals: [] }, 503);
-        const signals = items.slice(0, 8).map((item: any, index: number) => ({
+        let items = await rssNewsSearch("", lang);
+        if (!items.length) {
+          items = await rssNewsSearch(lang === "ar" ? "مصر OR العالم OR رياضة OR اقتصاد" : "Egypt OR world OR sports OR economy", lang);
+        }
+        if (!items.length) return json({ status: "provider_unavailable", signals: [], providersTried: ["Google News RSS", "BBC RSS"] }, 503);
+        const signals = items.slice(0, 10).map((item: any, index: number) => ({
           rank: index + 1,
           title: item.title,
           source: item.source,
@@ -1654,11 +1685,12 @@ export default {
         }));
         return json({
           status: "ok",
-          provider: "Google News RSS",
+          provider: "Google News RSS + BBC RSS",
           basis: "current headlines, not a popularity ranking",
           signals
         });
-      } catch {
+      } catch (error) {
+        await reportBayanError(env, "api/trending", error);
         return json({ status: "provider_error", signals: [] }, 502);
       }
     }
