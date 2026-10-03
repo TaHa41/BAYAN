@@ -1196,16 +1196,16 @@ const recordVisitorInterest = async (env: Env, visitorId: string, section: strin
 const runKnowledgeMaintenance = async (env: Env) => {
   if (!env.DB) return { ok: false, reason: "database_not_configured" };
   const now = Date.now();
-  const rows = await env.DB.prepare("SELECT slug, updated_at FROM knowledge_articles WHERE status='PUBLISHED'").all();
+  const dueRows = await env.DB.prepare("SELECT slug, updated_at, next_review_at FROM knowledge_articles WHERE status='PUBLISHED' AND (next_review_at IS NULL OR next_review_at <= ?) ORDER BY updated_at ASC LIMIT 50").bind(new Date(now).toISOString()).all();
   let due = 0;
-  for (const row of (rows.results || []) as any[]) {
+  for (const row of (dueRows.results || []) as any[]) {
     const ageDays = Math.max(0, (now - new Date(String(row.updated_at)).getTime()) / 86_400_000);
     const freshness = Math.max(0, Math.min(1, Math.exp(-ageDays / 30)));
     const nextReview = new Date(now + Math.max(1, Math.round(30 * freshness)) * 86_400_000).toISOString();
     await env.DB.prepare("UPDATE knowledge_articles SET freshness_score=?, next_review_at=? WHERE slug=?").bind(freshness, nextReview, row.slug).run();
-    if (ageDays >= 30) due++;
+    due++;
   }
-  return { ok: true, checked: rows.results?.length || 0, reviewDue: due, checkedAt: new Date().toISOString() };
+  return { ok: true, checked: due, reviewDue: due, checkedAt: new Date().toISOString() };
 };
 
 const browserRenderedCheck = async (env: Env, route: string) => {
