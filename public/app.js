@@ -62,14 +62,12 @@ const renderArticle=(k,isPersisted)=>{
   const relatedHtml=related.length?'<div class="section-head"><div><h2>اقرأ أيضًا</h2><p>مواد مرتبطة من نفس المجال.</p></div></div><div class="grid">'+related.map(x=>'<a class="card article-card" href="'+withLang("/article/"+x.id)+'"><span class="article-section">'+sectionIcon(x.section)+(window.BAYAN_CONTENT?.sectionMeta?.[x.section]||x.section)+'</span><h3>'+escHtml(x.title)+'</h3><p>'+escHtml(x.summary)+'</p></a>').join("")+'</div>':"";
   app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isPersisted?"مقال معرفة":(isEn?"Article":"مقال"))+'</div><div class="article-kicker">'+sectionIcon(section)+(window.BAYAN_CONTENT?.sectionMeta?.[section]||section)+'</div><h1 class="page-title">'+escHtml(k.title||"مقال بيان")+'</h1><p class="page-lead">'+escHtml(k.summary||"")+'</p>'+summaryBlock([sourceLabel,"المحتوى مبني على الأدلة المتاحة، مع تجنب اختلاق معلومات غير مؤكدة.","يمكن حفظ المقال للرجوع إليه أو مشاركته."])+actions+evidence()+adSlot("article")+'<article class="article-body card">'+body.map(p=>"<p>"+escHtml(p)+"</p>").join("")+'</article>'+sourceHtml+relatedHtml+'</section>';
 };
-if(!a){
-  try{
-    const rr=await fetch("/api/knowledge?id="+encodeURIComponent(slug));
-    const dd=await rr.json();
-    if(dd.article){renderArticle(dd.article,true);return;}
-  }catch{}
-}
 if(a){renderArticle(a,false);return;}
+try{
+  const rr=await fetch("/api/knowledge?id="+encodeURIComponent(slug));
+  const dd=await rr.json();
+  if(dd.article){renderArticle(dd.article,true);return;}
+}catch{}
 const sectionArticle=(window.BAYAN_CONTENT?.articles||[]).find(x=>x.section===slug);
 if(sectionArticle){renderArticle(sectionArticle,false);return;}
 try{
