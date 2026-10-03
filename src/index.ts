@@ -8,6 +8,9 @@ interface Env {
   GNEWS_API_KEY?: string;
   GOLD_API_KEY?: string;
   GOOGLE_MAPS_API_KEY?: string;
+  RESEND_API_KEY?: string;
+  BAYAN_NOTIFY_EMAIL?: string;
+  BAYAN_NOTIFY_FROM?: string;
   ADSENSE_ENABLED?: string;
   ADSENSE_CLIENT_ID?: string;
   ADSENSE_PUBLISHER_ID?: string;
@@ -178,14 +181,63 @@ const ensureContributionTable = async (env: Env) => {
     return true;
   } catch { return false; }
 };
+const sendBayanEmail = async (env: Env, subject: string, text: string) => {
+  if (!env.RESEND_API_KEY || !env.BAYAN_NOTIFY_EMAIL) return false;
+  const from = env.BAYAN_NOTIFY_FROM || "BAYAN <onboarding@resend.dev>";
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer " + env.RESEND_API_KEY },
+      body: JSON.stringify({ from, to: [env.BAYAN_NOTIFY_EMAIL], subject: cleanText(subject, 180), text: cleanText(text, 12000) })
+    });
+    return response.ok;
+  } catch { return false; }
+};
+
 const managerAuthorized = (request: Request, env: Env) => {
   const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || request.headers.get("x-bayan-manager-token") || "";
   return !!env.BAYAN_AI_MANAGER_TOKEN && supplied === env.BAYAN_AI_MANAGER_TOKEN;
 };
 
+const ensureKnowledgeTables = async (env: Env) => {
+  if (!env.DB) return false;
+  try {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS knowledge_articles (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      slug TEXT NOT NULL UNIQUE,
+      query TEXT NOT NULL,
+      section TEXT NOT NULL,
+      title TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      body TEXT NOT NULL,
+      sources_json TEXT NOT NULL DEFAULT '[]',
+      status TEXT NOT NULL DEFAULT 'PUBLISHED',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`).run();
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS knowledge_entities (
+      entity_key TEXT PRIMARY KEY,
+      entity_type TEXT NOT NULL,
+      label TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`).run();
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS knowledge_edges (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      from_key TEXT NOT NULL,
+      to_key TEXT NOT NULL,
+      relation TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )`).run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_knowledge_articles_section_updated ON knowledge_articles(section, updated_at DESC)").run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_knowledge_articles_status_updated ON knowledge_articles(status, updated_at DESC)").run();
+    return true;
+  } catch { return false; }
+};
+
 const saveKnowledgeArticle = async (env: Env, article: any) => {
   if (!env.DB) return { persisted: false, reason: "database_not_configured" };
   try {
+    if (!await ensureKnowledgeTables(env)) return { persisted: false, reason: "knowledge_schema_unavailable" };
     const sql = "INSERT INTO knowledge_articles (slug, query, section, title, summary, body, sources_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?) ON CONFLICT(slug) DO UPDATE SET section=excluded.section, title=excluded.title, summary=excluded.summary, body=excluded.body, sources_json=excluded.sources_json, status='PUBLISHED', updated_at=excluded.updated_at";
     await env.DB.prepare(sql).bind(article.slug, article.query, article.section, article.title, article.summary, article.body.join("\n"), JSON.stringify(article.sources || []), article.createdAt, article.createdAt).run();
     return { persisted: true };
@@ -195,6 +247,7 @@ const saveKnowledgeArticle = async (env: Env, article: any) => {
 const loadKnowledgeArticles = async (env: Env, section?: string, limit = 30) => {
   if (!env.DB) return [];
   try {
+    if (!await ensureKnowledgeTables(env)) return [];
     const safeLimit = Math.max(1, Math.min(100, limit));
     const result = section ? await env.DB.prepare("SELECT slug, query, section, title, summary, body, sources_json, status, created_at, updated_at FROM knowledge_articles WHERE section = ? ORDER BY created_at DESC LIMIT ?").bind(section, safeLimit).all() : await env.DB.prepare("SELECT slug, query, section, title, summary, body, sources_json, status, created_at, updated_at FROM knowledge_articles ORDER BY created_at DESC LIMIT ?").bind(safeLimit).all();
     return (result.results || []).map((row: any) => ({ id: row.slug, query: row.query, section: row.section, title: row.title, summary: row.summary, body: String(row.body || "").split(/\n+/).filter(Boolean), sources: (() => { try { return JSON.parse(row.sources_json || "[]"); } catch { return []; } })(), status: row.status, createdAt: row.created_at, updatedAt: row.updated_at }));
@@ -694,6 +747,7 @@ export default {
     }
 
     if (path === "/api/knowledge/graph") {
+      if (!await ensureKnowledgeTables(env)) return json({ status: "database_error", nodes: [], edges: [] }, 503);
       const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit") || 50)));
       if (!env.DB) return json({ status: "not_configured", nodes: [], edges: [] }, 503);
       try {
@@ -744,7 +798,8 @@ export default {
         if (!env.DB || !visitorId || !title || contribution.length < 20) return json({ status: "invalid_contribution" }, 400);
         if (!await ensureContributionTable(env)) return json({ status: "database_unavailable" }, 503);
         await env.DB.prepare("INSERT INTO visitor_contributions(visitor_id,title,body,source,status,created_at) VALUES(?,?,?,?, 'PENDING_REVIEW',?)").bind(visitorId,title,contribution,source||null,new Date().toISOString()).run();
-        return json({ status: "received", moderation: "PENDING_REVIEW" }, 201);
+        const notified = await sendBayanEmail(env, "مساهمة جديدة في بيان: " + title, "وصلت مساهمة جديدة وتحتاج مراجعة.\n\nالعنوان: " + title + "\n\nالمحتوى:\n" + contribution + "\n\nالمصدر: " + (source || "غير مذكور") + "\n\nالحالة: PENDING_REVIEW\n\nصفحة المراجعة: /review");
+        return json({ status: "received", moderation: "PENDING_REVIEW", notification: notified }, 201);
       } catch { return json({ status: "invalid_request" }, 400); }
     }
 
@@ -840,10 +895,25 @@ export default {
             { role: "user", content: "Mode: " + (body.mode || "knowledge") + "\n" + prompt }
           ]);
           const aiAnswer = textOf(result);
+          let article: any = null;
+          if (results.length && !["code","write"].includes(String(body.mode || "").toLowerCase())) {
+            try {
+              const generated = await generateKnowledgeArticle(env, language, input, results);
+              if (generated) {
+                const slug = await slugForQuery(input);
+                const section = sectionForIntent(queryIntent(input), input);
+                const knowledgeArticle = { slug, query: input, section, title: generated.title, summary: generated.summary, body: generated.body, sources: results.slice(0, 8).map(withoutUrl), createdAt: new Date().toISOString() };
+                const persistence = await saveKnowledgeArticle(env, knowledgeArticle);
+                if (persistence.persisted) await refreshKnowledgeGraph(env, knowledgeArticle);
+                article = { id: slug, section, title: generated.title, summary: generated.summary, persisted: persistence.persisted };
+              }
+            } catch {}
+          }
+          await sendBayanEmail(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان:\n\n" + input + "\n\nإجابة بيان:\n" + aiAnswer);
           return json({
             answer: aiAnswer, claims: [], evidence: results.map(withoutUrl),
             confidence: results.length ? 0.7 : 0.3, warnings: [],
-            provider: "cloudflare-workers-ai"
+            provider: "cloudflare-workers-ai", article
           });
         }
 
@@ -854,11 +924,27 @@ export default {
                 { role: "system", content: "You are BAYAN AI. Be neutral, evidence-first, explicit about uncertainty, and never fabricate. Use only the supplied evidence." },
                 { role: "user", content: "Mode: " + (body.mode || "knowledge") + "\n" + prompt }
               ]);
+              const aiAnswer = textOf(result);
+              let article: any = null;
+              if (results.length && !["code","write"].includes(String(body.mode || "").toLowerCase())) {
+                try {
+                  const generated = await generateKnowledgeArticle(env, language, input, results);
+                  if (generated) {
+                    const slug = await slugForQuery(input);
+                    const section = sectionForIntent(queryIntent(input), input);
+                    const knowledgeArticle = { slug, query: input, section, title: generated.title, summary: generated.summary, body: generated.body, sources: results.slice(0, 8).map(withoutUrl), createdAt: new Date().toISOString() };
+                    const persistence = await saveKnowledgeArticle(env, knowledgeArticle);
+                    if (persistence.persisted) await refreshKnowledgeGraph(env, knowledgeArticle);
+                    article = { id: slug, section, title: generated.title, summary: generated.summary, persisted: persistence.persisted };
+                  }
+                } catch {}
+              }
+              await sendBayanEmail(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان:\n\n" + input + "\n\nإجابة بيان:\n" + aiAnswer);
               return json({
-                answer: textOf(result), claims: [], evidence: results.map(withoutUrl),
+                answer: aiAnswer, claims: [], evidence: results.map(withoutUrl),
                 confidence: results.length ? 0.7 : 0.3,
                 warnings: ["Primary AI provider failed; Cloudflare Workers AI fallback used."],
-                provider: "cloudflare-workers-ai-fallback"
+                provider: "cloudflare-workers-ai-fallback", article
               });
             } catch {}
           }
