@@ -21,5 +21,13 @@ Keep BAYAN evidence-first, resilient, and operational. Prefer safe automatic rec
 5. Review the diff for secrets and unintended behavior.
 6. Deploy only after validation.
 
-## Runtime self-healing\n1. Detect and reproduce the failure.\n2. Ask the configured AI for a diagnosis and a safe recovery proposal.\n3. Execute only allowlisted operational actions.\n4. Re-test the affected path.\n5. Send the outcome to Telegram.\n6. If a source-code/configuration change is required, create a repair proposal for review rather than changing production code.\n\n## Cloudflare Issues automation
+## Runtime self-healing
+1. Detect and reproduce the failure.
+2. Ask the configured AI for a diagnosis and a safe recovery proposal.
+3. Execute only allowlisted operational actions.
+4. Re-test the affected path.
+5. Send the outcome to Telegram.
+6. If a source-code/configuration change is required, create a repair proposal for review rather than changing production code.
+
+## Cloudflare Issues automation
 Issues may send diagnostic context to a coding agent. The agent should inspect this playbook and the connected repository, propose/test a fix, and leave deployment for review.
