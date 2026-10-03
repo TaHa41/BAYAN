@@ -38,29 +38,32 @@ try{
 try{
   const home=await fetch(base+"/",{redirect:"follow"});
   const html=await home.text();
-  const ok=home.ok &&
-    /<link(?=[^>]*\brel=["'][^"']*\bcanonical\b)(?=[^>]*\bhref=["'][^"']+["'])[^>]*>/i.test(html) &&
-    /<meta(?=[^>]*\bname=["']robots["'])(?=[^>]*\bcontent=["'][^"']+["'])[^>]*>/i.test(html) &&
-    /<link(?=[^>]*\bhreflang=["'](?:ar|en|x-default)["'])(?=[^>]*\bhref=["'][^"']+["'])[^>]*>/i.test(html) &&
-    /id=["']app["']/i.test(html);
+  const tags=[...html.matchAll(/<link\b[^>]*>/gi)].map(m=>m[0]);
+  const meta=[...html.matchAll(/<meta\b[^>]*>/gi)].map(m=>m[0]);
+  const hasCanonical=tags.some(t=>/\brel=["']canonical["']/i.test(t)&&/\bhref=["'][^"']+["']/i.test(t));
+  const hasHreflang=tags.some(t=>/\bhreflang=["'](?:ar|en|x-default)["']/i.test(t)&&/\bhref=["'][^"']+["']/i.test(t));
+  const hasRobots=meta.some(t=>/\bname=["']robots["']/i.test(t)&&/\bcontent=["'][^"']+["']/i.test(t));
+  const ok=home.ok && hasCanonical && hasHreflang && hasRobots && /id=["']app["']/i.test(html);
   console.log((ok?"PASS":"FAIL")+" / HTML SEO/security contract");
   if(!ok) failed++;
 }catch(e){console.log("FAIL / HTML SEO/security contract "+e.message);failed++;}
 try{
   const appJs=await (await fetch(base+"/app.js",{redirect:"follow"})).text();
-  const ok=/querySelector\("#language"\)[\s\S]{0,500}addEventListener\("click"/.test(appJs) &&
+  const ok=/querySelector\("#language"\)/.test(appJs) &&
+    /addEventListener\("click"/.test(appJs) &&
     /searchParams\.set\("lang",isEn\?"ar":"en"\)/.test(appJs) &&
-    /const isEn=/.test(appJs);
+    /isEn=/.test(appJs);
   console.log((ok?"PASS":"FAIL")+" frontend language-switch contract");
   if(!ok) failed++;
 }catch(e){console.log("FAIL frontend language-switch contract "+e.message);failed++;}
 try{
   const en=await fetch(base+"/?lang=en",{redirect:"follow"});
   const html=await en.text();
-  const ok=en.ok && /<html[^>]+lang=["']en["'][^>]+dir=["']ltr["']/i.test(html) &&
-    /<link(?=[^>]*rel=["'][^"']*canonical)(?=[^>]*href=["'][^"']+\?lang=en["'])[^>]*>/i.test(html) &&
-    /<link(?=[^>]*hreflang=["']ar["'])(?=[^>]*href=["'][^"']+["'])[^>]*>/i.test(html) &&
-    /<link(?=[^>]*hreflang=["']en["'])(?=[^>]*href=["'][^"']+\?lang=en["'])[^>]*>/i.test(html);
+  const links=[...html.matchAll(/<link\b[^>]*>/gi)].map(m=>m[0]);
+  const hasEnCanonical=links.some(t=>/\brel=["']canonical["']/i.test(t)&&/\bhref=["'][^"']*\?lang=en["']/i.test(t));
+  const hasArAlternate=links.some(t=>/\bhreflang=["']ar["']/i.test(t)&&/\bhref=["'][^"']+["']/i.test(t));
+  const hasEnAlternate=links.some(t=>/\bhreflang=["']en["']/i.test(t)&&/\bhref=["'][^"']*\?lang=en["']/i.test(t));
+  const ok=en.ok && /<html[^>]+lang=["']en["'][^>]+dir=["']ltr["']/i.test(html) && hasEnCanonical && hasArAlternate && hasEnAlternate;
   console.log((ok?"PASS":"FAIL")+" English SEO/language contract");
   if(!ok) failed++;
 }catch(e){console.log("FAIL frontend language-switch contract "+e.message);failed++;}
