@@ -31,3 +31,14 @@ Keep BAYAN evidence-first, resilient, and operational. Prefer safe automatic rec
 
 ## Cloudflare Issues automation
 Issues may send diagnostic context to a coding agent. The agent should inspect this playbook and the connected repository, propose/test a fix, and leave deployment for review.
+
+## AI repair skills
+The canonical AI repair skill set is documented in docs/AI_REPAIR_PLAYBOOK.md. The Guardian must use it for incident diagnosis. Treat the playbook as operational guidance, not permission to modify source code automatically.
+
+## Current platform guidance
+- Prefer Cloudflare bindings over REST calls for Cloudflare services.
+- Use durable background primitives for long-running retryable work when the required bindings are configured.
+- Keep request-scoped state out of module-level mutable variables.
+- Always await or waitUntil asynchronous work.
+- Keep provider fallbacks explicit and observable.
+- Treat AI Search namespace/instance configuration as deployment configuration, not hard-coded infrastructure.
