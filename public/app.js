@@ -109,7 +109,7 @@ try{
 const r=await fetch("/api/search?q="+encodeURIComponent(query)+"&lang="+(isEn?"en":"ar"));
 const d=await r.json();
 if(!r.ok||d.status==="search_provider_not_configured"){state.innerHTML='<h3>البحث غير متاح مؤقتًا</h3><p class="muted">لم تتوفر نتيجة قابلة للتحقق من مزودي البحث. جرّب صياغة السؤال مرة أخرى.</p>';return;}
-if(d.answer){answer.style.display="block";answer.innerHTML='<h2>إجابة بيان</h2><div class="answer-copy">'+esc(d.answer).replace(/\n/g,"<br>")+'</div><p class="muted">تمت الصياغة من الأدلة المتاحة فقط.</p>';}
+if(d.answer){answer.style.display="block";answer.innerHTML='<h2>إجابة بيان</h2><div class="answer-copy">'+esc(d.answer).replace(/\n/g,"<br>")+'</div>'+(d.article&&d.article.id?'<div class="actions"><a class="primary" href="'+withLang("/article/"+encodeURIComponent(d.article.id))+'">فتح المقالة كاملة داخل بيان</a></div>':"")+'<p class="muted">تمت الصياغة من الأدلة المتاحة فقط.</p>';}
 const items=d.items||[];
 if(items.length){evidence.style.display="grid";evidence.innerHTML=items.map((x)=>
 '<article class="card search-article" data-rank="'+esc(x.rank)+'"><span class="article-section">مقال '+esc(x.rank)+'</span><h3>'+escapeHtml(x.title)+'</h3><p class="muted">'+esc(x.source)+(x.date?" · "+esc(x.date):"")+'</p><p>'+esc(x.snippet)+'</p><div class="actions"><button class="secondary read-search-article" type="button">اقرأ المقال كاملًا داخل بيان</button></div><div class="search-article-body" hidden></div></article>'
@@ -124,7 +124,7 @@ evidence.querySelectorAll(".read-search-article").forEach((button)=>{
       const rr=await fetch("/api/search/article?q="+encodeURIComponent(query)+"&rank="+encodeURIComponent(rank)+"&lang="+(isEn?"en":"ar"));
       const dd=await rr.json();
       if(!rr.ok||!dd.article){throw new Error("article_unavailable");}
-      body.innerHTML='<div class="article-reader"><h4>'+escapeHtml(dd.article.title||"مقال بيان")+'</h4><div class="answer-copy">'+esc(dd.article.body||"Insufficient Evidence").replace(/\n/g,"<br>")+'</div><small class="muted">'+escapeHtml(dd.article.source||"المصدر")+((dd.article.date)?" · "+escapeHtml(dd.article.date):"")+'</small></div>';
+      location.href=withLang("/article/"+encodeURIComponent(dd.article.id));
       button.textContent="إخفاء المقال";
     }catch{
       body.innerHTML='<p class="muted">تعذر تجهيز المقال الآن. لم يتم عرض محتوى غير متحقق منه.</p>';
