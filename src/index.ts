@@ -557,6 +557,23 @@ const buildArticleEvidence = async (env: Env, results: any[]) => {
   return materials.join("\n\n");
 };
 
+const buildEvidenceArticleFallback = (query: string, results: any[]) => {
+  const usable = results.filter((x: any) => x?.title && x?.snippet);
+  const sources = new Set(usable.map((x: any) => String(x.source || "").toLowerCase()).filter(Boolean));
+  if (usable.length < 2 || sources.size < 2) return null;
+  const lead = usable[0];
+  const body = usable.slice(0, 6).map((x: any) =>
+    "وفقًا لـ" + cleanText(x.source || "المصدر", 120) + "، " + cleanText(x.snippet, 650)
+  );
+  body.push("تختلف تفاصيل النتائج بحسب المصدر وتاريخ النشر. لذلك يعرض بيان الأدلة كما وردت في المصادر المسترجعة ولا يحولها إلى حقيقة موحدة عندما لا تتفق المصادر.");
+  return {
+    title: cleanText(lead.title || query, 240),
+    summary: "ملخص أدلة من مصادر مستقلة متعددة حول: " + cleanText(query, 240),
+    body,
+    evidenceOnly: true
+  };
+};
+
 const generateKnowledgeArticle = async (env: Env, language: string, query: string, results: any[]) => {
   const evidence = await buildArticleEvidence(env, results);
   if (!evidence.trim()) return null;
@@ -587,12 +604,12 @@ const generateKnowledgeArticle = async (env: Env, language: string, query: strin
         text = textOf(result);
       } catch {}
     }
-    if (!text || text === "Insufficient Evidence") return null;
+    if (!text || text === "Insufficient Evidence") return buildEvidenceArticleFallback(query, results);
     const lines = text.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
     const title = cleanText(lines[0] || query, 240);
     const body = lines.slice(1).filter((x) => !/^(المصادر|sources)\s*:??$/i.test(x));
-    return { title, summary: cleanText(body[0] || "مقال معرفي أصلي مبني على الأدلة المسترجعة.", 500), body: body.slice(1) };
-  } catch { return null; }
+    return { title, summary: cleanText(body[0] || "مقال معرفي أصلي مبني على الأدلة المسترجعة.", 500), body: body.slice(1), evidenceOnly: false };
+  } catch { return buildEvidenceArticleFallback(query, results); }
 };
 
 const knowledgeRateLimit = new Map<string, { count: number; resetAt: number }>();
