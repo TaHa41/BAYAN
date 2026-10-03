@@ -243,6 +243,31 @@ const diagnoseTechnicalReport = async (env: Env, report: string) => {
   return "لم يتوفر محرك ذكاء اصطناعي للتشخيص وقت الخطأ؛ تم إرسال البيانات التقنية الآمنة كما هي.";
 };
 
+const ensureRuntimeAuditTable = async (env: Env) => {
+  if (!env.DB) return false;
+  try {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS runtime_audits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      checked_at TEXT NOT NULL,
+      healthy INTEGER NOT NULL DEFAULT 0,
+      details_json TEXT NOT NULL DEFAULT '[]'
+    )`).run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_runtime_audits_checked ON runtime_audits(checked_at DESC)").run();
+    return true;
+  } catch { return false; }
+};
+
+const ensureContentQueueRetryColumn = async (env: Env) => {
+  if (!env.DB) return false;
+  try {
+    await env.DB.prepare("ALTER TABLE content_queue ADD COLUMN next_attempt_at TEXT").run();
+  } catch {}
+  try {
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_content_queue_retry ON content_queue(status,next_attempt_at,priority)").run();
+    return true;
+  } catch { return false; }
+};
+
 const ensureRepairQueue = async (env: Env) => {
   if (!env.DB) return;
   await env.DB.prepare(`
@@ -281,7 +306,7 @@ const processBayanRepairQueue = async (env: Env) => {
   if (!env.DB) return;
   await ensureRepairQueue(env);
   const jobs = await env.DB.prepare(
-    "SELECT * FROM repair_jobs WHERE status IN ('QUEUED','WAITING_AI') AND (next_attempt_at IS NULL OR next_attempt_at <= ?) ORDER BY created_at ASC LIMIT 2"
+    "SELECT * FROM repair_jobs WHERE status IN ('QUEUED','WAITING_AI','WAITING_VERIFY') AND (next_attempt_at IS NULL OR next_attempt_at <= ?) ORDER BY created_at ASC LIMIT 2"
   ).bind(new Date().toISOString()).all<any>();
   for (const job of jobs.results || []) {
     const started = new Date().toISOString();
@@ -300,11 +325,20 @@ const processBayanRepairQueue = async (env: Env) => {
       }
 
       const repair = await attemptBayanSelfRepair(env, job.context, new Error(job.error_text));
-      const isQuota = /4006|daily free allocation|429|quota/i.test(JSON.stringify(repair));
-      const status = repair.action === "diagnose_only" ? "WAITING_AI" : "WAITING_VERIFY";
-      const next = isQuota ? new Date(Date.now() + 30 * 60_000).toISOString() : new Date(Date.now() + 5 * 60_000).toISOString();
-      await env.DB.prepare("UPDATE repair_jobs SET status=?,last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
-        .bind(status, repair.action, cleanText(repair.diagnosis || repair.result, 4000), next, new Date().toISOString(), job.id).run();
+      if (repair.action === "cooldown") {
+        await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI',last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
+          .bind(repair.action, cleanText(repair.result, 4000), new Date(Date.now() + 15 * 60_000).toISOString(), new Date().toISOString(), job.id).run();
+        continue;
+      }
+      if (repair.action === "diagnose_only") {
+        await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI',last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
+          .bind(repair.action, cleanText(repair.diagnosis || repair.result, 4000), new Date(Date.now() + 30 * 60_000).toISOString(), new Date().toISOString(), job.id).run();
+        continue;
+      }
+      const isQuota = /4006|daily free allocation|429|quota|allocation/i.test(JSON.stringify(repair));
+      const next = isQuota ? new Date(Date.now() + 60 * 60_000).toISOString() : new Date(Date.now() + 5 * 60_000).toISOString();
+      await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_VERIFY',last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
+        .bind(repair.action, cleanText(repair.diagnosis || repair.result, 4000), next, new Date().toISOString(), job.id).run();
     } catch (error) {
       await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI',last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
         .bind("retry_later", safeErrorMessage(error), new Date(Date.now() + 15 * 60_000).toISOString(), new Date().toISOString(), job.id).run();
@@ -863,7 +897,7 @@ export default {
           attempts: audit.results.filter((x: any) => !x.ok)
         });
       }
-      if (env.DB) {
+      if (env.DB && await ensureRuntimeAuditTable(env)) {
         await env.DB.prepare("INSERT INTO runtime_audits (checked_at, healthy, details_json) VALUES (?, ?, ?)")
           .bind(audit.checkedAt, audit.healthy ? 1 : 0, JSON.stringify(audit.results)).run();
         await env.DB.prepare("DELETE FROM runtime_audits WHERE id NOT IN (SELECT id FROM runtime_audits ORDER BY checked_at DESC LIMIT 100)").run();
