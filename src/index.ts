@@ -759,7 +759,10 @@ const buildEvidenceArticleFallback = (query: string, results: any[]) => {
 const articleQualityCheck = (text: string, query: string, intent: string, evidence: string) => {
   const normalized = normalizeGeneratedText(text);
   const paragraphs = normalized.split(/\n+/).map((x: string) => x.trim()).filter(Boolean);
-  const headings = paragraphs.filter((x: string) => /^#{1,3}\s+/.test(x));
+  const headings = paragraphs.filter((x: string) =>
+    /^#{1,3}\s+/.test(x) ||
+    /^(?:المقدمة|الخلاصة|النتيجة|الأسباب|الخطوات|طريقة|كيفية|لماذا|كيف|ما هو|ما هي|التفاصيل|الخلفية|التاريخ|الآثار|الأهمية|الحل|التشخيص|التحقق|الحدود|الأسئلة الشائعة)\b/i.test(x)
+  );
   const words = normalized.split(/\s+/).filter(Boolean);
   const queryTerms = query.toLowerCase().split(/\s+/).map((x: string) => x.replace(/[^\p{L}\p{N}]+/gu, "")).filter((x: string) => x.length > 2).slice(0, 10);
   const topicHits = queryTerms.filter((term: string) => normalized.toLowerCase().includes(term) || term.slice(0, Math.max(3, term.length - 2)) && normalized.toLowerCase().includes(term.slice(0, Math.max(3, term.length - 2)))).length;
@@ -772,8 +775,8 @@ const articleQualityCheck = (text: string, query: string, intent: string, eviden
   const evidenceStart = evidence.toLowerCase().slice(0, 220);
   const generatedStart = normalized.toLowerCase().slice(0, 220);
   const rawEvidenceOverlap = evidenceStart.length > 120 && generatedStart.length > 120 && evidenceStart === generatedStart;
-  const minimumWords = intent === "howto" || intent === "troubleshooting" ? 180 : intent === "list" ? 150 : 180;
-  const requiredHeadings = intent === "howto" || intent === "troubleshooting" ? 2 : 2;
+  const minimumWords = intent === "howto" || intent === "troubleshooting" ? 150 : intent === "list" ? 120 : 140;
+  const requiredHeadings = intent === "howto" || intent === "troubleshooting" ? 1 : 0;
   const hasSteps = intent === "howto" || intent === "troubleshooting"
     ? /(?:^|\n)\s*(?:\d+[.)]|[-*]\s)/.test(normalized)
     : true;
@@ -847,6 +850,11 @@ const generateKnowledgeArticle = async (env: Env, language: string, query: strin
     let quality = articleQualityCheck(text, query, intent, evidence);
     if (!quality.ok) {
       text = await runOnce("أعد كتابة المقال من الصفر. أسباب الرفض السابقة: " + quality.reasons.join(", ") + ". لا تغيّر الحقائق المدعومة. اجعل النص مقالًا كاملًا مترابطًا، وأجب السؤال مباشرة، واستخدم عناوين واضحة وفقرات ذات معنى. لا تنقل أي مقتطف حرفيًا.");
+      quality = articleQualityCheck(text, query, intent, evidence);
+    }
+    if (!text || !quality.ok) {
+      const reasons = quality.reasons.join(", ");
+      text = await runOnce("اكتب نسخة نهائية جديدة من الصفر. لا تلتزم بتنسيق Markdown إذا لم يكن مناسبًا؛ الأهم أن تكون مادة عربية واضحة ومترابطة لا تقل عن 180 كلمة، تجيب السؤال مباشرة، وتحتوي على مقدمة وتفاصيل وخلاصة. أسباب الفشل السابقة: " + reasons + ". لا تذكر هذه التعليمات داخل المقال.");
       quality = articleQualityCheck(text, query, intent, evidence);
     }
     if (!text || !quality.ok) return buildEvidenceArticleFallback(query, results);
