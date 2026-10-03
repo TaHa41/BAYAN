@@ -18,6 +18,9 @@ interface Env {
   BAYAN_AI_MANAGER_TOKEN?: string;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_CHAT_ID?: string;
+  RESEND_API_KEY?: string;
+  BAYAN_OWNER_EMAIL?: string;
+  RESEND_FROM_EMAIL?: string;
   ASSETS?: Fetcher;
   AI?: any;
   AI_SEARCH?: any;
@@ -544,7 +547,10 @@ const attemptBayanSelfRepair = async (env: Env, context: string, error: unknown)
 
 const sendBayanDiagnostic = async (env: Env, subject: string, report: string) => {
   try {
-    const telegram = await sendBayanTelegram(env, "⚠️ " + subject + "\n\n" + report.slice(0, 3600));
+    const [telegram, email] = await Promise.all([
+      sendBayanTelegram(env, "⚠️ " + subject + "\n\n" + report.slice(0, 3600)),
+      sendBayanEmail(env, subject, report)
+    ]);
     console.log(JSON.stringify({
       event: "bayan_notification",
       subject: cleanText(subject, 180),
@@ -673,16 +679,48 @@ const sendBayanTelegram = async (env: Env, text: string, chatId?: string) => {
   }
 };
 
+const sendBayanEmail = async (env: Env, subject: string, text: string) => {
+  if (!env.RESEND_API_KEY || !env.BAYAN_OWNER_EMAIL) {
+    return { ok: false, configured: false, error: "email_not_configured" };
+  }
+  try {
+    const from = cleanText(env.RESEND_FROM_EMAIL || "BAYAN <onboarding@resend.dev>", 180);
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer " + env.RESEND_API_KEY
+      },
+      body: JSON.stringify({
+        from,
+        to: [cleanText(env.BAYAN_OWNER_EMAIL, 240)],
+        subject: cleanText(subject, 180),
+        text: cleanText(text, 12000)
+      })
+    });
+    if (!response.ok) return { ok: false, configured: true, error: "resend_http_" + response.status };
+    const data = await response.json().catch(() => ({} as any));
+    return { ok: true, configured: true, id: data?.id || null };
+  } catch (error) {
+    return { ok: false, configured: true, error: safeErrorMessage(error) };
+  }
+};
+
 const sendBayanOwnerNotification = async (env: Env, subject: string, text: string) => {
-  const telegram = await sendBayanTelegram(env, "🔔 " + cleanText(subject, 180) + "\n\n" + text.slice(0, 3600));
+  const [telegram, email] = await Promise.all([
+    sendBayanTelegram(env, "🔔 " + cleanText(subject, 180) + "\n\n" + text.slice(0, 3600)),
+    sendBayanEmail(env, subject, text)
+  ]);
   console.log(JSON.stringify({
     event: "bayan_owner_notification",
     subject: cleanText(subject, 180),
     telegramDelivered: telegram.ok,
     telegramError: telegram.error || null,
+    emailDelivered: email.ok,
+    emailError: email.error || null,
     timestamp: new Date().toISOString()
   }));
-  return { telegram };
+  return { telegram, email };
 };
 
 const discoverTelegramChat = async (env: Env) => {
