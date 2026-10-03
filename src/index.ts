@@ -1724,12 +1724,36 @@ export default {
           images: true,
           pwa: true,
           savedArticles: true,
+          cloudSavedArticles: !!env.DB,
+          articleHistory: !!env.DB,
+          correctionRequests: !!env.DB,
+          articleRequests: !!env.DB,
+          notificationPreferences: !!env.DB,
+          sourceComparison: !!env.SEARCH_API_KEY || !!env.AI_SEARCH,
           selfHealing: true,
           runtimeAudit: true,
           sourceAwareAI: true
         },
         rule: "Every generated answer must be evidence-first; insufficient evidence is surfaced instead of fabricated."
       });
+    }
+
+    if (path === "/api/search/compare" && request.method === "GET") {
+      const q=cleanText(url.searchParams.get("q"),500);
+      const lang=(url.searchParams.get("lang")||"ar").toLowerCase()==="en"?"en":"ar";
+      if(!q) return json({status:"empty_query",sources:[]});
+      try {
+        const search=await internalSearch(q,env);
+        if(!search.ok) return json({status:search.status,sources:[]},503);
+        const sources=search.results.slice(0,12).map((item:any)=>({
+          rank:item.rank||null,title:item.title,source:item.source,domain:item.domain||null,date:item.date||null,url:item.url||null,snippet:item.snippet||"",
+          evidenceStrength:item.evidenceStrength||null
+        }));
+        return json({status:"ok",query:q,language:lang,sources,sourceCount:sources.length,providerCount:search.providerCount,independentSources:search.independentSources,research:search.researchQueries,coverage:search.coverage});
+      } catch(error) {
+        await reportBayanError(env,"api/search/compare",error);
+        return json({status:"provider_error",sources:[]},502);
+      }
     }
 
     if (path === "/api/search/article") {
