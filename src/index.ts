@@ -211,6 +211,30 @@ const safeErrorMessage = (error: unknown) => {
   return message.replace(/(api[_-]?key|authorization|bearer|token|password|secret)\s*[:=]\s*\S+/gi, "$1=[REDACTED]").slice(0, 1600);
 };
 
+const diagnoseTechnicalReport = async (env: Env, report: string) => {
+  const instruction = "أنت مدير تقني لبيان. حلّل تقرير الخطأ المعطى فقط. اكتب بالعربية: 1) المشكلة 2) السبب المرجح مع درجة اليقين 3) ما تم عمله تلقائيًا 4) ما الذي يحتاج تدخلًا يدويًا 5) خطوات التحقق التالية. لا تخترع سببًا غير موجود في التقرير ولا تذكر أي أسرار.";
+  if (env.OPENAI_API_KEY) {
+    try {
+      const response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: "Bearer " + env.OPENAI_API_KEY },
+        body: JSON.stringify({ model: env.OPENAI_MODEL?.trim() || DEFAULT_OPENAI_MODEL, instructions: instruction, input: report, store: false })
+      });
+      if (response.ok) return textOf(await response.json() as any);
+    } catch {}
+  }
+  if (env.AI) {
+    try {
+      const result = await cloudflareAiRun(env, DEFAULT_CLOUDFLARE_AI_MODEL, [
+        { role: "system", content: instruction },
+        { role: "user", content: report }
+      ]);
+      return textOf(result);
+    } catch {}
+  }
+  return "لم يتوفر محرك ذكاء اصطناعي للتشخيص وقت الخطأ؛ تم إرسال البيانات التقنية الآمنة كما هي.";
+};
+
 const sendBayanDiagnostic = async (env: Env, subject: string, report: string) => {
   const delivered = await sendBayanEmail(env, subject, report);
   console.log(JSON.stringify({
@@ -230,7 +254,7 @@ const reportBayanError = async (env: Env, context: string, error: unknown, extra
   const last = diagnosticMemory.get(signature) || 0;
   if (now - last < 300_000) return false;
   diagnosticMemory.set(signature, now);
-  const report = [
+  let report = [
     "بيان — تقرير خطأ تقني تلقائي",
     "المكان: " + cleanText(context, 240),
     "المشكلة: " + safe,
@@ -243,6 +267,8 @@ const reportBayanError = async (env: Env, context: string, error: unknown, extra
     extra?.repair ? "الإصلاح المنفذ: " + cleanText(extra.repair, 1200) : "",
     "الخطوة التالية: راجع Workers Logs / Issues إذا تكرر الخطأ."
   ].filter(Boolean).join("\n");
+  const diagnosis = await diagnoseTechnicalReport(env, report);
+  report += "\n\nتشخيص الذكاء الاصطناعي:\n" + cleanText(diagnosis, 5000);
   return sendBayanDiagnostic(env, "تنبيه خطأ تقني مهم في بيان", report);
 };
 
