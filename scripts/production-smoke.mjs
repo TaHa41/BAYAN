@@ -45,6 +45,7 @@ try{
   const hasRobots=meta.some(t=>/\bname=["']robots["']/i.test(t)&&/\bcontent=["'][^"']+["']/i.test(t));
   const ok=home.ok && hasCanonical && hasHreflang && hasRobots && /id=["']app["']/i.test(html);
   console.log((ok?"PASS":"FAIL")+" / HTML SEO/security contract");
+  if(!ok) console.log("SEO_DEBUG", JSON.stringify({links:tags,metaRobots:meta.filter(t=>/name=["']robots["']/i.test(t)),head:html.slice(0,3200)}));
   if(!ok) failed++;
 }catch(e){console.log("FAIL / HTML SEO/security contract "+e.message);failed++;}
 try{
@@ -65,6 +66,7 @@ try{
   const hasEnAlternate=links.some(t=>/\bhreflang=["']en["']/i.test(t)&&/\bhref=["'][^"']*\?lang=en["']/i.test(t));
   const ok=en.ok && /<html[^>]+lang=["']en["'][^>]+dir=["']ltr["']/i.test(html) && hasEnCanonical && hasArAlternate && hasEnAlternate;
   console.log((ok?"PASS":"FAIL")+" English SEO/language contract");
+  if(!ok) console.log("EN_SEO_DEBUG", JSON.stringify({links,head:html.slice(0,3200)}));
   if(!ok) failed++;
 }catch(e){console.log("FAIL frontend language-switch contract "+e.message);failed++;}
 try{
