@@ -1252,7 +1252,7 @@ const runRuntimeAudit = async (env: Env) => {
     if (!response.ok) throw new Error("assets_http_" + response.status);
     return { status: response.status };
   });
-  const publicRoutes = ["/", "/egypt", "/arab", "/world", "/science", "/economy", "/politics", "/technology", "/health", "/history-culture", "/people", "/sports", "/travel", "/arts", "/news", "/trending", "/prices", "/about", "/methodology", "/privacy", "/terms", "/contact", "/contribute", "/review", "/ai", "/saved"];
+  const publicRoutes = ["/", "/egypt", "/arab", "/world", "/science", "/economy", "/politics", "/technology", "/health", "/history-culture", "/people", "/sports", "/travel", "/arts", "/news", "/trending", "/prices", "/tools", "/about", "/methodology", "/privacy", "/terms", "/contact", "/contribute", "/review", "/ai", "/saved"];
   for (const route of publicRoutes) {
     await check("page:" + route, async () => {
       if (!env.ASSETS) throw new Error("assets_binding_missing");
