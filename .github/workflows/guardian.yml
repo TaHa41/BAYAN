@@ -1,0 +1,89 @@
+name: BAYAN Guardian
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_run:
+    workflows: ["BAYAN CI", "BAYAN Deploy"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+  issues: write
+
+concurrency:
+  group: bayan-guardian
+  cancel-in-progress: true
+
+jobs:
+  production:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Production smoke diagnostics
+        id: smoke
+        continue-on-error: true
+        run: node scripts/production-smoke.mjs
+        env:
+          BAYAN_URL: https://bayan.tahaomar411.workers.dev
+
+      - name: AI diagnosis
+        if: steps.smoke.outcome == 'failure'
+        id: ai
+        continue-on-error: true
+        run: |
+          node scripts/ai-guardian.mjs | tee ai-diagnosis.json
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: gpt-5.6-luna
+          DIAGNOSTIC_REPORT: |
+            The BAYAN production smoke test failed.
+            Repository commit: ${{ github.sha }}
+            Trigger: ${{ github.event_name }}
+            Re-run the production diagnostics and use the workflow logs as the evidence source.
+
+      - name: Create incident issue
+        if: steps.smoke.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          body="Automated BAYAN Guardian incident.
+
+          Commit: ${{ github.sha }}
+          Trigger: ${{ github.event_name }}
+          Production smoke diagnostics failed.
+
+          The Guardian ran the evidence-first AI diagnosis when OPENAI_API_KEY is available in GitHub Actions. It never exposes secrets and does not apply unvalidated source changes."
+          gh issue create --repo "${{ github.repository }}" --title "BAYAN Guardian: production health failure" --body "$body" || true
+
+      - name: Fail guardian on production regression
+        if: steps.smoke.outcome == 'failure'
+        run: exit 1
+
+  ci-recovery:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record failed workflow
+        run: |
+          echo "BAYAN Guardian detected a failed workflow."
+          echo "Workflow: ${{ github.event.workflow_run.name }}"
+          echo "Run: ${{ github.event.workflow_run.id }}"
+          echo "SHA: ${{ github.event.workflow_run.head_sha }}"
+
+      - name: Create CI incident
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --repo "${{ github.repository }}"             --title "BAYAN Guardian: CI/deploy failure detected"             --body "Automated Guardian detected a failed workflow run.
+
+          Workflow: ${{ github.event.workflow_run.name }}
+          Run ID: ${{ github.event.workflow_run.id }}
+          Commit: ${{ github.event.workflow_run.head_sha }}
+
+          Review the failing run logs. The production guardian remains evidence-first and does not deploy unverified changes." || true
