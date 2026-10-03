@@ -324,9 +324,12 @@ const discoverTelegramChat = async (env: Env) => {
 };
 
 const managerAuthorized = (request: Request, env: Env) => {
-  const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || request.headers.get("x-bayan-manager-token") || "";
-  return !!env.BAYAN_AI_MANAGER_TOKEN && supplied === env.BAYAN_AI_MANAGER_TOKEN;
+  const supplied = (request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || request.headers.get("x-bayan-manager-token") || "").trim();
+  const expected = (env.BAYAN_AI_MANAGER_TOKEN || "").trim();
+  return !!expected && !!supplied && supplied === expected;
 };
+
+const managerAuthError = (env: Env) => env.BAYAN_AI_MANAGER_TOKEN ? "manager_token_invalid" : "manager_token_not_configured";
 
 const ensureKnowledgeTables = async (env: Env) => {
   if (!env.DB) return false;
@@ -965,14 +968,14 @@ export default {
     }
 
     if (path === "/api/contributions/review" && request.method === "GET") {
-      if (!managerAuthorized(request, env)) return json({ status: "forbidden" }, 403);
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
       if (!await ensureContributionTable(env)) return json({ status: "database_unavailable" }, 503);
       const status = cleanText(url.searchParams.get("status"), 40) || "PENDING_REVIEW";
       const result = await env.DB!.prepare("SELECT id, visitor_id, title, body, source, status, reviewer_note, created_at, reviewed_at FROM visitor_contributions WHERE status=? ORDER BY created_at DESC LIMIT 100").bind(status).all();
       return json({ status: "ok", items: result.results || [], count: (result.results || []).length });
     }
     if (path === "/api/contributions/review" && request.method === "POST") {
-      if (!managerAuthorized(request, env)) return json({ status: "forbidden" }, 403);
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
       if (!await ensureContributionTable(env)) return json({ status: "database_unavailable" }, 503);
       const body = await request.json() as { id?: number; status?: string; note?: string };
       const id = Number(body.id);
@@ -1247,7 +1250,7 @@ export default {
     }
 
     if (path === "/api/ai/manager/status" && request.method === "GET") {
-      if (!managerAuthorized(request, env)) return json({ status: "forbidden" }, 403);
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
       return json({
         status: "ok",
         checkedAt: new Date().toISOString(),
@@ -1270,7 +1273,7 @@ export default {
     }
 
     if (path === "/api/ai/manager/test-email" && request.method === "POST") {
-      if (!managerAuthorized(request, env)) return json({ status: "forbidden" }, 403);
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
       const started = Date.now();
       const checks: any[] = [];
       const check = async (name: string, fn: () => Promise<any>) => {
