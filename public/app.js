@@ -67,8 +67,26 @@ if(!r.ok||d.status==="search_provider_not_configured"){state.innerHTML='<h3>ال
 if(d.answer){answer.style.display="block";answer.innerHTML='<h2>إجابة بيان</h2><div class="answer-copy">'+esc(d.answer).replace(/\n/g,"<br>")+'</div><p class="muted">تمت الصياغة من الأدلة المتاحة فقط.</p>';}
 const items=d.items||[];
 if(items.length){evidence.style.display="grid";evidence.innerHTML=items.map((x)=>
-'<article class="card"><span class="article-section">دليل '+esc(x.rank)+'</span><h3>'+escapeHtml(x.title)+'</h3><p class="muted">'+esc(x.source)+(x.date?" · "+esc(x.date):"")+'</p><p>'+esc(x.snippet)+'</p></article>'
-).join("");}
+'<article class="card search-article" data-rank="'+esc(x.rank)+'"><span class="article-section">مقال '+esc(x.rank)+'</span><h3>'+escapeHtml(x.title)+'</h3><p class="muted">'+esc(x.source)+(x.date?" · "+esc(x.date):"")+'</p><p>'+esc(x.snippet)+'</p><div class="actions"><button class="secondary read-search-article" type="button">اقرأ المقال كاملًا داخل بيان</button></div><div class="search-article-body" hidden></div></article>'
+).join("");
+evidence.querySelectorAll(".read-search-article").forEach((button)=>{
+  button.addEventListener("click",async()=>{
+    const card=button.closest(".search-article"), body=card?.querySelector(".search-article-body"), rank=card?.dataset.rank;
+    if(!card||!body||!rank)return;
+    if(!body.hidden){body.hidden=true;button.textContent="اقرأ المقال كاملًا داخل بيان";return;}
+    button.disabled=true;button.textContent="جارٍ إعداد المقال…";body.hidden=false;body.innerHTML='<p class="muted">بيان يجمع المادة ويكتب مقالًا أصليًا قابلًا للقراءة داخل الموقع…</p>';
+    try{
+      const rr=await fetch("/api/search/article?q="+encodeURIComponent(query)+"&rank="+encodeURIComponent(rank)+"&lang="+(isEn?"en":"ar"));
+      const dd=await rr.json();
+      if(!rr.ok||!dd.article){throw new Error("article_unavailable");}
+      body.innerHTML='<div class="article-reader"><h4>'+escapeHtml(dd.article.title||"مقال بيان")+'</h4><div class="answer-copy">'+esc(dd.article.body||"Insufficient Evidence").replace(/\n/g,"<br>")+'</div><small class="muted">'+escapeHtml(dd.article.source||"المصدر")+((dd.article.date)?" · "+escapeHtml(dd.article.date):"")+'</small></div>';
+      button.textContent="إخفاء المقال";
+    }catch{
+      body.innerHTML='<p class="muted">تعذر تجهيز المقال الآن. لم يتم عرض محتوى غير متحقق منه.</p>';
+      button.textContent="حاول مرة أخرى";
+    }finally{button.disabled=false;}
+  });
+});}
 state.innerHTML='<h3>تم البحث</h3><p class="muted">'+items.length+' مصادر/نتائج استُخدمت داخليًا. لا توجد روابط خارجية معروضة للزائر.</p>';
 }catch{state.innerHTML='<h3>تعذر إكمال البحث</h3><p class="muted">لم يتم عرض معلومة غير متحقق منها.</p>';}}
 form.onsubmit=(e)=>{e.preventDefault();const query=document.querySelector("#searchInput").value.trim();if(query){const u=new URL(location.href);u.searchParams.set("q",query);history.pushState({q:query},"",u.pathname+u.search);run(query);}};
