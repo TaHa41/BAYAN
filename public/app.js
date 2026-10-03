@@ -135,6 +135,29 @@ const updateWisdom=()=>{const wisdom=window.BAYAN_CONTENT?.wisdom||[];const w=do
 safeRenderRoute(path);
 window.setInterval(updateWisdom,30000);
 document.addEventListener("click",(event)=>{
+  const save=event.target.closest("[data-bayan-save]");
+  if(save){
+    event.preventDefault();
+    event.stopPropagation();
+    const id=save.getAttribute("data-bayan-save");
+    let list=[];try{list=JSON.parse(localStorage.getItem("bayan:saved-articles")||"[]")}catch{}
+    if(list.includes(id)){list=list.filter(x=>x!==id);save.textContent="☆ حفظ المقال";}else{list.unshift(id);save.textContent="★ محفوظ";}
+    localStorage.setItem("bayan:saved-articles",JSON.stringify(list.slice(0,100)));
+    return;
+  }
+  const share=event.target.closest("[data-bayan-share]");
+  if(share){
+    event.preventDefault();
+    event.stopPropagation();
+    const title=share.getAttribute("data-bayan-share")||"مقال بيان";
+    const data={title,text:title+" — BAYAN | بيان",url:location.href};
+    if(navigator.share)navigator.share(data).catch(()=>{});
+    else if(navigator.clipboard)navigator.clipboard.writeText(location.href).then(()=>{share.textContent="✓ تم نسخ الرابط";setTimeout(()=>share.textContent="↗ مشاركة",1800)}).catch(()=>{});
+    return;
+  }
+  const link=event.target.closest("a");
+  if(!link)return;
+
   const link=event.target.closest("a");
   if(!link)return;
   const href=link.getAttribute("href");
