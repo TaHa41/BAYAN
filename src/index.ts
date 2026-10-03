@@ -815,9 +815,9 @@ const browserRenderedCheck = async (env: Env, route: string) => {
   const base = "https://bayan.tahaomar411.workers.dev";
   const rendered = await env.BROWSER.quickAction("content", { url: base + route });
   const html = typeof rendered === "string" ? rendered : JSON.stringify(rendered);
-  const hasApp = html.includes('id="app"') || html.includes('id=\\"app\\"');
-  const recovery = /وضع الاسترداد|تعذر تحميل الصفحة|BAYAN يعمل على وضع الاسترداد/i.test(html);
-  if (!hasApp || recovery) throw new Error("browser_render_degraded_" + route);
+  const hasEmptyApp = html.includes('<main id="app"></main>');
+  const recovery = html.includes("وضع الاسترداد") || html.includes("تعذر تحميل الصفحة");
+  if (hasEmptyApp || recovery) throw new Error("browser_render_degraded_" + route);
   return { rendered: true };
 };
 
