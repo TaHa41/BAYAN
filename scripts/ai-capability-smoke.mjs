@@ -12,7 +12,7 @@ let failed = false;
 for (const test of tests) {
   const response = await fetch(BASE_URL + "/api/ai", { method: "POST", headers: { "content-type": "application/json", "x-bayan-test": "1" }, body: JSON.stringify({ input: test.input, mode: test.mode, live: test.live }) });
   let data = null; try { data = await response.json(); } catch {}
-  if (!response.ok || !data?.answer || String(data.answer).trim().length < 8) { console.error("[AI BENCHMARK] FAIL " + test.name + ": HTTP " + response.status); failed = true; continue; }
+  if (!response.ok || !data?.answer || String(data.answer).trim().length < 8) { console.error("[AI BENCHMARK] FAIL " + test.name + ": HTTP " + response.status + " diagnostics=" + JSON.stringify(data?.diagnostics || {})); failed = true; continue; }
   const answer = String(data.answer).toLowerCase();
   const checks = {
     arithmetic: /323/.test(answer),
