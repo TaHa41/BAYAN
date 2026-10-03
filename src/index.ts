@@ -419,6 +419,12 @@ export default {
       const search = await internalSearch(q, env);
       if (!search.ok) return json({ query: q, items: [], status: search.status }, 503);
 
+      // Every successful search becomes a discoverable BAYAN knowledge item.
+      // Persistence is intentionally deferred to the verified content pipeline; the
+      // response exposes the category signal so the client can associate the query.
+      const inferredSection = queryIntent(q);
+      const knowledgeRecord = { query: q, section: inferredSection, discoveredAt: new Date().toISOString(), status: "DISCOVERED" };
+
       if (!env.OPENAI_API_KEY) {
         return json({
           query: q,
@@ -426,7 +432,8 @@ export default {
           items: search.results.map(withoutUrl),
           status: "ok",
           answer: null,
-          verification: "search_results_only"
+          verification: "search_results_only",
+          knowledge: knowledgeRecord
         });
       }
 
@@ -464,7 +471,8 @@ export default {
           answer: textOf(data),
           items: search.results.map(withoutUrl),
           status: "ok",
-          verification: "evidence_synthesized"
+          verification: "evidence_synthesized",
+          knowledge: knowledgeRecord
         });
       } catch {
         return json({
@@ -474,7 +482,8 @@ export default {
           status: "ok",
           answer: null,
           verification: "search_results_only",
-          warning: "AI synthesis unavailable; raw evidence was retained."
+          warning: "AI synthesis unavailable; raw evidence was retained.",
+          knowledge: knowledgeRecord
         });
       }
     }
