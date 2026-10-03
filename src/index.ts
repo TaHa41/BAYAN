@@ -810,6 +810,17 @@ const runKnowledgeMaintenance = async (env: Env) => {
   return { ok: true, checked: rows.results?.length || 0, reviewDue: due, checkedAt: new Date().toISOString() };
 };
 
+const browserRenderedCheck = async (env: Env, route: string) => {
+  if (!env.BROWSER) return { skipped: true };
+  const base = "https://bayan.tahaomar411.workers.dev";
+  const rendered = await env.BROWSER.quickAction("content", { url: base + route });
+  const html = typeof rendered === "string" ? rendered : JSON.stringify(rendered);
+  const hasApp = html.includes('id="app"') || html.includes('id=\\"app\\"');
+  const recovery = /وضع الاسترداد|تعذر تحميل الصفحة|BAYAN يعمل على وضع الاسترداد/i.test(html);
+  if (!hasApp || recovery) throw new Error("browser_render_degraded_" + route);
+  return { rendered: true };
+};
+
 const runRuntimeAudit = async (env: Env) => {
   const results: any[] = [];
   const started = Date.now();
@@ -843,6 +854,9 @@ const runRuntimeAudit = async (env: Env) => {
     await env.DB.prepare("SELECT 1 AS ok").first();
     return { configured: true };
   });
+  await check("browser:home", async () => browserRenderedCheck(env, "/"));
+  await check("browser:news", async () => browserRenderedCheck(env, "/news"));
+  await check("browser:search", async () => browserRenderedCheck(env, "/search?q=بيان"));
   await check("/search", async () => {
     const search = await internalSearch("BAYAN", env);
     if (!search.ok) throw new Error("search_unavailable");
