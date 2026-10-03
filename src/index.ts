@@ -164,7 +164,7 @@ const renderHtml = async (response: Response, requestUrl: URL) => {
       "query-input": "required name=search_term_string"
     }
   }).replace(/</g, "\\u003c");
-  html = html.replace(/<title>[^<]*<\\/title>/i, "<title>" + seoTitle + "</title>");
+  html = html.replace(/<title>[^<]*<\/title>/i, "<title>" + seoTitle + "</title>");
   html = html.replace(/<meta name="description" content="[^"]*">/i, '<meta name="description" content="' + seoDescription.replace(/"/g, "&quot;") + '">');
   html = html.replace("</head>",
     '<link rel="canonical" href="' + canonical + '">' +
