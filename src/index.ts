@@ -8,6 +8,13 @@ interface Env {
   GNEWS_API_KEY?: string;
   GOLD_API_KEY?: string;
   GOOGLE_MAPS_API_KEY?: string;
+  ADSENSE_ENABLED?: string;
+  ADSENSE_CLIENT_ID?: string;
+  ADSENSE_PUBLISHER_ID?: string;
+  ADSENSE_SLOT_HOME_TOP?: string;
+  ADSENSE_SLOT_SECTION_TOP?: string;
+  ADSENSE_SLOT_ARTICLE?: string;
+  ADSENSE_SLOT_HOME_BOTTOM?: string;
   ASSETS?: Fetcher;
 }
 
@@ -120,6 +127,21 @@ export default {
           evidenceFirst: true,
           insufficientEvidenceAllowed: true,
           secretsServerOnly: true
+        }
+      });
+    }
+
+    if (path === "/api/ads/config") {
+      const enabled = env.ADSENSE_ENABLED === "true" && !!env.ADSENSE_CLIENT_ID;
+      return json({
+        enabled,
+        provider: enabled ? "adsense" : null,
+        clientId: enabled ? env.ADSENSE_CLIENT_ID : null,
+        slots: {
+          homeTop: env.ADSENSE_SLOT_HOME_TOP || null,
+          sectionTop: env.ADSENSE_SLOT_SECTION_TOP || null,
+          article: env.ADSENSE_SLOT_ARTICLE || null,
+          homeBottom: env.ADSENSE_SLOT_HOME_BOTTOM || null
         }
       });
     }
@@ -393,6 +415,19 @@ export default {
       } catch {
         return json({ status: "source_error", source: "Frankfurter" }, 502);
       }
+    }
+
+    if (path === "/ads.txt") {
+      const publisher = (env.ADSENSE_PUBLISHER_ID || "").trim();
+      const lines = publisher && /^pub-[0-9]{16}$/.test(publisher)
+        ? ["google.com, " + publisher + ", DIRECT, f08c47fec0942fa0"]
+        : [];
+      return new Response(lines.join("\n") + (lines.length ? "\n" : ""), {
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control": "public, max-age=3600"
+        }
+      });
     }
 
     if (path === "/robots.txt") {
