@@ -7,6 +7,7 @@ interface Env {
   SEARCH_API_KEY?: string;
   GNEWS_API_KEY?: string;
   GOLD_API_KEY?: string;
+  WIKIMEDIA_ENTERPRISE_TOKEN?: string;
   GOOGLE_MAPS_API_KEY?: string;
   ADSENSE_ENABLED?: string;
   ADSENSE_CLIENT_ID?: string;
@@ -925,7 +926,7 @@ const buildArticleEvidence = async (env: Env, results: any[]) => {
 const buildEvidenceArticleFallback = (query: string, results: any[]) => {
   const usable = results.filter((x: any) => x?.title && x?.snippet).slice(0, 8);
   const sources = new Set(usable.map((x: any) => String(x.source || x.provider || "").toLowerCase()).filter(Boolean));
-  if (usable.length < 2 || sources.size < 2) return null;
+  if (!usable.length || !sources.size) return null;
   return {
     title: "ملخص الأدلة المتاحة عن " + cleanText(query, 180),
     summary: "تعذر إنشاء مقال تحريري كامل من الأدلة الحالية؛ لذلك يعرض بيان ملخصًا واضحًا للأدلة بدل تقديم مقتطفات المصادر على أنها مقال.",
@@ -1386,6 +1387,56 @@ const rssNewsSearch = async (query = "", language = "ar") => {
   return rerankResults(query, Array.from(unique.values()).slice(0, 30)).slice(0, 12);
 };
 
+const wikimediaEnterpriseLookup = async (query: string, language = "ar") => {
+  if (!env.WIKIMEDIA_ENTERPRISE_TOKEN) return [];
+  const name = cleanText(query
+    .replace(/^(?:ما هو|ما هي|من هو|من هي|who is|what is|what are)\\s+/i, "")
+    .replace(/[؟?!،,.:;]+$/g, "")
+    .trim(), 180);
+  if (!name || /\\b(?:كيف|لماذا|متى|how|why|when|latest|today|اليوم|الآن|الان)\\b/i.test(name)) return [];
+  const project = language === "en" ? "enwiki" : "arwiki";
+  try {
+    const endpoint = "https://api.enterprise.wikimedia.com/v2/articles/" + encodeURIComponent(name.replace(/\\s+/g, "_"));
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "accept": "application/json",
+        "authorization": "Bearer " + env.WIKIMEDIA_ENTERPRISE_TOKEN
+      },
+      body: JSON.stringify({
+        filters: [{ field: "is_part_of.identifier", value: project }],
+        fields: ["name","abstract","url","date_modified","article_body","license","version"],
+        limit: 1
+      }),
+      signal: AbortSignal.timeout(7000)
+    });
+    if (!response.ok) throw new Error("wikimedia_enterprise_http_" + response.status);
+    const data = await response.json() as any;
+    const article = Array.isArray(data) ? data[0] : null;
+    if (!article) return [];
+    const html = String(article?.article_body?.html || "");
+    const abstract = cleanEvidenceText(article?.abstract || "", 1400);
+    const bodyText = cleanEvidenceText(html.replace(/<[^>]+>/g, " "), 1800);
+    const snippet = abstract || bodyText;
+    if (!article?.name || !snippet) return [];
+    return [{
+      rank: 1,
+      provider: "wikimedia_enterprise",
+      title: cleanText(article.name, 220),
+      source: "Wikimedia Enterprise",
+      date: article.date_modified || null,
+      snippet,
+      url: typeof article.url === "string" ? article.url : null,
+      wikimedia: true,
+      license: Array.isArray(article.license) ? article.license[0]?.identifier || null : null,
+      revision: article?.version?.identifier || null
+    }];
+  } catch (error) {
+    return [];
+  }
+};
+
 const wikipediaSearch = async (query: string, language = "ar") => {
   const host = language === "en" ? "en.wikipedia.org" : "ar.wikipedia.org";
   const endpoint = "https://" + host + "/w/rest.php/v1/search/page?q=" + encodeURIComponent(query) + "&limit=8";
@@ -1516,7 +1567,8 @@ const internalSearch = async (query: string, env: Env) => {
 
   const tasks = research.flatMap((researchQuery) => providers.map((provider) => searchOne(researchQuery, provider)));
   const settled = await Promise.all(tasks);
-  const merged = settled.flat().filter((x: any) => x.title && x.snippet);
+  const enterprise = await wikimediaEnterpriseLookup(query, language);
+  const merged = [...enterprise, ...settled.flat()].filter((x: any) => x.title && x.snippet);
   const unique = new Map<string, any>();
   for (const item of merged) {
     const key = item.url || (item.title + "|" + item.source).toLowerCase();
@@ -1676,6 +1728,7 @@ export default {
           search: !!env.SEARCH_API_KEY,
           gnews: !!env.GNEWS_API_KEY,
           gold: !!env.GOLD_API_KEY,
+          wikimediaEnterprise: !!env.WIKIMEDIA_ENTERPRISE_TOKEN,
           maps: !!env.GOOGLE_MAPS_API_KEY
         },
         model: env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL,
@@ -1720,6 +1773,7 @@ export default {
           news: !!env.GNEWS_API_KEY,
           gold: !!env.GOLD_API_KEY,
           maps: !!env.GOOGLE_MAPS_API_KEY,
+          wikimediaEnterprise: !!env.WIKIMEDIA_ENTERPRISE_TOKEN,
           images: true,
           pwa: true,
           savedArticles: true,
