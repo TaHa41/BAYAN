@@ -1,0 +1,20 @@
+{
+  "name": "BAYAN | بيان",
+  "short_name": "BAYAN",
+  "description": "منصة عربية وإنجليزية للمعلومة والمعرفة والبحث",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#07101c",
+  "theme_color": "#07101c",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
