@@ -2596,16 +2596,33 @@ export default {
     if (path === "/sitemap.xml") {
       const routes = ["/", "/egypt", "/arab", "/world", "/science", "/economy", "/politics", "/technology", "/health", "/history-culture", "/people", "/sports", "/travel", "/arts", "/news", "/trending", "/prices", "/about", "/methodology", "/privacy", "/terms", "/contact", "/article/sky-blue", "/article/password-security", "/article/inflation-explained", "/article/health-information", "/article/sports-statistics", "/article/travel-checklist", "/article/ai-evidence", "/article/history-context"];
       const xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
-      let dynamicRoutes: string[] = [];
+      let dynamicRows: any[] = [];
       if (env.DB) {
         try {
-          const rows = await env.DB.prepare("SELECT slug FROM knowledge_articles WHERE status='PUBLISHED' ORDER BY updated_at DESC LIMIT 500").all();
-          dynamicRoutes = (rows.results || []).map((row: any) => "/article/" + encodeURIComponent(String(row.slug)));
+          const rows = await env.DB.prepare("SELECT slug,updated_at FROM knowledge_articles WHERE status='PUBLISHED' ORDER BY updated_at DESC LIMIT 500").all();
+          dynamicRows = (rows.results || []).map((row: any) => ({ route: "/article/" + encodeURIComponent(String(row.slug)), lastmod: row.updated_at || null }));
         } catch {}
       }
-      const allRoutes = [...new Set([...routes, ...dynamicRoutes])];
-      const body = "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">" + allRoutes.map((route) => "<url><loc>" + url.origin + route + "</loc></url>").join("") + "</urlset>";
-      return new Response(xml + body, { headers: { "content-type": "application/xml; charset=utf-8" } });
+      const staticRoutes = routes.map((route) => ({ route, lastmod: null }));
+      const allRows = [...staticRoutes, ...dynamicRows].filter((x, i, arr) => arr.findIndex((y) => y.route === x.route) === i);
+      const escXml = (value: string) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+      const variants = (route: string, lastmod: string | null) => {
+        const ar = url.origin + route;
+        const en = ar + (route.includes("?") ? "&lang=en" : "?lang=en");
+        const last = lastmod ? "<lastmod>" + escXml(String(lastmod)) + "</lastmod>" : "";
+        return "<url><loc>" + escXml(ar) + "</loc>" + last +
+          "<xhtml:link rel=\"alternate\" hreflang=\"ar\" href=\"" + escXml(ar) + "\"/>" +
+          "<xhtml:link rel=\"alternate\" hreflang=\"en\" href=\"" + escXml(en) + "\"/>" +
+          "<xhtml:link rel=\"alternate\" hreflang=\"x-default\" href=\"" + escXml(ar) + "\"/>" +
+          "</url>" +
+          "<url><loc>" + escXml(en) + "</loc>" + last +
+          "<xhtml:link rel=\"alternate\" hreflang=\"ar\" href=\"" + escXml(ar) + "\"/>" +
+          "<xhtml:link rel=\"alternate\" hreflang=\"en\" href=\"" + escXml(en) + "\"/>" +
+          "<xhtml:link rel=\"alternate\" hreflang=\"x-default\" href=\"" + escXml(ar) + "\"/>" +
+          "</url>";
+      };
+      const body = "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\" xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">" + allRows.map((x) => variants(x.route, x.lastmod)).join("") + "</urlset>";
+      return new Response(xml + body, { headers: { "content-type": "application/xml; charset=utf-8", "cache-control": "public, max-age=300" } });
     }
 
     if (env.ASSETS) {
