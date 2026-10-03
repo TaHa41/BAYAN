@@ -2,7 +2,7 @@ const base=(process.env.BAYAN_URL||"https://bayan.tahaomar411.workers.dev").repl
 const checks=[
   ["/","text/html"],["/health","application/json"],["/api/features","application/json"],["/api/trending","application/json"],["/api/gold","application/json"],
   ["/egypt","text/html"],["/science","text/html"],["/technology","text/html"],["/news","text/html"],
-  ["/prices","text/html"],["/search","text/html"],["/ai","text/html"],["/saved","text/html"],["/manifest.json","application/json"],["/sw.js","application/javascript"],["/sitemap.xml","application/xml"],["/robots.txt","text/plain"]
+  ["/prices","text/html"],["/search","text/html"],["/ai","text/html"],["/saved","text/html"],["/manifest.json","application/json"],["/sw.js","text/javascript"],["/sitemap.xml","application/xml"],["/robots.txt","text/plain"]
 ];
 let failed=0;
 for(const [path,type] of checks){
@@ -38,7 +38,7 @@ try{
 try{
   const home=await fetch(base+"/",{redirect:"follow"});
   const html=await home.text();
-  const ok=home.ok && /<link rel="canonical"/i.test(html) && /name="robots"/i.test(html) &&
+  const ok=home.ok && /<link rel="canonical"\s+href=/i.test(html) && /name="robots"/i.test(html) &&
     /hreflang="en"/i.test(html) && /id="app"/i.test(html);
   console.log((ok?"PASS":"FAIL")+" / HTML SEO/security contract");
   if(!ok) failed++;
