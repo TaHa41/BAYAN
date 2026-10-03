@@ -19,6 +19,8 @@ interface Env {
   ADSENSE_SLOT_ARTICLE?: string;
   ADSENSE_SLOT_HOME_BOTTOM?: string;
   BAYAN_AI_MANAGER_TOKEN?: string;
+  TELEGRAM_BOT_TOKEN?: string;
+  TELEGRAM_CHAT_ID?: string;
   ASSETS?: Fetcher;
   AI?: any;
   AI_SEARCH?: any;
@@ -249,10 +251,12 @@ const diagnoseTechnicalReport = async (env: Env, report: string) => {
 
 const sendBayanDiagnostic = async (env: Env, subject: string, report: string) => {
   const delivered = await sendBayanEmail(env, subject, report);
+  const telegram = await sendBayanTelegram(env, "⚠️ " + subject + "\n\n" + report.slice(0, 3600));
   console.log(JSON.stringify({
     event: "bayan_notification",
     subject: cleanText(subject, 180),
     delivered,
+    telegramDelivered: telegram.ok,
     destination_configured: !!(env.BAYAN_NOTIFY_EMAIL || "bayan.contact@yahoo.com") && !!env.RESEND_API_KEY,
     timestamp: new Date().toISOString()
   }));
@@ -283,6 +287,40 @@ const reportBayanError = async (env: Env, context: string, error: unknown, extra
   const diagnosis = await diagnoseTechnicalReport(env, report);
   report += "\n\nتشخيص الذكاء الاصطناعي:\n" + cleanText(diagnosis, 5000);
   return sendBayanDiagnostic(env, "تنبيه خطأ تقني مهم في بيان", report);
+};
+
+const telegramApi = async (env: Env, method: string, body?: Record<string, unknown>) => {
+  if (!env.TELEGRAM_BOT_TOKEN) throw new Error("telegram_bot_token_missing");
+  const response = await fetch("https://api.telegram.org/bot" + env.TELEGRAM_BOT_TOKEN + "/" + method, {
+    method: body ? "POST" : "GET",
+    headers: body ? { "content-type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined
+  });
+  let data: any = null;
+  try { data = await response.json(); } catch {}
+  if (!response.ok || !data?.ok) throw new Error("telegram_http_" + response.status + (data?.description ? ":" + cleanText(data.description, 240) : ""));
+  return data;
+};
+
+const sendBayanTelegram = async (env: Env, text: string, chatId?: string) => {
+  const destination = cleanText(chatId || env.TELEGRAM_CHAT_ID || "", 120);
+  if (!destination) return { ok: false, error: "telegram_chat_id_missing" };
+  try {
+    await telegramApi(env, "sendMessage", { chat_id: destination, text: cleanText(text, 4000) });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: safeErrorMessage(error) };
+  }
+};
+
+const discoverTelegramChat = async (env: Env) => {
+  const data = await telegramApi(env, "getUpdates");
+  const updates = Array.isArray(data?.result) ? data.result : [];
+  for (let i = updates.length - 1; i >= 0; i--) {
+    const chat = updates[i]?.message?.chat;
+    if (chat?.id != null && chat?.type === "private") return { chatId: String(chat.id), username: cleanText(chat.username || "", 120), firstName: cleanText(chat.first_name || "", 120) };
+  }
+  return null;
 };
 
 const managerAuthorized = (request: Request, env: Env) => {
@@ -1192,6 +1230,20 @@ export default {
         } catch {}
       }
       return json({ status: failed.length ? "degraded" : "healthy", checkedAt: new Date().toISOString(), results, diagnosis, automaticRepairPolicy: "Only allowlisted runtime retries/circuit recovery are automatic; source-code changes require CI validation before deployment." });
+    }
+
+    if (path === "/api/ai/manager/telegram/setup" && request.method === "GET") {
+      if (!managerAuthorized(request, env)) return json({ error: "unauthorized" }, 401);
+      try {
+        const chat = await discoverTelegramChat(env);
+        return json({ status: chat ? "chat_found" : "chat_not_found", configured: !!env.TELEGRAM_BOT_TOKEN, chatId: chat?.chatId || null, username: chat?.username || null, firstName: chat?.firstName || null, next: chat ? "Save chatId as TELEGRAM_CHAT_ID secret, then run /api/ai/manager/telegram/test." : "Open the bot, press Start, send /start, then retry." });
+      } catch (error) { return json({ status: "telegram_error", error: safeErrorMessage(error) }, 502); }
+    }
+
+    if (path === "/api/ai/manager/telegram/test" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({ error: "unauthorized" }, 401);
+      const result = await sendBayanTelegram(env, "✅ اختبار Telegram من BAYAN\n\nتم ربط قناة التنبيهات.");
+      return json({ status: result.ok ? "ok" : "telegram_send_failed", delivered: result.ok, error: result.error || null, chatConfigured: !!env.TELEGRAM_CHAT_ID, botConfigured: !!env.TELEGRAM_BOT_TOKEN }, result.ok ? 200 : 502);
     }
 
     if (path === "/api/ai/manager/status" && request.method === "GET") {
