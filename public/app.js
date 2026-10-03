@@ -72,7 +72,15 @@ if(!a){
 if(a){renderArticle(a,false);return;}
 const sectionArticle=(window.BAYAN_CONTENT?.articles||[]).find(x=>x.section===slug);
 if(sectionArticle){renderArticle(sectionArticle,false);return;}
-const pair=content[slug]||["موضوع في بيان","محتوى معرفي في بيان."];
+try{
+  const query=decodeURIComponent(slug).replace(/[-_]+/g," ").trim();
+  if(query){
+    const generated=await fetch("/api/search/article?q="+encodeURIComponent(query)+"&lang="+(isEn?"en":"ar"));
+    const gd=await generated.json();
+    if(generated.ok&&gd.article&&gd.article.body){renderArticle({...gd.article,id:gd.article.id||slug},true);return;}
+  }
+}catch{}
+const pair=content[slug]||[decodeURIComponent(slug).replace(/[-_]+/g," ")||"مقال بيان","لم يتم العثور على مادة منشورة لهذا المسار بعد."];
 app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isEn?"Article":"مقال")+'</div><h1 class="page-title">'+escHtml(pair[0])+'</h1><p class="page-lead">'+escHtml(pair[1])+'</p>'+summaryBlock(["سيُعرض المحتوى الكامل بعد اجتياز دورة الاسترجاع والتحليل والكتابة والتحقق."])+'</section>';
 }
 async function dynamicKnowledgePage(kind,slug){
