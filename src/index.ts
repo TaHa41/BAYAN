@@ -1993,6 +1993,57 @@ export default {
       } catch { return json({ status: "database_error", articles: [] }, 503); }
     }
 
+    if (path === "/api/saved" && request.method === "GET") {
+      const visitorId = cleanText(url.searchParams.get("visitorId"), 100);
+      if (!visitorId || !env.DB || !await ensureUserFeatureTables(env)) return json({ status: "ok", articles: [] });
+      try { const result = await env.DB.prepare("SELECT a.slug,a.section,a.title,a.summary,a.updated_at FROM saved_articles s JOIN knowledge_articles a ON a.slug=s.article_slug WHERE s.visitor_id=? AND a.status='PUBLISHED' ORDER BY s.created_at DESC LIMIT 100").bind(visitorId).all(); return json({ status:"ok", articles:result.results||[] }); }
+      catch { return json({ status:"database_error",articles:[] },503); }
+    }
+    if (path === "/api/saved" && request.method === "POST") {
+      try {
+        const body=await request.json() as {visitorId?:string;articleSlug?:string;action?:string};
+        const visitorId=cleanText(body.visitorId,100), articleSlug=cleanText(body.articleSlug,240), action=body.action==="remove"?"remove":"save";
+        if(!visitorId||!articleSlug||!env.DB||!await ensureUserFeatureTables(env)) return json({status:"invalid_request"},400);
+        if(action==="remove") await env.DB.prepare("DELETE FROM saved_articles WHERE visitor_id=? AND article_slug=?").bind(visitorId,articleSlug).run();
+        else await env.DB.prepare("INSERT OR IGNORE INTO saved_articles(visitor_id,article_slug,created_at) VALUES(?,?,?)").bind(visitorId,articleSlug,new Date().toISOString()).run();
+        return json({status:"ok",saved:action==="save"});
+      } catch { return json({status:"invalid_request"},400); }
+    }
+    if (path === "/api/article/history" && request.method === "GET") {
+      const slug=cleanText(url.searchParams.get("slug"),240);
+      if(!slug||!env.DB||!await ensureUserFeatureTables(env)) return json({status:"ok",revisions:[]});
+      try { const result=await env.DB.prepare("SELECT id,article_slug,title,summary,body,sources_json,created_at FROM article_revisions WHERE article_slug=? ORDER BY created_at DESC LIMIT 30").bind(slug).all(); return json({status:"ok",revisions:result.results||[]}); }
+      catch { return json({status:"database_error",revisions:[]},503); }
+    }
+    if (path === "/api/requests" && request.method === "POST") {
+      try {
+        const body=await request.json() as {visitorId?:string;type?:string;title?:string;body?:string;source?:string};
+        const visitorId=cleanText(body.visitorId,100), type=["article","correction"].includes(String(body.type))?String(body.type):"", title=cleanText(body.title,240), content=cleanText(body.body,6000), source=cleanText(body.source,1000);
+        if(!visitorId||!type||!title||content.length<10||!env.DB||!await ensureUserFeatureTables(env)) return json({status:"invalid_request"},400);
+        const now=new Date().toISOString();
+        const result=await env.DB.prepare("INSERT INTO user_requests(visitor_id,request_type,title,body,source,status,created_at,updated_at) VALUES(?,?,?,?,?,'PENDING_REVIEW',?,?)").bind(visitorId,type,title,content,source||null,now,now).run();
+        await sendBayanOwnerNotification(env,type==="correction"?"تصحيح معلومة جديد في بيان":"طلب مقال جديد في بيان","العنوان: "+title+"\n\nالمحتوى: "+content+"\n\nالمصدر: "+(source||"غير مذكور")+"\n\nالحالة: PENDING_REVIEW");
+        return json({status:"received",id:result.meta?.last_row_id||null,moderation:"PENDING_REVIEW"},201);
+      } catch { return json({status:"invalid_request"},400); }
+    }
+    if (path === "/api/notifications" && request.method === "GET") {
+      const visitorId=cleanText(url.searchParams.get("visitorId"),100);
+      if(!visitorId||!env.DB||!await ensureUserFeatureTables(env)) return json({status:"ok",enabled:false,topics:[]});
+      try { const row=await env.DB.prepare("SELECT enabled,language,topics_json FROM notification_preferences WHERE visitor_id=?").bind(visitorId).first() as any; return json({status:"ok",enabled:!!row?.enabled,language:row?.language||"ar",topics:row?.topics_json?JSON.parse(row.topics_json):[]}); }
+      catch { return json({status:"database_error",enabled:false,topics:[]},503); }
+    }
+    if (path === "/api/notifications" && request.method === "POST") {
+      try {
+        const body=await request.json() as {visitorId?:string;enabled?:boolean;language?:string;topics?:string[]};
+        const visitorId=cleanText(body.visitorId,100);
+        if(!visitorId||!env.DB||!await ensureUserFeatureTables(env)) return json({status:"invalid_request"},400);
+        const topics=Array.isArray(body.topics)?body.topics.map(x=>cleanText(x,80)).filter(Boolean).slice(0,30):[];
+        const now=new Date().toISOString();
+        await env.DB.prepare("INSERT INTO notification_preferences(visitor_id,enabled,language,topics_json,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(visitor_id) DO UPDATE SET enabled=excluded.enabled,language=excluded.language,topics_json=excluded.topics_json,updated_at=excluded.updated_at").bind(visitorId,body.enabled?1:0,body.language==="en"?"en":"ar",JSON.stringify(topics),now).run();
+        return json({status:"ok",enabled:!!body.enabled,topics});
+      } catch { return json({status:"invalid_request"},400); }
+    }
+
     if (path === "/api/contributions" && request.method === "POST") {
       try {
         const body = await request.json() as { visitorId?: string; title?: string; body?: string; source?: string };
