@@ -568,19 +568,21 @@ const attemptBayanSelfRepair = async (env: Env, context: string, error: unknown)
   }
   await setCooldown("repair", signature, 15 * 60);
 
-  const diagnosis = await diagnoseTechnicalReport(env, [
+  const diagnosisResult = await diagnoseTechnicalReport(env, [
     "السياق: " + cleanText(context, 240),
     "الخطأ: " + safe,
     "المطلوب: اقترح إصلاحًا تشغيليًا آمنًا فقط. لا تقترح تعديل كود أو حذف بيانات أو تغيير أسرار تلقائيًا.",
     "الإصلاحات المسموح بها: إعادة المحاولة، استخدام fallback، تعطيل مزود متعطل مؤقتًا، أو اعتبار المشكلة خارجية وتسجيلها."
   ].join("\n"));
+  const diagnosis = diagnosisResult.text;
+  const diagnosisProvider = diagnosisResult.provider;
 
   if (/4006|daily free allocation|cloudflare_ai/i.test(safe)) {
     return {
       attempted: true,
       action: "cloudflare_ai_cooldown",
       result: "تم إيقاف محاولات Cloudflare AI الإضافية مؤقتًا لهذا الخطأ والاعتماد على المسارات البديلة حتى لا يتكرر استهلاك الحصة.",
-      diagnosis: cleanText(diagnosis, 1200)
+      diagnosis: cleanText(diagnosis, 1200), diagnosisProvider
     };
   }
   if (/openai_http_429|rate.?limit|quota/i.test(safe)) {
@@ -588,7 +590,7 @@ const attemptBayanSelfRepair = async (env: Env, context: string, error: unknown)
       attempted: true,
       action: "provider_fallback",
       result: "تم تفعيل مسار fallback وعدم اعتبار OpenAI وحده مصدرًا وحيدًا للذكاء الاصطناعي.",
-      diagnosis: cleanText(diagnosis, 1200)
+      diagnosis: cleanText(diagnosis, 1200), diagnosisProvider
     };
   }
   if (/cloudflare_web_search_failed|cloudflare_web_search_not_configured/i.test(safe)) {
@@ -596,14 +598,14 @@ const attemptBayanSelfRepair = async (env: Env, context: string, error: unknown)
       attempted: true,
       action: "search_fallback",
       result: "تم تجاوز مزود البحث المتعطل والاعتماد على مزودي البحث الآخرين المتاحين.",
-      diagnosis: cleanText(diagnosis, 1200)
+      diagnosis: cleanText(diagnosis, 1200), diagnosisProvider
     };
   }
   return {
     attempted: true,
     action: "diagnose_only",
     result: "تم تحليل الخطأ آليًا، لكن لم يُسمح بإجراء تغيير غير مؤكد أو تعديل كود تلقائي.",
-    diagnosis: cleanText(diagnosis, 1200)
+    diagnosis: cleanText(diagnosis, 1200), diagnosisProvider
   };
 };
 
