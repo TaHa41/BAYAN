@@ -48,20 +48,26 @@ function home(){app.innerHTML='<section class="hero"><div><div class="eyebrow">B
 }
 async function articlePage(slug){
 const a=(window.BAYAN_CONTENT?.articles||[]).find(x=>x.id===slug);
+const renderArticle=(k,isPersisted)=>{
+  const section=k.section||"news";
+  const body=Array.isArray(k.body)?k.body:(String(k.body||"").split(/\n+/).filter(Boolean));
+  const saved=(()=>{try{return JSON.parse(localStorage.getItem("bayan:saved-articles")||"[]").includes(k.id||slug)}catch{return false}})();
+  const related=(window.BAYAN_CONTENT?.articles||[]).filter(x=>x.section===section&&x.id!==(k.id||slug)).slice(0,3);
+  const sourceLabel=isPersisted?"مقال معرفة محفوظ داخل بيان":"مقال معرفي في بيان";
+  const actions='<div class="actions article-actions"><button class="secondary" type="button" data-bayan-save="'+escHtml(k.id||slug)+'">'+(saved?"★ محفوظ":"☆ حفظ المقال")+'</button><button class="secondary" type="button" data-bayan-share="'+escHtml(k.title||"مقال بيان")+'">↗ مشاركة</button></div>';
+  const relatedHtml=related.length?'<div class="section-head"><div><h2>اقرأ أيضًا</h2><p>مواد مرتبطة من نفس المجال.</p></div></div><div class="grid">'+related.map(x=>'<a class="card article-card" href="'+withLang("/article/"+x.id)+'"><span class="article-section">'+sectionIcon(x.section)+(window.BAYAN_CONTENT?.sectionMeta?.[x.section]||x.section)+'</span><h3>'+escHtml(x.title)+'</h3><p>'+escHtml(x.summary)+'</p></a>').join("")+'</div>':"";
+  app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isPersisted?"مقال معرفة":(isEn?"Article":"مقال"))+'</div><div class="article-kicker">'+sectionIcon(section)+(window.BAYAN_CONTENT?.sectionMeta?.[section]||section)+'</div><h1 class="page-title">'+escHtml(k.title||"مقال بيان")+'</h1><p class="page-lead">'+escHtml(k.summary||"")+'</p>'+summaryBlock([sourceLabel,"المحتوى مبني على الأدلة المتاحة، مع تجنب اختلاق معلومات غير مؤكدة.","يمكن حفظ المقال للرجوع إليه أو مشاركته."])+actions+evidence()+adSlot("article")+'<article class="article-body card">'+body.map(p=>"<p>"+escHtml(p)+"</p>").join("")+'</article>'+relatedHtml+'</section>';
+};
 if(!a){
   try{
     const rr=await fetch("/api/knowledge?id="+encodeURIComponent(slug));
     const dd=await rr.json();
-    const k=dd.article;
-    if(k){
-      app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / مقال معرفة</div><div class="article-kicker">'+sectionIcon(k.section)+(window.BAYAN_CONTENT?.sectionMeta?.[k.section]||k.section)+'</div><h1 class="page-title">'+escapeHtml(k.title)+'</h1><p class="page-lead">'+escapeHtml(k.summary)+'</p>'+summaryBlock(["مقال أصلي جرى توليده من الأدلة المسترجعة.","المادة محفوظة داخل قاعدة معرفة بيان ومصنفة تلقائيًا في قسمها.","يمكن تحديثها عند ظهور أدلة جديدة."])+evidence()+'<article class="article-body card">'+(k.body||[]).map(p=>"<p>"+escapeHtml(p)+"</p>").join("")+'</article></section>';
-      return;
-    }
+    if(dd.article){renderArticle(dd.article,true);return;}
   }catch{}
 }
-const pair=content[slug]||[a?.title||"موضوع في بيان",a?.summary||"محتوى معرفي في بيان."];
-const body=a?.body||["سيُعرض المحتوى الكامل بعد اجتياز دورة الاسترجاع والتحليل والكتابة والتحقق."];
-app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isEn?"Article":"مقال")+'</div><div class="article-kicker">'+sectionIcon(a?.section||"news")+(a?.section?(window.BAYAN_CONTENT.sectionMeta[a.section]||a.section):"BAYAN")+'</div><h1 class="page-title">'+pair[0]+'</h1><p class="page-lead">'+pair[1]+'</p>'+summaryBlock(["الخلاصة تعرض الفكرة الأساسية قبل التفاصيل.","المقال يميز بين المعلومة والتفسير ويحتاج إلى مصادر قابلة للفحص.","وقت القراءة: "+(a?.readTime||"—")])+evidence()+adSlot("article")+'<article class="article-body card">'+body.map(p=>"<p>"+p+"</p>").join("")+'</article></section>';
+if(a){renderArticle(a,false);return;}
+const pair=content[slug]||["موضوع في بيان","محتوى معرفي في بيان."];
+app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isEn?"Article":"مقال")+'</div><h1 class="page-title">'+escHtml(pair[0])+'</h1><p class="page-lead">'+escHtml(pair[1])+'</p>'+summaryBlock(["سيُعرض المحتوى الكامل بعد اجتياز دورة الاسترجاع والتحليل والكتابة والتحقق."])+'</section>';
 }
 async function dynamicKnowledgePage(kind,slug){
 const labels={person:isEn?"Person":"شخص",event:isEn?"Event":"حدث",topic:isEn?"Topic":"موضوع"};
