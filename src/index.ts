@@ -18,6 +18,7 @@ interface Env {
   BAYAN_AI_MANAGER_TOKEN?: string;
   ASSETS?: Fetcher;
   AI?: any;
+  AI_SEARCH?: any;
 }
 
 const DEFAULT_OPENAI_MODEL = "gpt-5.6-luna";
@@ -27,6 +28,27 @@ const DEFAULT_AI_GATEWAY = "default";
 const cloudflareAiRun = async (env: Env, model: string, messages: any[]) => {
   if (!env.AI) throw new Error("cloudflare_ai_not_configured");
   return env.AI.run(model, { messages }, { gateway: { id: DEFAULT_AI_GATEWAY } });
+};
+
+const cloudflareKnowledgeSearch = async (env: Env, query: string) => {
+  if (!env.AI_SEARCH) throw new Error("cloudflare_ai_search_not_configured");
+  const instance = env.AI_SEARCH.get("bayan-knowledge");
+  return instance.search({
+    query,
+    ai_search_options: {
+      retrieval: {
+        retrieval_type: "hybrid",
+        max_num_results: 10
+      },
+      reranking: {
+        enabled: true,
+        model: "@cf/baai/bge-reranker-base"
+      },
+      query_rewrite: {
+        enabled: true
+      }
+    }
+  });
 };
 
 const cloudflareWebSearch = async (env: Env, query: string, provider = "exa") => {
@@ -226,6 +248,17 @@ export default {
       }
     }
 
+    if (path === "/api/knowledge/search") {
+      const query = cleanText(url.searchParams.get("q"), 1024);
+      if (!query) return json({ ok: false, error: "query_required" }, 400);
+      try {
+        const result = await cloudflareKnowledgeSearch(env, query);
+        return json({ ok: true, provider: "cloudflare-ai-search", results: result });
+      } catch (error) {
+        return json({ ok: false, error: String(error?.message || "cloudflare_ai_search_error") }, 503);
+      }
+    }
+
     if (path === "/api/tools") {
       return json({
         tools: ["search", "knowledge-search", "evidence-synthesis", "news", "gold", "maps", "image-search", "article", "summary", "verification", "repair", "live-weather", "live-fx", "ads", "ai"],
@@ -268,6 +301,7 @@ export default {
       cloudflareWorkersAI: !!env.AI,
       cloudflareAIGateway: !!env.AI,
       cloudflareWebSearch: !!env.AI?.websearch,
+      cloudflareAISearch: !!env.AI_SEARCH,
       agentTracing: true,
           ai: !!env.OPENAI_API_KEY,
           webSearch: !!env.SEARCH_API_KEY,
