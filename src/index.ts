@@ -367,7 +367,8 @@ export default {
       });
     }
 
-    if (path === "/api/ai/cloudflare" && request.method === "POST") {\n      if (!allowRequest(request, 20)) return json({ ok: false, error: "rate_limited" }, 429);
+    if (path === "/api/ai/cloudflare" && request.method === "POST") {
+      if (!allowRequest(request, 20)) return json({ ok: false, error: "rate_limited" }, 429);
       try {
         const body = await request.json() as any;
         const messages = Array.isArray(body?.messages)
@@ -533,7 +534,8 @@ export default {
       const articles = await loadKnowledgeArticles(env, section, limit);
       return json({ status: "ok", section: section || null, article: id ? articles.find((x: any) => x.id === id) || null : null, articles });
     }
-    if (path === "/api/ai" && request.method === "POST") {\n      if (!allowRequest(request, 20)) return json({ ok: false, error: "rate_limited" }, 429);
+    if (path === "/api/ai" && request.method === "POST") {
+      if (!allowRequest(request, 20)) return json({ ok: false, error: "rate_limited" }, 429);
       try {
         const body = await request.json() as { input?: string; mode?: string; live?: boolean };
         const input = body.input?.trim().slice(0, 2000);
