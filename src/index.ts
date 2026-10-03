@@ -1880,7 +1880,7 @@ export default {
         articleSlug: generated ? knowledge.articleId : "",
         sourceCount: search.sourceCount, providerCount: search.providerCount
       });
-      return json({ query: q, intent, section, answer, article: generated ? { id: knowledge.articleId, title: generated.title, summary: generated.summary, body: generated.body } : null, items: search.results.map(withoutUrl), status: "ok", verification: generated ? "article_generated_from_retrieved_evidence" : "search_results_only", knowledge });
+      return json({ query: q, intent, section, answer, article: generated ? { id: knowledge.articleId, title: generated.title, summary: generated.summary, body: generated.body } : null, items: search.results.map(withoutUrl), status: "ok", verification: generated ? "article_generated_from_retrieved_evidence" : "search_results_only", research: { queries: search.researchQueries, sourceCount: search.sourceCount, providerCount: search.providerCount, independentSources: search.independentSources, coverage: search.coverage }, knowledge });
     }
 
     if (path === "/api/knowledge/searches" && request.method === "GET") {
@@ -2076,7 +2076,7 @@ export default {
             return json({
               answer: fallbackAnswer,
               claims: [],
-              evidence: fallbackSearch.results.map(withoutUrl),
+              evidence: fallbackSearch.results.map(withoutUrl), research: { queries: fallbackSearch.researchQueries, sourceCount: fallbackSearch.sourceCount, providerCount: fallbackSearch.providerCount, independentSources: fallbackSearch.independentSources, coverage: fallbackSearch.coverage },
               confidence: 0.5,
               warnings: ["AI generation is unavailable; BAYAN returned retrieved evidence without synthesis."],
               provider: fallbackSearch.status
