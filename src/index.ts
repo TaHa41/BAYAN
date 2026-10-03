@@ -609,7 +609,7 @@ const reportBayanError = async (env: Env, context: string, error: unknown, extra
     "المكان: " + cleanText(context, 240),
     "المشكلة: " + safe,
     "الوقت: " + new Date().toISOString(),
-    "الإصدار: " + cleanText(env.BAYAN_VERSION || "0.6.0", 100),
+    "الإصدار: " + cleanText(env.BAYAN_VERSION || "0.7.0", 100),
     "Commit: " + cleanText(env.BAYAN_COMMIT_SHA || "source-commit-not-injected", 100),
     "الإجراء التلقائي: تمت إعادة المحاولة واستخدام المسار البديل إن كان متاحًا.",
     "الحالة بعد المحاولة: تحتاج مراجعة إذا استمر الخطأ.",
@@ -1246,7 +1246,7 @@ const runRuntimeAudit = async (env: Env) => {
     }
     results.push({ route: name, ok: false, status: 0, latencyMs: Date.now() - t, attempt: 3, error: safeErrorMessage(lastError) });
   };
-  await check("/api/health", async () => ({ service: "BAYAN", version: env.BAYAN_VERSION || "0.6.0" }));
+  await check("/api/health", async () => ({ service: "BAYAN", version: env.BAYAN_VERSION || "0.7.0" }));
   await check("/assets", async () => {
     if (!env.ASSETS) throw new Error("assets_binding_missing");
     const response = await env.ASSETS.fetch(new Request("https://bayan.internal/"));
@@ -1614,7 +1614,7 @@ export default {
       return json({
         status: "ok",
         service: "BAYAN",
-        version: env.BAYAN_VERSION ?? "0.6.0",
+        version: env.BAYAN_VERSION ?? "0.7.0",
         commit: env.BAYAN_COMMIT_SHA ?? "local",
         environment: env.BAYAN_ENVIRONMENT ?? "development",
         timestamp: new Date().toISOString()
