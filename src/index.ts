@@ -8,6 +8,8 @@ interface Env {
   GNEWS_API_KEY?: string;
   GOLD_API_KEY?: string;
   WIKIMEDIA_ENTERPRISE_TOKEN?: string;
+  SEARCH_PROVIDER?: string;
+  AI_SEARCH_INSTANCE?: string;
   GOOGLE_MAPS_API_KEY?: string;
   ADSENSE_ENABLED?: string;
   ADSENSE_CLIENT_ID?: string;
@@ -31,15 +33,36 @@ const OPENAI_FALLBACK_MODELS = ["gpt-6-luna", "gpt-6.1-sol"];
 const DEFAULT_CLOUDFLARE_AI_MODEL = "@cf/openai/gpt-oss-120b";
 const CLOUDFLARE_AI_FALLBACK_MODELS = ["@cf/zai-org/glm-5.3-flash", "@cf/zai-org/glm-4.7-flash"];
 const DEFAULT_AI_GATEWAY = "default";
-const aiProviderCooldown = new Map<string, number>();
+const DEFAULT_AI_SEARCH_INSTANCE = "bayan-knowledge";
+const DEFAULT_SEARCH_PROVIDER = "ceramic";
+const SEARCH_PROVIDER_CHAIN = ["ceramic", "exa", "linkup"];
+
+const cooldownKey = async (namespace: string, signature: string) => {
+  const data = new TextEncoder().encode(namespace + "|" + signature);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  const hex = Array.from(new Uint8Array(digest)).map((x) => x.toString(16).padStart(2, "0")).join("");
+  return new Request("https://bayan.internal/__bayan-cooldown/" + namespace + "/" + hex);
+};
+
+const claimCooldown = async (namespace: string, signature: string, ttlSeconds: number) => {
+  try {
+    const key = await cooldownKey(namespace, signature);
+    const cache = caches.default;
+    if (await cache.match(key)) return false;
+    await cache.put(key, new Response("1", { headers: { "cache-control": "max-age=" + Math.max(1, Math.floor(ttlSeconds)) } }));
+    return true;
+  } catch {
+    return true;
+  }
+};
 
 const cloudflareAiRun = async (env: Env, model: string, messages: any[]) => {
   if (!env.AI) throw new Error("cloudflare_ai_not_configured");
   const models = [model, ...CLOUDFLARE_AI_FALLBACK_MODELS.filter((x) => x !== model)];
   let lastError: unknown = null;
   for (const candidate of models) {
-    const cooldownUntil = aiProviderCooldown.get("cf:" + candidate) || 0;
-    if (cooldownUntil > Date.now()) {
+    const cooldownOpen = await claimCooldown("ai-model", "cf:" + candidate, 30 * 60);
+    if (!cooldownOpen) {
       lastError = new Error("cloudflare_ai_model_cooldown");
       continue;
     }
@@ -54,7 +77,7 @@ const cloudflareAiRun = async (env: Env, model: string, messages: any[]) => {
       lastError = error;
       const safe = safeErrorMessage(error);
       if (/4006|daily free allocation|429|quota|allocation/i.test(safe)) {
-        aiProviderCooldown.set("cf:" + candidate, Date.now() + 30 * 60_000);
+        await claimCooldown("ai-model", "cf:" + candidate, 30 * 60);
       }
     }
   }
@@ -63,7 +86,7 @@ const cloudflareAiRun = async (env: Env, model: string, messages: any[]) => {
 
 const cloudflareKnowledgeSearch = async (env: Env, query: string) => {
   if (!env.AI_SEARCH) throw new Error("cloudflare_ai_search_not_configured");
-  const instance = env.AI_SEARCH.get("bayan-knowledge");
+  const instance = env.AI_SEARCH.get(env.AI_SEARCH_INSTANCE?.trim() || DEFAULT_AI_SEARCH_INSTANCE);
   return instance.search({
     messages: [{ role: "user", content: query }]
   });
@@ -94,16 +117,24 @@ const openAiResponses = async (env: Env, instructions: string, input: string) =>
   throw new Error(lastError);
 };
 
-const cloudflareWebSearch = async (env: Env, query: string, provider = "exa") => {
+const cloudflareWebSearch = async (env: Env, query: string, provider?: string) => {
   if (!env.AI?.websearch) throw new Error("cloudflare_web_search_not_configured");
-  const response = await env.AI.websearch({
-    gatewayId: DEFAULT_AI_GATEWAY,
-    query,
-    provider,
-    limit: 8
-  });
-  if (!response.ok) throw new Error("cloudflare_web_search_failed");
-  return response.json();
+  const requested = provider?.trim().toLowerCase() || env.SEARCH_PROVIDER?.trim().toLowerCase() || DEFAULT_SEARCH_PROVIDER;
+  const chain = [requested, ...SEARCH_PROVIDER_CHAIN].filter((x, i, a) => SEARCH_PROVIDER_CHAIN.includes(x) && a.indexOf(x) === i);
+  let lastError = "cloudflare_web_search_failed";
+  for (const candidate of chain) {
+    try {
+      const response = await env.AI.websearch({ gatewayId: DEFAULT_AI_GATEWAY, query: cleanText(query, 1024), provider: candidate, limit: 8 });
+      if (response.ok) {
+        const data = await response.json() as any;
+        return { ...data, metadata: { ...(data?.metadata || {}), provider: candidate } };
+      }
+      lastError = "cloudflare_web_search_" + candidate + "_http_" + response.status;
+    } catch (error) {
+      lastError = "cloudflare_web_search_" + candidate + "_" + safeErrorMessage(error);
+    }
+  }
+  throw new Error(lastError);
 };
 
 
@@ -356,8 +387,6 @@ const loadAnalytics = async (env: Env, hours: number) => {
   };
 };
 
-const diagnosticMemory = new Map<string, number>();
-
 const safeErrorMessage = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error || "unknown_error");
   return message.replace(/(api[_-]?key|authorization|bearer|token|password|secret)\s*[:=]\s*\S+/gi, "$1=[REDACTED]").slice(0, 1600);
@@ -515,17 +544,14 @@ const processBayanRepairQueue = async (env: Env) => {
   }
 };
 
-const repairMemory = new Map<string, number>();
-
 const attemptBayanSelfRepair = async (env: Env, context: string, error: unknown) => {
   const safe = safeErrorMessage(error);
   const signature = context + "|" + safe;
   const now = Date.now();
-  const last = repairMemory.get(signature) || 0;
-  if (now - last < 900_000) {
+  const claim = await claimCooldown("repair", signature, 15 * 60);
+  if (!claim) {
     return { attempted: false, action: "cooldown", result: "تم منع تكرار الإصلاح الآلي لنفس الخطأ خلال 15 دقيقة." };
   }
-  repairMemory.set(signature, now);
 
   const diagnosis = await diagnoseTechnicalReport(env, [
     "السياق: " + cleanText(context, 240),
@@ -599,8 +625,8 @@ const reportBayanError = async (env: Env, context: string, error: unknown, extra
   const safe = safeErrorMessage(error);
   const signature = context + "|" + safe;
   const now = Date.now();
-  const last = diagnosticMemory.get(signature) || 0;
-  if (now - last < 300_000) return false;
+  const claim = await claimCooldown("diagnostic", signature, 5 * 60);
+  if (!claim) return false;
 
   const reportLines = [
     "بيان — تقرير خطأ تقني تلقائي",
@@ -614,7 +640,7 @@ const reportBayanError = async (env: Env, context: string, error: unknown, extra
     extra?.attempts ? "المحاولات: " + JSON.stringify(extra.attempts).slice(0, 2000) : "",
     extra?.repair ? "الإصلاح المنفذ: " + cleanText(extra.repair, 1200) : "",
     "الخطوة التالية: راجع Workers Logs / Issues إذا تكرر الخطأ.",
-    "التنبيه: تُرسل تقارير بيان عبر Telegram، ويُستخدم البريد الإلكتروني أيضًا إذا كانت إعداداته مفعلة."
+    "التنبيه: تُرسل تقارير بيان إلى قناة Telegram المهيأة فقط."
   ].filter(Boolean);
 
   // لا نجعل قاعدة البيانات أو محرك التشخيص شرطًا لإرسال التنبيه.
@@ -648,7 +674,6 @@ const reportBayanError = async (env: Env, context: string, error: unknown, extra
   );
 
   // لا نحجب التنبيهات اللاحقة إذا فشل Telegram هذه المرة.
-  if (delivery?.ok) diagnosticMemory.set(signature, now);
   return delivery;
 };
 
