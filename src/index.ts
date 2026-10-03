@@ -329,6 +329,88 @@ export default {
       });
     }
 
+    if (path === "/api/search/article") {
+      const q = cleanText(url.searchParams.get("q"), 500);
+      const rank = Math.max(1, Math.min(8, Number(url.searchParams.get("rank") || 1)));
+      const lang = (url.searchParams.get("lang") || "ar").toLowerCase() === "en" ? "en" : "ar";
+      if (!q) return json({ error: "query_required" }, 400);
+      const search = await internalSearch(q, env);
+      if (!search.ok || !search.results[rank - 1]) {
+        return json({ error: "article_source_unavailable", status: search.status }, 503);
+      }
+      const source = search.results[rank - 1];
+      let sourceText = source.snippet || "";
+      if (env.BROWSER && source.url) {
+        try {
+          const rendered = await env.BROWSER.quickAction("markdown", { url: source.url });
+          const raw = typeof rendered === "string" ? rendered : await rendered.text();
+          sourceText = cleanText(raw, 18000) || sourceText;
+        } catch {}
+      }
+      const prompt = "BAYAN original article writer.\n" +
+        "Language: " + lang + "\n" +
+        "User search: " + q + "\n" +
+        "Source title: " + source.title + "\n" +
+        "Source name: " + source.source + "\n" +
+        "Source date: " + (source.date || "unknown") + "\n\n" +
+        "Create a standalone BAYAN article that the visitor can read completely inside BAYAN. " +
+        "Summarize and explain the source material in original wording; never reproduce the source article verbatim. " +
+        "Do not invent facts, dates, quotes, numbers, people, or events. " +
+        "If the source material is incomplete, clearly say what is not established. " +
+        "Return plain text with a short title, then 4-8 paragraphs, then a short 'المصدر/Source' line naming the source only. " +
+        "Do not include URLs.\n\nSource material:\n" + sourceText;
+      try {
+        if (env.OPENAI_API_KEY) {
+          const response = await fetch("https://api.openai.com/v1/responses", {
+            method: "POST",
+            headers: { "content-type": "application/json", authorization: "Bearer " + env.OPENAI_API_KEY },
+            body: JSON.stringify({
+              model: env.OPENAI_MODEL?.trim() || DEFAULT_OPENAI_MODEL,
+              instructions: "You are BAYAN. Produce an original evidence-first article, not a reproduction of the source.",
+              input: prompt,
+              store: false
+            })
+          });
+          if (response.ok) {
+            const data = await response.json() as any;
+            return json({
+              status: "ok",
+              query: q,
+              article: {
+                title: source.title,
+                source: source.source,
+                date: source.date,
+                body: textOf(data),
+                rank
+              }
+            });
+          }
+        } else if (env.AI) {
+          const result = await cloudflareAiRun(env, DEFAULT_CLOUDFLARE_AI_MODEL, [
+            { role: "system", content: "You are BAYAN. Produce an original evidence-first article, not a reproduction of the source. Never invent." },
+            { role: "user", content: prompt }
+          ]);
+          return json({
+            status: "ok",
+            query: q,
+            article: { title: source.title, source: source.source, date: source.date, body: textOf(result), rank }
+          });
+        }
+      } catch {}
+      return json({
+        status: "ok",
+        query: q,
+        article: {
+          title: source.title,
+          source: source.source,
+          date: source.date,
+          body: source.snippet || "Insufficient Evidence",
+          rank
+        },
+        warning: "full_article_generation_unavailable"
+      });
+    }
+
     if (path === "/api/search") {
       const q = url.searchParams.get("q")?.trim().slice(0, 500) ?? "";
       const lang = (url.searchParams.get("lang") || "ar").toLowerCase() === "en" ? "en" : "ar";
