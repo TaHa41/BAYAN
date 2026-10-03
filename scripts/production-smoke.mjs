@@ -44,6 +44,14 @@ try{
   if(!ok) failed++;
 }catch(e){console.log("FAIL /health contract "+e.message);failed++;}
 try{
+  const toolsPage=await fetch(base+"/tools",{redirect:"follow"});
+  const toolsHtml=await toolsPage.text();
+  const ok=toolsPage.ok && /BAYAN TOOLS|أدوات بيان|Weather|الطقس/i.test(toolsHtml);
+  console.log((ok?"PASS":"FAIL")+" /tools page");
+  if(!ok) failed++;
+}catch(e){console.log("FAIL /tools page "+e.message);failed++;}
+
+try{
   const home=await fetch(base+"/",{redirect:"follow"});
   const html=await home.text();
   const tags=[...html.matchAll(/<link\b[^>]*>/gi)].map(m=>m[0]);
