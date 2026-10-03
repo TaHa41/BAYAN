@@ -205,6 +205,66 @@ const generateKnowledgeArticle = async (env: Env, language: string, query: strin
   } catch { return null; }
 };
 
+const knowledgeRateLimit = new Map<string, { count: number; resetAt: number }>();
+
+const allowRequest = (request: Request, limit = 60) => {
+  const now = Date.now();
+  const key = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "anonymous";
+  const current = knowledgeRateLimit.get(key);
+  if (!current || current.resetAt <= now) {
+    knowledgeRateLimit.set(key, { count: 1, resetAt: now + 60_000 });
+    return true;
+  }
+  if (current.count >= limit) return false;
+  current.count++;
+  return true;
+};
+
+const rerankResults = (query: string, results: any[]) => {
+  const terms = query.toLowerCase().split(/\s+/).filter((x) => x.length > 2).slice(0, 12);
+  return results.map((item, index) => {
+    const hay = (String(item.title || "") + " " + String(item.snippet || "")).toLowerCase();
+    const hits = terms.reduce((n, term) => n + (hay.includes(term) ? 1 : 0), 0);
+    return { ...item, _score: hits * 10 - index };
+  }).sort((a, b) => b._score - a._score).map(({ _score, ...item }, index) => ({ ...item, rank: index + 1 }));
+};
+
+const imageGate = (images: any[], query: string) => {
+  const q = query.toLowerCase().split(/\s+/).filter((x) => x.length > 2);
+  return images.filter((image) => {
+    const text = (String(image.alt || "") + " " + String(image.title || "")).toLowerCase();
+    return !!image.url && !!image.alt && !!image.license && q.some((term) => text.includes(term));
+  }).slice(0, 8);
+};
+
+const refreshKnowledgeGraph = async (env: Env, article: any) => {
+  if (!env.DB) return;
+  try {
+    await env.DB.prepare("INSERT OR REPLACE INTO knowledge_entities (entity_key, entity_type, label, updated_at) VALUES (?, 'article', ?, ?)").bind("article:" + article.slug, article.title, article.createdAt).run();
+    for (const source of (article.sources || []).slice(0, 8)) {
+      const label = cleanText(source.source || source.domain || "Unknown source", 160);
+      const key = "source:" + label.toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g, "-");
+      await env.DB.prepare("INSERT OR REPLACE INTO knowledge_entities (entity_key, entity_type, label, updated_at) VALUES (?, 'source', ?, ?)").bind(key, label, article.createdAt).run();
+      await env.DB.prepare("INSERT OR IGNORE INTO knowledge_edges (from_key, to_key, relation, created_at) VALUES (?, ?, 'SUPPORTED_BY', ?)").bind("article:" + article.slug, key, article.createdAt).run();
+    }
+  } catch {}
+};
+
+const runKnowledgeMaintenance = async (env: Env) => {
+  if (!env.DB) return { ok: false, reason: "database_not_configured" };
+  const now = Date.now();
+  const rows = await env.DB.prepare("SELECT slug, updated_at FROM knowledge_articles WHERE status='PUBLISHED'").all();
+  let due = 0;
+  for (const row of (rows.results || []) as any[]) {
+    const ageDays = Math.max(0, (now - new Date(String(row.updated_at)).getTime()) / 86_400_000);
+    const freshness = Math.max(0, Math.min(1, Math.exp(-ageDays / 30)));
+    const nextReview = new Date(now + Math.max(1, Math.round(30 * freshness)) * 86_400_000).toISOString();
+    await env.DB.prepare("UPDATE knowledge_articles SET freshness_score=?, next_review_at=? WHERE slug=?").bind(freshness, nextReview, row.slug).run();
+    if (ageDays >= 30) due++;
+  }
+  return { ok: true, checked: rows.results?.length || 0, reviewDue: due, checkedAt: new Date().toISOString() };
+};
+
 const runRuntimeAudit = async (baseUrl: string) => {
   const routes = ["/", "/health", "/api/features", "/search", "/news", "/prices", "/sitemap.xml"];
   const results = await Promise.all(routes.map(async (route) => {
@@ -249,7 +309,7 @@ const internalSearch = async (query: string, env: Env) => {
           date: cleanText(item.date, 80) || null, snippet: cleanText(item.snippet, 700),
           url: typeof item.link === "string" ? item.link : null
         }));
-        if (results.length) return { ok: true as const, status: "ok", results };
+        if (results.length) return { ok: true as const, status: "ok", results: rerankResults(query, results) };
       }
     } catch {}
   }
@@ -266,7 +326,7 @@ const internalSearch = async (query: string, env: Env) => {
         snippet: cleanText(item.snippet || item.text || item.description || item.content, 700),
         url: typeof (item.url || item.link) === "string" ? (item.url || item.link) : null
       })).filter((x: any) => x.title && x.snippet);
-      if (results.length) return { ok: true as const, status: "cloudflare_web_search", results };
+      if (results.length) return { ok: true as const, status: "cloudflare_web_search", results: rerankResults(query, results) };
     } catch {}
   }
 
@@ -307,7 +367,7 @@ export default {
       });
     }
 
-    if (path === "/api/ai/cloudflare" && request.method === "POST") {
+    if (path === "/api/ai/cloudflare" && request.method === "POST") {\n      if (!allowRequest(request, 20)) return json({ ok: false, error: "rate_limited" }, 429);
       try {
         const body = await request.json() as any;
         const messages = Array.isArray(body?.messages)
@@ -421,7 +481,7 @@ export default {
       const section = sectionForIntent(queryIntent(q), q);
       const slug = await slugForQuery(q);
       const article = { slug, query: q, section, title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 8).map(withoutUrl), createdAt: new Date().toISOString() };
-      const persistence = await saveKnowledgeArticle(env, article);
+      const persistence = await saveKnowledgeArticle(env, article);\n      if (persistence.persisted) await refreshKnowledgeGraph(env, article);
       return json({ status: "ok", query: q, section, persisted: persistence.persisted, article: { id: slug, title: article.title, summary: article.summary, body: article.body, source: article.sources[0]?.source || "BAYAN evidence", date: article.sources[0]?.date || null, rank } });
     }
     if (path === "/api/search") {
@@ -449,6 +509,22 @@ export default {
       return json({ query: q, intent, section, answer, article: generated ? { id: knowledge.articleId, title: generated.title, summary: generated.summary, body: generated.body } : null, items: search.results.map(withoutUrl), status: "ok", verification: generated ? "article_generated_from_retrieved_evidence" : "search_results_only", knowledge });
     }
 
+    if (path === "/api/knowledge/graph") {
+      const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit") || 50)));
+      if (!env.DB) return json({ status: "not_configured", nodes: [], edges: [] }, 503);
+      try {
+        const nodes = await env.DB.prepare("SELECT entity_key, entity_type, label, updated_at FROM knowledge_entities ORDER BY updated_at DESC LIMIT ?").bind(limit).all();
+        const edges = await env.DB.prepare("SELECT from_key, to_key, relation, created_at FROM knowledge_edges ORDER BY created_at DESC LIMIT ?").bind(limit * 2).all();
+        return json({ status: "ok", nodes: nodes.results || [], edges: edges.results || [] });
+      } catch { return json({ status: "database_error", nodes: [], edges: [] }, 503); }
+    }
+
+    if (path === "/api/knowledge/maintenance" && request.method === "POST") {
+      const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || "";
+      if (!env.BAYAN_AI_MANAGER_TOKEN || supplied !== env.BAYAN_AI_MANAGER_TOKEN) return json({ status: "forbidden" }, 403);
+      return json(await runKnowledgeMaintenance(env));
+    }
+
     if (path === "/api/knowledge") {
       const section = cleanText(url.searchParams.get("section"), 80) || undefined;
       const id = cleanText(url.searchParams.get("id"), 120) || undefined;
@@ -456,7 +532,7 @@ export default {
       const articles = await loadKnowledgeArticles(env, section, limit);
       return json({ status: "ok", section: section || null, article: id ? articles.find((x: any) => x.id === id) || null : null, articles });
     }
-    if (path === "/api/ai" && request.method === "POST") {
+    if (path === "/api/ai" && request.method === "POST") {\n      if (!allowRequest(request, 20)) return json({ ok: false, error: "rate_limited" }, 429);
       try {
         const body = await request.json() as { input?: string; mode?: string; live?: boolean };
         const input = body.input?.trim().slice(0, 2000);
@@ -682,7 +758,7 @@ export default {
           sourceUrl: x.foreign_landing_url || x.url, relevanceScore: x.rank_feature || 0,
           rightsStatus: x.license ? "license_identified" : "needs_license_check"
         }));
-        return json({ status: "ok", source: "Openverse", images });
+        return json({ status: "ok", source: "Openverse", images: imageGate(images, q), gate: "IMAGE_CHECKED" });
       } catch {
         return json({ status: "source_error", source: "Openverse" }, 502);
       }
