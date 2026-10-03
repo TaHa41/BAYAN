@@ -30,7 +30,45 @@ const uiTranslations={
 "تعذر تحديث الأخبار":"Unable to update news","الأخبار غير متاحة الآن":"News unavailable","الإشارات غير متاحة الآن":"Signals unavailable",
 "تعذر تحديث الإشارات":"Unable to update signals","لا توجد مقالات محفوظة":"No saved articles","لا توجد مساهمات جديدة":"No new contributions",
 "إرسال للمراجعة":"Submit for review","المحتوى":"Content","العنوان":"Title","المصدر (اختياري)":"Source (optional)",
-"المعلومة أولًا. الدليل قبل الادعاء.":"Information first. Evidence before claims."
+"المقال يشرح الموضوع في سياق مترابط، ثم يفصل الأدلة والمصادر في نهاية الصفحة.":"The article explains the topic coherently, then separates the evidence and sources.",
+"مواد مرتبطة من نفس المجال.":"Related material from the same field.",
+"المصدر:":"Source:",
+"مصدر مباشر":"Direct source","مصدر غير محدد":"Unspecified source",
+"جرام · تحديث المصدر:":"Gram · source updated:",
+"الذهب بالجنيه المصري":"Gold in Egyptian pounds","الذهب غير متاح الآن":"Gold unavailable",
+"لا نعرض رقمًا غير موثوق.":"No unverified number is shown.",
+"مقال معرفة محفوظ في بيان":"Knowledge article saved in BAYAN",
+"الوضوح قبل السرعة.":"Clarity before speed.","المصادر والتحقق جزء من طريقة عمل المنصة.":"Sources and verification are part of the platform.",
+"أي معلومة غير مؤكدة تُعامل على أنها غير مؤكدة.":"Unverified information is treated as unverified.",
+"محتوى القسم":"Section content","افتح أي مادة لقراءة التفاصيل داخل بيان.":"Open any item to read its details inside BAYAN.",
+"ابحث عن سؤال أو شخص أو موضوع أو خبر. يجمع بيان الأدلة أولًا ثم يرتبها في إجابة واضحة، مع فصل المصادر عن الخلاصة.":"Search for a question, person, topic, or news item. BAYAN gathers evidence first and separates sources from the answer.",
+"ابدأ البحث":"Start searching","يجمع بيان الأدلة قبل كتابة الإجابة.":"BAYAN gathers evidence before writing the answer.",
+"اكتب سؤالك لتحصل على نتيجة منظمة داخل بيان.":"Ask a question to get an organized result inside BAYAN.",
+"الأدلة التي استُخدمت في بناء الإجابة.":"Evidence used to build the answer.",
+"المصادر التي استُخدمت في بناء الإجابة.":"Sources used to build the answer.",
+"قراءة داخل بيان":"Read inside BAYAN","جارٍ إعداد المقال…":"Preparing the article…",
+"حاول مرة أخرى":"Try again","اكتمل البحث":"Search complete","تم جمع":"Collected",
+"مصادر/نتائج وعرضها في أقسام منفصلة.":"sources/results and displayed them separately.",
+"مقال معرفي في بيان":"BAYAN knowledge article","مقال معرفة":"Knowledge article",
+"مشاركة":"Share","حفظ المقال":"Save article","محفوظ":"Saved","اقرأ أيضًا":"Read also",
+"مراجعة مساهمات الزوار":"Visitor contributions review","مفتاح المراجعة":"Review key","عرض المساهمات":"Load contributions",
+"تحديث إحصاءات الزيارات":"Refresh visitor analytics","فحص إعدادات النظام":"Check system configuration",
+"ربط Telegram واستخراج CHAT_ID":"Connect Telegram and discover CHAT_ID","اختبار Telegram":"Test Telegram",
+"إحصاءات الزيارات":"Visitor analytics","أسئلة البحث المحفوظة":"Saved research questions",
+"المراقبة والإصلاح الذاتي":"Monitoring and self-healing","ستظهر هنا الأخطاء التي اكتشفها بيان، التشخيص، المحاولات، وحالة التحقق.":"Detected errors, diagnosis, attempts, and verification status will appear here.",
+"يحتفظ بيان بسجل الأسئلة البحثية المجهول لتحسين قاعدة المعرفة والمحتوى الاستباقي.":"BAYAN keeps an anonymized research-question history to improve the knowledge base and proactive content.",
+"عرض":"Load","تم التحقق":"Verified","إرسال للمراجعة":"Submit for review",
+"تعذر عرض هذه الصفحة":"Unable to display this page","تم احتواء الخطأ حتى لا تظهر الصفحة فارغة.":"The error was contained so the page does not remain blank.",
+"إعادة المحاولة":"Try again","هذه الصفحة غير متاحة.":"This page is unavailable.",
+"المعلومة أولًا. الدليل قبل الادعاء.":"Information first. Evidence before claims.",
+"ساهم بمعلومة":"Contribute information","يمكنك إرسال معلومة أو تصحيح أو مصدر. لا تُنشر مساهمتك تلقائيًا؛ تمر أولًا بالمراجعة والتحقق.":"Send information, a correction, or a source. Contributions are reviewed before publication.",
+"العنوان":"Title","المحتوى":"Content","المصدر (اختياري)":"Source (optional)",
+"ما المعلومة؟":"What is the information?","اكتب المعلومة بالتفصيل...":"Write the information in detail...",
+"اسم المصدر أو المرجع":"Source or reference name","اكتب عنوانًا ومعلومة لا تقل عن 20 حرفًا.":"Enter a title and information of at least 20 characters.",
+"جارٍ إرسال المساهمة للمراجعة…":"Submitting contribution for review…","تم استلام المساهمة وستدخل دورة المراجعة.":"Contribution received and queued for review.",
+"تعذر إرسال المساهمة.":"Unable to submit contribution.","تعذر الاتصال بالخدمة.":"Unable to connect to the service.",
+"عن بيان":"About BAYAN","المنهجية":"Methodology","الخصوصية":"Privacy","الشروط":"Terms","تواصل":"Contact",
+"الوضوح قبل السرعة.":"Clarity before speed."
 };
 const localizeUi=()=>{if(!isEn)return;const root=document.querySelector("#app");if(!root)return;const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);for(const node of nodes){const value=node.nodeValue||"";let next=value;for(const [ar,en] of Object.entries(uiTranslations)){if(next.trim()===ar)next=next.replace(ar,en);}if(next!==value)node.nodeValue=next;}root.querySelectorAll("input[placeholder],textarea[placeholder]").forEach(el=>{const v=el.getAttribute("placeholder");if(v&&uiTranslations[v])el.setAttribute("placeholder",uiTranslations[v]);});};
 function summaryBlock(items){return '<section class="summary"><h2>'+(isEn?"Quick Summary":"الخلاصة")+'</h2><ul>'+items.map(x=>"<li>"+x+"</li>").join("")+"</ul></section>"}function adSlot(slot){return '<div class="ad-slot" data-ad-slot="'+slot+'" hidden><span>إعلان</span></div>'}function evidence(){return '<div class="evidence-strip"><span class="badge">'+(isEn?"Sources required":"المصادر مطلوبة")+'</span><span class="badge">'+(isEn?"Verification":"حالة التحقق")+'</span><span class="badge">'+(isEn?"Updated with evidence":"التحديث مرتبط بالدليل")+'</span></div>'}function editorialArticles(){const list=window.BAYAN_CONTENT?.articles||[];const meta=window.BAYAN_CONTENT?.sectionMeta||{};return '<section><div class="section-head"><div><h2>'+(isEn?"BAYAN articles":"مقالات بيان")+'</h2><p>'+(isEn?"Original content that explains and answers, not just search results.":"محتوى أصلي يشرح ويجيب، وليس مجرد نتائج بحث.")+'</p></div></div><div class="grid article-grid">'+list.slice(0,6).map(a=>'<a class="card article-card" href="'+withLang("/article/"+a.id)+'"><span class="article-section">'+sectionIcon(a.section)+(meta[a.section]||a.section)+'</span><h3>'+escapeHtml(a.title)+'</h3><p>'+escapeHtml(a.summary)+'</p><small>'+escapeHtml(a.readTime)+'</small></a>').join("")+'</div></section>'}async function loadHomeNewsAndDiscovery(){
@@ -250,7 +288,7 @@ async function loadPersistedSection(key){
     const items=Array.isArray(dd.articles)?dd.articles:[];
     const grid=document.querySelector(".dynamic-knowledge-grid");
     if(!items.length||!grid)return;
-    grid.innerHTML=items.map(a=>'<a class="card article-card" href="'+withLang("/article/"+a.id)+'"><span class="article-section">'+sectionIcon(a.section)+(window.BAYAN_CONTENT?.sectionMeta?.[a.section]||a.section)+'</span><h3>'+escapeHtml(a.title)+'</h3><p>'+escapeHtml(a.summary)+'</p><small>مقال معرفة محفوظ في بيان</small></a>').join("")+grid.innerHTML;
+    grid.innerHTML=items.map(a=>'<a class="card article-card" href="'+withLang("/article/"+a.id)+'"><span class="article-section">'+sectionIcon(a.section)+(window.BAYAN_CONTENT?.sectionMeta?.[a.section]||a.section)+'</span><h3>'+escapeHtml(a.title)+'</h3><p>'+escapeHtml(a.summary)+'</p><small>'+(isEn?"Knowledge article saved in BAYAN":"مقال معرفة محفوظ في بيان")+'</small></a>').join("")+grid.innerHTML;
   }catch{}
 }
 async function articlePage(slug){
@@ -263,8 +301,8 @@ const renderArticle=(k,isPersisted)=>{
   const sources=Array.isArray(k.sources)?k.sources:[];
   const sourceHtml=sources.length?"<section class=\"card article-sources\"><h2>المصادر المستخدمة</h2><p class=\"muted\">المصادر التالية استُخدمت للتحقق وبناء المقال، وليست بديلًا عن متن المقال.</p><ol>"+sources.slice(0,12).map(s=>"<li>"+escHtml(s.source||s.title||(isEn?"Source":"مصدر"))+(s.date?" · "+escHtml(s.date):"")+"</li>").join("")+"</ol></section>":"";
   const sourceLabel=isPersisted?(isEn?"Knowledge article saved in BAYAN":"مقال معرفة محفوظ داخل بيان"):(isEn?"BAYAN knowledge article":"مقال معرفي في بيان");
-  const actions='<div class="actions article-actions"><button class="secondary" type="button" data-bayan-save="'+escHtml(k.id||slug)+'">'+(saved?"محفوظ":"حفظ المقال")+'</button><button class="secondary" type="button" data-bayan-share="'+escHtml(k.title||"مقال بيان")+'">مشاركة</button></div>';
-  const relatedHtml=related.length?'<div class="section-head"><div><h2>اقرأ أيضًا</h2><p>مواد مرتبطة من نفس المجال.</p></div></div><div class="grid">'+related.map(x=>'<a class="card article-card" href="'+withLang("/article/"+x.id)+'"><span class="article-section">'+sectionIcon(x.section)+(window.BAYAN_CONTENT?.sectionMeta?.[x.section]||x.section)+'</span><h3>'+escHtml(x.title)+'</h3><p>'+escHtml(x.summary)+'</p></a>').join("")+'</div>':"";
+  const actions='<div class="actions article-actions"><button class="secondary" type="button" data-bayan-save="'+escHtml(k.id||slug)+'">'+(saved?(isEn?"Saved":"محفوظ"):(isEn?"Save article":"حفظ المقال"))+'</button><button class="secondary" type="button" data-bayan-share="'+escHtml(k.title||"مقال بيان")+'">'+(isEn?"Share":"مشاركة")+'</button></div>';
+  const relatedHtml=related.length?'<div class="section-head"><div><h2>'+(isEn?"Read also":"اقرأ أيضًا")+'</h2><p>'+(isEn?"Related material from the same field.":"مواد مرتبطة من نفس المجال.")+'</p></div></div><div class="grid">'+related.map(x=>'<a class="card article-card" href="'+withLang("/article/"+x.id)+'"><span class="article-section">'+sectionIcon(x.section)+(window.BAYAN_CONTENT?.sectionMeta?.[x.section]||x.section)+'</span><h3>'+escHtml(x.title)+'</h3><p>'+escHtml(x.summary)+'</p></a>').join("")+'</div>':"";
   const heroImage=k.image?'<img loading="eager" class="news-image article-hero-image" src="'+escHtml(k.image)+'" alt="" referrerpolicy="no-referrer">':"";
   let articleHtml="";
   let listItems=[];
@@ -280,7 +318,7 @@ const renderArticle=(k,isPersisted)=>{
     articleHtml+="<p>"+escHtml(value)+"</p>";
   }
   flushList();
-  app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isPersisted?"مقال معرفة":(isEn?"Article":"مقال"))+'</div><div class="article-kicker">'+sectionIcon(section)+(window.BAYAN_CONTENT?.sectionMeta?.[section]||section)+'</div><h1 class="page-title">'+escHtml(k.title||"مقال بيان")+'</h1>'+heroImage+'<p class="page-lead article-intro">'+escHtml(k.summary||"")+'</p>'+summaryBlock([sourceLabel,"المقال يشرح الموضوع في سياق مترابط، ثم يفصل الأدلة والمصادر في نهاية الصفحة."])+actions+adSlot("article")+'<article class="article-body card">'+articleHtml+'</article>'+sourceHtml+relatedHtml+'</section>';
+  app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isPersisted?"مقال معرفة":(isEn?"Article":"مقال"))+'</div><div class="article-kicker">'+sectionIcon(section)+(window.BAYAN_CONTENT?.sectionMeta?.[section]||section)+'</div><h1 class="page-title">'+escHtml(k.title||"مقال بيان")+'</h1>'+heroImage+'<p class="page-lead article-intro">'+escHtml(k.summary||"")+'</p>'+summaryBlock([sourceLabel,isEn?"The article explains the topic coherently, then separates the evidence and sources.":"المقال يشرح الموضوع في سياق مترابط، ثم يفصل الأدلة والمصادر في نهاية الصفحة."])+actions+adSlot("article")+'<article class="article-body card">'+articleHtml+'</article>'+sourceHtml+relatedHtml+'</section>';
 };
 const trendParams=new URLSearchParams(location.search);
 if(trendParams.get("trend")==="1"){
@@ -421,7 +459,7 @@ document.addEventListener("click",(event)=>{
     event.stopPropagation();
     const id=save.getAttribute("data-bayan-save");
     let list=[];try{list=JSON.parse(localStorage.getItem("bayan:saved-articles")||"[]")}catch{}
-    if(list.includes(id)){list=list.filter(x=>x!==id);save.textContent="☆ حفظ المقال";}else{list.unshift(id);save.textContent="★ محفوظ";}
+    if(list.includes(id)){list=list.filter(x=>x!==id);save.textContent=isEn?"Save article":"حفظ المقال";}else{list.unshift(id);save.textContent=isEn?"Saved":"محفوظ";}
     localStorage.setItem("bayan:saved-articles",JSON.stringify(list.slice(0,100)));const article=(window.BAYAN_CONTENT?.articles||[]).find(x=>x.id===id);if(article)recordInterest(article.section,"save");
     return;
   }
@@ -432,7 +470,7 @@ document.addEventListener("click",(event)=>{
     const title=share.getAttribute("data-bayan-share")||"مقال بيان";
     const data={title,text:title+" — BAYAN | بيان",url:location.href};
     if(navigator.share)navigator.share(data).catch(()=>{});
-    else if(navigator.clipboard)navigator.clipboard.writeText(location.href).then(()=>{share.textContent="✓ تم نسخ الرابط";setTimeout(()=>share.textContent="↗ مشاركة",1800)}).catch(()=>{});
+    else if(navigator.clipboard)navigator.clipboard.writeText(location.href).then(()=>{share.textContent=isEn?"Link copied":"تم نسخ الرابط";setTimeout(()=>share.textContent=isEn?"Share":"مشاركة",1800)}).catch(()=>{});
     return;
   }
   const link=event.target.closest("a");
