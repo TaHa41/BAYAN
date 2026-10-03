@@ -52,12 +52,27 @@ const renderHtml = async (response: Response, requestUrl: URL) => {
   const alternateAr = requestUrl.origin + cleanPath;
   const alternateEn = requestUrl.origin + cleanPath + "?lang=en";
   html = html.replace('<html lang="ar" dir="rtl">', '<html lang="' + language + '" dir="' + direction + '">');
+  const indexable = !cleanPath.startsWith("/search") && !cleanPath.startsWith("/ai");
+  const robots = indexable ? "index,follow" : "noindex,follow";
+  const jsonLd = JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "BAYAN | بيان",
+    url: requestUrl.origin + "/",
+    inLanguage: ["ar", "en"],
+    potentialAction: {
+      "@type": "SearchAction",
+      target: requestUrl.origin + "/search?q={search_term_string}",
+      "query-input": "required name=search_term_string"
+    }
+  }).replace(/</g, "\\u003c");
   html = html.replace("</head>",
     '<link rel="canonical" href="' + canonical + '">' +
     '<link rel="alternate" hreflang="ar" href="' + alternateAr + '">' +
     '<link rel="alternate" hreflang="en" href="' + alternateEn + '">' +
     '<link rel="alternate" hreflang="x-default" href="' + alternateAr + '">' +
-    '<meta name="robots" content="index,follow">' +
+    '<meta name="robots" content="' + robots + '">' +
+    '<script type="application/ld+json">' + jsonLd + '</script>' +
     "</head>"
   );
   return new Response(html, { status: response.status, statusText: response.statusText, headers });
