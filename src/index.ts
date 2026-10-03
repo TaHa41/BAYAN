@@ -605,18 +605,40 @@ export default {
 
     if (path === "/api/news") {
       const q = (url.searchParams.get("q") || "").trim();
-      if (!env.GNEWS_API_KEY) return json({ status: "not_configured", provider: "GNews", message: "Add GNEWS_API_KEY as a Cloudflare Secret." }, 503);
       try {
-        const lang = (url.searchParams.get("lang") || "en").toLowerCase();
+        const lang = (url.searchParams.get("lang") || "ar").toLowerCase();
         if (!["en", "ar"].includes(lang)) return json({ status: "invalid_language", supported: ["en", "ar"] }, 400);
-        const endpoint = q ? "search" : "top-headlines";
-        const api = "https://gnews.io/api/v4/" + endpoint + "?lang=" + lang + "&max=10&apikey=" + encodeURIComponent(env.GNEWS_API_KEY) + (q ? "&q=" + encodeURIComponent(q) : "&category=general");
-        const response = await fetch(api);
-        if (!response.ok) return json({ status: "provider_error", provider: "GNews" }, 502);
-        const data = await response.json() as any;
-        return json({ status: "ok", provider: "GNews", articles: (data.articles || []).slice(0,10).map((article: any) => ({ title: cleanText(article.title, 240), description: cleanText(article.description || article.content, 900), content: cleanText(article.content, 1600), publishedAt: article.publishedAt || null, source: { name: cleanText(article.source?.name, 160) }, image: typeof article.image === "string" ? article.image : null })), totalArticles: data.totalArticles || 0 });
+
+        if (env.GNEWS_API_KEY) {
+          const endpoint = q ? "search" : "top-headlines";
+          const api = "https://gnews.io/api/v4/" + endpoint + "?lang=" + lang + "&max=10&apikey=" + encodeURIComponent(env.GNEWS_API_KEY) + (q ? "&q=" + encodeURIComponent(q) : "&category=general");
+          const response = await fetch(api);
+          if (response.ok) {
+            const data = await response.json() as any;
+            return json({ status: "ok", provider: "GNews", articles: (data.articles || []).slice(0,10).map((article: any) => ({ title: cleanText(article.title, 240), description: cleanText(article.description || article.content, 900), content: cleanText(article.content, 1600), publishedAt: article.publishedAt || null, source: { name: cleanText(article.source?.name, 160) }, image: typeof article.image === "string" ? article.image : null })), totalArticles: data.totalArticles || 0 });
+          }
+        }
+
+        const searchQuery = q || (lang === "ar" ? "أحدث الأخبار اليوم" : "latest verified news today");
+        const search = await internalSearch(searchQuery, env);
+        if (search.ok && search.results.length) {
+          return json({
+            status: "ok",
+            provider: search.status === "cloudflare_web_search" ? "Cloudflare Web Search" : "Search",
+            articles: search.results.slice(0,10).map((item: any) => ({
+              title: item.title,
+              description: item.snippet,
+              content: item.snippet,
+              publishedAt: item.date || null,
+              source: { name: item.source },
+              image: null
+            })),
+            totalArticles: search.results.length
+          });
+        }
+        return json({ status: "provider_unavailable", provider: "GNews/Search", articles: [], totalArticles: 0 }, 503);
       } catch {
-        return json({ status: "provider_error", provider: "GNews" }, 502);
+        return json({ status: "provider_error", provider: "GNews/Search" }, 502);
       }
     }
 
