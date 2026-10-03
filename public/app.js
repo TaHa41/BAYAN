@@ -153,16 +153,6 @@ function home(){app.innerHTML='<section class="hero"><div><div class="eyebrow">B
   }catch{}
 }
 async function articlePage(slug){
-const trendParams=new URLSearchParams(location.search);
-if(trendParams.get("trend")==="1"){
-  try{
-    const title=trendParams.get("title")||"";
-    const image=trendParams.get("image")||"";
-    const rr=await fetch("/api/trending/article?title="+encodeURIComponent(title)+"&image="+encodeURIComponent(image)+"&lang="+(isEn?"en":"ar"));
-    const dd=await rr.json();
-    if(rr.ok&&dd.article){renderArticle({...dd.article,id:dd.article.id||slug,image:dd.article.image||image},true);return;}
-  }catch{}
-}
 const a=(window.BAYAN_CONTENT?.articles||[]).find(x=>x.id===slug);
 const renderArticle=(k,isPersisted)=>{
   const section=k.section||"news";
@@ -175,6 +165,16 @@ const renderArticle=(k,isPersisted)=>{
   const heroImage=k.image?'<img loading="eager" class="news-image article-hero-image" src="'+escHtml(k.image)+'" alt="" referrerpolicy="no-referrer">':"";
   app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isPersisted?"مقال معرفة":(isEn?"Article":"مقال"))+'</div><div class="article-kicker">'+sectionIcon(section)+(window.BAYAN_CONTENT?.sectionMeta?.[section]||section)+'</div><h1 class="page-title">'+escHtml(k.title||"مقال بيان")+'</h1>'+heroImage+'<p class="page-lead">'+escHtml(k.summary||"")+'</p>'+summaryBlock([sourceLabel,"المحتوى مبني على الأدلة المتاحة، مع تجنب اختلاق معلومات غير مؤكدة."])+actions+evidence()+adSlot("article")+'<article class="article-body card">'+body.map(p=>"<p>"+escHtml(p)+"</p>").join("")+'</article>'+sourceHtml+relatedHtml+'</section>';
 };
+const trendParams=new URLSearchParams(location.search);
+if(trendParams.get("trend")==="1"){
+  try{
+    const title=trendParams.get("title")||"";
+    const image=trendParams.get("image")||"";
+    const rr=await fetch("/api/trending/article?title="+encodeURIComponent(title)+"&image="+encodeURIComponent(image)+"&lang="+(isEn?"en":"ar"));
+    const dd=await rr.json();
+    if(rr.ok&&dd.article){renderArticle({...dd.article,id:dd.article.id||slug,image:dd.article.image||image},true);return;}
+  }catch{}
+}
 if(a){renderArticle(a,false);return;}
 try{
   const rr=await fetch("/api/knowledge?id="+encodeURIComponent(slug));
