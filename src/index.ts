@@ -836,17 +836,17 @@ const stripMarkup = (value: string, max = 900) =>
 const rssItems = (xml: string) => {
   const items: any[] = [];
   const blocks = [
-    ...(xml.match(/<item[\\s\\S]*?<\\/item>/gi) || []),
-    ...(xml.match(/<entry[\\s\\S]*?<\\/entry>/gi) || [])
+    ...(xml.match(/<item[\s\S]*?<\/item>/gi) || []),
+    ...(xml.match(/<entry[\s\S]*?<\/entry>/gi) || [])
   ];
   for (const raw of blocks.slice(0, 40)) {
     const pick = (tag: string) => {
-      const m = raw.match(new RegExp("<" + tag + "(?:\\\\s[^>]*)?>([\\\\s\\\\S]*?)<\\/" + tag + ">", "i"));
+      const m = raw.match(new RegExp("<" + tag + "(?:\\s[^>]*)?>([\\s\\S]*?)<\\/" + tag + ">", "i"));
       return m ? stripMarkup(m[1], tag === "description" || tag === "summary" || tag === "content" ? 900 : 320) : "";
     };
     const title = pick("title");
     if (!title) continue;
-    const linkMatch = raw.match(/<link(?:\\s[^>]*)?(?:href=["']([^"']+)["'][^>]*)?>([\\s\\S]*?)<\\/link>/i);
+    const linkMatch = raw.match(/<link(?:\s[^>]*)?(?:href=["']([^"']+)["'][^>]*)?>([\s\S]*?)<\/link>/i);
     const link = (linkMatch?.[1] || linkMatch?.[2] || "").trim();
     const source = pick("source") || pick("author") || "RSS";
     const date = pick("pubDate") || pick("published") || pick("updated") || null;
