@@ -44,16 +44,21 @@ const cooldownKey = async (namespace: string, signature: string) => {
   return new Request("https://bayan.internal/__bayan-cooldown/" + namespace + "/" + hex);
 };
 
-const claimCooldown = async (namespace: string, signature: string, ttlSeconds: number) => {
+const isCooldownActive = async (namespace: string, signature: string) => {
   try {
-    const key = await cooldownKey(namespace, signature);
-    const cache = caches.default;
-    if (await cache.match(key)) return false;
-    await cache.put(key, new Response("1", { headers: { "cache-control": "max-age=" + Math.max(1, Math.floor(ttlSeconds)) } }));
-    return true;
+    return !!(await caches.default.match(await cooldownKey(namespace, signature)));
   } catch {
-    return true;
+    return false;
   }
+};
+
+const setCooldown = async (namespace: string, signature: string, ttlSeconds: number) => {
+  try {
+    await caches.default.put(
+      await cooldownKey(namespace, signature),
+      new Response("1", { headers: { "cache-control": "max-age=" + Math.max(1, Math.floor(ttlSeconds)) } })
+    );
+  } catch {}
 };
 
 const cloudflareAiRun = async (env: Env, model: string, messages: any[]) => {
@@ -61,7 +66,7 @@ const cloudflareAiRun = async (env: Env, model: string, messages: any[]) => {
   const models = [model, ...CLOUDFLARE_AI_FALLBACK_MODELS.filter((x) => x !== model)];
   let lastError: unknown = null;
   for (const candidate of models) {
-    const cooldownOpen = await claimCooldown("ai-model", "cf:" + candidate, 30 * 60);
+    const cooldownOpen = !(await isCooldownActive("ai-model", "cf:" + candidate));
     if (!cooldownOpen) {
       lastError = new Error("cloudflare_ai_model_cooldown");
       continue;
@@ -77,7 +82,7 @@ const cloudflareAiRun = async (env: Env, model: string, messages: any[]) => {
       lastError = error;
       const safe = safeErrorMessage(error);
       if (/4006|daily free allocation|429|quota|allocation/i.test(safe)) {
-        await claimCooldown("ai-model", "cf:" + candidate, 30 * 60);
+        await setCooldown("ai-model", "cf:" + candidate, 30 * 60);
       }
     }
   }
@@ -548,7 +553,7 @@ const attemptBayanSelfRepair = async (env: Env, context: string, error: unknown)
   const safe = safeErrorMessage(error);
   const signature = context + "|" + safe;
   const now = Date.now();
-  const claim = await claimCooldown("repair", signature, 15 * 60);
+  const claim = !(await isCooldownActive("repair", signature));
   if (!claim) {
     return { attempted: false, action: "cooldown", result: "تم منع تكرار الإصلاح الآلي لنفس الخطأ خلال 15 دقيقة." };
   }
@@ -625,7 +630,7 @@ const reportBayanError = async (env: Env, context: string, error: unknown, extra
   const safe = safeErrorMessage(error);
   const signature = context + "|" + safe;
   const now = Date.now();
-  const claim = await claimCooldown("diagnostic", signature, 5 * 60);
+  const claim = !(await isCooldownActive("diagnostic", signature));
   if (!claim) return false;
 
   const reportLines = [
