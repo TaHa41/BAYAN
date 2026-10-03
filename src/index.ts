@@ -1529,12 +1529,32 @@ const internalSearch = async (query: string, env: Env) => {
   if (strong.length >= 8) results = strong.slice(0, 16);
   const providerCount = new Set(results.flatMap((x: any) => String(x.provider || "").split("+").filter(Boolean))).size;
   const sourceCount = new Set(results.map((x: any) => String(x.source || "").toLowerCase()).filter(Boolean)).size;
+  const independentSources = new Set(
+    results.map((x: any) => {
+      const raw = String(x.source || x.domain || "").toLowerCase().replace(/^www\./, "");
+      return raw.split(/[|/]/)[0].trim();
+    }).filter(Boolean)
+  ).size;
+  const coverage = {
+    researchAngles: research.length,
+    sourceCount,
+    providerCount,
+    independentSources,
+    adequate: sourceCount >= 4 && providerCount >= 2 && independentSources >= 3,
+    gaps: [
+      sourceCount < 4 ? "limited_source_count" : null,
+      providerCount < 2 ? "limited_provider_diversity" : null,
+      independentSources < 3 ? "limited_independent_sources" : null
+    ].filter(Boolean)
+  };
   return {
     ok: results.length > 0,
     status: results.length ? "multi_source" : "search_provider_not_configured",
     results,
     providerCount,
     sourceCount,
+    independentSources,
+    coverage,
     researchQueries: research,
     attempts
   };
@@ -1739,7 +1759,7 @@ export default {
         const generated = await generateKnowledgeArticle(env, lang, title, search.results);
         if (!generated) return json({ error: "full_article_generation_unavailable" }, 503);
         const slug = await slugForQuery("trending:" + title);
-        const article = { slug, query: title, section: "news", title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 8).map(withoutUrl), createdAt: new Date().toISOString() };
+        const article = { slug, query: title, section: "news", title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
         const persistence = await saveKnowledgeArticle(env, article);
         if (persistence.persisted) await refreshKnowledgeGraph(env, article);
         return json({ status: "ok", article: { id: slug, title: article.title, summary: article.summary, body: article.body, sources: article.sources, sourceUrl, image } });
@@ -1832,7 +1852,7 @@ export default {
       let knowledge: any = { query: q, section, status: "DISCOVERED", persisted: false };
       if (generated) {
         const slug = await slugForQuery(q);
-        const article = { slug, query: q, section, title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 8).map(withoutUrl), createdAt: new Date().toISOString() };
+        const article = { slug, query: q, section, title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
         const persistence = await saveKnowledgeArticle(env, article);
         if (persistence.persisted) await refreshKnowledgeGraph(env, article);
         knowledge = { ...knowledge, status: "PUBLISHED", persisted: persistence.persisted, articleId: slug };
@@ -2117,7 +2137,7 @@ export default {
               if (generated) {
                 const slug = await slugForQuery(input);
                 const section = sectionForIntent(queryIntent(input), input);
-                const knowledgeArticle = { slug, query: input, section, title: generated.title, summary: generated.summary, body: generated.body, sources: results.slice(0, 8).map(withoutUrl), createdAt: new Date().toISOString() };
+                const knowledgeArticle = { slug, query: input, section, title: generated.title, summary: generated.summary, body: generated.body, sources: results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
                 const persistence = await saveKnowledgeArticle(env, knowledgeArticle);
                 if (persistence.persisted) await refreshKnowledgeGraph(env, knowledgeArticle);
                 article = { id: slug, section, title: generated.title, summary: generated.summary, persisted: persistence.persisted };
@@ -2147,7 +2167,7 @@ export default {
                   if (generated) {
                     const slug = await slugForQuery(input);
                     const section = sectionForIntent(queryIntent(input), input);
-                    const knowledgeArticle = { slug, query: input, section, title: generated.title, summary: generated.summary, body: generated.body, sources: results.slice(0, 8).map(withoutUrl), createdAt: new Date().toISOString() };
+                    const knowledgeArticle = { slug, query: input, section, title: generated.title, summary: generated.summary, body: generated.body, sources: results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
                     const persistence = await saveKnowledgeArticle(env, knowledgeArticle);
                     if (persistence.persisted) await refreshKnowledgeGraph(env, knowledgeArticle);
                     article = { id: slug, section, title: generated.title, summary: generated.summary, persisted: persistence.persisted };
@@ -2182,7 +2202,7 @@ export default {
             if (generated) {
               const slug = await slugForQuery(input);
               const section = sectionForIntent(queryIntent(input), input);
-              const knowledgeArticle = { slug, query: input, section, title: generated.title, summary: generated.summary, body: generated.body, sources: results.slice(0, 8).map(withoutUrl), createdAt: new Date().toISOString() };
+              const knowledgeArticle = { slug, query: input, section, title: generated.title, summary: generated.summary, body: generated.body, sources: results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
               const persistence = await saveKnowledgeArticle(env, knowledgeArticle);
               if (persistence.persisted) await refreshKnowledgeGraph(env, knowledgeArticle);
               article = { id: slug, section, title: generated.title, summary: generated.summary, persisted: persistence.persisted };
