@@ -936,6 +936,29 @@ export default {
       }
     }
 
+    if (path === "/api/trending") {
+      try {
+        const lang = (url.searchParams.get("lang") || "ar").toLowerCase() === "en" ? "en" : "ar";
+        const items = await rssNewsSearch("", lang);
+        if (!items.length) return json({ status: "provider_unavailable", signals: [] }, 503);
+        const signals = items.slice(0, 8).map((item: any, index: number) => ({
+          rank: index + 1,
+          title: item.title,
+          source: item.source,
+          date: item.date || null,
+          basis: "current_news_signal"
+        }));
+        return json({
+          status: "ok",
+          provider: "Google News RSS",
+          basis: "current headlines, not a popularity ranking",
+          signals
+        });
+      } catch {
+        return json({ status: "provider_error", signals: [] }, 502);
+      }
+    }
+
     if (path === "/api/gold") {
       if (!env.GOLD_API_KEY) return json({ status: "not_configured", provider: "GoldAPI", message: "Add GOLD_API_KEY as a Cloudflare Secret." }, 503);
       try {
