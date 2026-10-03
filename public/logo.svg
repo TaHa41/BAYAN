@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+<title>BAYAN | بيان</title><desc>علامة بيان الهندسية تجمع حرف ب مع خطوط المعرفة والبيانات</desc>
+<defs><linearGradient id="g" x1="70" y1="60" x2="450" y2="450" gradientUnits="userSpaceOnUse"><stop stop-color="#79ddff"/><stop offset="1" stop-color="#9b8cff"/></linearGradient></defs>
+<rect width="512" height="512" rx="112" fill="#07101c"/>
+<path d="M146 112v206c0 52 38 84 91 84h33c57 0 96-35 96-91V112" fill="none" stroke="url(#g)" stroke-width="34" stroke-linecap="round"/>
+<path d="M122 177h170M122 239h125" fill="none" stroke="#edf4ff" stroke-width="18" stroke-linecap="round" opacity=".92"/>
+<circle cx="353" cy="238" r="17" fill="#79ddff"/>
+<path d="M154 374c39 22 82 32 127 32 43 0 84-9 121-29" fill="none" stroke="#9b8cff" stroke-width="12" stroke-linecap="round" opacity=".8"/>
+</svg>
