@@ -790,6 +790,37 @@ const ensureKnowledgeTables = async (env: Env) => {
   } catch { return false; }
 };
 
+const ensureKnowledgeSearchTable = async (env: Env) => {
+  if (!env.DB) return false;
+  try {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS knowledge_searches (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      query TEXT NOT NULL,
+      language TEXT NOT NULL DEFAULT 'ar',
+      intent TEXT,
+      section TEXT,
+      status TEXT NOT NULL DEFAULT 'DISCOVERED',
+      article_slug TEXT,
+      source_count INTEGER NOT NULL DEFAULT 0,
+      provider_count INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL
+    )`).run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_knowledge_searches_query_time ON knowledge_searches(query,created_at DESC)").run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_knowledge_searches_time ON knowledge_searches(created_at DESC)").run();
+    return true;
+  } catch { return false; }
+};
+
+const recordKnowledgeSearch = async (env: Env, data: { query: string; language: string; intent?: string; section?: string; status?: string; articleSlug?: string; sourceCount?: number; providerCount?: number }) => {
+  if (!env.DB) return false;
+  try {
+    if (!await ensureKnowledgeSearchTable(env)) return false;
+    await env.DB.prepare("INSERT INTO knowledge_searches(query,language,intent,section,status,article_slug,source_count,provider_count,created_at) VALUES(?,?,?,?,?,?,?,?,?)")
+      .bind(cleanText(data.query, 500), data.language === "en" ? "en" : "ar", cleanText(data.intent || "", 40) || null, cleanText(data.section || "", 80) || null, cleanText(data.status || "DISCOVERED", 40), cleanText(data.articleSlug || "", 240) || null, Number(data.sourceCount || 0), Number(data.providerCount || 0), new Date().toISOString()).run();
+    return true;
+  } catch { return false; }
+};
+
 const saveKnowledgeArticle = async (env: Env, article: any) => {
   if (!env.DB) return { persisted: false, reason: "database_not_configured" };
   try {
@@ -1633,7 +1664,7 @@ export default {
 
     if (path === "/api/search/article") {
       const q = cleanText(url.searchParams.get("q"), 500);
-      const rank = Math.max(1, Math.min(8, Number(url.searchParams.get("rank") || 1)));
+      const rank = Math.max(1, Math.min(16, Number(url.searchParams.get("rank") || 1)));
       const lang = (url.searchParams.get("lang") || "ar").toLowerCase() === "en" ? "en" : "ar";
       if (!q) return json({ error: "query_required" }, 400);
       const search = await internalSearch(q, env);
@@ -1642,7 +1673,7 @@ export default {
       if (!generated) return json({ error: "full_article_generation_unavailable" }, 503);
       const section = sectionForIntent(queryIntent(q), q);
       const slug = await slugForQuery(q);
-      const article = { slug, query: q, section, title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 8).map(withoutUrl), createdAt: new Date().toISOString() };
+      const article = { slug, query: q, section, title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
       const persistence = await saveKnowledgeArticle(env, article);
       if (persistence.persisted) await refreshKnowledgeGraph(env, article);
       return json({ status: "ok", query: q, section, persisted: persistence.persisted, article: { id: slug, title: article.title, summary: article.summary, body: article.body, source: article.sources[0]?.source || "BAYAN evidence", date: article.sources[0]?.date || null, rank } });
@@ -1673,6 +1704,7 @@ export default {
       const q = url.searchParams.get("q")?.trim().slice(0, 500) ?? "";
       const lang = (url.searchParams.get("lang") || "ar").toLowerCase() === "en" ? "en" : "ar";
       if (!q) return json({ query: "", items: [], status: "empty_query" });
+      const logSearch = async (payload: any) => { try { await recordKnowledgeSearch(env, payload); } catch {} };
 
       // Weather questions are live-data requests, not ordinary web searches.
       // Resolve the place first so queries such as "طقس الغردقة" / "weather Cairo"
@@ -1714,6 +1746,7 @@ export default {
                   const answer = lang === "ar"
                     ? "الطقس الآن في " + place.name + ": " + current.temperature_2m + "°C، والرطوبة " + current.relative_humidity_2m + "%."
                     : "Current weather in " + place.name + ": " + current.temperature_2m + "°C, humidity " + current.relative_humidity_2m + "%.";
+                  await logSearch({ query: q, language: lang, intent: "weather", section: "prices", status: "LIVE_DATA", sourceCount: 1, providerCount: 1 });
                   return json({
                     query: q,
                     status: "ok",
@@ -1772,6 +1805,12 @@ export default {
         } catch {}
       }
       if (!answer) answer = evidenceFallbackAnswer(q, search.results);
+      await logSearch({
+        query: q, language: lang, intent, section,
+        status: generated ? "PUBLISHED" : "DISCOVERED",
+        articleSlug: generated ? knowledge.articleId : "",
+        sourceCount: search.sourceCount, providerCount: search.providerCount
+      });
       return json({ query: q, intent, section, answer, article: generated ? { id: knowledge.articleId, title: generated.title, summary: generated.summary, body: generated.body } : null, items: search.results.map(withoutUrl), status: "ok", verification: generated ? "article_generated_from_retrieved_evidence" : "search_results_only", knowledge });
     }
 
