@@ -354,6 +354,78 @@ const queryIntent = (query: string) => {
   return "general";
 };
 
+const decodeHtmlEntities = (value: string) => String(value || "")
+  .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+  .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+  .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+  .replace(/&#(\d+);/g, (_m, n) => String.fromCharCode(Number(n)));
+
+const stripMarkup = (value: string, max = 900) =>
+  cleanText(decodeHtmlEntities(String(value || "")).replace(/<[^>]+>/g, " "), max);
+
+const rssItems = (xml: string) => {
+  const items: any[] = [];
+  const matches = xml.match(/<item[\s\S]*?<\/item>/gi) || [];
+  for (const raw of matches.slice(0, 20)) {
+    const pick = (tag: string) => {
+      const m = raw.match(new RegExp("<" + tag + "(?:\\s[^>]*)?>([\\s\\S]*?)<\\/" + tag + ">", "i"));
+      return m ? stripMarkup(m[1], tag === "description" ? 900 : 320) : "";
+    };
+    const title = pick("title");
+    if (!title) continue;
+    const link = pick("link") || ((raw.match(/<link>([\s\S]*?)<\/link>/i) || [,""])[1] || "").trim();
+    const source = pick("source") || "RSS";
+    const date = pick("pubDate") || pick("published") || null;
+    const description = pick("description");
+    items.push({ title, source, date, snippet: description || title, url: link || null });
+  }
+  return items;
+};
+
+const rssNewsSearch = async (query = "", language = "ar") => {
+  const hl = language === "en" ? "en-US" : "ar";
+  const gl = language === "en" ? "US" : "EG";
+  const ceid = language === "en" ? "US:en" : "EG:ar";
+  const q = query ? "&q=" + encodeURIComponent(query) : "";
+  const endpoint = "https://news.google.com/rss?hl=" + encodeURIComponent(hl) + "&gl=" + gl + "&ceid=" + encodeURIComponent(ceid) + q;
+  try {
+    const response = await fetch(endpoint, { headers: { "user-agent": "BAYAN/1.0 news reader" } });
+    if (!response.ok) return [];
+    return rerankResults(query, rssItems(await response.text()).slice(0, 12)).slice(0, 8);
+  } catch {
+    return [];
+  }
+};
+
+const wikipediaSearch = async (query: string, language = "ar") => {
+  const host = language === "en" ? "en.wikipedia.org" : "ar.wikipedia.org";
+  const endpoint = "https://" + host + "/w/rest.php/v1/search/page?q=" + encodeURIComponent(query) + "&limit=8";
+  try {
+    const response = await fetch(endpoint, { headers: { "Api-User-Agent": "BAYAN/1.0 (knowledge search)" } });
+    if (!response.ok) return [];
+    const data = await response.json() as any;
+    const pages = Array.isArray(data?.pages) ? data.pages : [];
+    return pages.map((item: any, index: number) => ({
+      rank: index + 1,
+      title: cleanText(item?.title, 220),
+      source: "Wikipedia",
+      date: null,
+      snippet: stripMarkup(item?.description || item?.excerpt || "", 700),
+      url: typeof item?.key === "string" ? "https://" + host + "/wiki/" + encodeURIComponent(item.key) : null
+    })).filter((x: any) => x.title && x.snippet);
+  } catch {
+    return [];
+  }
+};
+
+const evidenceFallbackAnswer = (query: string, results: any[]) => {
+  if (!results.length) return null;
+  const lines = results.slice(0, 6).map((x: any, i: number) =>
+    (i + 1) + ". " + x.title + " — " + x.snippet + (x.source ? " (" + x.source + ")" : "")
+  );
+  return "هذه نتائج الأدلة المتاحة داخل بيان للسؤال: " + query + "\n\n" + lines.join("\n");
+};
+
 const internalSearch = async (query: string, env: Env) => {
   if (env.SEARCH_API_KEY) {
     const endpoint =
@@ -389,6 +461,11 @@ const internalSearch = async (query: string, env: Env) => {
     } catch {}
   }
 
+  const language = /[\u0600-\u06FF]/.test(query) ? "ar" : "en";
+  const rss = await rssNewsSearch(query, language);
+  if (rss.length) return { ok: true as const, status: "rss", results: rss };
+  const wiki = await wikipediaSearch(query, language);
+  if (wiki.length) return { ok: true as const, status: "wikipedia", results: wiki };
   return { ok: false as const, status: "search_provider_not_configured", results: [] };
 };
 
@@ -589,6 +666,7 @@ export default {
           answer = textOf(result);
         } catch {}
       }
+      if (!answer) answer = evidenceFallbackAnswer(q, search.results);
       return json({ query: q, intent, section, answer, article: generated ? { id: knowledge.articleId, title: generated.title, summary: generated.summary, body: generated.body } : null, items: search.results.map(withoutUrl), status: "ok", verification: generated ? "article_generated_from_retrieved_evidence" : "search_results_only", knowledge });
     }
 
@@ -661,10 +739,21 @@ export default {
         if (!input) return json({ error: "input_required" }, 400);
 
         if (!env.OPENAI_API_KEY && !env.AI) {
+          const fallbackSearch = await internalSearch(input, env);
+          if (fallbackSearch.ok && fallbackSearch.results.length) {
+            return json({
+              answer: evidenceFallbackAnswer(input, fallbackSearch.results),
+              claims: [],
+              evidence: fallbackSearch.results.map(withoutUrl),
+              confidence: 0.5,
+              warnings: ["AI generation is unavailable; BAYAN returned retrieved evidence without synthesis."],
+              provider: fallbackSearch.status
+            });
+          }
           return json({
-            answer: "مساعد بيان غير مفعّل حاليًا.",
+            answer: "Insufficient Evidence: لا يتوفر حاليًا مزود بحث أو ذكاء اصطناعي يمكنه التحقق من هذا الطلب.",
             claims: [], evidence: [], confidence: 0,
-            warnings: ["No AI provider is configured"]
+            warnings: ["No AI or search provider is configured"]
           }, 503);
         }
 
@@ -809,6 +898,22 @@ export default {
         }
 
         const searchQuery = q || (lang === "ar" ? "أحدث الأخبار اليوم" : "latest verified news today");
+        const rss = await rssNewsSearch(q, lang);
+        if (rss.length) {
+          return json({
+            status: "ok",
+            provider: "Google News RSS",
+            articles: rss.slice(0, 10).map((item: any) => ({
+              title: item.title,
+              description: item.snippet,
+              content: item.snippet,
+              publishedAt: item.date || null,
+              source: { name: item.source },
+              image: null
+            })),
+            totalArticles: rss.length
+          });
+        }
         const search = await internalSearch(searchQuery, env);
         if (search.ok && search.results.length) {
           return json({
