@@ -1105,33 +1105,59 @@ const refreshKnowledgeGraph = async (env: Env, article: any) => {
   } catch {}
 };
 
-const processContentQueue = async (env: Env) => {
+const enqueueProactiveTopics = async (env: Env) => {
+  if (!env.DB) return { ok: false, queued: 0 };
+  try {
+    await ensureContentQueueRetryColumn(env);
+    const topics = await rssNewsSearch("", "ar");
+    let queued = 0;
+    for (const item of topics.slice(0, 4)) {
+      const topic = cleanText(item?.title || "", 240);
+      if (!topic) continue;
+      const existing = await env.DB.prepare("SELECT id FROM content_queue WHERE topic=? AND status IN ('QUEUED','PROCESSING','RETRY_WAIT') LIMIT 1").bind(topic).first<any>();
+      if (existing) continue;
+      await env.DB.prepare("INSERT INTO content_queue(topic,section,language,priority,status,created_at,next_attempt_at) VALUES(?,?,?,?,?,?,?)")
+        .bind(topic, sectionForIntent(editorialIntent(topic), topic), "ar", 55, "QUEUED", new Date().toISOString(), new Date().toISOString()).run();
+      queued++;
+    }
+    return { ok: true, queued };
+  } catch (error) {
+    return { ok: false, queued: 0, error: safeErrorMessage(error) };
+  }
+};
+
+const processContentQueue = async (env: Env, maxJobs = 2) => {
   if (!env.DB) return { ok: false, reason: "database_not_configured" };
   await ensureContentQueueRetryColumn(env);
-  const now = new Date().toISOString();
-  const row = (await env.DB.prepare("SELECT id, topic, section, language, attempts FROM content_queue WHERE status IN ('QUEUED','RETRY_WAIT') AND (next_attempt_at IS NULL OR next_attempt_at <= ?) ORDER BY priority DESC, created_at ASC LIMIT 1").bind(now).all()).results?.[0] as any;
-  if (!row) return { ok: true, processed: false };
-  await env.DB.prepare("UPDATE content_queue SET status='PROCESSING', attempts=attempts+1 WHERE id=? AND status IN ('QUEUED','RETRY_WAIT')").bind(row.id).run();
-  try {
-    const search = await internalSearch(String(row.topic), env);
-    if (!search.ok || !search.results?.length) throw new Error("evidence_unavailable");
-    if ((search.sourceCount || 0) < 2) throw new Error("insufficient_independent_sources");
-    const generated = await generateKnowledgeArticle(env, String(row.language || "ar"), String(row.topic), search.results);
-    if (!generated) throw new Error("generation_unavailable");
-    const slug = await slugForQuery(String(row.topic));
-    const article = { slug, query: String(row.topic), section: String(row.section), title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 12).map(withoutUrl), createdAt: now };
-    const persistence = await saveKnowledgeArticle(env, article);
-    if (!persistence.persisted) throw new Error("database_write_failed");
-    await refreshKnowledgeGraph(env, article);
-    await env.DB.prepare("UPDATE content_queue SET status='PUBLISHED', processed_at=? WHERE id=?").bind(now, row.id).run();
-    return { ok: true, processed: true, id: row.id, slug };
-  } catch {
-    const attempts = Number(row.attempts || 0) + 1;
-    const status = attempts >= 6 ? "BLOCKED" : "RETRY_WAIT";
-    const retryAt = new Date(Date.now() + Math.min(60, 5 * Math.pow(2, Math.max(0, attempts - 1))) * 60_000).toISOString();
-    await env.DB.prepare("UPDATE content_queue SET status=?, processed_at=?, next_attempt_at=? WHERE id=?").bind(status, now, status === "BLOCKED" ? null : retryAt, row.id).run();
-    return { ok: false, processed: true, id: row.id, status, nextAttemptAt: retryAt };
+  const processed: any[] = [];
+  for (let cycle = 0; cycle < Math.max(1, Math.min(3, maxJobs)); cycle++) {
+    const now = new Date().toISOString();
+    const row = (await env.DB.prepare("SELECT id, topic, section, language, attempts FROM content_queue WHERE status IN ('QUEUED','RETRY_WAIT') AND (next_attempt_at IS NULL OR next_attempt_at <= ?) ORDER BY priority DESC, created_at ASC LIMIT 1").bind(now).all()).results?.[0] as any;
+    if (!row) break;
+    const claimed = await env.DB.prepare("UPDATE content_queue SET status='PROCESSING', attempts=attempts+1 WHERE id=? AND status IN ('QUEUED','RETRY_WAIT')").bind(row.id).run();
+    if (!claimed.success || Number(claimed.meta?.changes || 0) !== 1) continue;
+    try {
+      const search = await internalSearch(String(row.topic), env);
+      if (!search.ok || !search.results?.length) throw new Error("evidence_unavailable");
+      if ((search.sourceCount || 0) < 2) throw new Error("insufficient_independent_sources");
+      const generated = await generateKnowledgeArticle(env, String(row.language || "ar"), String(row.topic), search.results);
+      if (!generated) throw new Error("generation_unavailable");
+      const slug = await slugForQuery(String(row.topic));
+      const article = { slug, query: String(row.topic), section: String(row.section), title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 12).map(withoutUrl), createdAt: now };
+      const persistence = await saveKnowledgeArticle(env, article);
+      if (!persistence.persisted) throw new Error("database_write_failed");
+      await refreshKnowledgeGraph(env, article);
+      await env.DB.prepare("UPDATE content_queue SET status='PUBLISHED', processed_at=?, next_attempt_at=NULL WHERE id=?").bind(now, row.id).run();
+      processed.push({ id: row.id, status: "PUBLISHED", slug });
+    } catch (error) {
+      const attempts = Number(row.attempts || 0) + 1;
+      const status = attempts >= 6 ? "BLOCKED" : "RETRY_WAIT";
+      const retryAt = status === "BLOCKED" ? null : new Date(Date.now() + Math.min(60, 5 * Math.pow(2, Math.max(0, attempts - 1))) * 60_000).toISOString();
+      await env.DB.prepare("UPDATE content_queue SET status=?, processed_at=?, next_attempt_at=? WHERE id=?").bind(status, now, retryAt, row.id).run();
+      processed.push({ id: row.id, status, nextAttemptAt: retryAt, error: safeErrorMessage(error) });
+    }
   }
+  return { ok: true, processed };
 };
 
 const validInterestSections = new Set(["egypt","arab","world","science","economy","politics","technology","health","history-culture","people","sports","travel","arts","news","trending","prices"]);
@@ -1528,7 +1554,8 @@ export default {
         await env.DB.prepare("DELETE FROM runtime_audits WHERE id NOT IN (SELECT id FROM runtime_audits ORDER BY checked_at DESC LIMIT 100)").run();
       }
       await runKnowledgeMaintenance(env);
-      await processContentQueue(env);
+      await enqueueProactiveTopics(env);
+      await processContentQueue(env, 2);
       await processBayanRepairQueue(env);
     } catch (error) {
       await reportBayanError(env, "scheduled runtime audit / maintenance", error);
