@@ -41,6 +41,8 @@ const renderHtml = async (response: Response, requestUrl: URL) => {
   if (!(headers.get("content-type") || "").includes("text/html")) {
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   }
+  headers.set("cache-control", "no-store, no-cache, must-revalidate");
+  headers.set("pragma", "no-cache");
   let html = await response.text();
   const language = requestUrl.searchParams.get("lang") === "en" ? "en" : "ar";
   const direction = language === "en" ? "ltr" : "rtl";
