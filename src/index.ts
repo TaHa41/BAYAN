@@ -616,7 +616,7 @@ const reportBayanError = async (env: Env, context: string, error: unknown, extra
     extra?.attempts ? "المحاولات: " + JSON.stringify(extra.attempts).slice(0, 2000) : "",
     extra?.repair ? "الإصلاح المنفذ: " + cleanText(extra.repair, 1200) : "",
     "الخطوة التالية: راجع Workers Logs / Issues إذا تكرر الخطأ.",
-    "التنبيه: يتم إرسال تقارير بيان عبر Telegram فقط؛ لا يعتمد النظام على البريد الإلكتروني."
+    "التنبيه: تُرسل تقارير بيان عبر Telegram، ويُستخدم البريد الإلكتروني أيضًا إذا كانت إعداداته مفعلة."
   ].filter(Boolean);
 
   // لا نجعل قاعدة البيانات أو محرك التشخيص شرطًا لإرسال التنبيه.
@@ -1124,11 +1124,10 @@ const enqueueProactiveTopics = async (env: Env) => {
     for (const item of topics.slice(0, 4)) {
       const topic = cleanText(item?.title || "", 240);
       if (!topic) continue;
-      const existing = await env.DB.prepare("SELECT id FROM content_queue WHERE topic=? AND status IN ('QUEUED','PROCESSING','RETRY_WAIT') LIMIT 1").bind(topic).first<any>();
-      if (existing) continue;
-      await env.DB.prepare("INSERT INTO content_queue(topic,section,language,priority,status,created_at,next_attempt_at) VALUES(?,?,?,?,?,?,?)")
-        .bind(topic, sectionForIntent(editorialIntent(topic), topic), "ar", 55, "QUEUED", new Date().toISOString(), new Date().toISOString()).run();
-      queued++;
+      if (await queueContentTopic(env, topic, sectionForIntent(editorialIntent(topic), topic), "ar", 55)) queued++;
+    }
+    for (const topic of ["How to verify information online", "How generative AI works"]) {
+      if (await queueContentTopic(env, topic, sectionForIntent(editorialIntent(topic), topic), "en", 45)) queued++;
     }
     return { ok: true, queued };
   } catch (error) {
@@ -1136,7 +1135,21 @@ const enqueueProactiveTopics = async (env: Env) => {
   }
 };
 
-const processContentQueue = async (env: Env, maxJobs = 2) => {
+const queueContentTopic = async (env: Env, topic: string, section: string, language = "ar", priority = 55) => {
+  if (!env.DB) return false;
+  const cleanTopic = cleanText(topic, 500);
+  const cleanSection = validInterestSections.has(section) ? section : sectionForIntent(queryIntent(cleanTopic), cleanTopic);
+  if (!cleanTopic) return false;
+  try {
+    await ensureContentQueueRetryColumn(env);
+    const existing = await env.DB.prepare("SELECT id FROM content_queue WHERE topic=? AND language=? AND status IN ('QUEUED','PROCESSING','RETRY_WAIT') LIMIT 1").bind(cleanTopic, language === "en" ? "en" : "ar").first<any>();
+    if (existing) return true;
+    await env.DB.prepare("INSERT INTO content_queue(topic,section,language,priority,status,created_at,next_attempt_at) VALUES(?,?,?,?,?,?,?)").bind(cleanTopic, cleanSection, language === "en" ? "en" : "ar", Math.max(0, Math.min(100, priority)), "QUEUED", new Date().toISOString(), new Date().toISOString()).run();
+    return true;
+  } catch { return false; }
+};
+
+
   if (!env.DB) return { ok: false, reason: "database_not_configured" };
   await ensureContentQueueRetryColumn(env);
   const processed: any[] = [];
@@ -1233,7 +1246,7 @@ const runRuntimeAudit = async (env: Env) => {
     }
     results.push({ route: name, ok: false, status: 0, latencyMs: Date.now() - t, attempt: 3, error: safeErrorMessage(lastError) });
   };
-  await check("/health", async () => ({ service: "BAYAN", version: env.BAYAN_VERSION || "0.6.0" }));
+  await check("/api/health", async () => ({ service: "BAYAN", version: env.BAYAN_VERSION || "0.6.0" }));
   await check("/assets", async () => {
     if (!env.ASSETS) throw new Error("assets_binding_missing");
     const response = await env.ASSETS.fetch(new Request("https://bayan.internal/"));
@@ -1597,7 +1610,7 @@ export default {
       const url = new URL(request.url);
     const path = url.pathname;
 
-    if (path === "/api/health") {
+    if (path === "/api/health" || path === "/health") {
       return json({
         status: "ok",
         service: "BAYAN",
@@ -1625,7 +1638,7 @@ export default {
         return json({ ok: true, provider: "cloudflare", gateway: DEFAULT_AI_GATEWAY, model, result });
       } catch (error) {
         await reportBayanError(env, "api/ai/cloudflare", error);
-        return json({ ok: false, error: error instanceof Error ? error.message : "cloudflare_ai_error" }, 503);
+        return json({ ok: false, error: safeErrorMessage(error) }, 503);
       }
     }
 
@@ -1640,7 +1653,7 @@ export default {
         return json({ ok: true, provider, results: result });
       } catch (error) {
         await reportBayanError(env, "api/search/web", error);
-        return json({ ok: false, error: error instanceof Error ? error.message : "cloudflare_web_search_error" }, 503);
+        return json({ ok: false, error: safeErrorMessage(error) }, 503);
       }
     }
 
@@ -1652,7 +1665,7 @@ export default {
         return json({ ok: true, provider: "cloudflare-ai-search", results: result });
       } catch (error) {
         await reportBayanError(env, "api/knowledge/search", error);
-        return json({ ok: false, error: error instanceof Error ? error.message : "cloudflare_ai_search_error" }, 503);
+        return json({ ok: false, error: safeErrorMessage(error) }, 503);
       }
     }
 
@@ -1727,7 +1740,10 @@ export default {
       const search = await internalSearch(q, env);
       if (!search.ok || !search.results[rank - 1]) return json({ error: "article_source_unavailable", status: search.status }, 503);
       const generated = await generateKnowledgeArticle(env, lang, q, search.results);
-      if (!generated) return json({ error: "full_article_generation_unavailable" }, 503);
+      if (!generated) {
+        await queueContentTopic(env, q, sectionForIntent(queryIntent(q), q), lang, 100);
+        return json({ error: "full_article_generation_unavailable", status: "queued_for_retry" }, 503);
+      }
       const section = sectionForIntent(queryIntent(q), q);
       const slug = await slugForQuery(q);
       const article = { slug, query: q, section, title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
@@ -1803,7 +1819,7 @@ export default {
                   const answer = lang === "ar"
                     ? "الطقس الآن في " + place.name + ": " + current.temperature_2m + "°C، والرطوبة " + current.relative_humidity_2m + "%."
                     : "Current weather in " + place.name + ": " + current.temperature_2m + "°C, humidity " + current.relative_humidity_2m + "%.";
-                  await logSearch({ query: q, language: lang, intent: "weather", section: "prices", status: "LIVE_DATA", sourceCount: 1, providerCount: 1 });
+                  await logSearch({ query: q, language: lang, intent: "weather", section: "travel", status: "LIVE_DATA", sourceCount: 1, providerCount: 1 });
                   return json({
                     query: q,
                     status: "ok",
@@ -1842,8 +1858,15 @@ export default {
         const slug = await slugForQuery(q);
         const article = { slug, query: q, section, title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
         const persistence = await saveKnowledgeArticle(env, article);
-        if (persistence.persisted) await refreshKnowledgeGraph(env, article);
-        knowledge = { ...knowledge, status: "PUBLISHED", persisted: persistence.persisted, articleId: slug };
+        if (persistence.persisted) {
+          await refreshKnowledgeGraph(env, article);
+          knowledge = { ...knowledge, status: "PUBLISHED", persisted: true, articleId: slug };
+        } else {
+          knowledge = { ...knowledge, status: "QUEUED_FOR_PERSISTENCE_RETRY", persisted: false, articleId: slug };
+        }
+      } else {
+        const queued = await queueContentTopic(env, q, section, lang, 100);
+        knowledge = { ...knowledge, status: queued ? "QUEUED_FOR_ARTICLE" : "DISCOVERED" };
       }
       let answer = null;
       if (env.OPENAI_API_KEY) {
