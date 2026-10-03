@@ -79,9 +79,19 @@ async function loadRepairs(){
     const d=await r.json();
     if(!r.ok){box.innerHTML='<div class="card"><h3>تعذر تحميل سجل الإصلاح</h3><p class="muted">تحقق من مفتاح الإدارة.</p></div>';return;}
     const jobs=Array.isArray(d.jobs)?d.jobs:[];
-    box.innerHTML='<div class="section-head"><div><h3>المراقبة والإصلاح الذاتي</h3><p class="muted">'+jobs.length+' سجل إصلاح حديث</p></div></div><div class="grid">'+(jobs.length?jobs.map(x=>'<article class="card"><span class="number">#'+escapeHtml(x.id)+' · '+escapeHtml(x.status)+'</span><h3>'+escapeHtml(x.context)+'</h3><p>'+escapeHtml(x.error_text)+'</p><p class="muted">المحاولات: '+escapeHtml(x.attempts)+' · الإجراء: '+escapeHtml(x.last_action||"—")+'</p><p>'+escapeHtml(x.diagnosis||"بانتظار التشخيص")+'</p><small>التالي: '+escapeHtml(x.next_attempt_at||"—")+'</small></article>').join(""):'<article class="card"><p class="muted">لا توجد أعطال مسجلة.</p></article>')+'</div>';
+    box.innerHTML='<div class="section-head"><div><h3>المراقبة والإصلاح الذاتي</h3><p class="muted">'+jobs.length+' سجل إصلاح حديث</p></div></div><div class="grid">'+(jobs.length?jobs.map(x=>'<article class="card"><span class="number">#'+escapeHtml(x.id)+' · '+escapeHtml(x.status)+'</span><h3>'+escapeHtml(x.context)+'</h3><p>'+escapeHtml(x.error_text)+'</p><p class="muted">المحاولات: '+escapeHtml(x.attempts)+' · الإجراء: '+escapeHtml(x.last_action||"—")+'</p><p>'+escapeHtml(x.diagnosis||"بانتظار التشخيص")+'</p><small>التالي: '+escapeHtml(x.next_attempt_at||"—")+'</small>'+(x.status!=="RESOLVED"?'<div class="actions"><button class="secondary repair-retry" data-id="'+escapeHtml(x.id)+'" type="button">إعادة الإصلاح الآن</button></div>':"")+'</article>').join(""):'<article class="card"><p class="muted">لا توجد أعطال مسجلة.</p></article>')+'</div>';
   }catch{box.innerHTML='<div class="card"><h3>تعذر الاتصال بسجل الإصلاح</h3></div>';}
 }
+document.querySelector("#bayanRepairs")?.addEventListener("click",async(e)=>{
+  const b=e.target.closest(".repair-retry"); if(!b)return;
+  const t=token.value.trim(); if(!t){state.textContent="أدخل BAYAN_AI_MANAGER_TOKEN أولًا.";return;}
+  b.disabled=true; b.textContent="جارٍ إعادة المحاولة…";
+  try{
+    const r=await fetch("/api/ai/manager/repairs/retry",{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+t},body:JSON.stringify({id:Number(b.dataset.id)})});
+    const d=await r.json(); state.textContent=r.ok?"تم وضع الإصلاح في قائمة التنفيذ وسيُعاد التحقق منه تلقائيًا.":"تعذر إعادة الإصلاح: "+(d.error||d.status||"خطأ");
+    if(r.ok) setTimeout(()=>loadRepairs().catch(()=>{}),800);
+  }catch{state.textContent="تعذر الاتصال بخدمة الإصلاح."}finally{b.disabled=false;b.textContent="إعادة الإصلاح الآن";}
+});
 document.querySelector("#reviewLoad").onclick=load;
 document.querySelector("#telegramSetup").onclick=async()=>{
   const t=token.value.trim();
