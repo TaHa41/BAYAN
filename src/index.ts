@@ -936,7 +936,7 @@ export default {
       const id = Number(body.id);
       const status = ["PENDING_REVIEW","VERIFIED","REJECTED","NEEDS_MORE_INFO"].includes(String(body.status)) ? String(body.status) : "";
       if (!Number.isInteger(id) || id < 1 || !status) return json({ status: "invalid_review" }, 400);
-      const current = await env.DB.prepare("SELECT id, title, body, source, status FROM visitor_contributions WHERE id=?").bind(id).first() as any;
+      const current = await env.DB!.prepare("SELECT id, title, body, source, status FROM visitor_contributions WHERE id=?").bind(id).first() as any;
       if (!current) return json({ status: "contribution_not_found" }, 404);
       const now = new Date().toISOString();
       let publishedArticle: any = null;
@@ -971,7 +971,7 @@ export default {
         await refreshKnowledgeGraph(env, article);
         publishedArticle = { id: articleSlug, section: article.section, title: article.title };
       }
-      await env.DB.prepare("UPDATE visitor_contributions SET status=?, reviewer_note=?, reviewed_at=? WHERE id=?")
+      await env.DB!.prepare("UPDATE visitor_contributions SET status=?, reviewer_note=?, reviewed_at=? WHERE id=?")
         .bind(status, cleanText(body.note, 1000) || null, now, id).run();
       if (status === "VERIFIED") {
         await sendBayanEmail(env, "تم التحقق من مساهمة في بيان", "تمت مراجعة المساهمة رقم " + id + " ونشرها في قاعدة المعرفة.\n\nالعنوان: " + String(current.title) + "\n\nالمقالة: /article/" + publishedArticle.id);
