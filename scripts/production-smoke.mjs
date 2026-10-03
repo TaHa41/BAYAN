@@ -47,6 +47,13 @@ try{
   if(!ok) failed++;
 }catch(e){console.log("FAIL / HTML SEO/security contract "+e.message);failed++;}
 try{
+  const appJs=await (await fetch(base+"/app.js?v=20261003-20",{redirect:"follow"})).text();
+  const ok=/querySelector\("#language"\)[\s\S]{0,500}addEventListener\("click"/.test(appJs) &&
+    /searchParams\.set\("lang",isEn\?"ar":"en"\)/.test(appJs);
+  console.log((ok?"PASS":"FAIL")+" frontend language-switch contract");
+  if(!ok) failed++;
+}catch(e){console.log("FAIL frontend language-switch contract "+e.message);failed++;}
+try{
   const features=await (await fetch(base+"/api/features",{redirect:"follow"})).json();
   const f=features?.features||{};
   const ok=f.pwa===true && f.savedArticles===true && f.selfHealing===true && f.runtimeAudit===true && f.sourceAwareAI===true;
