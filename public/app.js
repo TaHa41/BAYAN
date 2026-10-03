@@ -215,15 +215,20 @@ const renderArticle=(k,isPersisted)=>{
   const actions='<div class="actions article-actions"><button class="secondary" type="button" data-bayan-save="'+escHtml(k.id||slug)+'">'+(saved?"محفوظ":"حفظ المقال")+'</button><button class="secondary" type="button" data-bayan-share="'+escHtml(k.title||"مقال بيان")+'">مشاركة</button></div>';
   const relatedHtml=related.length?'<div class="section-head"><div><h2>اقرأ أيضًا</h2><p>مواد مرتبطة من نفس المجال.</p></div></div><div class="grid">'+related.map(x=>'<a class="card article-card" href="'+withLang("/article/"+x.id)+'"><span class="article-section">'+sectionIcon(x.section)+(window.BAYAN_CONTENT?.sectionMeta?.[x.section]||x.section)+'</span><h3>'+escHtml(x.title)+'</h3><p>'+escHtml(x.summary)+'</p></a>').join("")+'</div>':"";
   const heroImage=k.image?'<img loading="eager" class="news-image article-hero-image" src="'+escHtml(k.image)+'" alt="" referrerpolicy="no-referrer">':"";
-  const articleHtml=body.map(line=>{
+  let articleHtml="";
+  let listItems=[];
+  const flushList=()=>{if(listItems.length){articleHtml+="<ul>"+listItems.join("")+"</ul>";listItems=[];}};
+  for(const line of body){
     const value=String(line||"").trim();
-    if(!value)return "";
-    if(/^###\s+/.test(value))return "<h3>"+escHtml(value.replace(/^###\s+/,""))+"</h3>";
-    if(/^##\s+/.test(value))return "<h2>"+escHtml(value.replace(/^##\s+/,""))+"</h2>";
-    if(/^#\s+/.test(value))return "<h2>"+escHtml(value.replace(/^#\s+/,""))+"</h2>";
-    if(/^[-*]\s+/.test(value))return "<li>"+escHtml(value.replace(/^[-*]\s+/,""))+"</li>";
-    return "<p>"+escHtml(value)+"</p>";
-  }).join("");
+    if(!value)continue;
+    if(/^[-*]\s+/.test(value)){listItems.push("<li>"+escHtml(value.replace(/^[-*]\s+/,""))+"</li>");continue;}
+    flushList();
+    if(/^###\s+/.test(value)){articleHtml+="<h3>"+escHtml(value.replace(/^###\s+/,""))+"</h3>";continue;}
+    if(/^##\s+/.test(value)){articleHtml+="<h2>"+escHtml(value.replace(/^##\s+/,""))+"</h2>";continue;}
+    if(/^#\s+/.test(value)){articleHtml+="<h2>"+escHtml(value.replace(/^#\s+/,""))+"</h2>";continue;}
+    articleHtml+="<p>"+escHtml(value)+"</p>";
+  }
+  flushList();
   app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isPersisted?"مقال معرفة":(isEn?"Article":"مقال"))+'</div><div class="article-kicker">'+sectionIcon(section)+(window.BAYAN_CONTENT?.sectionMeta?.[section]||section)+'</div><h1 class="page-title">'+escHtml(k.title||"مقال بيان")+'</h1>'+heroImage+'<p class="page-lead article-intro">'+escHtml(k.summary||"")+'</p>'+summaryBlock([sourceLabel,"المقال يشرح الموضوع في سياق مترابط، ثم يفصل الأدلة والمصادر في نهاية الصفحة."])+actions+adSlot("article")+'<article class="article-body card">'+articleHtml+'</article>'+sourceHtml+relatedHtml+'</section>';
 };
 const trendParams=new URLSearchParams(location.search);
