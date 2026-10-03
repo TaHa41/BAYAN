@@ -826,12 +826,18 @@ const runRuntimeAudit = async (env: Env) => {
   const started = Date.now();
   const check = async (name: string, fn: () => Promise<any>) => {
     const t = Date.now();
-    try {
-      const details = await fn();
-      results.push({ route: name, ok: true, status: 200, latencyMs: Date.now() - t, attempt: 1, details });
-    } catch (error) {
-      results.push({ route: name, ok: false, status: 0, latencyMs: Date.now() - t, attempt: 1, error: safeErrorMessage(error) });
+    let lastError: unknown = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const details = await fn();
+        results.push({ route: name, ok: true, status: 200, latencyMs: Date.now() - t, attempt, details });
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+      }
     }
+    results.push({ route: name, ok: false, status: 0, latencyMs: Date.now() - t, attempt: 3, error: safeErrorMessage(lastError) });
   };
   await check("/health", async () => ({ service: "BAYAN", version: env.BAYAN_VERSION || "0.5.0" }));
   await check("/assets", async () => {
