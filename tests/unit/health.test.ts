@@ -33,6 +33,24 @@ describe("BAYAN platform", () => {
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("");
   });
+  it("protects diagnostics and never returns secret values", async () => {
+    const denied = await worker.fetch(new Request("https://bayan.test/api/diagnostics"), { OPENAI_API_KEY: "secret" });
+    expect(denied.status).toBe(403);
+    const allowed = await worker.fetch(new Request("https://bayan.test/api/diagnostics", { headers: { authorization: "Bearer manager-secret" } }), {
+      BAYAN_AI_MANAGER_TOKEN: "manager-secret",
+      OPENAI_API_KEY: "secret",
+      SEARCH_PROVIDER: "ceramic",
+      AI_SEARCH_INSTANCE: "bayan-knowledge",
+      BAYAN_VERSION: "0.8.0",
+      BAYAN_COMMIT_SHA: "test"
+    });
+    expect(allowed.status).toBe(200);
+    const body = await allowed.text();
+    expect(body).toContain('"status": "ok"');
+    expect(body).toContain('"searchProviderChain"');
+    expect(body).not.toContain("manager-secret");
+    expect(body).not.toContain("secret");
+  });
   it("requires AI input", async () => {
     const response = await worker.fetch(new Request("https://bayan.test/api/ai",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({input:" "})}), {});
     expect(response.status).toBe(400);
