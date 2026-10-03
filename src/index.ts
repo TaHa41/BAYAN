@@ -273,6 +273,42 @@ const refreshKnowledgeGraph = async (env: Env, article: any) => {
   } catch {}
 };
 
+const processContentQueue = async (env: Env) => {
+  if (!env.DB) return { ok: false, reason: "database_not_configured" };
+  const row = (await env.DB.prepare("SELECT id, topic, section, language, attempts FROM content_queue WHERE status='QUEUED' ORDER BY priority DESC, created_at ASC LIMIT 1").all()).results?.[0] as any;
+  if (!row) return { ok: true, processed: false };
+  const now = new Date().toISOString();
+  await env.DB.prepare("UPDATE content_queue SET status='PROCESSING', attempts=attempts+1 WHERE id=? AND status='QUEUED'").bind(row.id).run();
+  try {
+    const search = await internalSearch(String(row.topic), env);
+    if (!search.ok || !search.results?.length) throw new Error("evidence_unavailable");
+    const generated = await generateKnowledgeArticle(env, String(row.language || "ar"), String(row.topic), search.results);
+    if (!generated) throw new Error("generation_unavailable");
+    const slug = await slugForQuery(String(row.topic));
+    const article = { slug, query: String(row.topic), section: String(row.section), title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 8).map(withoutUrl), createdAt: now };
+    const persistence = await saveKnowledgeArticle(env, article);
+    if (!persistence.persisted) throw new Error("database_write_failed");
+    await refreshKnowledgeGraph(env, article);
+    await env.DB.prepare("UPDATE content_queue SET status='PUBLISHED', processed_at=? WHERE id=?").bind(now, row.id).run();
+    return { ok: true, processed: true, id: row.id, slug };
+  } catch {
+    const attempts = Number(row.attempts || 0) + 1;
+    const status = attempts >= 3 ? "BLOCKED" : "QUEUED";
+    await env.DB.prepare("UPDATE content_queue SET status=?, processed_at=? WHERE id=?").bind(status, now, row.id).run();
+    return { ok: false, processed: true, id: row.id, status };
+  }
+};
+
+const validInterestSections = new Set(["egypt","arab","world","science","economy","politics","technology","health","history-culture","people","sports","travel","arts","news","trending","prices"]);
+
+const recordVisitorInterest = async (env: Env, visitorId: string, section: string, eventType = "view", language = "ar") => {
+  if (!env.DB || !visitorId || !validInterestSections.has(section)) return false;
+  const now = new Date().toISOString();
+  await env.DB.prepare("INSERT INTO visitor_profiles(visitor_id,language,interests_json,first_seen_at,last_seen_at) VALUES(?,?,?,?,?) ON CONFLICT(visitor_id) DO UPDATE SET language=excluded.language,last_seen_at=excluded.last_seen_at").bind(visitorId, language, "[]", now, now).run();
+  const weight = eventType === "save" ? 3 : eventType === "search" ? 2 : 1;
+  await env.DB.prepare("INSERT INTO visitor_interest_events(visitor_id,section,event_type,weight,created_at) VALUES(?,?,?,?,?)").bind(visitorId, section, eventType, weight, now).run();
+  return true;
+};
 const runKnowledgeMaintenance = async (env: Env) => {
   if (!env.DB) return { ok: false, reason: "database_not_configured" };
   const now = Date.now();
@@ -385,6 +421,7 @@ export default {
         await env.DB.prepare("DELETE FROM runtime_audits WHERE id NOT IN (SELECT id FROM runtime_audits ORDER BY checked_at DESC LIMIT 100)").run();
       }
       await runKnowledgeMaintenance(env);
+      await processContentQueue(env);
     } catch {}
   },
 
@@ -569,6 +606,44 @@ export default {
       const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || "";
       if (!env.BAYAN_AI_MANAGER_TOKEN || supplied !== env.BAYAN_AI_MANAGER_TOKEN) return json({ status: "forbidden" }, 403);
       return json(await runKnowledgeMaintenance(env));
+    }
+
+    if (path === "/api/interest" && request.method === "POST") {
+      try {
+        const body = await request.json() as { visitorId?: string; section?: string; eventType?: string; language?: string };
+        const visitorId = cleanText(body.visitorId, 100);
+        const section = cleanText(body.section, 80);
+        if (!visitorId || !validInterestSections.has(section)) return json({ status: "invalid_interest" }, 400);
+        await recordVisitorInterest(env, visitorId, section, cleanText(body.eventType, 30) || "view", body.language === "en" ? "en" : "ar");
+        return json({ status: "ok" });
+      } catch { return json({ status: "invalid_request" }, 400); }
+    }
+
+    if (path === "/api/recommendations") {
+      const visitorId = cleanText(url.searchParams.get("visitorId"), 100);
+      if (!env.DB || !visitorId) return json({ status: "ok", articles: [] });
+      try {
+        const rows = await env.DB.prepare("SELECT section, SUM(weight) AS score FROM visitor_interest_events WHERE visitor_id=? GROUP BY section ORDER BY score DESC LIMIT 5").bind(visitorId).all();
+        const sections = (rows.results || []).map((x:any)=>String(x.section));
+        if (!sections.length) return json({ status: "ok", articles: [] });
+        const placeholders = sections.map(()=>"?").join(",");
+        const sql = "SELECT slug,section,title,summary,updated_at FROM knowledge_articles WHERE status='PUBLISHED' AND section IN ("+placeholders+") ORDER BY updated_at DESC LIMIT 12";
+        const result = await env.DB.prepare(sql).bind(...sections).all();
+        return json({ status: "ok", interests: rows.results || [], articles: result.results || [] });
+      } catch { return json({ status: "database_error", articles: [] }, 503); }
+    }
+
+    if (path === "/api/contributions" && request.method === "POST") {
+      try {
+        const body = await request.json() as { visitorId?: string; title?: string; body?: string; source?: string };
+        const visitorId = cleanText(body.visitorId, 100);
+        const title = cleanText(body.title, 240);
+        const contribution = cleanText(body.body, 6000);
+        const source = cleanText(body.source, 500);
+        if (!env.DB || !visitorId || !title || contribution.length < 20) return json({ status: "invalid_contribution" }, 400);
+        await env.DB.prepare("INSERT INTO visitor_contributions(visitor_id,title,body,source,status,created_at) VALUES(?,?,?,?, 'PENDING_REVIEW',?)").bind(visitorId,title,contribution,source||null,new Date().toISOString()).run();
+        return json({ status: "received", moderation: "PENDING_REVIEW" }, 201);
+      } catch { return json({ status: "invalid_request" }, 400); }
     }
 
     if (path === "/api/knowledge") {
