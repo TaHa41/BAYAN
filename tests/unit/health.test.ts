@@ -4,7 +4,7 @@ import worker from "../../src/index";
 describe("BAYAN platform", () => {
   it("returns safe health metadata", async () => {
     const response = await worker.fetch(new Request("https://bayan.test/api/health"), {
-      BAYAN_ENVIRONMENT: "test", BAYAN_VERSION: "0.6.0", BAYAN_COMMIT_SHA: "test",
+      BAYAN_ENVIRONMENT: "test", BAYAN_VERSION: "0.7.0", BAYAN_COMMIT_SHA: "test",
     });
     expect(response.status).toBe(200);
     const body = await response.json() as unknown as { status: string; environment: string; version: string };
