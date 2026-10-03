@@ -15,6 +15,7 @@ interface Env {
   ADSENSE_SLOT_SECTION_TOP?: string;
   ADSENSE_SLOT_ARTICLE?: string;
   ADSENSE_SLOT_HOME_BOTTOM?: string;
+  BAYAN_AI_MANAGER_TOKEN?: string;
   ASSETS?: Fetcher;
 }
 
@@ -77,6 +78,17 @@ const withoutUrl = (item: any) => {
 
 const sourceName = (item: any) =>
   cleanText(item?.source || item?.domain || item?.displayed_link || "Unknown source", 160);
+
+const queryIntent = (query: string) => {
+  const q = query.toLowerCase();
+  if (/(طقس|الجو|درجة الحرارة|weather|temperature|humidity)/.test(q)) return "weather";
+  if (/(ذهب|عيار 24|عيار 21|عيار 18|gold)/.test(q)) return "gold";
+  if (/(سعر|أسعار|دولار|يورو|جنيه|ريال|درهم|price|currency|usd|eur|gbp|sar|aed)/.test(q)) return "markets";
+  if (/(خبر|أخبار|اليوم|الآن|news|today|latest|current)/.test(q)) return "news";
+  if (/(من هو|من هي|ولد|توفي|who is|biography)/.test(q)) return "person";
+  if (/(ما هو|ما هي|اشرح|كيف يعمل|what is|how does)/.test(q)) return "knowledge";
+  return "general";
+};
 
 const internalSearch = async (query: string, env: Env) => {
   if (!env.SEARCH_API_KEY) {
@@ -208,6 +220,7 @@ export default {
       if (!env.OPENAI_API_KEY) {
         return json({
           query: q,
+          intent: queryIntent(q),
           items: search.results.map(withoutUrl),
           status: "ok",
           answer: null,
@@ -233,6 +246,7 @@ export default {
         if (!response.ok) {
           return json({
             query: q,
+            intent: queryIntent(q),
             items: search.results.map(withoutUrl),
             status: "ok",
             answer: null,
@@ -244,6 +258,7 @@ export default {
         const data = await response.json() as any;
         return json({
           query: q,
+          intent: queryIntent(q),
           answer: textOf(data),
           items: search.results.map(withoutUrl),
           status: "ok",
@@ -252,6 +267,7 @@ export default {
       } catch {
         return json({
           query: q,
+          intent: queryIntent(q),
           items: search.results.map(withoutUrl),
           status: "ok",
           answer: null,
@@ -339,6 +355,45 @@ export default {
       }
     }
 
+    if (path === "/api/ai/manager" && request.method === "POST") {
+      const supplied = request.headers.get("authorization")?.replace(/^Bearer\\s+/i, "") || "";
+      if (!env.BAYAN_AI_MANAGER_TOKEN || supplied !== env.BAYAN_AI_MANAGER_TOKEN) return json({ status: "forbidden" }, 403);
+      const checks = [
+        { name: "health", path: "/health" },
+        { name: "features", path: "/api/features" },
+        { name: "search", path: "/api/search?q=ما%20هو%20بيان&lang=ar" },
+        { name: "markets", path: "/api/markets?base=USD&quote=EGP" },
+        { name: "weather", path: "/api/weather?city=Cairo" }
+      ];
+      const results: any[] = [];
+      for (const check of checks) {
+        try {
+          const response = await fetch(new URL(check.path, request.url), { headers: { "x-bayan-internal": "1" } });
+          results.push({ name: check.name, status: response.status, ok: response.ok });
+        } catch {
+          results.push({ name: check.name, status: 0, ok: false });
+        }
+      }
+      const failed = results.filter((x) => !x.ok);
+      let diagnosis = "No runtime failure detected.";
+      if (failed.length && env.OPENAI_API_KEY) {
+        try {
+          const ai = await fetch("https://api.openai.com/v1/responses", {
+            method: "POST",
+            headers: { "content-type": "application/json", authorization: "Bearer " + env.OPENAI_API_KEY },
+            body: JSON.stringify({
+              model: env.OPENAI_MODEL?.trim() || DEFAULT_OPENAI_MODEL,
+              instructions: "You are BAYAN Site Manager. Diagnose only from supplied runtime checks. Do not invent root causes. Return a concise diagnosis, safe repair steps, verification steps, and whether rollback should be considered. Never expose secrets.",
+              input: JSON.stringify({ results, version: env.BAYAN_VERSION, commit: env.BAYAN_COMMIT_SHA }),
+              store: false
+            })
+          });
+          if (ai.ok) diagnosis = textOf(await ai.json());
+        } catch {}
+      }
+      return json({ status: failed.length ? "degraded" : "healthy", checkedAt: new Date().toISOString(), results, diagnosis, automaticRepairPolicy: "Only allowlisted runtime retries/circuit recovery are automatic; source-code changes require CI validation before deployment." });
+    }
+
     if (path === "/api/news") {
       const q = (url.searchParams.get("q") || "").trim();
       if (!env.GNEWS_API_KEY) return json({ status: "not_configured", provider: "GNews", message: "Add GNEWS_API_KEY as a Cloudflare Secret." }, 503);
@@ -350,7 +405,7 @@ export default {
         const response = await fetch(api);
         if (!response.ok) return json({ status: "provider_error", provider: "GNews" }, 502);
         const data = await response.json() as any;
-        return json({ status: "ok", provider: "GNews", articles: data.articles || [], totalArticles: data.totalArticles || 0 });
+        return json({ status: "ok", provider: "GNews", articles: (data.articles || []).slice(0,10).map((article: any) => ({ title: cleanText(article.title, 240), description: cleanText(article.description || article.content, 900), content: cleanText(article.content, 1600), publishedAt: article.publishedAt || null, source: { name: cleanText(article.source?.name, 160) }, image: typeof article.image === "string" ? article.image : null })), totalArticles: data.totalArticles || 0 });
       } catch {
         return json({ status: "provider_error", provider: "GNews" }, 502);
       }
@@ -472,7 +527,7 @@ export default {
     }
 
     if (path === "/sitemap.xml") {
-      const routes = ["/", "/egypt", "/arab", "/world", "/science", "/economy", "/politics", "/technology", "/health", "/history-culture", "/people", "/sports", "/travel", "/arts", "/news", "/trending", "/prices", "/search", "/about", "/methodology", "/privacy", "/terms", "/contact"];
+      const routes = ["/", "/egypt", "/arab", "/world", "/science", "/economy", "/politics", "/technology", "/health", "/history-culture", "/people", "/sports", "/travel", "/arts", "/news", "/trending", "/prices", "/about", "/methodology", "/privacy", "/terms", "/contact", "/article/sky-blue", "/article/password-security", "/article/inflation-explained", "/article/health-information", "/article/sports-statistics", "/article/travel-checklist", "/article/ai-evidence", "/article/history-context"];
       const xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
       const body = "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">" + routes.map((route) => "<url><loc>" + url.origin + route + "</loc></url>").join("") + "</urlset>";
       return new Response(xml + body, { headers: { "content-type": "application/xml; charset=utf-8" } });
