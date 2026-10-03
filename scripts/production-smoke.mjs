@@ -78,6 +78,16 @@ try{
   if(!ok) failed++;
 }catch(e){console.log("FAIL frontend language-switch contract "+e.message);failed++;}
 try{
+  const englishRoutes=["/","/egypt","/science","/technology","/news","/prices","/search","/ai","/saved","/contribute"];
+  for(const route of englishRoutes){
+    const response=await fetch(base+route+"?lang=en",{redirect:"follow"});
+    const html=await response.text();
+    const ok=response.ok && /<html[^>]+lang=["']en["'][^>]+dir=["']ltr["']/i.test(html);
+    console.log((ok?"PASS":"FAIL")+" English route "+route);
+    if(!ok) failed++;
+  }
+}catch(e){console.log("FAIL English route coverage "+e.message);failed++;}
+try{
   const features=await (await fetch(base+"/api/features",{redirect:"follow"})).json();
   const f=features?.features||{};
   const ok=f.pwa===true && f.savedArticles===true && f.selfHealing===true && f.runtimeAudit===true && f.sourceAwareAI===true;
