@@ -595,6 +595,7 @@ const sendBayanTelegram = async (env: Env, text: string, chatId?: string) => {
     if (!destination) {
       const discovered = await discoverTelegramChat(env);
       destination = cleanText(discovered?.chatId || "", 120);
+      if (!destination && discovered?.source === "webhook") return { ok: false, error: "telegram_getupdates_conflict_webhook_configured" };
     }
     if (!destination) return { ok: false, error: "telegram_chat_id_missing_start_bot_first" };
     await telegramApi(env, "sendMessage", { chat_id: destination, text: cleanText(text, 4000) });
@@ -617,13 +618,27 @@ const sendBayanOwnerNotification = async (env: Env, subject: string, text: strin
 };
 
 const discoverTelegramChat = async (env: Env) => {
-  const data = await telegramApi(env, "getUpdates");
-  const updates = Array.isArray(data?.result) ? data.result : [];
-  for (let i = updates.length - 1; i >= 0; i--) {
-    const chat = updates[i]?.message?.chat;
-    if (chat?.id != null && chat?.type === "private") return { chatId: String(chat.id), username: cleanText(chat.username || "", 120), firstName: cleanText(chat.first_name || "", 120) };
+  try {
+    const data = await telegramApi(env, "getUpdates");
+    const updates = Array.isArray(data?.result) ? data.result : [];
+    for (let i = updates.length - 1; i >= 0; i--) {
+      const chat = updates[i]?.message?.chat;
+      if (chat?.id != null && chat?.type === "private") return { chatId: String(chat.id), username: cleanText(chat.username || "", 120), firstName: cleanText(chat.first_name || "", 120), source: "getUpdates" };
+    }
+    return null;
+  } catch (error) {
+    const safe = safeErrorMessage(error);
+    if (/webhook|409|conflict|getUpdates/i.test(safe)) {
+      try {
+        const webhook = await telegramApi(env, "getWebhookInfo");
+        const url = cleanText(webhook?.result?.url || "", 500);
+        return { chatId: "", username: "", firstName: "", source: "webhook", webhookConfigured: !!url, webhookUrl: url, error: safe };
+      } catch (webhookError) {
+        return { chatId: "", username: "", firstName: "", source: "webhook_check_failed", error: safeErrorMessage(webhookError) };
+      }
+    }
+    throw error;
   }
-  return null;
 };
 
 const managerAuthorized = (request: Request, env: Env) => {
