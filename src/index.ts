@@ -43,7 +43,12 @@ const cloudflareAiRun = async (env: Env, model: string, messages: any[]) => {
       continue;
     }
     try {
-      return await env.AI.run(candidate, { messages });
+      return await env.AI.run(candidate, { messages }, {
+        gateway: {
+          id: DEFAULT_AI_GATEWAY,
+          collectLog: true
+        }
+      });
     } catch (error) {
       lastError = error;
       const safe = safeErrorMessage(error);
@@ -1088,12 +1093,21 @@ const runKnowledgeMaintenance = async (env: Env) => {
 const browserRenderedCheck = async (env: Env, route: string) => {
   if (!env.BROWSER) return { skipped: true };
   const base = "https://bayan.tahaomar411.workers.dev";
-  const rendered = await env.BROWSER.quickAction("content", { url: base + route });
-  const html = typeof rendered === "string" ? rendered : JSON.stringify(rendered);
-  const hasEmptyApp = html.includes('<main id="app"></main>');
-  const recovery = html.includes("وضع الاسترداد") || html.includes("تعذر تحميل الصفحة");
-  if (hasEmptyApp || recovery) throw new Error("browser_render_degraded_" + route);
-  return { rendered: true };
+  const rendered = await env.BROWSER.quickAction("content", {
+    url: base + route,
+    gotoOptions: { waitUntil: "networkidle2" }
+  });
+  let html = "";
+  if (typeof rendered === "string") html = rendered;
+  else if (rendered instanceof Response) html = await rendered.text();
+  else if (typeof rendered?.result === "string") html = rendered.result;
+  else if (typeof rendered?.content === "string") html = rendered.content;
+  else html = JSON.stringify(rendered || "");
+  const hasApp = /<main[^>]+id=["']app["'][^>]*>/i.test(html);
+  const hasEmptyApp = /<main[^>]+id=["']app["'][^>]*>s*</main>/i.test(html);
+  const recovery = /وضع الاسترداد|تعذر تحميل الصفحة|Unable to load page|Internal Server Error|Unhandled exception/i.test(html);
+  if (!html.trim() || !hasApp || hasEmptyApp || recovery) throw new Error("browser_render_degraded_" + route);
+  return { rendered: true, bytes: html.length };
 };
 
 const runRuntimeAudit = async (env: Env) => {
@@ -1138,9 +1152,11 @@ const runRuntimeAudit = async (env: Env) => {
     await env.DB.prepare("SELECT 1 AS ok").first();
     return { configured: true };
   });
-  await check("browser:home", async () => browserRenderedCheck(env, "/"));
-  await check("browser:news", async () => browserRenderedCheck(env, "/news"));
-  await check("browser:search", async () => browserRenderedCheck(env, "/search?q=بيان"));
+  // Browser Run is expensive; rotate one representative SPA route per audit cycle.
+  // This still gives continuous coverage without multiplying browser calls every 5 minutes.
+  const browserRoutes = ["/", "/news", "/search?q=بيان"];
+  const browserRoute = browserRoutes[Math.floor(Date.now() / 300000) % browserRoutes.length];
+  await check("browser:" + browserRoute, async () => browserRenderedCheck(env, browserRoute));
   await check("/search", async () => {
     const search = await internalSearch("BAYAN", env);
     if (!search.ok) throw new Error("search_unavailable");
@@ -1300,27 +1316,25 @@ const evidenceFallbackAnswer = (query: string, results: any[]) => {
 
 const researchQueries = (query: string) => {
   const intent = editorialIntent(query);
+  const language = /[\u0600-\u06FF]/.test(query) ? "ar" : "en";
   const variants = [query];
-  if (intent === "howto") {
-    variants.push(query + " المتطلبات والخطوات");
-    variants.push(query + " الأخطاء الشائعة وكيفية التحقق من الحل");
-  } else if (intent === "troubleshooting") {
-    variants.push(query + " الأسباب والتشخيص");
-    variants.push(query + " الحلول والتحقق من الإصلاح");
-  } else if (intent === "news") {
-    variants.push(query + " آخر التطورات");
-    variants.push(query + " الخلفية والتسلسل الزمني");
-  } else if (intent === "person") {
-    variants.push(query + " السيرة والتعليم والمسيرة والإنجازات");
-    variants.push(query + " أحدث المعلومات والحالة الحالية");
-  } else if (intent === "comparison") {
-    variants.push(query + " الفروق والمزايا والقيود");
-    variants.push(query + " الاستخدامات والنتائج");
+  const add = (...items: string[]) => variants.push(...items);
+  if (language === "ar") {
+    if (intent === "howto") add(query + " المتطلبات قبل البدء", query + " الخطوات بالتفصيل", query + " الأخطاء الشائعة والتحقق من نجاح الحل", query + " البدائل والقيود");
+    else if (intent === "troubleshooting") add(query + " الأسباب المحتملة والتشخيص", query + " الحلول خطوة بخطوة", query + " كيفية التحقق من الإصلاح والبدائل", query + " الأخطاء الشائعة بعد الإصلاح");
+    else if (intent === "news") add(query + " آخر التطورات اليوم", query + " الخلفية والتسلسل الزمني", query + " المصادر المستقلة والتفاصيل المؤكدة", query + " الوضع الحالي وما تغير");
+    else if (intent === "person") add(query + " السيرة والتعليم والمسيرة والإنجازات", query + " الأعمال والأثر والمصادر الموثوقة", query + " أحدث المعلومات والحالة الحالية", query + " التواريخ والأحداث المهمة");
+    else if (intent === "comparison") add(query + " الفروق والمزايا والقيود", query + " الاستخدامات والأداء والنتائج", query + " التكلفة والمتطلبات", query + " الحالات التي لا يناسب فيها كل خيار");
+    else add(query + " الخلفية والتفاصيل الأساسية", query + " كيف ولماذا وما الأسباب", query + " أمثلة واستخدامات وحدود", query + " أحدث المعلومات والتطورات");
   } else {
-    variants.push(query + " الخلفية والتفاصيل الأساسية");
-    variants.push(query + " أحدث المعلومات والتطورات");
+    if (intent === "howto") add(query + " requirements before starting", query + " detailed step by step", query + " common mistakes and how to verify the fix", query + " alternatives and limitations");
+    else if (intent === "troubleshooting") add(query + " causes and diagnosis", query + " step by step fixes", query + " how to verify the fix and alternatives", query + " common post-fix problems");
+    else if (intent === "news") add(query + " latest developments today", query + " background and timeline", query + " independent sources and confirmed details", query + " current status and what changed");
+    else if (intent === "person") add(query + " biography education career achievements", query + " works impact and authoritative sources", query + " latest information and current status", query + " important dates and events");
+    else if (intent === "comparison") add(query + " differences advantages limitations", query + " use cases performance and results", query + " cost and requirements", query + " when each option is not suitable");
+    else add(query + " background and key details", query + " how why and causes", query + " examples use cases and limitations", query + " latest information and developments");
   }
-  return Array.from(new Set(variants.map((x) => cleanText(x, 500)).filter(Boolean))).slice(0, 3);
+  return Array.from(new Set(variants.map((x) => cleanText(x, 500)).filter(Boolean))).slice(0, 5);
 };
 
 const internalSearch = async (query: string, env: Env) => {
