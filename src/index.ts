@@ -1387,7 +1387,7 @@ const rssNewsSearch = async (query = "", language = "ar") => {
   return rerankResults(query, Array.from(unique.values()).slice(0, 30)).slice(0, 12);
 };
 
-const wikimediaEnterpriseLookup = async (query: string, language = "ar") => {
+const wikimediaEnterpriseLookup = async (env: Env, query: string, language = "ar") => {
   if (!env.WIKIMEDIA_ENTERPRISE_TOKEN) return [];
   const name = cleanText(query
     .replace(/^(?:ما هو|ما هي|من هو|من هي|who is|what is|what are)\\s+/i, "")
@@ -1567,7 +1567,7 @@ const internalSearch = async (query: string, env: Env) => {
 
   const tasks = research.flatMap((researchQuery) => providers.map((provider) => searchOne(researchQuery, provider)));
   const settled = await Promise.all(tasks);
-  const enterprise = await wikimediaEnterpriseLookup(query, language);
+  const enterprise = await wikimediaEnterpriseLookup(env, query, language);
   const merged = [...enterprise, ...settled.flat()].filter((x: any) => x.title && x.snippet);
   const unique = new Map<string, any>();
   for (const item of merged) {
