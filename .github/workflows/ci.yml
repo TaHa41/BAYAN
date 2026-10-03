@@ -21,6 +21,9 @@ jobs:
           node-version: 22
       - name: Install
         run: npm install
+      - name: Static release guards
+        run: npm run guards
+
       - name: Typecheck
         run: npm run typecheck
       - name: Unit tests
