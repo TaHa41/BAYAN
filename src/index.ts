@@ -371,7 +371,7 @@ export default {
     }
 
     if (path === "/api/ai/manager" && request.method === "POST") {
-      const supplied = request.headers.get("authorization")?.replace(/^Bearer\\s+/i, "") || "";
+      const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || "";
       if (!env.BAYAN_AI_MANAGER_TOKEN || supplied !== env.BAYAN_AI_MANAGER_TOKEN) return json({ status: "forbidden" }, 403);
       const checks = [
         { name: "health", path: "/health" },
