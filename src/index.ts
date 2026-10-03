@@ -1610,6 +1610,18 @@ export default {
       return json({ status: failed.length ? "degraded" : "healthy", checkedAt: new Date().toISOString(), results, diagnosis, automaticRepairPolicy: "Only allowlisted runtime retries/circuit recovery are automatic; source-code changes require CI validation before deployment." });
     }
 
+    if (path === "/api/ai/manager/repairs" && request.method === "GET") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      if (!env.DB) return json({ status: "database_unavailable", jobs: [] }, 503);
+      await ensureRepairQueue(env);
+      const status = cleanText(url.searchParams.get("status"), 40);
+      const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit") || 50)));
+      const result = status
+        ? await env.DB.prepare("SELECT id,signature,context,error_text,status,attempts,last_action,diagnosis,next_attempt_at,created_at,updated_at,resolved_at FROM repair_jobs WHERE status=? ORDER BY updated_at DESC LIMIT ?").bind(status, limit).all()
+        : await env.DB.prepare("SELECT id,signature,context,error_text,status,attempts,last_action,diagnosis,next_attempt_at,created_at,updated_at,resolved_at FROM repair_jobs ORDER BY updated_at DESC LIMIT ?").bind(limit).all();
+      return json({ status: "ok", jobs: result.results || [] });
+    }
+
     if (path === "/api/ai/manager/telegram/setup" && request.method === "GET") {
       if (!managerAuthorized(request, env)) return json({ error: "unauthorized" }, 401);
       try {
