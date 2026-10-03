@@ -72,7 +72,7 @@ const renderHtml = async (response: Response, requestUrl: URL) => {
     '<link rel="alternate" hreflang="en" href="' + alternateEn + '">' +
     '<link rel="alternate" hreflang="x-default" href="' + alternateAr + '">' +
     '<meta name="robots" content="' + robots + '">' +
-    '<meta name="google-site-verification" content="MnrdVWNpRUH3Uo0FVfLutUQZTtph1fA7gnVJihwlWWU">' +
+    '<meta name="google-site-verification" content="GNb6pX-28eMbpuOezfmi_N6hM9g_zvusJ4FvclLTFqw>' +
     '<script type="application/ld+json">' + jsonLd + '</script>' +
     "</head>"
   );
