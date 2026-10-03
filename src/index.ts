@@ -192,13 +192,14 @@ const ensureContributionTable = async (env: Env) => {
   } catch { return false; }
 };
 const sendBayanEmail = async (env: Env, subject: string, text: string) => {
-  if (!env.RESEND_API_KEY || !env.BAYAN_NOTIFY_EMAIL) return false;
+  const destination = env.BAYAN_NOTIFY_EMAIL || "bayan.contact@yahoo.com";
+  if (!env.RESEND_API_KEY) return false;
   const from = env.BAYAN_NOTIFY_FROM || "BAYAN <onboarding@resend.dev>";
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { "content-type": "application/json", authorization: "Bearer " + env.RESEND_API_KEY },
-      body: JSON.stringify({ from, to: [env.BAYAN_NOTIFY_EMAIL], subject: cleanText(subject, 180), text: cleanText(text, 12000) })
+      body: JSON.stringify({ from, to: [destination], subject: cleanText(subject, 180), text: cleanText(text, 12000) })
     });
     return response.ok;
   } catch { return false; }
@@ -241,7 +242,7 @@ const sendBayanDiagnostic = async (env: Env, subject: string, report: string) =>
     event: "bayan_notification",
     subject: cleanText(subject, 180),
     delivered,
-    destination_configured: !!env.BAYAN_NOTIFY_EMAIL && !!env.RESEND_API_KEY,
+    destination_configured: !!destination && !!env.RESEND_API_KEY,
     timestamp: new Date().toISOString()
   }));
   return delivered;
