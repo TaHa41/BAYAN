@@ -543,9 +543,17 @@ const sendBayanDiagnostic = async (env: Env, subject: string, report: string) =>
     event: "bayan_notification",
     subject: cleanText(subject, 180),
     telegramDelivered: telegram.ok,
+    telegramChatId: telegram.chatId || null,
+    telegramSource: telegram.source || null,
     telegramError: telegram.error || null,
     timestamp: new Date().toISOString()
   }));
+  if (!telegram.ok) {
+    console.error("BAYAN_TELEGRAM_REPORT_FAILED", JSON.stringify({
+      subject: cleanText(subject, 180),
+      error: telegram.error || "unknown_telegram_error"
+    }));
+  }
   return telegram;
 };
 
@@ -590,16 +598,32 @@ const telegramApi = async (env: Env, method: string, body?: Record<string, unkno
 };
 
 const sendBayanTelegram = async (env: Env, text: string, chatId?: string) => {
-  let destination = cleanText(chatId || env.TELEGRAM_CHAT_ID || "", 120);
+  const message = cleanText(text, 4000);
+  const configured = cleanText(chatId || env.TELEGRAM_CHAT_ID || "", 120);
   try {
-    if (!destination) {
-      const discovered = await discoverTelegramChat(env);
-      destination = cleanText(discovered?.chatId || "", 120);
-      if (!destination && discovered?.source === "webhook") return { ok: false, error: "telegram_getupdates_conflict_webhook_configured" };
+    if (configured) {
+      try {
+        await telegramApi(env, "sendMessage", { chat_id: configured, text: message });
+        return { ok: true, chatId: configured, source: "configured" };
+      } catch (configuredError) {
+        const firstError = safeErrorMessage(configuredError);
+        const discovered = await discoverTelegramChat(env);
+        const fallback = cleanText(discovered?.chatId || "", 120);
+        if (!fallback || fallback === configured) return { ok: false, error: firstError };
+        try {
+          await telegramApi(env, "sendMessage", { chat_id: fallback, text: message });
+          return { ok: true, chatId: fallback, source: "discovered_fallback", previousError: firstError };
+        } catch (fallbackError) {
+          return { ok: false, error: firstError + " | fallback: " + safeErrorMessage(fallbackError) };
+        }
+      }
     }
+    const discovered = await discoverTelegramChat(env);
+    const destination = cleanText(discovered?.chatId || "", 120);
+    if (!destination && discovered?.source === "webhook") return { ok: false, error: "telegram_getupdates_conflict_webhook_configured" };
     if (!destination) return { ok: false, error: "telegram_chat_id_missing_start_bot_first" };
-    await telegramApi(env, "sendMessage", { chat_id: destination, text: cleanText(text, 4000) });
-    return { ok: true, chatId: destination };
+    await telegramApi(env, "sendMessage", { chat_id: destination, text: message });
+    return { ok: true, chatId: destination, source: "discovered" };
   } catch (error) {
     return { ok: false, error: safeErrorMessage(error) };
   }
