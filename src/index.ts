@@ -1040,6 +1040,8 @@ export default {
           : "BAYAN knowledge answer.\nLanguage: " + language + "\nUser request: " + input +
             "\nNo live search evidence was available for this request. Answer from the model's general knowledge only when you are confident. Clearly distinguish established knowledge from uncertainty, do not invent citations or claim that live verification occurred, and say Insufficient Evidence when the question requires current or source-specific verification.";
         let response: Response | null = null;
+        let openaiFailure: string | null = null;
+        let cloudflareFailure: string | null = null;
         if (env.OPENAI_API_KEY) {
           response = await fetch("https://api.openai.com/v1/responses", {
             method: "POST",
@@ -1050,6 +1052,7 @@ export default {
               input: "Mode: " + (body.mode || "knowledge") + "\n" + prompt, store: false
             })
           });
+          if (!response.ok) openaiFailure = "openai_http_" + response.status;
         } else {
           const result = await cloudflareAiRun(env, DEFAULT_CLOUDFLARE_AI_MODEL, [
             { role: "system", content: "You are BAYAN AI. Be neutral, evidence-first, explicit about uncertainty, and never fabricate. Use only the supplied evidence." },
@@ -1107,14 +1110,15 @@ export default {
                 warnings: ["Primary AI provider failed; Cloudflare Workers AI fallback used."],
                 provider: "cloudflare-workers-ai-fallback", article
               });
-            } catch {}
+            } catch (error) { cloudflareFailure = safeErrorMessage(error); }
           }
           return json({
             answer: "Insufficient Evidence: تعذر إكمال التحقق الآن.",
             claims: [],
             evidence: [],
             confidence: 0,
-            warnings: ["AI provider error", "No unverified answer was generated."]
+            warnings: ["AI provider error", "No unverified answer was generated."],
+            ...(request.headers.get("x-bayan-test") === "1" ? { diagnostics: { openaiConfigured: !!env.OPENAI_API_KEY, cloudflareAIConfigured: !!env.AI, openaiFailure, cloudflareFailure } } : {})
           }, 502);
         }
 
