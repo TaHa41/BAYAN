@@ -503,7 +503,7 @@ export default {
         }
 
         const language = /[\u0600-\u06FF]/.test(input) ? "ar" : "en";
-        const shouldSearch = body.live !== false;
+        const shouldSearch = body.live !== false && !["code", "write"].includes(String(body.mode || "knowledge").toLowerCase());
         let results: any[] = [];
 
         if (shouldSearch) {
