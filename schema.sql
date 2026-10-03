@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS content_queue (
   id INTEGER PRIMARY KEY AUTOINCREMENT, topic TEXT NOT NULL, section TEXT NOT NULL,
   language TEXT NOT NULL DEFAULT 'ar', priority INTEGER NOT NULL DEFAULT 0,
   attempts INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'QUEUED',
-  created_at TEXT NOT NULL, processed_at TEXT
+  created_at TEXT NOT NULL, processed_at TEXT, next_attempt_at TEXT
 );
 CREATE TABLE IF NOT EXISTS visitor_profiles (
   visitor_id TEXT PRIMARY KEY, language TEXT NOT NULL DEFAULT 'ar',
