@@ -721,7 +721,7 @@ const sendBayanEmail = async (env: Env, subject: string, text: string) => {
       })
     });
     if (!response.ok) return { ok: false, configured: true, error: "resend_http_" + response.status };
-    const data = await response.json().catch(() => ({} as any));
+    const data: any = await response.json().catch(() => ({}));
     return { ok: true, configured: true, id: data?.id || null };
   } catch (error) {
     return { ok: false, configured: true, error: safeErrorMessage(error) };
@@ -1929,7 +1929,7 @@ export default {
         const result = await reportBayanError(env, context, new Error(detail), {
           repair: "تم استقبال خطأ الواجهة ووضعه في طابور التشخيص والتحقق."
         });
-        return json({ status: "received", repairQueued: true, diagnosticDelivered: !!result?.ok });
+        return json({ status: "received", repairQueued: true, diagnosticDelivered: typeof result === "object" && result !== null && result.ok === true });
       } catch (error) {
         return json({ status: "invalid_client_error", error: safeErrorMessage(error) }, 400);
       }
