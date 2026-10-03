@@ -381,6 +381,24 @@ const queueBayanRepair = async (env: Env, context: string, error: unknown) => {
   } catch {}
 };
 
+const verifyBayanRepair = async (env: Env, job: any) => {
+  if (job.context.includes("runtime audit")) {
+    const audit = await runRuntimeAudit(env);
+    return { ok: audit.healthy, details: JSON.stringify(audit.results).slice(0, 2500) };
+  }
+  if (job.context.includes("client/")) {
+    try {
+      if (!env.ASSETS) throw new Error("assets_binding_missing");
+      const response = await env.ASSETS.fetch(new Request("https://bayan.internal/"));
+      return { ok: response.ok, details: "assets_root_http_" + response.status };
+    } catch (error) {
+      return { ok: false, details: safeErrorMessage(error) };
+    }
+  }
+  const audit = await runRuntimeAudit(env);
+  return { ok: audit.healthy, details: JSON.stringify(audit.results).slice(0, 2500) };
+};
+
 const processBayanRepairQueue = async (env: Env) => {
   if (!env.DB) return;
   await ensureRepairQueue(env);
