@@ -2156,12 +2156,14 @@ export default {
         new Error("manual_diagnostic_test"),
         { repair: "اختبار مسار التقرير فقط؛ لا يمثل عطلًا حقيقيًا." }
       );
+      const delivered = typeof result === "object" && result !== null && result.ok === true;
+      const deliveryError = typeof result === "object" && result !== null ? result.error || null : "diagnostic_deduplicated";
       return json({
-        status: result?.ok ? "ok" : "telegram_send_failed",
-        delivered: !!result?.ok,
-        error: result?.error || null,
+        status: delivered ? "ok" : "telegram_send_failed",
+        delivered,
+        error: deliveryError,
         elapsedMs: Date.now() - started
-      }, result?.ok ? 200 : 502);
+      }, delivered ? 200 : 502);
     }
 
     if (path === "/api/ai/manager/status" && request.method === "GET") {
