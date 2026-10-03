@@ -829,6 +829,15 @@ const runRuntimeAudit = async (env: Env) => {
     if (!response.ok) throw new Error("assets_http_" + response.status);
     return { status: response.status };
   });
+  const publicRoutes = ["/", "/egypt", "/arab", "/world", "/science", "/economy", "/politics", "/technology", "/health", "/history-culture", "/people", "/sports", "/travel", "/arts", "/news", "/trending", "/prices", "/about", "/methodology", "/privacy", "/terms", "/contact", "/contribute", "/review"];
+  for (const route of publicRoutes) {
+    await check("page:" + route, async () => {
+      if (!env.ASSETS) throw new Error("assets_binding_missing");
+      const response = await env.ASSETS.fetch(new Request("https://bayan.internal" + route));
+      if (!response.ok) throw new Error("page_http_" + response.status);
+      return { contentType: response.headers.get("content-type") || "" };
+    });
+  }
   await check("/database", async () => {
     if (!env.DB) throw new Error("database_binding_missing");
     await env.DB.prepare("SELECT 1 AS ok").first();
