@@ -9,9 +9,9 @@ Keep BAYAN evidence-first, resilient, and operational. Prefer safe automatic rec
 - Search/news answers should prefer independent sources and label limited evidence.
 - Visitor contributions remain PENDING_REVIEW until a manager verifies them.
 - Verified contributions may enter the knowledge database only after the review action succeeds.
-- Technical failures must be observable through console errors/Cloudflare Issues and, when configured, emailed to the BAYAN notification inbox.
+- Technical failures must be observable through console errors/Cloudflare Issues and sent to the configured Telegram owner channel.
 - AI failures should use the configured fallback chain before returning Insufficient Evidence.
-- Do not auto-deploy source-code changes merely because an AI agent proposed them. Changes must pass typecheck/build/tests and then be reviewed/deployed.
+- The runtime AI may attempt safe operational recovery first: retry, fallback provider, temporary provider cooldown, or alternate search source. It must not edit source code, secrets, permissions, or production data autonomously.
 
 ## Repair loop
 1. Reproduce the failure from logs/Issues.
@@ -21,5 +21,5 @@ Keep BAYAN evidence-first, resilient, and operational. Prefer safe automatic rec
 5. Review the diff for secrets and unintended behavior.
 6. Deploy only after validation.
 
-## Cloudflare Issues automation
+## Runtime self-healing\n1. Detect and reproduce the failure.\n2. Ask the configured AI for a diagnosis and a safe recovery proposal.\n3. Execute only allowlisted operational actions.\n4. Re-test the affected path.\n5. Send the outcome to Telegram.\n6. If a source-code/configuration change is required, create a repair proposal for review rather than changing production code.\n\n## Cloudflare Issues automation
 Issues may send diagnostic context to a coding agent. The agent should inspect this playbook and the connected repository, propose/test a fix, and leave deployment for review.
