@@ -160,6 +160,29 @@ const slugForQuery = async (query: string) => {
   return "knowledge-" + Array.from(new Uint8Array(digest)).slice(0, 10).map((x) => x.toString(16).padStart(2, "0")).join("");
 };
 
+const ensureContributionTable = async (env: Env) => {
+  if (!env.DB) return false;
+  try {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS visitor_contributions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      visitor_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      source TEXT,
+      status TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
+      reviewer_note TEXT,
+      created_at TEXT NOT NULL,
+      reviewed_at TEXT
+    )`).run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_contributions_status_created ON visitor_contributions(status, created_at DESC)").run();
+    return true;
+  } catch { return false; }
+};
+const managerAuthorized = (request: Request, env: Env) => {
+  const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || request.headers.get("x-bayan-manager-token") || "";
+  return !!env.BAYAN_AI_MANAGER_TOKEN && supplied === env.BAYAN_AI_MANAGER_TOKEN;
+};
+
 const saveKnowledgeArticle = async (env: Env, article: any) => {
   if (!env.DB) return { persisted: false, reason: "database_not_configured" };
   try {
@@ -719,9 +742,28 @@ export default {
         const contribution = cleanText(body.body, 6000);
         const source = cleanText(body.source, 500);
         if (!env.DB || !visitorId || !title || contribution.length < 20) return json({ status: "invalid_contribution" }, 400);
+        if (!await ensureContributionTable(env)) return json({ status: "database_unavailable" }, 503);
         await env.DB.prepare("INSERT INTO visitor_contributions(visitor_id,title,body,source,status,created_at) VALUES(?,?,?,?, 'PENDING_REVIEW',?)").bind(visitorId,title,contribution,source||null,new Date().toISOString()).run();
         return json({ status: "received", moderation: "PENDING_REVIEW" }, 201);
       } catch { return json({ status: "invalid_request" }, 400); }
+    }
+
+    if (path === "/api/contributions/review" && request.method === "GET") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden" }, 403);
+      if (!await ensureContributionTable(env)) return json({ status: "database_unavailable" }, 503);
+      const status = cleanText(url.searchParams.get("status"), 40) || "PENDING_REVIEW";
+      const result = await env.DB!.prepare("SELECT id, visitor_id, title, body, source, status, reviewer_note, created_at, reviewed_at FROM visitor_contributions WHERE status=? ORDER BY created_at DESC LIMIT 100").bind(status).all();
+      return json({ status: "ok", items: result.results || [], count: (result.results || []).length });
+    }
+    if (path === "/api/contributions/review" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden" }, 403);
+      if (!await ensureContributionTable(env)) return json({ status: "database_unavailable" }, 503);
+      const body = await request.json() as { id?: number; status?: string; note?: string };
+      const id = Number(body.id);
+      const status = ["PENDING_REVIEW","VERIFIED","REJECTED","NEEDS_MORE_INFO"].includes(String(body.status)) ? String(body.status) : "";
+      if (!Number.isInteger(id) || id < 1 || !status) return json({ status: "invalid_review" }, 400);
+      await env.DB.prepare("UPDATE visitor_contributions SET status=?, reviewer_note=?, reviewed_at=? WHERE id=?").bind(status, cleanText(body.note, 1000) || null, new Date().toISOString(), id).run();
+      return json({ status: "updated", id, moderation: status });
     }
 
     if (path === "/api/knowledge") {
@@ -797,8 +839,9 @@ export default {
             { role: "system", content: "You are BAYAN AI. Be neutral, evidence-first, explicit about uncertainty, and never fabricate. Use only the supplied evidence." },
             { role: "user", content: "Mode: " + (body.mode || "knowledge") + "\n" + prompt }
           ]);
+          const aiAnswer = textOf(result);
           return json({
-            answer: textOf(result), claims: [], evidence: results.map(withoutUrl),
+            answer: aiAnswer, claims: [], evidence: results.map(withoutUrl),
             confidence: results.length ? 0.7 : 0.3, warnings: [],
             provider: "cloudflare-workers-ai"
           });
@@ -829,12 +872,25 @@ export default {
         }
 
         const data = await response.json() as any;
+        const aiAnswer = textOf(data);
+        let article: any = null;
+        if (results.length && !["code","write"].includes(String(body.mode || "").toLowerCase())) {
+          try {
+            const generated = await generateKnowledgeArticle(env, language, input, results);
+            if (generated) {
+              const slug = await slugForQuery(input);
+              const section = sectionForIntent(queryIntent(input), input);
+              const knowledgeArticle = { slug, query: input, section, title: generated.title, summary: generated.summary, body: generated.body, sources: results.slice(0, 8).map(withoutUrl), createdAt: new Date().toISOString() };
+              const persistence = await saveKnowledgeArticle(env, knowledgeArticle);
+              if (persistence.persisted) await refreshKnowledgeGraph(env, knowledgeArticle);
+              article = { id: slug, section, title: generated.title, summary: generated.summary, persisted: persistence.persisted };
+            }
+          } catch {}
+        }
         return json({
-          answer: textOf(data),
-          claims: [],
-          evidence: results.map(withoutUrl),
-          confidence: results.length ? 0.7 : 0.3,
-          warnings: [],
+          answer: aiAnswer, claims: [], evidence: results.map(withoutUrl),
+          confidence: results.length ? 0.7 : 0.3, warnings: [],
+          provider: "openai", article,
           policy: "external_sources_used_internally; no_external_links_to_visitor"
         });
       } catch {
