@@ -4,11 +4,18 @@ import worker from "../../src/index";
 describe("BAYAN platform", () => {
   it("returns safe health metadata", async () => {
     const response = await worker.fetch(new Request("https://bayan.test/api/health"), {
-      BAYAN_ENVIRONMENT: "test", BAYAN_VERSION: "0.3.0", BAYAN_COMMIT_SHA: "test",
+      BAYAN_ENVIRONMENT: "test", BAYAN_VERSION: "0.6.0", BAYAN_COMMIT_SHA: "test",
     });
     expect(response.status).toBe(200);
     const body = await response.json() as { status: string; environment: string; version: string };
-    expect(body.status).toBe("ok"); expect(body.environment).toBe("test"); expect(body.version).toBe("0.3.0");
+    expect(body.status).toBe("ok"); expect(body.environment).toBe("test"); expect(body.version).toBe("0.6.0");
+  });
+  it("keeps the legacy health alias working for the runtime audit", async () => {
+    const response = await worker.fetch(new Request("https://bayan.test/health"), {
+      BAYAN_ENVIRONMENT: "test", BAYAN_VERSION: "0.6.0", BAYAN_COMMIT_SHA: "test",
+    });
+    expect(response.status).toBe(200);
+    expect((await response.json()).status).toBe("ok");
   });
   it("exposes the tool catalog without secrets", async () => {
     const response = await worker.fetch(new Request("https://bayan.test/api/tools"), { OPENAI_API_KEY: "secret" });
