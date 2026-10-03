@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   actions: write
   issues: write
 
@@ -50,6 +50,96 @@ jobs:
             Repository commit: ${{ github.sha }}
             Trigger: ${{ github.event_name }}
             Re-run the production diagnostics and use the workflow logs as the evidence source.
+
+      - name: Prevent repair loops
+        id: guard
+        if: steps.smoke.outcome == 'failure'
+        run: |
+          if git log -5 --pretty=%s | grep -q '^auto-fix:'; then
+            echo "repair_allowed=false" >> "$GITHUB_OUTPUT"
+            echo "A recent auto-fix commit exists; stopping to prevent a repair loop."
+          else
+            echo "repair_allowed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate constrained repair patch
+        if: steps.smoke.outcome == 'failure' && steps.guard.outputs.repair_allowed == 'true' && env.OPENAI_API_KEY != ''
+        continue-on-error: true
+        run: |
+          node scripts/ai-auto-repair.mjs
+
+      - name: Validate and apply repair
+        id: repair
+        if: steps.smoke.outcome == 'failure' && steps.guard.outputs.repair_allowed == 'true' && hashFiles('auto-repair.patch') != ''
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -q '^NO_SAFE_FIX        if: steps.smoke.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          body="Automated BAYAN Guardian incident.
+
+          Commit: ${{ github.sha }}
+          Trigger: ${{ github.event_name }}
+          Production smoke diagnostics failed.
+
+          The Guardian ran the evidence-first AI diagnosis when OPENAI_API_KEY is available in GitHub Actions. It never exposes secrets and does not apply unvalidated source changes."
+          gh issue create --repo "${{ github.repository }}" --title "BAYAN Guardian: production health failure" --body "$body" || true
+
+      - name: Fail guardian on production regression
+        if: steps.smoke.outcome == 'failure'
+        run: exit 1
+
+  ci-recovery:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record failed workflow
+        run: |
+          echo "BAYAN Guardian detected a failed workflow."
+          echo "Workflow: ${{ github.event.workflow_run.name }}"
+          echo "Run: ${{ github.event.workflow_run.id }}"
+          echo "SHA: ${{ github.event.workflow_run.head_sha }}"
+
+      - name: Create CI incident
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --repo "${{ github.repository }}"             --title "BAYAN Guardian: CI/deploy failure detected"             --body "Automated Guardian detected a failed workflow run.
+
+          Workflow: ${{ github.event.workflow_run.name }}
+          Run ID: ${{ github.event.workflow_run.id }}
+          Commit: ${{ github.event.workflow_run.head_sha }}
+
+          Review the failing run logs. The production guardian remains evidence-first and does not deploy unverified changes." || true
+ auto-repair.patch; then
+            echo "No safe automatic fix was produced."
+            exit 1
+          fi
+          git apply --check auto-repair.patch
+          git apply auto-repair.patch
+          if git diff --name-only | grep -Ev '^(src/|public/|scripts/|tests/|package.json$)' | grep .; then
+            echo "Repair touched a forbidden path."
+            git reset --hard HEAD
+            exit 1
+          fi
+          if git diff --name-status | awk '$1 ~ /^D/ {print; bad=1} END {exit bad?0:1}'; then
+            echo "Repair attempted to delete a file."
+            git reset --hard HEAD
+            exit 1
+          fi
+          git diff --check
+          npm install
+          npm run typecheck
+          npm test
+          npm run build
+          git config user.name "BAYAN Auto Repair"
+          git config user.email "bayan-auto-repair@users.noreply.github.com"
+          git add src public scripts tests package.json
+          git commit -m "auto-fix: repair production regression"
+          git push origin HEAD:main
 
       - name: Create incident issue
         if: steps.smoke.outcome == 'failure'
