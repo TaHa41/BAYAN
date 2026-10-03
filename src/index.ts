@@ -557,6 +557,7 @@ const attemptBayanSelfRepair = async (env: Env, context: string, error: unknown)
   if (!claim) {
     return { attempted: false, action: "cooldown", result: "تم منع تكرار الإصلاح الآلي لنفس الخطأ خلال 15 دقيقة." };
   }
+  await setCooldown("repair", signature, 15 * 60);
 
   const diagnosis = await diagnoseTechnicalReport(env, [
     "السياق: " + cleanText(context, 240),
@@ -632,6 +633,7 @@ const reportBayanError = async (env: Env, context: string, error: unknown, extra
   const now = Date.now();
   const claim = !(await isCooldownActive("diagnostic", signature));
   if (!claim) return false;
+  await setCooldown("diagnostic", signature, 5 * 60);
 
   const reportLines = [
     "بيان — تقرير خطأ تقني تلقائي",
