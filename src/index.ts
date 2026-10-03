@@ -8,9 +8,6 @@ interface Env {
   GNEWS_API_KEY?: string;
   GOLD_API_KEY?: string;
   GOOGLE_MAPS_API_KEY?: string;
-  RESEND_API_KEY?: string;
-  BAYAN_NOTIFY_EMAIL?: string;
-  BAYAN_NOTIFY_FROM?: string;
   ADSENSE_ENABLED?: string;
   ADSENSE_CLIENT_ID?: string;
   ADSENSE_PUBLISHER_ID?: string;
@@ -194,30 +191,6 @@ const ensureContributionTable = async (env: Env) => {
     return true;
   } catch { return false; }
 };
-const sendBayanEmail = async (env: Env, subject: string, text: string): Promise<{ok:boolean; error?:string}> => {
-  const destination = env.BAYAN_NOTIFY_EMAIL || "bayan.contact@yahoo.com";
-  if (!env.RESEND_API_KEY) return { ok: false, error: "resend_api_key_missing" };
-  const from = env.BAYAN_NOTIFY_FROM || "BAYAN <onboarding@resend.dev>";
-  try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: "Bearer " + env.RESEND_API_KEY },
-      body: JSON.stringify({ from, to: [destination], subject: cleanText(subject, 180), text: cleanText(text, 12000) })
-    });
-    if (!response.ok) {
-      let detail = "";
-      try { const body = await response.json() as any; detail = cleanText(body?.message || body?.error || body?.name || "", 300); } catch {}
-      const error = "resend_http_" + response.status + (detail ? ":" + detail : "");
-      console.error(JSON.stringify({ event: "bayan_email_failed", status: response.status, error }));
-      return { ok: false, error };
-    }
-    return { ok: true };
-  } catch (error) {
-    console.error(JSON.stringify({ event: "bayan_email_exception", error: safeErrorMessage(error) }));
-    return { ok: false, error: "resend_request_failed" };
-  }
-};
-
 const diagnosticMemory = new Map<string, number>();
 
 const safeErrorMessage = (error: unknown) => {
@@ -250,17 +223,15 @@ const diagnoseTechnicalReport = async (env: Env, report: string) => {
 };
 
 const sendBayanDiagnostic = async (env: Env, subject: string, report: string) => {
-  const delivered = await sendBayanEmail(env, subject, report);
   const telegram = await sendBayanTelegram(env, "⚠️ " + subject + "\n\n" + report.slice(0, 3600));
   console.log(JSON.stringify({
     event: "bayan_notification",
     subject: cleanText(subject, 180),
-    delivered,
     telegramDelivered: telegram.ok,
-    destination_configured: !!(env.BAYAN_NOTIFY_EMAIL || "bayan.contact@yahoo.com") && !!env.RESEND_API_KEY,
+    telegramError: telegram.error || null,
     timestamp: new Date().toISOString()
   }));
-  return delivered;
+  return telegram;
 };
 
 const reportBayanError = async (env: Env, context: string, error: unknown, extra: any = {}) => {
@@ -315,15 +286,14 @@ const sendBayanTelegram = async (env: Env, text: string, chatId?: string) => {
 
 const sendBayanOwnerNotification = async (env: Env, subject: string, text: string) => {
   const telegram = await sendBayanTelegram(env, "🔔 " + cleanText(subject, 180) + "\n\n" + text.slice(0, 3600));
-  const email = await sendBayanEmail(env, subject, text);
   console.log(JSON.stringify({
     event: "bayan_owner_notification",
     subject: cleanText(subject, 180),
     telegramDelivered: telegram.ok,
-    emailDelivered: email.ok,
+    telegramError: telegram.error || null,
     timestamp: new Date().toISOString()
   }));
-  return { telegram, email };
+  return { telegram };
 };
 
 const discoverTelegramChat = async (env: Env) => {
@@ -1276,13 +1246,46 @@ export default {
           searchApi: !!env.SEARCH_API_KEY,
           gnews: !!env.GNEWS_API_KEY,
           goldApi: !!env.GOLD_API_KEY,
-          resend: !!env.RESEND_API_KEY,
           managerToken: !!env.BAYAN_AI_MANAGER_TOKEN
-        },
-        notificationDestination: env.BAYAN_NOTIFY_EMAIL || "bayan.contact@yahoo.com",
-        senderConfigured: !!env.BAYAN_NOTIFY_FROM,
-        senderNote: env.BAYAN_NOTIFY_FROM ? "configured" : "using Resend testing sender; production delivery to Yahoo may require a verified Resend domain/sender"
+        }
       });
+    }
+
+    if (path === "/api/ai/manager/test-telegram" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      const started = Date.now();
+      const checks: any[] = [];
+      const check = async (name: string, fn: () => Promise<any>) => {
+        const t = Date.now();
+        try { checks.push({ name, ok: true, latencyMs: Date.now() - t, details: await fn() }); }
+        catch (error) { checks.push({ name, ok: false, latencyMs: Date.now() - t, error: safeErrorMessage(error) }); }
+      };
+      await check("site_health", async () => {
+        const response = await fetch(new URL("/health", request.url), { headers: { "x-bayan-internal": "1" } });
+        if (!response.ok) throw new Error("health_http_" + response.status);
+        return await response.json();
+      });
+      await check("multi_source_search", async () => {
+        const search = await internalSearch("ما هو بيان منصة المعرفة", env);
+        if (!search.ok) throw new Error("search_unavailable");
+        return { providers: search.providerCount, sources: search.sourceCount, results: search.results.length, failedProviders: search.attempts.filter((x: any) => !x.ok) };
+      });
+      const failed = checks.filter((x) => !x.ok);
+      const report = [
+        "بيان — رسالة اختبار Telegram وتشخيص شاملة",
+        "الوقت: " + new Date().toISOString(),
+        "الإصدار: " + cleanText(env.BAYAN_VERSION || "unknown", 100),
+        "Commit: " + cleanText(env.BAYAN_COMMIT_SHA || "unknown", 100),
+        "المدة: " + (Date.now() - started) + "ms",
+        "",
+        "نتيجة الاختبارات:",
+        ...checks.map((x: any) => "- " + x.name + ": " + (x.ok ? "OK" : "FAILED") + (x.error ? " — " + x.error : "") + (x.details ? " — " + JSON.stringify(x.details).slice(0, 1200) : "")),
+        "",
+        "المشاكل المكتشفة:",
+        failed.length ? failed.map((x: any) => "- " + x.name + ": " + x.error).join("\n") : "- لا توجد مشكلة في الاختبارات الحالية."
+      ].join("\n");
+      const telegram = await sendBayanTelegram(env, "🧪 بيان — اختبار وتشخيص", report);
+      return json({ status: failed.length || !telegram.ok ? "degraded" : "healthy", delivered: telegram.ok, telegramError: telegram.error || null, checks, failed, report });
     }
 
     if (path === "/api/ai/manager/test-email" && request.method === "POST") {
@@ -1352,8 +1355,8 @@ export default {
         "حالة البريد: هذه الرسالة نفسها تُرسل عبر إعدادات إشعارات بيان.",
         "إذا ظهر FAILED، لا يتم اعتبار النظام سليمًا حتى ينجح الاختبار التالي."
       ].join("\n");
-      const emailResult = await sendBayanDiagnostic(env, "بيان — رسالة اختبار وتشخيص شاملة", report);
-      return json({ status: failed.length || !emailResult.ok ? "degraded" : "healthy", delivered: emailResult.ok, emailError: emailResult.error || null, checks, failed, report });
+      const telegramResult = await sendBayanDiagnostic(env, "بيان — رسالة اختبار وتشخيص شاملة", report);
+      return json({ status: failed.length || !telegramResult.ok ? "degraded" : "healthy", delivered: telegramResult.ok, telegramError: telegramResult.error || null, checks, failed, report });
     }
 
     if (path === "/api/news") {
