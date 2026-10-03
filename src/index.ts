@@ -164,8 +164,8 @@ const renderHtml = async (response: Response, requestUrl: URL, env?: Env) => {
       if (row) articleSeo = row;
     } catch {}
   }
-  const finalTitle = articleSeo?.title ? cleanText(articleSeo.title, 180) + " — BAYAN | بيان" : seoTitle;
-  const finalDescription = articleSeo?.summary ? cleanText(articleSeo.summary, 300) : seoDescription;
+  const finalTitle = articleSeo?.title ? cleanText(articleSeo.title, 180) + " — BAYAN | بيان" : seo[language][0];
+  const finalDescription = articleSeo?.summary ? cleanText(articleSeo.summary, 300) : seo[language][1];
   const [resolvedTitle, resolvedDescription] = [finalTitle, finalDescription];
 
   html = html.replace('<html lang="ar" dir="rtl">', '<html lang="' + language + '" dir="' + direction + '">');
