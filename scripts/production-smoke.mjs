@@ -38,8 +38,11 @@ try{
 try{
   const home=await fetch(base+"/",{redirect:"follow"});
   const html=await home.text();
-  const ok=home.ok && /<link rel="canonical"\s+href=/i.test(html) && /name="robots"/i.test(html) &&
-    /hreflang="en"/i.test(html) && /id="app"/i.test(html);
+  const ok=home.ok &&
+    /<link[^>]+rel=["']canonical["'][^>]+href=["'][^"']+["']/i.test(html) &&
+    /<meta[^>]+name=["']robots["'][^>]+content=["'][^"']+["']/i.test(html) &&
+    /<link[^>]+hreflang=["'](?:ar|en|x-default)["'][^>]+href=["'][^"']+["']/i.test(html) &&
+    /id=["']app["']/i.test(html);
   console.log((ok?"PASS":"FAIL")+" / HTML SEO/security contract");
   if(!ok) failed++;
 }catch(e){console.log("FAIL / HTML SEO/security contract "+e.message);failed++;}
