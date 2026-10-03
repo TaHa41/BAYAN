@@ -4,6 +4,14 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-02",
   "workers_dev": true,
+  "secrets": {
+    "required": [
+      "OPENAI_API_KEY",
+      "SEARCH_API_KEY",
+      "GNEWS_API_KEY",
+      "GOLD_API_KEY"
+    ]
+  },
   "observability": {
     "enabled": true
   },
