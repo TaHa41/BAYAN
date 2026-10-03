@@ -27,7 +27,7 @@ const DEFAULT_AI_GATEWAY = "default";
 
 const cloudflareAiRun = async (env: Env, model: string, messages: any[]) => {
   if (!env.AI) throw new Error("cloudflare_ai_not_configured");
-  return env.AI.run(model, { messages }, { gateway: { id: DEFAULT_AI_GATEWAY } });
+  return env.AI.run(model, { messages }, { gateway: { id: DEFAULT_AI_GATEWAY, skipCache: false, cacheTtl: 300 } });
 };
 
 const cloudflareKnowledgeSearch = async (env: Env, query: string) => {
@@ -124,6 +124,25 @@ const withoutUrl = (item: any) => {
 
 const sourceName = (item: any) =>
   cleanText(item?.source || item?.domain || item?.displayed_link || "Unknown source", 160);
+
+const runRuntimeAudit = async (baseUrl: string) => {
+  const routes = ["/", "/health", "/api/features", "/search", "/news", "/prices", "/sitemap.xml"];
+  const results = await Promise.all(routes.map(async (route) => {
+    const started = Date.now();
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const response = await fetch(baseUrl + route, { headers: { "x-bayan-monitor": "1" } });
+        const body = await response.text();
+        if (response.ok && body.trim()) {
+          return { route, ok: true, status: response.status, latencyMs: Date.now() - started, attempt };
+        }
+      } catch {}
+      await new Promise((resolve) => setTimeout(resolve, attempt * 250));
+    }
+    return { route, ok: false, status: 0, latencyMs: Date.now() - started, attempt: 3 };
+  }));
+  return { checkedAt: new Date().toISOString(), healthy: results.every((x) => x.ok), results };
+};
 
 const queryIntent = (query: string) => {
   const q = query.toLowerCase();
