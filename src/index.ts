@@ -269,7 +269,7 @@ export default {
           }, 502);
         }
 
-        const data = await response.json();
+        const data = await response.json() as any;
         return json({
           answer: textOf(data),
           claims: [],
