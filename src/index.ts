@@ -659,7 +659,8 @@ export default {
   },
 
   async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
+    try {
+      const url = new URL(request.url);
     const path = url.pathname;
 
     if (path === "/health" || path === "/api/health") {
@@ -1150,6 +1151,77 @@ export default {
       return json({ status: failed.length ? "degraded" : "healthy", checkedAt: new Date().toISOString(), results, diagnosis, automaticRepairPolicy: "Only allowlisted runtime retries/circuit recovery are automatic; source-code changes require CI validation before deployment." });
     }
 
+    if (path === "/api/ai/manager/test-email" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden" }, 403);
+      const started = Date.now();
+      const checks: any[] = [];
+      const check = async (name: string, fn: () => Promise<any>) => {
+        const t = Date.now();
+        try {
+          const value = await fn();
+          checks.push({ name, ok: true, latencyMs: Date.now() - t, details: value });
+        } catch (error) {
+          checks.push({ name, ok: false, latencyMs: Date.now() - t, error: safeErrorMessage(error) });
+        }
+      };
+      await check("site_health", async () => {
+        const response = await fetch(new URL("/health", request.url), { headers: { "x-bayan-internal": "1" } });
+        if (!response.ok) throw new Error("health_http_" + response.status);
+        return await response.json();
+      });
+      await check("multi_source_search", async () => {
+        const search = await internalSearch("ما هو بيان منصة المعرفة", env);
+        if (!search.ok) throw new Error("search_unavailable");
+        return { providers: search.providerCount, sources: search.sourceCount, results: search.results.length, failedProviders: search.attempts.filter((x: any) => !x.ok) };
+      });
+      await check("cloudflare_ai", async () => {
+        if (!env.AI) throw new Error("cloudflare_ai_not_configured");
+        const result = await cloudflareAiRun(env, DEFAULT_CLOUDFLARE_AI_MODEL, [
+          { role: "system", content: "Return only: BAYAN_AI_TEST_OK" },
+          { role: "user", content: "BAYAN AI diagnostic test." }
+        ]);
+        return { response: textOf(result).slice(0, 120), fallback_chain: CLOUDFLARE_AI_FALLBACK_MODELS };
+      });
+      await check("openai", async () => {
+        if (!env.OPENAI_API_KEY) throw new Error("openai_not_configured");
+        const response = await fetch("https://api.openai.com/v1/responses", {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: "Bearer " + env.OPENAI_API_KEY },
+          body: JSON.stringify({ model: env.OPENAI_MODEL?.trim() || DEFAULT_OPENAI_MODEL, instructions: "Return only BAYAN_OPENAI_TEST_OK.", input: "BAYAN diagnostic test.", store: false })
+        });
+        if (!response.ok) throw new Error("openai_http_" + response.status);
+        return { response: textOf(await response.json()).slice(0, 120) };
+      });
+      const failed = checks.filter((x) => !x.ok);
+      const repairActions = [
+        "البحث: يجمع الآن نتائج من أكثر من مزود بالتوازي ويزيل التكرار قبل الإجابة.",
+        "الذكاء الاصطناعي: يستخدم سلسلة نماذج احتياطية عند فشل النموذج الأساسي.",
+        "الموقع: يعيد المحاولة ثلاث مرات في الفحص الدوري قبل اعتبار المسار متعطلًا.",
+        "الأخطاء: أي استثناء غير معالج سيُسجل ويُرسل تقريرًا آمنًا دون مفاتيح أو أسرار."
+      ];
+      const report = [
+        "بيان — رسالة اختبار وتشخيص شاملة",
+        "الوقت: " + new Date().toISOString(),
+        "الإصدار: " + cleanText(env.BAYAN_VERSION || "unknown", 100),
+        "Commit: " + cleanText(env.BAYAN_COMMIT_SHA || "unknown", 100),
+        "المدة: " + (Date.now() - started) + "ms",
+        "",
+        "نتيجة الاختبارات:",
+        ...checks.map((x: any) => "- " + x.name + ": " + (x.ok ? "OK" : "FAILED") + " (" + x.latencyMs + "ms)" + (x.error ? " — " + x.error : "") + (x.details ? " — " + JSON.stringify(x.details).slice(0, 1200) : "")),
+        "",
+        "المشاكل المكتشفة:",
+        failed.length ? failed.map((x: any) => "- " + x.name + ": " + x.error).join("\n") : "- لا توجد مشكلة في الاختبارات الحالية.",
+        "",
+        "ما الذي تم عمله للإصلاح/الوقاية:",
+        ...repairActions.map((x) => "- " + x),
+        "",
+        "حالة البريد: هذه الرسالة نفسها تُرسل عبر إعدادات إشعارات بيان.",
+        "إذا ظهر FAILED، لا يتم اعتبار النظام سليمًا حتى ينجح الاختبار التالي."
+      ].join("\n");
+      const delivered = await sendBayanDiagnostic(env, "بيان — رسالة اختبار وتشخيص شاملة", report);
+      return json({ status: failed.length ? "degraded" : "healthy", delivered, checks, failed, report });
+    }
+
     if (path === "/api/news") {
       const q = (url.searchParams.get("q") || "").trim();
       try {
@@ -1367,5 +1439,14 @@ export default {
     }
 
     return json({ error: "Not Found", path }, 404);
+    } catch (error) {
+      await reportBayanError(env, "unhandled Worker exception", error, {
+        repair: "تم التقاط الاستثناء وإرسال تقرير تشخيصي بدل سقوط الطلب بصمت."
+      });
+      return json({
+        error: "internal_error",
+        message: "حدث خطأ تقني. تم تسجيله وإرسال تقرير تشخيصي إذا كانت إشعارات بيان مفعلة."
+      }, 500);
+    }
   }
 };
