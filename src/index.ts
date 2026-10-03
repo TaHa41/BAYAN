@@ -222,6 +222,75 @@ const diagnoseTechnicalReport = async (env: Env, report: string) => {
   return "لم يتوفر محرك ذكاء اصطناعي للتشخيص وقت الخطأ؛ تم إرسال البيانات التقنية الآمنة كما هي.";
 };
 
+const ensureRepairQueue = async (env: Env) => {
+  if (!env.DB) return;
+  await env.DB.prepare(`
+    CREATE TABLE IF NOT EXISTS repair_jobs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      signature TEXT NOT NULL UNIQUE,
+      context TEXT NOT NULL,
+      error_text TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'QUEUED',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_action TEXT,
+      diagnosis TEXT,
+      next_attempt_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      resolved_at TEXT
+    )
+  `).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_repair_jobs_status_next ON repair_jobs(status,next_attempt_at)").run();
+};
+
+const queueBayanRepair = async (env: Env, context: string, error: unknown) => {
+  if (!env.DB) return;
+  try {
+    await ensureRepairQueue(env);
+    const safe = safeErrorMessage(error);
+    const signature = context + "|" + safe;
+    const now = new Date().toISOString();
+    await env.DB.prepare(
+      "INSERT INTO repair_jobs (signature,context,error_text,status,created_at,updated_at) VALUES (?,?,?,?,?,?) ON CONFLICT(signature) DO UPDATE SET updated_at=excluded.updated_at"
+    ).bind(signature, cleanText(context, 240), safe, "QUEUED", now, now).run();
+  } catch {}
+};
+
+const processBayanRepairQueue = async (env: Env) => {
+  if (!env.DB) return;
+  await ensureRepairQueue(env);
+  const jobs = await env.DB.prepare(
+    "SELECT * FROM repair_jobs WHERE status IN ('QUEUED','WAITING_AI') AND (next_attempt_at IS NULL OR next_attempt_at <= ?) ORDER BY created_at ASC LIMIT 2"
+  ).bind(new Date().toISOString()).all<any>();
+  for (const job of jobs.results || []) {
+    const started = new Date().toISOString();
+    try {
+      await env.DB.prepare("UPDATE repair_jobs SET status='DIAGNOSING', attempts=attempts+1, updated_at=? WHERE id=?")
+        .bind(started, job.id).run();
+
+      if (job.context.includes("runtime audit")) {
+        const audit = await runRuntimeAudit(env);
+        if (audit.healthy) {
+          await env.DB.prepare("UPDATE repair_jobs SET status='RESOLVED',last_action=?,diagnosis=?,updated_at=?,resolved_at=? WHERE id=?")
+            .bind("runtime_audit_retry", "تمت إعادة فحص المكونات الداخلية ونجحت.", new Date().toISOString(), new Date().toISOString(), job.id).run();
+          await sendBayanOwnerNotification(env, "تم إصلاح مشكلة تلقائيًا", "تمت إعادة فحص بيان بعد عطل runtime audit وأصبحت المكونات الأساسية سليمة.");
+          continue;
+        }
+      }
+
+      const repair = await attemptBayanSelfRepair(env, job.context, new Error(job.error_text));
+      const isQuota = /4006|daily free allocation|429|quota/i.test(JSON.stringify(repair));
+      const status = repair.action === "diagnose_only" ? "WAITING_AI" : "WAITING_VERIFY";
+      const next = isQuota ? new Date(Date.now() + 30 * 60_000).toISOString() : new Date(Date.now() + 5 * 60_000).toISOString();
+      await env.DB.prepare("UPDATE repair_jobs SET status=?,last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
+        .bind(status, repair.action, cleanText(repair.diagnosis || repair.result, 4000), next, new Date().toISOString(), job.id).run();
+    } catch (error) {
+      await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI',last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
+        .bind("retry_later", safeErrorMessage(error), new Date(Date.now() + 15 * 60_000).toISOString(), new Date().toISOString(), job.id).run();
+    }
+  }
+};
+
 const repairMemory = new Map<string, number>();
 
 const attemptBayanSelfRepair = async (env: Env, context: string, error: unknown) => {
@@ -306,6 +375,7 @@ const reportBayanError = async (env: Env, context: string, error: unknown, extra
     "الخطوة التالية: راجع Workers Logs / Issues إذا تكرر الخطأ.",
     "التنبيه: يتم إرسال تقارير بيان عبر Telegram فقط؛ لا يعتمد النظام على البريد الإلكتروني."
   ].filter(Boolean).join("\n");
+  await queueBayanRepair(env, context, error);
   const repair = await attemptBayanSelfRepair(env, context, error);
   report += "\n\nمحاولة الإصلاح الذاتي:\n" + JSON.stringify(repair);
   return sendBayanDiagnostic(env, "تنبيه خطأ تقني مهم في بيان", report);
@@ -779,6 +849,7 @@ export default {
       }
       await runKnowledgeMaintenance(env);
       await processContentQueue(env);
+      await processBayanRepairQueue(env);
     } catch (error) {
       await reportBayanError(env, "scheduled runtime audit / maintenance", error);
     }
