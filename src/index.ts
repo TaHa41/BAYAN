@@ -1390,13 +1390,13 @@ const rssNewsSearch = async (query = "", language = "ar") => {
 const wikimediaEnterpriseLookup = async (env: Env, query: string, language = "ar") => {
   if (!env.WIKIMEDIA_ENTERPRISE_TOKEN) return [];
   const name = cleanText(query
-    .replace(/^(?:ما هو|ما هي|من هو|من هي|who is|what is|what are)\\s+/i, "")
+    .replace(/^(?:ما هو|ما هي|من هو|من هي|who is|what is|what are)\s+/i, "")
     .replace(/[؟?!،,.:;]+$/g, "")
     .trim(), 180);
-  if (!name || /\\b(?:كيف|لماذا|متى|how|why|when|latest|today|اليوم|الآن|الان)\\b/i.test(name)) return [];
+  if (!name || /\b(?:كيف|لماذا|متى|how|why|when|latest|today|اليوم|الآن|الان)\b/i.test(name)) return [];
   const project = language === "en" ? "enwiki" : "arwiki";
   try {
-    const endpoint = "https://api.enterprise.wikimedia.com/v2/articles/" + encodeURIComponent(name.replace(/\\s+/g, "_"));
+    const endpoint = "https://api.enterprise.wikimedia.com/v2/articles/" + encodeURIComponent(name.replace(/\s+/g, "_"));
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
