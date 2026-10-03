@@ -482,7 +482,8 @@ export default {
       const section = sectionForIntent(queryIntent(q), q);
       const slug = await slugForQuery(q);
       const article = { slug, query: q, section, title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 8).map(withoutUrl), createdAt: new Date().toISOString() };
-      const persistence = await saveKnowledgeArticle(env, article);\n      if (persistence.persisted) await refreshKnowledgeGraph(env, article);
+      const persistence = await saveKnowledgeArticle(env, article);
+      if (persistence.persisted) await refreshKnowledgeGraph(env, article);
       return json({ status: "ok", query: q, section, persisted: persistence.persisted, article: { id: slug, title: article.title, summary: article.summary, body: article.body, source: article.sources[0]?.source || "BAYAN evidence", date: article.sources[0]?.date || null, rank } });
     }
     if (path === "/api/search") {
