@@ -27,13 +27,17 @@ jobs:
 
       - name: Production smoke diagnostics
         id: smoke
-        continue-on-error: true
-        run: node scripts/production-smoke.mjs
+        run: |
+          if node scripts/production-smoke.mjs > smoke-report.json 2>&1; then
+            echo "SMOKE_FAILED=false" >> "$GITHUB_ENV"
+          else
+            echo "SMOKE_FAILED=true" >> "$GITHUB_ENV"
+          fi
         env:
           BAYAN_URL: https://bayan.tahaomar411.workers.dev
 
       - name: AI diagnosis
-        if: steps.smoke.conclusion == 'failure'
+        if: env.SMOKE_FAILED == 'true'
         id: ai
         continue-on-error: true
         run: |
