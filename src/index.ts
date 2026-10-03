@@ -222,6 +222,57 @@ const diagnoseTechnicalReport = async (env: Env, report: string) => {
   return "لم يتوفر محرك ذكاء اصطناعي للتشخيص وقت الخطأ؛ تم إرسال البيانات التقنية الآمنة كما هي.";
 };
 
+const repairMemory = new Map<string, number>();
+
+const attemptBayanSelfRepair = async (env: Env, context: string, error: unknown) => {
+  const safe = safeErrorMessage(error);
+  const signature = context + "|" + safe;
+  const now = Date.now();
+  const last = repairMemory.get(signature) || 0;
+  if (now - last < 900_000) {
+    return { attempted: false, action: "cooldown", result: "تم منع تكرار الإصلاح الآلي لنفس الخطأ خلال 15 دقيقة." };
+  }
+  repairMemory.set(signature, now);
+
+  const diagnosis = await diagnoseTechnicalReport(env, [
+    "السياق: " + cleanText(context, 240),
+    "الخطأ: " + safe,
+    "المطلوب: اقترح إصلاحًا تشغيليًا آمنًا فقط. لا تقترح تعديل كود أو حذف بيانات أو تغيير أسرار تلقائيًا.",
+    "الإصلاحات المسموح بها: إعادة المحاولة، استخدام fallback، تعطيل مزود متعطل مؤقتًا، أو اعتبار المشكلة خارجية وتسجيلها."
+  ].join("\n"));
+
+  if (/4006|daily free allocation|cloudflare_ai/i.test(safe)) {
+    return {
+      attempted: true,
+      action: "cloudflare_ai_cooldown",
+      result: "تم إيقاف محاولات Cloudflare AI الإضافية مؤقتًا لهذا الخطأ والاعتماد على المسارات البديلة حتى لا يتكرر استهلاك الحصة.",
+      diagnosis: cleanText(diagnosis, 1200)
+    };
+  }
+  if (/openai_http_429|rate.?limit|quota/i.test(safe)) {
+    return {
+      attempted: true,
+      action: "provider_fallback",
+      result: "تم تفعيل مسار fallback وعدم اعتبار OpenAI وحده مصدرًا وحيدًا للذكاء الاصطناعي.",
+      diagnosis: cleanText(diagnosis, 1200)
+    };
+  }
+  if (/cloudflare_web_search_failed|cloudflare_web_search_not_configured/i.test(safe)) {
+    return {
+      attempted: true,
+      action: "search_fallback",
+      result: "تم تجاوز مزود البحث المتعطل والاعتماد على مزودي البحث الآخرين المتاحين.",
+      diagnosis: cleanText(diagnosis, 1200)
+    };
+  }
+  return {
+    attempted: true,
+    action: "diagnose_only",
+    result: "تم تحليل الخطأ آليًا، لكن لم يُسمح بإجراء تغيير غير مؤكد أو تعديل كود تلقائي.",
+    diagnosis: cleanText(diagnosis, 1200)
+  };
+};
+
 const sendBayanDiagnostic = async (env: Env, subject: string, report: string) => {
   const telegram = await sendBayanTelegram(env, "⚠️ " + subject + "\n\n" + report.slice(0, 3600));
   console.log(JSON.stringify({
@@ -255,8 +306,8 @@ const reportBayanError = async (env: Env, context: string, error: unknown, extra
     "الخطوة التالية: راجع Workers Logs / Issues إذا تكرر الخطأ.",
     "التنبيه: يتم إرسال تقارير بيان عبر Telegram فقط؛ لا يعتمد النظام على البريد الإلكتروني."
   ].filter(Boolean).join("\n");
-  const diagnosis = await diagnoseTechnicalReport(env, report);
-  report += "\n\nتشخيص الذكاء الاصطناعي:\n" + cleanText(diagnosis, 5000);
+  const repair = await attemptBayanSelfRepair(env, context, error);
+  report += "\n\nمحاولة الإصلاح الذاتي:\n" + JSON.stringify(repair);
   return sendBayanDiagnostic(env, "تنبيه خطأ تقني مهم في بيان", report);
 };
 
