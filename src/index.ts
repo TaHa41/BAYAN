@@ -253,7 +253,7 @@ const reportBayanError = async (env: Env, context: string, error: unknown, extra
     extra?.attempts ? "المحاولات: " + JSON.stringify(extra.attempts).slice(0, 2000) : "",
     extra?.repair ? "الإصلاح المنفذ: " + cleanText(extra.repair, 1200) : "",
     "الخطوة التالية: راجع Workers Logs / Issues إذا تكرر الخطأ.",
-    "البريد: الوجهة الافتراضية لإشعارات بيان هي bayan.contact@yahoo.com، ولا تُذكر مفاتيح أو أسرار في التقرير."
+    "التنبيه: يتم إرسال تقارير بيان عبر Telegram فقط؛ لا يعتمد النظام على البريد الإلكتروني."
   ].filter(Boolean).join("\n");
   const diagnosis = await diagnoseTechnicalReport(env, report);
   report += "\n\nتشخيص الذكاء الاصطناعي:\n" + cleanText(diagnosis, 5000);
@@ -516,23 +516,36 @@ const runKnowledgeMaintenance = async (env: Env) => {
   return { ok: true, checked: rows.results?.length || 0, reviewDue: due, checkedAt: new Date().toISOString() };
 };
 
-const runRuntimeAudit = async (baseUrl: string) => {
-  const routes = ["/", "/health", "/api/features", "/search", "/news", "/prices", "/sitemap.xml"];
-  const results = await Promise.all(routes.map(async (route) => {
-    const started = Date.now();
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        const response = await fetch(baseUrl + route, { headers: { "x-bayan-monitor": "1" } });
-        const body = await response.text();
-        if (response.ok && body.trim()) {
-          return { route, ok: true, status: response.status, latencyMs: Date.now() - started, attempt };
-        }
-      } catch {}
-      await new Promise((resolve) => setTimeout(resolve, attempt * 250));
+const runRuntimeAudit = async (env: Env) => {
+  const results: any[] = [];
+  const started = Date.now();
+  const check = async (name: string, fn: () => Promise<any>) => {
+    const t = Date.now();
+    try {
+      const details = await fn();
+      results.push({ route: name, ok: true, status: 200, latencyMs: Date.now() - t, attempt: 1, details });
+    } catch (error) {
+      results.push({ route: name, ok: false, status: 0, latencyMs: Date.now() - t, attempt: 1, error: safeErrorMessage(error) });
     }
-    return { route, ok: false, status: 0, latencyMs: Date.now() - started, attempt: 3 };
-  }));
-  return { checkedAt: new Date().toISOString(), healthy: results.every((x) => x.ok), results };
+  };
+  await check("/health", async () => ({ service: "BAYAN", version: env.BAYAN_VERSION || "0.5.0" }));
+  await check("/assets", async () => {
+    if (!env.ASSETS) throw new Error("assets_binding_missing");
+    const response = await env.ASSETS.fetch(new Request("https://bayan.internal/"));
+    if (!response.ok) throw new Error("assets_http_" + response.status);
+    return { status: response.status };
+  });
+  await check("/database", async () => {
+    if (!env.DB) throw new Error("database_binding_missing");
+    await env.DB.prepare("SELECT 1 AS ok").first();
+    return { configured: true };
+  });
+  await check("/search", async () => {
+    const search = await internalSearch("BAYAN", env);
+    if (!search.ok) throw new Error("search_unavailable");
+    return { providers: search.providerCount, sources: search.sourceCount, results: search.results.length };
+  });
+  return { checkedAt: new Date().toISOString(), healthy: results.every((x) => x.ok), results, durationMs: Date.now() - started };
 };
 
 const queryIntent = (query: string) => {
@@ -700,9 +713,8 @@ const evidencePrompt = (language: string, query: string, results: any[]) => {
 
 export default {
   async scheduled(_controller: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
-    const baseUrl = "https://bayan.tahaomar411.workers.dev";
     try {
-      const audit = await runRuntimeAudit(baseUrl);
+      const audit = await runRuntimeAudit(env);
       if (!audit.healthy) {
         await reportBayanError(env, "scheduled runtime audit", new Error("runtime_audit_degraded"), {
           repair: "تمت إعادة المحاولة 3 مرات لكل مسار فاشل قبل إرسال التنبيه.",
