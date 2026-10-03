@@ -242,7 +242,7 @@ const sendBayanDiagnostic = async (env: Env, subject: string, report: string) =>
     event: "bayan_notification",
     subject: cleanText(subject, 180),
     delivered,
-    destination_configured: !!destination && !!env.RESEND_API_KEY,
+    destination_configured: !!(env.BAYAN_NOTIFY_EMAIL || "bayan.contact@yahoo.com") && !!env.RESEND_API_KEY,
     timestamp: new Date().toISOString()
   }));
   return delivered;
