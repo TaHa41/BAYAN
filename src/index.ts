@@ -450,8 +450,10 @@ export default {
 
     if (path === "/api/knowledge") {
       const section = cleanText(url.searchParams.get("section"), 80) || undefined;
+      const id = cleanText(url.searchParams.get("id"), 120) || undefined;
       const limit = Number(url.searchParams.get("limit") || 30);
-      return json({ status: "ok", section: section || null, articles: await loadKnowledgeArticles(env, section, limit) });
+      const articles = await loadKnowledgeArticles(env, section, limit);
+      return json({ status: "ok", section: section || null, article: id ? articles.find((x: any) => x.id === id) || null : null, articles });
     }
     if (path === "/api/ai" && request.method === "POST") {
       try {
