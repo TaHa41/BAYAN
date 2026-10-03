@@ -15,7 +15,7 @@ describe("BAYAN platform", () => {
       BAYAN_ENVIRONMENT: "test", BAYAN_VERSION: "0.6.0", BAYAN_COMMIT_SHA: "test",
     });
     expect(response.status).toBe(200);
-    expect((await response.json()).status).toBe("ok");
+    expect((await response.json() as { status: string }).status).toBe("ok");
   });
   it("exposes the tool catalog without secrets", async () => {
     const response = await worker.fetch(new Request("https://bayan.test/api/tools"), { OPENAI_API_KEY: "secret" });
