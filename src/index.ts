@@ -973,10 +973,12 @@ export default {
             }
           } catch {}
         }
+        await sendBayanEmail(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان:\n\n" + input + "\n\nإجابة بيان:\n" + aiAnswer + "\n\nالمقالة المحفوظة: " + (article?.persisted ? "نعم" : "لا"));
         return json({
           answer: aiAnswer, claims: [], evidence: results.map(withoutUrl),
           confidence: results.length ? 0.7 : 0.3, warnings: [],
           provider: "openai", article,
+          notification: !!env.RESEND_API_KEY && !!env.BAYAN_NOTIFY_EMAIL,
           policy: "external_sources_used_internally; no_external_links_to_visitor"
         });
       } catch {
