@@ -93,6 +93,46 @@ document.querySelector("#bayanRepairs")?.addEventListener("click",async(e)=>{
   }catch{state.textContent="تعذر الاتصال بخدمة الإصلاح."}finally{b.disabled=false;b.textContent="إعادة الإصلاح الآن";}
 });
 document.querySelector("#reviewLoad").onclick=load;
+document.querySelector("#reviewStatus").onclick=async()=>{
+  const t=token.value.trim();
+  if(!t){state.textContent="أدخل BAYAN_AI_MANAGER_TOKEN أولًا.";return;}
+  state.textContent="جارٍ فحص إعدادات النظام…";
+  const button=document.querySelector("#reviewStatus");
+  if(button) button.disabled=true;
+  try{
+    const r=await fetch("/api/ai/manager/status",{headers:{authorization:"Bearer "+t}});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){
+      state.textContent=r.status===403?"مفتاح الإدارة غير صحيح.":"تعذر فحص إعدادات النظام.";
+      return;
+    }
+    const labels={
+      database:"قاعدة البيانات D1",
+      cloudflareAI:"Cloudflare Workers AI",
+      cloudflareAISearch:"Cloudflare AI Search",
+      browser:"Browser Rendering",
+      openAI:"OpenAI",
+      searchApi:"مزود البحث",
+      gnews:"GNews",
+      goldApi:"Gold API",
+      managerToken:"مفتاح إدارة بيان"
+    };
+    const config=d.configuration||{};
+    const entries=Object.entries(labels).map(([key,label])=>{
+      const ok=!!config[key];
+      return '<div class="card"><strong>'+escapeHtml(label)+'</strong><p class="muted">'+(ok?"✓ متاح":"✕ غير مضبوط")+'</p></div>';
+    }).join("");
+    const missing=Object.keys(labels).filter(key=>!config[key]).map(key=>labels[key]);
+    const statusText=missing.length
+      ?"الفحص اكتمل، لكن توجد إعدادات غير مضبوطة: "+missing.join("، ")
+      :"الفحص اكتمل: الإعدادات الأساسية الظاهرة في النظام مضبوطة.";
+    state.innerHTML='<strong>'+escapeHtml(statusText)+'</strong><div class="grid" style="margin-top:1rem">'+entries+'</div>';
+  }catch{
+    state.textContent="تعذر الاتصال بخدمة فحص الإعدادات.";
+  }finally{
+    if(button) button.disabled=false;
+  }
+};
 document.querySelector("#telegramSetup").onclick=async()=>{
   const t=token.value.trim();
   if(!t){state.textContent="أدخل BAYAN_AI_MANAGER_TOKEN أولًا.";return;}
