@@ -2681,7 +2681,9 @@ export default {
     if (env.ASSETS) {
       let asset = await env.ASSETS.fetch(request);
       if (asset.status === 404 && !path.includes(".")) {
-        asset = await env.ASSETS.fetch(new Request(new URL("/index.html", request.url), request));
+        const spaUrl = new URL("/index.html", request.url);
+        spaUrl.search = url.search;
+        asset = await env.ASSETS.fetch(new Request(spaUrl.toString(), request));
       }
       return renderHtml(asset, url, env);
     }
