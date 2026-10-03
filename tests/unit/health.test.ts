@@ -15,6 +15,18 @@ describe("BAYAN platform", () => {
     const text = await response.text();
     expect(response.status).toBe(200); expect(text).not.toContain("secret"); expect(text).toContain("verification");
   });
+  it("exposes advertising configuration without enabling ads by default", async () => {
+    const response = await worker.fetch(new Request("https://bayan.test/api/ads/config"), {});
+    const body = await response.json() as { enabled: boolean; provider: string | null };
+    expect(response.status).toBe(200);
+    expect(body.enabled).toBe(false);
+    expect(body.provider).toBeNull();
+  });
+  it("serves a safe ads.txt response when no publisher is configured", async () => {
+    const response = await worker.fetch(new Request("https://bayan.test/ads.txt"), {});
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("");
+  });
   it("requires AI input", async () => {
     const response = await worker.fetch(new Request("https://bayan.test/api/ai",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({input:" "})}), {});
     expect(response.status).toBe(400);
