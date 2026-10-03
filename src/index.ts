@@ -633,7 +633,6 @@ const reportBayanError = async (env: Env, context: string, error: unknown, extra
   const now = Date.now();
   const claim = !(await isCooldownActive("diagnostic", signature));
   if (!claim) return false;
-  await setCooldown("diagnostic", signature, 5 * 60);
 
   const reportLines = [
     "بيان — تقرير خطأ تقني تلقائي",
@@ -681,6 +680,7 @@ const reportBayanError = async (env: Env, context: string, error: unknown, extra
   );
 
   // لا نحجب التنبيهات اللاحقة إذا فشل Telegram هذه المرة.
+  if (delivery?.ok) await setCooldown("diagnostic", signature, 5 * 60);
   return delivery;
 };
 
