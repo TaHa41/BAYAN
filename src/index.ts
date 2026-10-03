@@ -436,10 +436,10 @@ export default {
         const data = await response.json() as any;
         let egpPerUsd: number | null = null;
         try {
-          const fx = await fetch("https://api.frankfurter.app/latest?from=USD&to=EGP");
+          const fx = await fetch("https://api.frankfurter.dev/v2/rate/USD/EGP");
           if (fx.ok) {
             const fd = await fx.json() as any;
-            egpPerUsd = typeof fd.rates?.EGP === "number" ? fd.rates.EGP : null;
+            egpPerUsd = typeof fd.rate === "number" ? fd.rate : null;
           }
         } catch {}
         return json({
@@ -450,7 +450,7 @@ export default {
           karat24Egp: egpPerUsd && data.price_gram_24k ? egpPerUsd * data.price_gram_24k : null,
           karat21Egp: egpPerUsd && data.price_gram_21k ? egpPerUsd * data.price_gram_21k : null,
           karat18Egp: egpPerUsd && data.price_gram_18k ? egpPerUsd * data.price_gram_18k : null,
-          updatedAt: data.timestamp || null
+          updatedAt: typeof data.timestamp === "number" ? new Date(data.timestamp * 1000).toISOString() : (data.timestamp || null)
         });
       } catch {
         return json({ status: "provider_error", provider: "GoldAPI" }, 502);
@@ -511,11 +511,11 @@ export default {
       const supportedCurrencies = new Set(["USD", "EGP", "EUR", "GBP", "SAR", "AED"]);
       if (!supportedCurrencies.has(base) || !supportedCurrencies.has(quote)) return json({ status: "invalid_currency" }, 400);
       try {
-        const response = await fetch("https://api.frankfurter.app/latest?from=" + base + "&to=" + quote);
+        const response = await fetch("https://api.frankfurter.dev/v2/rate/" + base + "/" + quote);
         if (!response.ok) return json({ status: "source_error", source: "Frankfurter" }, 502);
         const data = await response.json() as any;
-        const rate = data.rates?.[quote];
-        if (typeof rate !== "number") return json({ status: "not_available", base, quote, source: "Frankfurter" }, 404);
+        const rate = typeof data.rate === "number" ? data.rate : null;
+        if (rate === null) return json({ status: "not_available", base, quote, source: "Frankfurter" }, 404);
         return json({ status: "ok", base, quote, rate, unit: "per 1 " + base, updatedAt: data.date || null, source: "Frankfurter" });
       } catch {
         return json({ status: "source_error", source: "Frankfurter" }, 502);
