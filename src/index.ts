@@ -642,10 +642,11 @@ const refreshKnowledgeGraph = async (env: Env, article: any) => {
 
 const processContentQueue = async (env: Env) => {
   if (!env.DB) return { ok: false, reason: "database_not_configured" };
-  const row = (await env.DB.prepare("SELECT id, topic, section, language, attempts FROM content_queue WHERE status='QUEUED' ORDER BY priority DESC, created_at ASC LIMIT 1").all()).results?.[0] as any;
-  if (!row) return { ok: true, processed: false };
+  await ensureContentQueueRetryColumn(env);
   const now = new Date().toISOString();
-  await env.DB.prepare("UPDATE content_queue SET status='PROCESSING', attempts=attempts+1 WHERE id=? AND status='QUEUED'").bind(row.id).run();
+  const row = (await env.DB.prepare("SELECT id, topic, section, language, attempts FROM content_queue WHERE status IN ('QUEUED','RETRY_WAIT') AND (next_attempt_at IS NULL OR next_attempt_at <= ?) ORDER BY priority DESC, created_at ASC LIMIT 1").bind(now).all()).results?.[0] as any;
+  if (!row) return { ok: true, processed: false };
+  await env.DB.prepare("UPDATE content_queue SET status='PROCESSING', attempts=attempts+1 WHERE id=? AND status IN ('QUEUED','RETRY_WAIT')").bind(row.id).run();
   try {
     const search = await internalSearch(String(row.topic), env);
     if (!search.ok || !search.results?.length) throw new Error("evidence_unavailable");
@@ -661,9 +662,10 @@ const processContentQueue = async (env: Env) => {
     return { ok: true, processed: true, id: row.id, slug };
   } catch {
     const attempts = Number(row.attempts || 0) + 1;
-    const status = attempts >= 3 ? "BLOCKED" : "QUEUED";
-    await env.DB.prepare("UPDATE content_queue SET status=?, processed_at=? WHERE id=?").bind(status, now, row.id).run();
-    return { ok: false, processed: true, id: row.id, status };
+    const status = attempts >= 6 ? "BLOCKED" : "RETRY_WAIT";
+    const retryAt = new Date(Date.now() + Math.min(60, 5 * Math.pow(2, Math.max(0, attempts - 1))) * 60_000).toISOString();
+    await env.DB.prepare("UPDATE content_queue SET status=?, processed_at=?, next_attempt_at=? WHERE id=?").bind(status, now, status === "BLOCKED" ? null : retryAt, row.id).run();
+    return { ok: false, processed: true, id: row.id, status, nextAttemptAt: retryAt };
   }
 };
 
