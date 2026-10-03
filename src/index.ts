@@ -538,23 +538,32 @@ const attemptBayanSelfRepair = async (env: Env, context: string, error: unknown)
 };
 
 const sendBayanDiagnostic = async (env: Env, subject: string, report: string) => {
-  const telegram = await sendBayanTelegram(env, "⚠️ " + subject + "\n\n" + report.slice(0, 3600));
-  console.log(JSON.stringify({
-    event: "bayan_notification",
-    subject: cleanText(subject, 180),
-    telegramDelivered: telegram.ok,
-    telegramChatId: telegram.chatId || null,
-    telegramSource: telegram.source || null,
-    telegramError: telegram.error || null,
-    timestamp: new Date().toISOString()
-  }));
-  if (!telegram.ok) {
+  try {
+    const telegram = await sendBayanTelegram(env, "⚠️ " + subject + "\n\n" + report.slice(0, 3600));
+    console.log(JSON.stringify({
+      event: "bayan_notification",
+      subject: cleanText(subject, 180),
+      telegramDelivered: telegram.ok,
+      telegramChatId: telegram.chatId || null,
+      telegramSource: telegram.source || null,
+      telegramError: telegram.error || null,
+      timestamp: new Date().toISOString()
+    }));
+    if (!telegram.ok) {
+      console.error("BAYAN_TELEGRAM_REPORT_FAILED", JSON.stringify({
+        subject: cleanText(subject, 180),
+        error: telegram.error || "unknown_telegram_error"
+      }));
+    }
+    return telegram;
+  } catch (error) {
+    const safe = safeErrorMessage(error);
     console.error("BAYAN_TELEGRAM_REPORT_FAILED", JSON.stringify({
       subject: cleanText(subject, 180),
-      error: telegram.error || "unknown_telegram_error"
+      error: safe
     }));
+    return { ok: false, error: safe };
   }
-  return telegram;
 };
 
 const reportBayanError = async (env: Env, context: string, error: unknown, extra: any = {}) => {
@@ -563,8 +572,8 @@ const reportBayanError = async (env: Env, context: string, error: unknown, extra
   const now = Date.now();
   const last = diagnosticMemory.get(signature) || 0;
   if (now - last < 300_000) return false;
-  diagnosticMemory.set(signature, now);
-  let report = [
+
+  const reportLines = [
     "بيان — تقرير خطأ تقني تلقائي",
     "المكان: " + cleanText(context, 240),
     "المشكلة: " + safe,
@@ -577,11 +586,41 @@ const reportBayanError = async (env: Env, context: string, error: unknown, extra
     extra?.repair ? "الإصلاح المنفذ: " + cleanText(extra.repair, 1200) : "",
     "الخطوة التالية: راجع Workers Logs / Issues إذا تكرر الخطأ.",
     "التنبيه: يتم إرسال تقارير بيان عبر Telegram فقط؛ لا يعتمد النظام على البريد الإلكتروني."
-  ].filter(Boolean).join("\n");
-  await queueBayanRepair(env, context, error);
-  const repair = await attemptBayanSelfRepair(env, context, error);
-  report += "\n\nمحاولة الإصلاح الذاتي:\n" + JSON.stringify(repair);
-  return sendBayanDiagnostic(env, "تنبيه خطأ تقني مهم في بيان", report);
+  ].filter(Boolean);
+
+  // لا نجعل قاعدة البيانات أو محرك التشخيص شرطًا لإرسال التنبيه.
+  // التقرير الأساسي يجب أن يصل أولًا، ثم نضيف نتيجة الإصلاح الذاتي إن نجحت.
+  let repair: any = { attempted: false, action: "not_run" };
+  let queueError = "";
+  try {
+    await queueBayanRepair(env, context, error);
+  } catch (queueFailure) {
+    queueError = safeErrorMessage(queueFailure);
+  }
+
+  try {
+    repair = await attemptBayanSelfRepair(env, context, error);
+  } catch (repairFailure) {
+    repair = {
+      attempted: true,
+      action: "repair_engine_failed",
+      result: "تعذر تشغيل محرك الإصلاح الذاتي، وتم إرسال التقرير الأساسي.",
+      error: safeErrorMessage(repairFailure)
+    };
+  }
+
+  if (queueError) reportLines.push("خطأ تسجيل مهمة الإصلاح: " + queueError);
+  reportLines.push("محاولة الإصلاح الذاتي: " + JSON.stringify(repair));
+
+  const delivery = await sendBayanDiagnostic(
+    env,
+    "تنبيه خطأ تقني مهم في بيان",
+    reportLines.join("\n")
+  );
+
+  // لا نحجب التنبيهات اللاحقة إذا فشل Telegram هذه المرة.
+  if (delivery?.ok) diagnosticMemory.set(signature, now);
+  return delivery;
 };
 
 const telegramApi = async (env: Env, method: string, body?: Record<string, unknown>) => {
@@ -2092,6 +2131,23 @@ export default {
       if (!managerAuthorized(request, env)) return json({ error: "unauthorized" }, 401);
       const result = await sendBayanTelegram(env, "✅ اختبار Telegram من BAYAN\n\nتم ربط قناة التنبيهات.");
       return json({ status: result.ok ? "ok" : "telegram_send_failed", delivered: result.ok, error: result.error || null, chatConfigured: !!env.TELEGRAM_CHAT_ID, botConfigured: !!env.TELEGRAM_BOT_TOKEN }, result.ok ? 200 : 502);
+    }
+
+    if (path === "/api/ai/manager/test-report" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({ error: "unauthorized" }, 401);
+      const started = Date.now();
+      const result = await reportBayanError(
+        env,
+        "manual Telegram diagnostic report",
+        new Error("manual_diagnostic_test"),
+        { repair: "اختبار مسار التقرير فقط؛ لا يمثل عطلًا حقيقيًا." }
+      );
+      return json({
+        status: result?.ok ? "ok" : "telegram_send_failed",
+        delivered: !!result?.ok,
+        error: result?.error || null,
+        elapsedMs: Date.now() - started
+      }, result?.ok ? 200 : 502);
     }
 
     if (path === "/api/ai/manager/status" && request.method === "GET") {
