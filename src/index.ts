@@ -567,10 +567,7 @@ const attemptBayanSelfRepair = async (env: Env, context: string, error: unknown)
 
 const sendBayanDiagnostic = async (env: Env, subject: string, report: string) => {
   try {
-    const [telegram, email] = await Promise.all([
-      sendBayanTelegram(env, "⚠️ " + subject + "\n\n" + report.slice(0, 3600)),
-      sendBayanEmail(env, subject, report)
-    ]);
+    const telegram = await sendBayanTelegram(env, "⚠️ " + subject + "\n\n" + report.slice(0, 3600));
     console.log(JSON.stringify({
       event: "bayan_notification",
       subject: cleanText(subject, 180),
