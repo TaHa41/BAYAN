@@ -194,6 +194,12 @@ const sendBayanEmail = async (env: Env, subject: string, text: string) => {
   } catch { return false; }
 };
 
+const reportBayanError = async (env: Env, context: string, error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error || "unknown_error");
+  const safe = message.replace(/(api[_-]?key|authorization|bearer|token|password|secret)\s*[:=]\s*\S+/gi, "$1=[REDACTED]").slice(0, 1200);
+  await sendBayanEmail(env, "تنبيه خطأ تقني مهم في بيان", "المكان: " + cleanText(context, 200) + "\nالخطأ: " + safe + "\nالوقت: " + new Date().toISOString() + "\nالإصدار: " + cleanText(env.BAYAN_VERSION || "unknown", 100));
+};
+
 const managerAuthorized = (request: Request, env: Env) => {
   const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || request.headers.get("x-bayan-manager-token") || "";
   return !!env.BAYAN_AI_MANAGER_TOKEN && supplied === env.BAYAN_AI_MANAGER_TOKEN;
@@ -575,7 +581,9 @@ export default {
       }
       await runKnowledgeMaintenance(env);
       await processContentQueue(env);
-    } catch {}
+    } catch (error) {
+      await reportBayanError(env, "scheduled runtime audit / maintenance", error);
+    }
   },
 
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -609,6 +617,7 @@ export default {
         const result = await cloudflareAiRun(env, model, messages);
         return json({ ok: true, provider: "cloudflare", gateway: DEFAULT_AI_GATEWAY, model, result });
       } catch (error) {
+        await reportBayanError(env, "api/ai/cloudflare", error);
         return json({ ok: false, error: error instanceof Error ? error.message : "cloudflare_ai_error" }, 503);
       }
     }
@@ -623,6 +632,7 @@ export default {
         const result = await cloudflareWebSearch(env, query, provider);
         return json({ ok: true, provider, results: result });
       } catch (error) {
+        await reportBayanError(env, "api/search/web", error);
         return json({ ok: false, error: error instanceof Error ? error.message : "cloudflare_web_search_error" }, 503);
       }
     }
@@ -634,6 +644,7 @@ export default {
         const result = await cloudflareKnowledgeSearch(env, query);
         return json({ ok: true, provider: "cloudflare-ai-search", results: result });
       } catch (error) {
+        await reportBayanError(env, "api/knowledge/search", error);
         return json({ ok: false, error: error instanceof Error ? error.message : "cloudflare_ai_search_error" }, 503);
       }
     }
