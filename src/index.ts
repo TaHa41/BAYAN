@@ -30,16 +30,26 @@ const OPENAI_FALLBACK_MODELS = ["gpt-6-luna", "gpt-5.6-sol"];
 const DEFAULT_CLOUDFLARE_AI_MODEL = "@cf/google/gemma-4-26b-a4b-it";
 const CLOUDFLARE_AI_FALLBACK_MODELS = ["@cf/zai-org/glm-4.7-flash", "@cf/google/gemma-4-26b-a4b-it"];
 const DEFAULT_AI_GATEWAY = "default";
+const aiProviderCooldown = new Map<string, number>();
 
 const cloudflareAiRun = async (env: Env, model: string, messages: any[]) => {
   if (!env.AI) throw new Error("cloudflare_ai_not_configured");
   const models = [model, ...CLOUDFLARE_AI_FALLBACK_MODELS.filter((x) => x !== model)];
   let lastError: unknown = null;
   for (const candidate of models) {
+    const cooldownUntil = aiProviderCooldown.get("cf:" + candidate) || 0;
+    if (cooldownUntil > Date.now()) {
+      lastError = new Error("cloudflare_ai_model_cooldown");
+      continue;
+    }
     try {
       return await env.AI.run(candidate, { messages });
     } catch (error) {
       lastError = error;
+      const safe = safeErrorMessage(error);
+      if (/4006|daily free allocation|429|quota|allocation/i.test(safe)) {
+        aiProviderCooldown.set("cf:" + candidate, Date.now() + 30 * 60_000);
+      }
     }
   }
   throw lastError instanceof Error ? lastError : new Error("cloudflare_ai_failed");
