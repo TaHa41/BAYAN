@@ -131,6 +131,24 @@ const renderHtml = async (response: Response, requestUrl: URL) => {
   const canonical = requestUrl.origin + cleanPath + (language === "en" ? "?lang=en" : "");
   const alternateAr = requestUrl.origin + cleanPath;
   const alternateEn = requestUrl.origin + cleanPath + "?lang=en";
+  const seoPages: Record<string, { ar: [string, string], en: [string, string] }> = {
+    "/": { ar: ["BAYAN | بيان — المعرفة والبحث الموثق", "بيان منصة عربية للمعرفة والبحث الموثق، تجمع المعلومات والأخبار والأبحاث مع فصل الأدلة عن التفسير."], en: ["BAYAN — Verified Knowledge & Research", "BAYAN is a bilingual knowledge and research platform that separates evidence from interpretation."] },
+    "/egypt": { ar: ["مصر — بيان", "أخبار ومعلومات وموضوعات عن مصر من مصادر متعددة مع سياق واضح وأدلة."], en: ["Egypt — BAYAN", "News, information and topics about Egypt with source-aware context."] },
+    "/science": { ar: ["العلوم — بيان", "شرح علمي واضح للمفاهيم والاكتشافات والأسئلة العلمية مع الاعتماد على الأدلة."], en: ["Science — BAYAN", "Clear explanations of science, discoveries and scientific questions with evidence-aware research."] },
+    "/technology": { ar: ["التكنولوجيا — بيان", "أخبار وشروحات التكنولوجيا والذكاء الاصطناعي والبرمجة مع مصادر وسياق."], en: ["Technology — BAYAN", "Technology, AI and software news and explanations with sources and context."] },
+    "/news": { ar: ["الأخبار — بيان", "أحدث الأخبار من مصادر إخبارية متعددة مع فصل الخبر عن التفسير والتكهن."], en: ["News — BAYAN", "Recent news from multiple sources, keeping reported facts separate from interpretation."] },
+    "/prices": { ar: ["الأسعار والأسواق — بيان", "متابعة الذهب وأسعار الصرف ومؤشرات الأسواق مع توضيح المصدر ووقت التحديث."], en: ["Prices & Markets — BAYAN", "Gold, exchange rates and market indicators with source and update context."] },
+    "/methodology": { ar: ["منهجية بيان", "كيف يجمع بيان المعلومات ويفحص المصادر ويبني الإجابات والمقالات."], en: ["BAYAN Methodology", "How BAYAN researches sources, checks evidence and builds answers and articles."] },
+    "/about": { ar: ["عن بيان", "تعرف على منصة بيان وأهدافها وطريقة تقديم المعرفة والمعلومات."], en: ["About BAYAN", "Learn about BAYAN, its goals and its approach to presenting knowledge and information."] }
+  };
+  const seo = seoPages[cleanPath] || (cleanPath.startsWith("/article/") ? {
+    ar: ["مقال — بيان", "مقال معرفي من بيان مبني على البحث والمصادر المتاحة."],
+    en: ["Article — BAYAN", "A BAYAN knowledge article built from research and available sources."]
+  } : {
+    ar: ["BAYAN | بيان", "منصة للمعرفة والبحث الموثق والمعلومات المبنية على الأدلة."],
+    en: ["BAYAN", "A knowledge and research platform focused on evidence-aware information."]
+  });
+  const [seoTitle, seoDescription] = language === "en" ? seo.en : seo.ar;
   html = html.replace('<html lang="ar" dir="rtl">', '<html lang="' + language + '" dir="' + direction + '">');
   const indexable = !cleanPath.startsWith("/search") && !cleanPath.startsWith("/ai") && !cleanPath.startsWith("/saved");
   const robots = indexable ? "index,follow" : "noindex,follow";
@@ -146,12 +164,18 @@ const renderHtml = async (response: Response, requestUrl: URL) => {
       "query-input": "required name=search_term_string"
     }
   }).replace(/</g, "\\u003c");
+  html = html.replace(/<title>[^<]*<\\/title>/i, "<title>" + seoTitle + "</title>");
+  html = html.replace(/<meta name="description" content="[^"]*">/i, '<meta name="description" content="' + seoDescription.replace(/"/g, "&quot;") + '">');
   html = html.replace("</head>",
     '<link rel="canonical" href="' + canonical + '">' +
     '<link rel="alternate" hreflang="ar" href="' + alternateAr + '">' +
     '<link rel="alternate" hreflang="en" href="' + alternateEn + '">' +
     '<link rel="alternate" hreflang="x-default" href="' + alternateAr + '">' +
     '<meta name="robots" content="' + robots + '">' +
+    '<meta property="og:title" content="' + seoTitle.replace(/"/g, "&quot;") + '">' +
+    '<meta property="og:description" content="' + seoDescription.replace(/"/g, "&quot;") + '">' +
+    '<meta property="og:url" content="' + canonical + '">' +
+    '<meta property="og:type" content="' + (cleanPath.startsWith("/article/") ? "article" : "website") + '">' +
     '<meta name="google-site-verification" content="GNb6pX-28eMbpuOezfmi_N6hM9g_zvusJ4FvclLTFqw">' +
     '<script type="application/ld+json">' + jsonLd + '</script>' +
     "</head>"
