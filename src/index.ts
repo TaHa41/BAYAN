@@ -758,34 +758,36 @@ const buildEvidenceArticleFallback = (query: string, results: any[]) => {
 
 const articleQualityCheck = (text: string, query: string, intent: string, evidence: string) => {
   const normalized = normalizeGeneratedText(text);
-  const paragraphs = normalized.split(/\n+/).map(x => x.trim()).filter(Boolean);
-  const headings = paragraphs.filter(x => /^#{1,3}\s+/.test(x));
+  const paragraphs = normalized.split(/\n+/).map((x: string) => x.trim()).filter(Boolean);
+  const headings = paragraphs.filter((x: string) => /^#{1,3}\s+/.test(x));
   const words = normalized.split(/\s+/).filter(Boolean);
-  const queryTerms = query.toLowerCase().split(/\s+/).filter(x => x.length > 2).slice(0, 12);
-  const topicHits = queryTerms.filter(term => normalized.toLowerCase().includes(term)).length;
+  const queryTerms = query.toLowerCase().split(/\s+/).map((x: string) => x.replace(/[^\p{L}\p{N}]+/gu, "")).filter((x: string) => x.length > 2).slice(0, 10);
+  const topicHits = queryTerms.filter((term: string) => normalized.toLowerCase().includes(term) || term.slice(0, Math.max(3, term.length - 2)) && normalized.toLowerCase().includes(term.slice(0, Math.max(3, term.length - 2)))).length;
   const badPatterns = [
-    /زين شنو/i, /شنو قدم/i, /شنو قدّم/i, /وتضيف ايه/i, /وفقًا للمصدر الأول/i,
-    /المصدر الأول.*المصدر الثاني/i, /source 1.*source 2/i, /�+/, /insufficient evidence/i
+    /زين\s+شنو/i, /شنو\s+قدم/i, /شنو\s+قدّم/i, /وتضيف\s+ايه/i, /وفقًا\s+للمصدر\s+الأول/i,
+    /المصدر\s+الأول.*المصدر\s+الثاني/i, /source\s*1.*source\s*2/i, /�+/, /insufficient\s+evidence/i
   ];
-  const repeated = new Set(paragraphs.map(x => x.replace(/^#+\s*/, "").trim())).size < Math.max(4, paragraphs.length * 0.72);
-  const rawEvidenceOverlap = evidence && normalized.length > 500
-    ? evidence.toLowerCase().includes(normalized.toLowerCase().slice(0, 220))
-    : false;
-  const minimumWords = intent === "howto" || intent === "troubleshooting" ? 220 : intent === "list" ? 180 : 260;
-  const requiredHeadings = intent === "howto" || intent === "troubleshooting" ? 3 : 4;
+  const uniqueParagraphs = new Set(paragraphs.map((x: string) => x.replace(/^#+\s*/, "").trim())).size;
+  const repeated = paragraphs.length >= 5 && uniqueParagraphs / paragraphs.length < 0.72;
+  const evidenceStart = evidence.toLowerCase().slice(0, 220);
+  const generatedStart = normalized.toLowerCase().slice(0, 220);
+  const rawEvidenceOverlap = evidenceStart.length > 120 && generatedStart.length > 120 && evidenceStart === generatedStart;
+  const minimumWords = intent === "howto" || intent === "troubleshooting" ? 180 : intent === "list" ? 150 : 180;
+  const requiredHeadings = intent === "howto" || intent === "troubleshooting" ? 2 : 2;
   const hasSteps = intent === "howto" || intent === "troubleshooting"
-    ? /\n\s*(?:\d+[.)]|[-*]\s)/.test(normalized)
+    ? /(?:^|\n)\s*(?:\d+[.)]|[-*]\s)/.test(normalized)
     : true;
-  const bad = badPatterns.some(re => re.test(normalized));
+  const bad = badPatterns.some((re: RegExp) => re.test(normalized));
+  const enoughTopic = !queryTerms.length || topicHits >= Math.min(2, queryTerms.length);
   return {
     ok: words.length >= minimumWords &&
       headings.length >= requiredHeadings &&
-      topicHits >= Math.min(2, Math.max(1, queryTerms.length)) &&
+      enoughTopic &&
       !repeated && !rawEvidenceOverlap && !bad && hasSteps,
     reasons: [
       words.length < minimumWords ? "too_short" : null,
       headings.length < requiredHeadings ? "too_few_sections" : null,
-      topicHits < Math.min(2, Math.max(1, queryTerms.length)) ? "weak_topic_match" : null,
+      !enoughTopic ? "weak_topic_match" : null,
       repeated ? "repeated_paragraphs" : null,
       rawEvidenceOverlap ? "source_text_overlap" : null,
       bad ? "language_or_source_contamination" : null,
@@ -844,7 +846,7 @@ const generateKnowledgeArticle = async (env: Env, language: string, query: strin
     let text = await runOnce();
     let quality = articleQualityCheck(text, query, intent, evidence);
     if (!quality.ok) {
-      text = await runOnce("أعد كتابة المقال من الصفر. المشكلة في المحاولة السابقة: " + quality.reasons.join(", ") + ". زد المحتوى الحقيقي، واربط الفقرات، وأجب السؤال مباشرة. لا تنقل أي مقتطف حرفيًا ولا تستخدم لهجة مختلطة.");
+      text = await runOnce("أعد كتابة المقال من الصفر. أسباب الرفض السابقة: " + quality.reasons.join(", ") + ". لا تغيّر الحقائق المدعومة. اجعل النص مقالًا كاملًا مترابطًا، وأجب السؤال مباشرة، واستخدم عناوين واضحة وفقرات ذات معنى. لا تنقل أي مقتطف حرفيًا.");
       quality = articleQualityCheck(text, query, intent, evidence);
     }
     if (!text || !quality.ok) return buildEvidenceArticleFallback(query, results);
