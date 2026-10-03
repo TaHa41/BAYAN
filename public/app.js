@@ -312,9 +312,14 @@ try{
 const r=await fetch("/api/search?q="+encodeURIComponent(query)+"&lang="+(isEn?"en":"ar"));
 const d=await r.json();
 if(!r.ok||d.status==="search_provider_not_configured"){state.innerHTML='<span class="status-dot error"></span><div><strong>البحث غير متاح مؤقتًا</strong><p>لم تتوفر مصادر قابلة للتحقق الآن.</p></div>';return;}
-if(d.answer){
+if(d.weather){
 answer.style.display="block";
-answer.innerHTML='<div class="answer-header"><div><span class="eyebrow">BAYAN ANSWER</span><h2>الخلاصة</h2></div><span class="verified-pill">مبنية على الأدلة</span></div><div class="answer-copy">'+esc(d.answer).replace(/\n/g,"<br>")+'</div>'+(d.article&&d.article.id?'<div class="actions"><a class="primary" href="'+withLang("/article/"+encodeURIComponent(d.article.id))+'">قراءة المقال الكامل</a></div>':"")+'<p class="answer-note">تمت الصياغة من الأدلة المتاحة. التفاصيل الزمنية أو الإحصائية تُراجع بحسب تاريخ المصدر.</p>';
+const w=d.weather;
+const weatherLabels={0:isEn?"Clear":"صحو",1:isEn?"Mainly clear":"غائم جزئيًا",2:isEn?"Partly cloudy":"غائم جزئيًا",3:isEn?"Overcast":"غائم",45:isEn?"Fog":"ضباب",48:isEn?"Fog":"ضباب",51:isEn?"Drizzle":"رذاذ",53:isEn?"Drizzle":"رذاذ",55:isEn?"Heavy drizzle":"رذاذ كثيف",61:isEn?"Light rain":"مطر خفيف",63:isEn?"Rain":"مطر",65:isEn?"Heavy rain":"مطر غزير",71:isEn?"Light snow":"ثلوج خفيفة",73:isEn?"Snow":"ثلوج",75:isEn?"Heavy snow":"ثلوج غزيرة",80:isEn?"Rain showers":"زخات مطر",81:isEn?"Rain showers":"زخات مطر",82:isEn?"Heavy rain showers":"زخات مطر غزيرة",95:isEn?"Thunderstorm":"عواصف رعدية",96:isEn?"Thunderstorm with hail":"عواصف رعدية مع برد",99:isEn?"Thunderstorm with hail":"عواصف رعدية مع برد"};
+answer.innerHTML='<div class="answer-header"><div><span class="eyebrow">LIVE WEATHER</span><h2>'+esc(isEn?"Current weather in "+w.city:"الطقس الآن في "+w.city)+'</h2></div><span class="verified-pill">'+esc(isEn?"Live source":"مصدر مباشر")+'</span></div><div class="weather-search-result"><strong>'+esc(String(w.temperature))+'°C</strong><p>'+esc(weatherLabels[w.weatherCode]||"Weather")+' · '+esc(isEn?"Humidity ":"الرطوبة ")+esc(String(w.humidity))+'%</p><small>'+esc(isEn?"Source: ":"المصدر: ")+esc(w.source||"Open-Meteo")+' · '+esc(w.updatedAt||"—")+'</small></div>';
+}else if(d.answer){
+answer.style.display="block";
+answer.innerHTML='<div class="answer-header"><div><span class="eyebrow">BAYAN ANSWER</span><h2>'+esc(isEn?"Summary":"الخلاصة")+'</h2></div><span class="verified-pill">'+esc(isEn?"Evidence-based":"مبنية على الأدلة")+'</span></div><div class="answer-copy">'+esc(d.answer).replace(/\n/g,"<br>")+'</div>'+(d.article&&d.article.id?'<div class="actions"><a class="primary" href="'+withLang("/article/"+encodeURIComponent(d.article.id))+'">'+esc(isEn?"Read full article":"قراءة المقال الكامل")+'</a></div>':"")+'<p class="answer-note">'+esc(isEn?"Written from the available evidence. Time-sensitive details are tied to source dates.":"تمت الصياغة من الأدلة المتاحة. التفاصيل الزمنية أو الإحصائية تُراجع بحسب تاريخ المصدر.")+'</p>';
 }
 const items=d.items||[];
 if(items.length){
