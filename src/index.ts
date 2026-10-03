@@ -1104,7 +1104,7 @@ const browserRenderedCheck = async (env: Env, route: string) => {
   else if (typeof rendered?.content === "string") html = rendered.content;
   else html = JSON.stringify(rendered || "");
   const hasApp = /<main[^>]+id=["']app["'][^>]*>/i.test(html);
-  const hasEmptyApp = /<main[^>]+id=["']app["'][^>]*>\\s*</main>/i.test(html);
+  const hasEmptyApp = /<main[^>]+id=["']app["'][^>]*>\s*</main>/i.test(html);
   const recovery = /وضع الاسترداد|تعذر تحميل الصفحة|Unable to load page|Internal Server Error|Unhandled exception/i.test(html);
   if (!html.trim() || !hasApp || hasEmptyApp || recovery) throw new Error("browser_render_degraded_" + route);
   return { rendered: true, bytes: html.length };
