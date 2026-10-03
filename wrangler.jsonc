@@ -4,6 +4,9 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-10-02",
   "workers_dev": true,
+  "ai": {
+    "binding": "AI"
+  },
   "keep_vars": true,
   "secrets": {
     "required": [
@@ -14,7 +17,10 @@
     ]
   },
   "observability": {
-    "enabled": true
+    "enabled": true,
+    "traces": {
+      "enabled": true
+    }
   },
   "assets": {
     "directory": "./public",
