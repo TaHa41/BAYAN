@@ -423,11 +423,15 @@ async function savedPage(){
  let ids=[];try{ids=JSON.parse(localStorage.getItem("bayan:saved-articles")||"[]")}catch{}
  const staticArticles=(window.BAYAN_CONTENT?.articles||[]).filter(a=>ids.includes(a.id));
  let persisted=[];
+ try{
+   const cloud=await fetch("/api/saved?visitorId="+encodeURIComponent(visitorId));
+   if(cloud.ok){const d=await cloud.json();persisted=(d.articles||[]).map(a=>({...a,id:a.slug}));}
+ }catch{}
  if(ids.length){
    try{
      const responses=await Promise.all(ids.slice(0,30).map(id=>fetch("/api/knowledge?id="+encodeURIComponent(id))));
      const data=await Promise.all(responses.map(r=>r.ok?r.json():Promise.resolve({})));
-     persisted=data.map(x=>x.article).filter(Boolean);
+     persisted=[...persisted,...data.map(x=>x.article).filter(Boolean)];
    }catch{}
  }
  const seen=new Set(),articles=[...staticArticles,...persisted].filter(a=>{const id=a.id||a.slug;if(!id||seen.has(id))return false;seen.add(id);return true;});
@@ -459,8 +463,11 @@ document.addEventListener("click",(event)=>{
     event.stopPropagation();
     const id=save.getAttribute("data-bayan-save");
     let list=[];try{list=JSON.parse(localStorage.getItem("bayan:saved-articles")||"[]")}catch{}
-    if(list.includes(id)){list=list.filter(x=>x!==id);save.textContent=isEn?"Save article":"حفظ المقال";}else{list.unshift(id);save.textContent=isEn?"Saved":"محفوظ";}
-    localStorage.setItem("bayan:saved-articles",JSON.stringify(list.slice(0,100)));const article=(window.BAYAN_CONTENT?.articles||[]).find(x=>x.id===id);if(article)recordInterest(article.section,"save");
+    const isRemoving=list.includes(id);
+    if(isRemoving){list=list.filter(x=>x!==id);save.textContent=isEn?"Save article":"حفظ المقال";}else{list.unshift(id);save.textContent=isEn?"Saved":"محفوظ";}
+    localStorage.setItem("bayan:saved-articles",JSON.stringify(list.slice(0,100)));
+    fetch("/api/saved",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({visitorId,articleSlug:id,action:isRemoving?"remove":"save"})}).catch(()=>{});
+    const article=(window.BAYAN_CONTENT?.articles||[]).find(x=>x.id===id);if(article)recordInterest(article.section,"save");
     return;
   }
   const share=event.target.closest("[data-bayan-share]");
