@@ -140,41 +140,47 @@ function escHtml(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt
 
 function topicPage(slug){const sec=sections.find(x=>x[0]===slug);app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isEn?"Topic":"موضوع")+'</div><h1 class="page-title">'+(sec?title(sec):slug)+'</h1>'+summaryBlock(["تعريف الموضوع وسياقه أولًا.","شرح ما نعرفه وما يحتاج إلى دليل إضافي.","مصادر وموضوعات مرتبطة لتوسيع الفهم."])+evidence()+'<div class="grid"><article class="card topic-card"><span class="number">EXPLAIN</span><h3>ما هو الموضوع؟</h3><p>سيُبنى التعريف من مصادر موثوقة ويُراجع قبل النشر.</p></article><article class="card topic-card"><span class="number">RELATED</span><h3>موضوعات مرتبطة</h3><p>روابط داخلية مفيدة بدون تكرار أو حشو SEO.</p></article></div></section>'}function searchPage(){
 const q=params.get("q")||"";
-app.innerHTML='<section class="page"><div class="eyebrow">SEARCH</div><h1 class="page-title">البحث</h1><p class="page-lead">ابحث عن سؤال، شخص، موضوع، خبر، سعر، طقس أو طريقة لحل مشكلة. النتائج تُجمع وتُراجع داخل بيان، ولا نوجّه الزائر إلى مواقع خارجية.</p><form id="siteSearch" class="searchbar" style="max-width:none;margin:25px 0"><input id="searchInput" name="q" value="'+q.replace(/"/g,"&quot;")+'" placeholder="اكتب ما تريد معرفته…" autocomplete="off"><button type="submit">بحث</button></form><div id="searchState" class="card"><h3>'+ (q?"جارٍ البحث…":"ابدأ بسؤال واضح") +'</h3><p class="muted">'+(q?"يجمع بيان الأدلة أولًا ثم يصوغ إجابة داخل الموقع.":"لن تظهر نتائج وهمية أو روابط خارجية للزائر.")+'</p></div><div id="searchAnswer" class="card answer" style="display:none"></div><div id="searchEvidence" class="grid" style="display:none"></div></section>';
-const form=document.querySelector("#siteSearch"),state=document.querySelector("#searchState"),answer=document.querySelector("#searchAnswer"),evidence=document.querySelector("#searchEvidence");
+app.innerHTML='<section class="page search-page"><div class="search-hero"><div><div class="eyebrow">SEARCH / KNOWLEDGE</div><h1 class="page-title">البحث</h1><p class="page-lead">ابحث عن سؤال أو شخص أو موضوع أو خبر. يجمع بيان الأدلة أولًا ثم يرتبها في إجابة واضحة، مع فصل المصادر عن الخلاصة.</p></div></div><form id="siteSearch" class="searchbar search-page-form"><input id="searchInput" name="q" value="'+q.replace(/"/g,"&quot;")+'" placeholder="مثال: من هو محمد صلاح؟" autocomplete="off"><button type="submit">بحث</button></form><div id="searchState" class="search-status"><span class="status-dot"></span><div><strong>'+ (q?"جارٍ البحث والتحقق…":"ابدأ البحث") +'</strong><p>'+(q?"يجمع بيان الأدلة قبل كتابة الإجابة.":"اكتب سؤالك لتحصل على نتيجة منظمة داخل بيان.")+'</p></div></div><div id="searchAnswer" class="search-answer" style="display:none"></div><section id="searchSources" class="search-sources" style="display:none"><div class="section-head"><div><h2>الأدلة والمصادر</h2><p>المصادر التي استُخدمت في بناء الإجابة.</p></div><span id="sourceCount" class="source-count"></span></div><div id="searchEvidence" class="search-results-grid"></div></section></section>';
+const form=document.querySelector("#siteSearch"),state=document.querySelector("#searchState"),answer=document.querySelector("#searchAnswer"),sources=document.querySelector("#searchSources"),evidence=document.querySelector("#searchEvidence"),sourceCount=document.querySelector("#sourceCount");
 const esc=(v)=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const run=async(query)=>{
 if(!query)return;
-state.innerHTML='<h3>جارٍ البحث والتحقق…</h3><p class="muted">يتم جمع الأدلة قبل كتابة الإجابة.</p>';
+state.innerHTML='<span class="status-dot loading"></span><div><strong>جارٍ البحث والتحقق…</strong><p>يتم جمع الأدلة ومقارنتها قبل عرض النتيجة.</p></div>';
 try{
 const r=await fetch("/api/search?q="+encodeURIComponent(query)+"&lang="+(isEn?"en":"ar"));
 const d=await r.json();
-if(!r.ok||d.status==="search_provider_not_configured"){state.innerHTML='<h3>البحث غير متاح مؤقتًا</h3><p class="muted">لم تتوفر نتيجة قابلة للتحقق من مزودي البحث. جرّب صياغة السؤال مرة أخرى.</p>';return;}
-if(d.answer){answer.style.display="block";answer.innerHTML='<h2>إجابة بيان</h2><div class="answer-copy">'+esc(d.answer).replace(/\n/g,"<br>")+'</div>'+(d.article&&d.article.id?'<div class="actions"><a class="primary" href="'+withLang("/article/"+encodeURIComponent(d.article.id))+'">فتح المقالة كاملة داخل بيان</a></div>':"")+'<p class="muted">تمت الصياغة من الأدلة المتاحة فقط.</p>';}
+if(!r.ok||d.status==="search_provider_not_configured"){state.innerHTML='<span class="status-dot error"></span><div><strong>البحث غير متاح مؤقتًا</strong><p>لم تتوفر مصادر قابلة للتحقق الآن.</p></div>';return;}
+if(d.answer){
+answer.style.display="block";
+answer.innerHTML='<div class="answer-header"><div><span class="eyebrow">BAYAN ANSWER</span><h2>الخلاصة</h2></div><span class="verified-pill">مبنية على الأدلة</span></div><div class="answer-copy">'+esc(d.answer).replace(/\n/g,"<br>")+'</div>'+(d.article&&d.article.id?'<div class="actions"><a class="primary" href="'+withLang("/article/"+encodeURIComponent(d.article.id))+'">قراءة المقال الكامل</a></div>':"")+'<p class="answer-note">تمت الصياغة من الأدلة المتاحة. التفاصيل الزمنية أو الإحصائية تُراجع بحسب تاريخ المصدر.</p>';
+}
 const items=d.items||[];
-if(items.length){evidence.style.display="grid";evidence.innerHTML=items.map((x)=>
-'<article class="card search-article" data-rank="'+esc(x.rank)+'"><span class="article-section">مقال '+esc(x.rank)+'</span><h3>'+escapeHtml(x.title)+'</h3><p class="muted">'+esc(x.source)+(x.date?" · "+esc(x.date):"")+'</p><p>'+esc(x.snippet)+'</p><div class="actions"><button class="secondary read-search-article" type="button">اقرأ المقال كاملًا داخل بيان</button></div><div class="search-article-body" hidden></div></article>'
-).join("");
-evidence.querySelectorAll(".read-search-article").forEach((button)=>{
-  button.addEventListener("click",async()=>{
-    const card=button.closest(".search-article"), body=card?.querySelector(".search-article-body"), rank=card?.dataset.rank;
-    if(!card||!body||!rank)return;
-    if(!body.hidden){body.hidden=true;button.textContent="اقرأ المقال كاملًا داخل بيان";return;}
-    button.disabled=true;button.textContent="جارٍ إعداد المقال…";body.hidden=false;body.innerHTML='<p class="muted">بيان يجمع المادة ويكتب مقالًا أصليًا قابلًا للقراءة داخل الموقع…</p>';
-    try{
-      const rr=await fetch("/api/search/article?q="+encodeURIComponent(query)+"&rank="+encodeURIComponent(rank)+"&lang="+(isEn?"en":"ar"));
-      const dd=await rr.json();
-      if(!rr.ok||!dd.article){throw new Error("article_unavailable");}
-      location.href=withLang("/article/"+encodeURIComponent(dd.article.id));
-      button.textContent="إخفاء المقال";
-    }catch{
-      body.innerHTML='<p class="muted">تعذر تجهيز المقال الآن. لم يتم عرض محتوى غير متحقق منه.</p>';
-      button.textContent="حاول مرة أخرى";
-    }finally{button.disabled=false;}
-  });
-});}
-state.innerHTML='<h3>تم البحث</h3><p class="muted">'+items.length+' مصادر/نتائج استُخدمت داخليًا. لا توجد روابط خارجية معروضة للزائر.</p>';
-}catch{state.innerHTML='<h3>تعذر إكمال البحث</h3><p class="muted">لم يتم عرض معلومة غير متحقق منها.</p>';}}
+if(items.length){
+sources.style.display="block";
+sourceCount.textContent=items.length+" مصادر";
+evidence.innerHTML=items.map((x,index)=>{
+const title=escapeHtml(x.title||"نتيجة بدون عنوان");
+const source=escapeHtml(x.source||"مصدر غير محدد");
+const date=x.date?escapeHtml(x.date):"";
+const snippet=escapeHtml(x.snippet||"لم يتوفر ملخص كافٍ.");
+return '<article class="search-result-card"><div class="result-number">'+String(index+1).padStart(2,"0")+'</div><div class="result-main"><div class="result-meta"><span class="source-name">'+source+'</span>'+(date?'<span>·</span><span>'+date+'</span>':"")+'</div><h3>'+title+'</h3><p>'+snippet+'</p><button class="secondary read-search-article" data-rank="'+esc(x.rank)+'" type="button">قراءة داخل بيان <span>←</span></button><div class="search-article-body" hidden></div></div></article>';
+}).join("");
+evidence.querySelectorAll(".read-search-article").forEach(button=>{
+button.addEventListener("click",async()=>{
+const card=button.closest(".search-result-card"),body=card?.querySelector(".search-article-body"),rank=button.dataset.rank;
+if(!card||!body||!rank)return;
+button.disabled=true;button.textContent="جارٍ إعداد المقال…";body.hidden=false;body.innerHTML='<p class="muted">بيان يتحقق من المادة ويجهز المقال…</p>';
+try{
+const rr=await fetch("/api/search/article?q="+encodeURIComponent(query)+"&rank="+encodeURIComponent(rank)+"&lang="+(isEn?"en":"ar"));
+const dd=await rr.json();
+if(!rr.ok||!dd.article)throw new Error("article_unavailable");
+location.href=withLang("/article/"+encodeURIComponent(dd.article.id));
+}catch{body.innerHTML='<p class="search-error">تعذر تجهيز المقال الآن؛ لم يتم عرض محتوى غير متحقق منه.</p>';button.disabled=false;button.textContent="حاول مرة أخرى";}
+});
+});
+}
+state.innerHTML='<span class="status-dot success"></span><div><strong>اكتمل البحث</strong><p>تم جمع '+items.length+' مصادر/نتائج وعرضها في أقسام منفصلة.</p></div>';
+}catch{state.innerHTML='<span class="status-dot error"></span><div><strong>تعذر إكمال البحث</strong><p>لم يتم عرض معلومة غير متحقق منها.</p></div>';}}
 form.onsubmit=(e)=>{e.preventDefault();const query=document.querySelector("#searchInput").value.trim();if(query){const u=new URL(location.href);u.searchParams.set("q",query);history.pushState({q:query},"",u.pathname+u.search);run(query);}};
 if(q)run(q);
 }function newsPage(){app.innerHTML='<section class="page"><div class="eyebrow">LIVE NEWS</div><h1 class="page-title">الأخبار</h1><p class="page-lead">أخبار حديثة من مزود مباشر، تُعرض داخل بيان مع المصدر ووقت النشر، دون روابط خارجية للزائر.</p><div class="card" id="newsState"><h3>جارٍ تحديث الأخبار…</h3></div><div id="newsGrid" class="grid article-grid"></div></section>';const state=document.querySelector("#newsState"),grid=document.querySelector("#newsGrid");fetch("/api/news?lang="+(isEn?"en":"ar")).then(r=>r.json()).then(d=>{if(!d.articles?.length){state.innerHTML='<h3>الأخبار غير متاحة الآن</h3><p class="muted">لم يتم عرض أخبار غير متحققة أو قديمة.</p>';return;}state.innerHTML='<h3>تم التحديث</h3><p class="muted">'+esc(d.totalArticles||d.articles.length)+' مادة من '+esc(d.provider||"المصدر المباشر")+'.</p>';grid.innerHTML=d.articles.slice(0,10).map(x=>'<article class="card article-card">'+(x.image?"<img loading=\"lazy\" src=\""+escapeHtml(x.image)+"\" alt=\"\" class=\"news-image\">":"")+'<span class="article-section">'+escapeHtml(x.source?.name||"News")+'</span><h3>'+escapeHtml(x.title||"")+'</h3><p>'+escapeHtml(x.description||x.content||"")+'</p><small>'+escapeHtml(x.publishedAt||"—")+'</small></article>').join("");}).catch(()=>{state.innerHTML='<h3>تعذر تحديث الأخبار</h3><p class="muted">لم يتم عرض معلومات غير متحققة.</p>';});}
