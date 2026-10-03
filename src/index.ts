@@ -53,6 +53,31 @@ const cloudflareKnowledgeSearch = async (env: Env, query: string) => {
   });
 };
 
+const openAiResponses = async (env: Env, instructions: string, input: string) => {
+  if (!env.OPENAI_API_KEY) throw new Error("openai_not_configured");
+  let lastError = "openai_failed";
+  const models = Array.from(new Set([
+    env.OPENAI_MODEL?.trim() || DEFAULT_OPENAI_MODEL,
+    ...OPENAI_FALLBACK_MODELS
+  ]));
+  for (const model of models) {
+    try {
+      const response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: "Bearer " + env.OPENAI_API_KEY },
+        body: JSON.stringify({ model, instructions, input, store: false })
+      });
+      if (response.ok) return { ok: true, model, data: await response.json() as any };
+      const body = await response.text().catch(() => "");
+      lastError = "openai_http_" + response.status + (body ? ":" + cleanText(body, 180) : "");
+      if (![408, 409, 429, 500, 502, 503, 504].includes(response.status)) break;
+    } catch (error) {
+      lastError = safeErrorMessage(error);
+    }
+  }
+  throw new Error(lastError);
+};
+
 const cloudflareWebSearch = async (env: Env, query: string, provider = "exa") => {
   if (!env.AI?.websearch) throw new Error("cloudflare_web_search_not_configured");
   const response = await env.AI.websearch({
@@ -202,12 +227,8 @@ const diagnoseTechnicalReport = async (env: Env, report: string) => {
   const instruction = "أنت مدير تقني لبيان. حلّل تقرير الخطأ المعطى فقط. اكتب بالعربية: 1) المشكلة 2) السبب المرجح مع درجة اليقين 3) ما تم عمله تلقائيًا 4) ما الذي يحتاج تدخلًا يدويًا 5) خطوات التحقق التالية. لا تخترع سببًا غير موجود في التقرير ولا تذكر أي أسرار.";
   if (env.OPENAI_API_KEY) {
     try {
-      const response = await fetch("https://api.openai.com/v1/responses", {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: "Bearer " + env.OPENAI_API_KEY },
-        body: JSON.stringify({ model: env.OPENAI_MODEL?.trim() || DEFAULT_OPENAI_MODEL, instructions: instruction, input: report, store: false })
-      });
-      if (response.ok) return textOf(await response.json() as any);
+      const response = await openAiResponses(env, instruction, report);
+      return textOf(response.data);
     } catch {}
   }
   if (env.AI) {
