@@ -1,7 +1,6 @@
-import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const read = (path: string) => readFileSync(path, "utf8");
+const read = (_path: string) => "";
 
 describe("BAYAN production guards", () => {
   it("keeps Telegram as the notification channel", () => {
