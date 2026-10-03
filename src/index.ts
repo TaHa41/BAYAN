@@ -2302,7 +2302,8 @@ export default {
           searchApi: !!env.SEARCH_API_KEY,
           gnews: !!env.GNEWS_API_KEY,
           goldApi: !!env.GOLD_API_KEY,
-          managerToken: !!env.BAYAN_AI_MANAGER_TOKEN
+          managerToken: !!env.BAYAN_AI_MANAGER_TOKEN,
+          emailNotifications: !!env.RESEND_API_KEY && !!env.BAYAN_OWNER_EMAIL
         }
       });
     }
