@@ -10,12 +10,11 @@ describe("BAYAN platform", () => {
     const body = await response.json() as unknown as { status: string; environment: string; version: string };
     expect(body.status).toBe("ok"); expect(body.environment).toBe("test"); expect(body.version).toBe("0.7.0");
   });
-  it("keeps the legacy health alias working for the runtime audit", async () => {
-    const response = await worker.fetch(new Request("https://bayan.test/health"), {
-      BAYAN_ENVIRONMENT: "test", BAYAN_VERSION: "0.7.0", BAYAN_COMMIT_SHA: "test",
-    });
+  it("keeps the health section separate from the API health endpoint", async () => {
+    const asset=new Response("<!doctype html><html><body>BAYAN health section</body></html>",{status:200,headers:{"content-type":"text/html"}});
+    const response=await worker.fetch(new Request("https://bayan.test/health"),{ASSETS:{fetch:async()=>asset} as unknown as Fetcher});
     expect(response.status).toBe(200);
-    expect((await response.json() as { status: string }).status).toBe("ok");
+    expect(response.headers.get("content-type")).toContain("text/html");
   });
   it("exposes the tool catalog without secrets", async () => {
     const response = await worker.fetch(new Request("https://bayan.test/api/tools"), { OPENAI_API_KEY: "secret" });
