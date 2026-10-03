@@ -27,8 +27,8 @@ interface Env {
 
 const DEFAULT_OPENAI_MODEL = "gpt-6-luna";
 const OPENAI_FALLBACK_MODELS = ["gpt-6-luna", "gpt-5.6-sol"];
-const DEFAULT_CLOUDFLARE_AI_MODEL = "@cf/google/gemma-4-26b-a4b-it";
-const CLOUDFLARE_AI_FALLBACK_MODELS = ["@cf/zai-org/glm-4.7-flash", "@cf/google/gemma-4-26b-a4b-it"];
+const DEFAULT_CLOUDFLARE_AI_MODEL = "@cf/openai/gpt-oss-120b";
+const CLOUDFLARE_AI_FALLBACK_MODELS = ["@cf/zai-org/glm-5.3-flash", "@cf/zai-org/glm-4.7-flash"];
 const DEFAULT_AI_GATEWAY = "default";
 const aiProviderCooldown = new Map<string, number>();
 
