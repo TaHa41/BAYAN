@@ -916,7 +916,8 @@ export default {
           if (search.ok) results = search.results;
         }
 
-        if (shouldSearch && !results.length) {
+        if (shouldSearch && !results.length && String(body.mode || "knowledge").toLowerCase() !== "knowledge") {
+          await reportBayanError(env, "api/ai evidence retrieval", new Error("no_search_evidence"));
           return json({
             answer: "Insufficient Evidence: لم أجد مصادر بحث كافية للتحقق من هذه المعلومة.",
             claims: [],
@@ -926,6 +927,11 @@ export default {
           });
         }
 
+        const prompt = shouldSearch && results.length
+          ? evidencePrompt(language, input, results)
+          : "BAYAN knowledge answer.\nLanguage: " + language + "\nUser request: " + input +
+            "\nNo live search evidence was available for this request. Answer from the model's general knowledge only when you are confident. Clearly distinguish established knowledge from uncertainty, do not invent citations or claim that live verification occurred, and say Insufficient Evidence when the question requires current or source-specific verification.";
+        /*
         const prompt = shouldSearch
           ? evidencePrompt(language, input, results)
           : "BAYAN internal knowledge request.\nLanguage: " + language + "\nUser request: " + input +
