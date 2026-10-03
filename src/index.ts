@@ -663,7 +663,7 @@ const loadKnowledgeArticles = async (env: Env, section?: string, limit = 30) => 
 
 const buildArticleEvidence = async (env: Env, results: any[]) => {
   const materials: string[] = [];
-  for (const source of results.slice(0, 3)) {
+  for (const source of results.slice(0, 6)) {
     let material = source.snippet || "";
     if (env.BROWSER && source.url) {
       try { const rendered = await env.BROWSER.quickAction("markdown", { url: source.url }); const raw = typeof rendered === "string" ? rendered : await rendered.text(); material = cleanText(raw, 7000) || material; } catch {}
@@ -708,6 +708,10 @@ const generateKnowledgeArticle = async (env: Env, language: string, query: strin
     "السؤال الذي يجب أن يجيب عنه المقال هو: " + query,
     "ابدأ من الإجابة الأساسية على السؤال بوضوح، ثم اشرح التفاصيل والسياق. لا تجعل القارئ يستنتج الإجابة من المقتطفات بنفسه.",
     "الموضوع: " + query,
+    "تاريخ التحرير الحالي: " + new Date().toISOString().slice(0, 10),
+    "اعتبر المعلومات الزمنية حساسة للسياق: ميّز بين تاريخ وقوع الحدث، تاريخ نشر المصدر، وما إذا كانت المعلومة ما زالت سارية حتى تاريخ التحرير.",
+    "إذا كان السؤال يتصل بـ(اليوم/حاليًا/آخر المستجدات/ذكرى)، فلا تستخدم معلومة قديمة كأنها حدث اليوم. اذكر التاريخ الفعلي للحدث بوضوح، وبيّن إن كانت المناسبة اليوم فعلًا أم أن المصدر يتحدث عن تاريخ سابق.",
+    "لا تصف شخصًا متوفى بأنه حي، ولا تستخدم صياغة توحي بأن خبرًا قديمًا وقع اليوم. إذا لم تتوفر أدلة حديثة كافية، قل ذلك بوضوح بدل اختراع تحديث.",
     "",
     "قواعد إلزامية:",
     "1) ابدأ بعنوان واضح في سطر منفصل.",
@@ -772,12 +776,24 @@ const allowRequest = (request: Request, limit = 60) => {
 };
 
 const rerankResults = (query: string, results: any[]) => {
-  const terms = query.toLowerCase().split(/\s+/).filter((x) => x.length > 2).slice(0, 12);
+  const rawTerms = query.toLowerCase().split(/\s+/).filter((x) => x.length > 2);
+  const stop = new Set(["ماذا","كيف","لماذا","متى","اين","أين","من","عن","هو","هي","ما","هل","the","what","how","why","when","where","who","about"]);
+  const terms = rawTerms.filter((x) => !stop.has(x)).slice(0, 16);
+  const queryIsCurrent = /(اليوم|النهارده|النهاردة|حالي|حاليا|الآن|الان|today|current|latest|now|ذكرى|ذكرى وفاة|ذكرى ميلاد)/i.test(query);
   return results.map((item, index) => {
-    const hay = (String(item.title || "") + " " + String(item.snippet || "")).toLowerCase();
+    const title = String(item.title || "").toLowerCase();
+    const snippet = String(item.snippet || "").toLowerCase();
+    const hay = title + " " + snippet;
     const hits = terms.reduce((n, term) => n + (hay.includes(term) ? 1 : 0), 0);
-    return { ...item, _score: hits * 10 - index };
-  }).sort((a, b) => b._score - a._score).map(({ _score, ...item }, index) => ({ ...item, rank: index + 1 }));
+    const exactTitle = terms.reduce((n, term) => n + (title.includes(term) ? 1 : 0), 0);
+    const weakSource = /facebook|instagram|youtube|tiktok|reddit/i.test(String(item.source || "") + " " + String(item.url || ""));
+    const relevance = hits * 12 + exactTitle * 8;
+    const sourcePenalty = weakSource ? 18 : 0;
+    const freshness = queryIsCurrent && item.date ? Math.max(0, 8 - Math.floor((Date.now() - new Date(item.date).getTime()) / 86400000 / 30)) : 0;
+    return { ...item, _score: relevance + freshness - sourcePenalty - index * 0.25 };
+  }).filter((item) => !terms.length || terms.some((term) => (String(item.title || "") + " " + String(item.snippet || "")).toLowerCase().includes(term)))
+    .sort((a, b) => b._score - a._score)
+    .map(({ _score, ...item }, index) => ({ ...item, rank: index + 1 }));
 };
 
 const imageGate = (images: any[], query: string) => {
