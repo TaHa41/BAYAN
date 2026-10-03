@@ -34,20 +34,7 @@ const cloudflareKnowledgeSearch = async (env: Env, query: string) => {
   if (!env.AI_SEARCH) throw new Error("cloudflare_ai_search_not_configured");
   const instance = env.AI_SEARCH.get("bayan-knowledge");
   return instance.search({
-    query,
-    ai_search_options: {
-      retrieval: {
-        retrieval_type: "hybrid",
-        max_num_results: 10
-      },
-      reranking: {
-        enabled: true,
-        model: "@cf/baai/bge-reranker-base"
-      },
-      query_rewrite: {
-        enabled: true
-      }
-    }
+    messages: [{ role: "user", content: query }]
   });
 };
 
