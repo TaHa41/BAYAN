@@ -29,7 +29,7 @@ const DEFAULT_AI_GATEWAY = "default";
 
 const cloudflareAiRun = async (env: Env, model: string, messages: any[]) => {
   if (!env.AI) throw new Error("cloudflare_ai_not_configured");
-  return env.AI.run(model, { messages }, { gateway: { id: DEFAULT_AI_GATEWAY, skipCache: false, cacheTtl: 300 } });
+  return env.AI.run(model, { messages });
 };
 
 const cloudflareKnowledgeSearch = async (env: Env, query: string) => {
@@ -518,6 +518,20 @@ export default {
         }
 
         if (!response || !response.ok) {
+          if (env.AI) {
+            try {
+              const result = await cloudflareAiRun(env, DEFAULT_CLOUDFLARE_AI_MODEL, [
+                { role: "system", content: "You are BAYAN AI. Be neutral, evidence-first, explicit about uncertainty, and never fabricate. Use only the supplied evidence." },
+                { role: "user", content: "Mode: " + (body.mode || "knowledge") + "\n" + prompt }
+              ]);
+              return json({
+                answer: textOf(result), claims: [], evidence: results.map(withoutUrl),
+                confidence: results.length ? 0.7 : 0.3,
+                warnings: ["Primary AI provider failed; Cloudflare Workers AI fallback used."],
+                provider: "cloudflare-workers-ai-fallback"
+              });
+            } catch {}
+          }
           return json({
             answer: "Insufficient Evidence: تعذر إكمال التحقق الآن.",
             claims: [],
