@@ -31,11 +31,11 @@ const recordInterest=(section,eventType="view")=>{if(!section)return;try{const k
     const [trend,news]=await Promise.all([trendRes.json(),newsRes.json()]);
     if(trendBox){
       const signals=Array.isArray(trend.signals)?trend.signals.slice(0,3):[];
-      trendBox.innerHTML=signals.length?signals.map(x=>'<div class="signal-item"><strong>'+esc(x.title)+'</strong><small>'+esc(x.source||"مصدر مباشر")+(x.date?" · "+esc(x.date):"")+'</small></div>').join(""):'<p class="muted">لم تصل إشارات حديثة قابلة للعرض الآن.</p>';
+      trendBox.innerHTML=signals.length?signals.map(x=>'<a class="signal-item" href="'+esc(x.url||("/search?q="+encodeURIComponent(x.title||"")))+'" target="'+(x.url?"_blank":"_self")+'" rel="'+(x.url?"noopener noreferrer":"")+'"><strong>'+esc(x.title)+'</strong><small>'+esc(x.source||"مصدر مباشر")+(x.date?" · "+esc(x.date):"")+'</small></a>').join(""):'<p class="muted">لم تصل إشارات حديثة قابلة للعرض الآن.</p>';
     }
     if(newsBox){
       const articles=Array.isArray(news.articles)?news.articles.slice(0,3):[];
-      newsBox.innerHTML=articles.length?articles.map(x=>'<div class="signal-item"><strong>'+esc(x.title)+'</strong><small>'+esc(x.source?.name||"مصدر مباشر")+(x.publishedAt?" · "+esc(x.publishedAt):"")+'</small></div>').join(""):'<p class="muted">لم تصل أخبار حديثة قابلة للعرض الآن.</p>';
+      newsBox.innerHTML=articles.length?articles.map(x=>'<a class="signal-item" href="'+esc(x.url||("/search?q="+encodeURIComponent(x.title||"")))+'" target="'+(x.url?"_blank":"_self")+'" rel="'+(x.url?"noopener noreferrer":"")+'"><strong>'+esc(x.title)+'</strong><small>'+esc(x.source?.name||"مصدر مباشر")+(x.publishedAt?" · "+esc(x.publishedAt):"")+'</small></a>').join(""):'<p class="muted">لم تصل أخبار حديثة قابلة للعرض الآن.</p>';
     }
   }catch{
     if(trendBox)trendBox.innerHTML='<p class="muted">تعذر تحديث الإشارات مؤقتًا.</p>';
