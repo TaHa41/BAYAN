@@ -398,11 +398,11 @@ const safeErrorMessage = (error: unknown) => {
 };
 
 const diagnoseTechnicalReport = async (env: Env, report: string) => {
-  const instruction = "أنت مدير تقني لبيان. حلّل تقرير الخطأ المعطى فقط. اكتب بالعربية: 1) المشكلة 2) السبب المرجح مع درجة اليقين 3) ما تم عمله تلقائيًا 4) ما الذي يحتاج تدخلًا يدويًا 5) خطوات التحقق التالية. لا تخترع سببًا غير موجود في التقرير ولا تذكر أي أسرار.";
+  const instruction = "أنت مدير تقني لبيان. حلّل تقرير الخطأ المعطى فقط. اكتب بالعربية: 1) التصنيف 2) المشكلة 3) السبب المرجح مع درجة اليقين 4) ما تم عمله تلقائيًا 5) ما الذي يحتاج تدخلًا يدويًا 6) خطوات التحقق التالية. لا تخترع سببًا غير موجود في التقرير ولا تذكر أي أسرار.";
   if (env.OPENAI_API_KEY) {
     try {
       const response = await openAiResponses(env, instruction, report);
-      return textOf(response.data);
+      return { available: true, provider: "openai", text: textOf(response.data) };
     } catch {}
   }
   if (env.AI) {
@@ -411,10 +411,19 @@ const diagnoseTechnicalReport = async (env: Env, report: string) => {
         { role: "system", content: instruction },
         { role: "user", content: report }
       ]);
-      return textOf(result);
+      return { available: true, provider: "cloudflare", text: textOf(result) };
     } catch {}
   }
-  return "لم يتوفر محرك ذكاء اصطناعي للتشخيص وقت الخطأ؛ تم إرسال البيانات التقنية الآمنة كما هي.";
+  return {
+    available: false,
+    provider: "none",
+    text: "تعذر تشغيل محرك الذكاء الاصطناعي للتشخيص وقت الحدث؛ لم يتم الادعاء بأن AI حلّل المشكلة. تم الاعتماد على التصنيف والقواعد الآمنة فقط."
+  };
+};
+
+const isDiagnosticTestContext = (context: string, error: unknown) => {
+  const value = (String(context || "") + " " + safeErrorMessage(error)).toLowerCase();
+  return /manual[ _-]?telegram[ _-]?diagnostic|manual[ _-]?diagnostic[ _-]?test|telegram[ _-]?diagnostic[ _-]?test|health[ _-]?check|self[ _-]?test/.test(value);
 };
 
 const ensureRuntimeAuditTable = async (env: Env) => {
@@ -629,57 +638,46 @@ const sendBayanDiagnostic = async (env: Env, subject: string, report: string) =>
 
 const reportBayanError = async (env: Env, context: string, error: unknown, extra: any = {}) => {
   const safe = safeErrorMessage(error);
+  const isTest = isDiagnosticTestContext(context, error);
   const signature = context + "|" + safe;
-  const now = Date.now();
   const claim = !(await isCooldownActive("diagnostic", signature));
   if (!claim) return false;
 
+  const runtimeVersion = cleanText(env.BAYAN_VERSION || "unknown", 100);
+  const runtimeCommit = cleanText(env.BAYAN_COMMIT_SHA || "unknown", 100);
   const reportLines = [
-    "بيان — تقرير خطأ تقني تلقائي",
+    isTest ? "بيان — تقرير اختبار تشخيصي (TEST)" : "بيان — تقرير خطأ تقني تلقائي",
+    "التصنيف: " + (isTest ? "DIAGNOSTIC_TEST" : "PRODUCTION_INCIDENT"),
     "المكان: " + cleanText(context, 240),
     "المشكلة: " + safe,
     "الوقت: " + new Date().toISOString(),
-    "الإصدار: " + cleanText(env.BAYAN_VERSION || "0.7.0", 100),
-    "Commit: " + cleanText(env.BAYAN_COMMIT_SHA || "source-commit-not-injected", 100),
-    "الإجراء التلقائي: تمت إعادة المحاولة واستخدام المسار البديل إن كان متاحًا.",
-    "الحالة بعد المحاولة: تحتاج مراجعة إذا استمر الخطأ.",
+    "الإصدار: " + runtimeVersion,
+    "Commit: " + runtimeCommit,
+    isTest ? "الإجراء التلقائي: اختبار لمسار التقرير فقط؛ لم يُعتبر عطلًا في الخدمة." : "الإجراء التلقائي: تمت إعادة المحاولة واستخدام المسار البديل إن كان متاحًا.",
+    isTest ? "الحالة: لا يوجد Incident إنتاجي ما لم يفشل اختبار الصحة نفسه." : "الحالة بعد المحاولة: تحتاج مراجعة إذا استمر الخطأ.",
     extra?.attempts ? "المحاولات: " + JSON.stringify(extra.attempts).slice(0, 2000) : "",
     extra?.repair ? "الإصلاح المنفذ: " + cleanText(extra.repair, 1200) : "",
-    "الخطوة التالية: راجع Workers Logs / Issues إذا تكرر الخطأ.",
-    "التنبيه: تُرسل تقارير بيان إلى قناة Telegram المهيأة فقط."
+    "الخطوة التالية: " + (isTest ? "اعتبر الاختبار ناجحًا إذا وصل هذا التقرير دون أخطاء في Telegram." : "راجع Workers Logs / Issues إذا تكرر الخطأ."),
   ].filter(Boolean);
 
-  // لا نجعل قاعدة البيانات أو محرك التشخيص شرطًا لإرسال التنبيه.
-  // التقرير الأساسي يجب أن يصل أولًا، ثم نضيف نتيجة الإصلاح الذاتي إن نجحت.
-  let repair: any = { attempted: false, action: "not_run" };
-  let queueError = "";
-  try {
-    await queueBayanRepair(env, context, error);
-  } catch (queueFailure) {
-    queueError = safeErrorMessage(queueFailure);
+  if (isTest) {
+    const delivery = await sendBayanDiagnostic(env, "اختبار تشخيص Telegram — TEST", reportLines.join("\n"));
+    if (delivery?.ok) await setCooldown("diagnostic-test", signature, 5 * 60);
+    return delivery;
   }
 
+  let repair: any = { attempted: false, action: "not_run" };
+  let queueError = "";
+  try { await queueBayanRepair(env, context, error); } catch (queueFailure) { queueError = safeErrorMessage(queueFailure); }
   try {
     repair = await attemptBayanSelfRepair(env, context, error);
   } catch (repairFailure) {
-    repair = {
-      attempted: true,
-      action: "repair_engine_failed",
-      result: "تعذر تشغيل محرك الإصلاح الذاتي، وتم إرسال التقرير الأساسي.",
-      error: safeErrorMessage(repairFailure)
-    };
+    repair = { attempted: true, action: "repair_engine_failed", result: "تعذر تشغيل محرك الإصلاح الذاتي، وتم إرسال التقرير الأساسي.", error: safeErrorMessage(repairFailure) };
   }
-
   if (queueError) reportLines.push("خطأ تسجيل مهمة الإصلاح: " + queueError);
   reportLines.push("محاولة الإصلاح الذاتي: " + JSON.stringify(repair));
 
-  const delivery = await sendBayanDiagnostic(
-    env,
-    "تنبيه خطأ تقني مهم في بيان",
-    reportLines.join("\n")
-  );
-
-  // لا نحجب التنبيهات اللاحقة إذا فشل Telegram هذه المرة.
+  const delivery = await sendBayanDiagnostic(env, "تنبيه خطأ تقني مهم في بيان", reportLines.join("\n"));
   if (delivery?.ok) await setCooldown("diagnostic", signature, 5 * 60);
   return delivery;
 };
