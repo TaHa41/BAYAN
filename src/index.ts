@@ -175,7 +175,6 @@ const normalizeGeneratedText = (value: unknown) => String(value ?? "")
   .replace(/\\u([0-9a-fA-F]{4})/g, (_m, hex) => String.fromCharCode(parseInt(hex, 16)))
   .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ")
   .replace(/[ \t]+/g, " ")
-  .replace(/^[#*_]+\s*/g, "")
   .replace(/\s+([،؛:.!?؟])/g, "$1")
   .trim();
 
@@ -1010,13 +1009,15 @@ const rssNewsSearch = async (query = "", language = "ar") => {
   const googleEndpoint = query
     ? "https://news.google.com/rss/search?q=" + encodeURIComponent(query) + "&hl=" + encodeURIComponent(hl) + "&gl=" + gl + "&ceid=" + encodeURIComponent(ceid)
     : "https://news.google.com/rss?hl=" + encodeURIComponent(hl) + "&gl=" + gl + "&ceid=" + encodeURIComponent(ceid);
-  const feeds = [
-    googleEndpoint,
-    language === "ar"
-      ? "https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdff8b8cab9"
-      : "https://www.aljazeera.com/xml/rss/all.xml",
-    language === "ar" ? "https://feeds.bbci.co.uk/arabic/rss.xml" : "https://feeds.bbci.co.uk/news/rss.xml"
-  ];
+  const feeds = query
+    ? [googleEndpoint]
+    : [
+        googleEndpoint,
+        language === "ar"
+          ? "https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdff8b8cab9"
+          : "https://www.aljazeera.com/xml/rss/all.xml",
+        language === "ar" ? "https://feeds.bbci.co.uk/arabic/rss.xml" : "https://feeds.bbci.co.uk/news/rss.xml"
+      ];
   const settled = await Promise.allSettled(feeds.map((endpoint) => fetchTextWithTimeout(endpoint)));
   const collected: any[] = [];
   for (const item of settled) {
@@ -1054,10 +1055,26 @@ const wikipediaSearch = async (query: string, language = "ar") => {
 
 const evidenceFallbackAnswer = (query: string, results: any[]) => {
   if (!results.length) return null;
-  const lines = results.slice(0, 6).map((x: any, i: number) =>
-    (i + 1) + ". " + x.title + " — " + x.snippet + (x.source ? " (" + x.source + ")" : "")
-  );
-  return "هذه نتائج الأدلة المتاحة داخل بيان للسؤال: " + query + "\n\n" + lines.join("\n");
+  const top = results.slice(0, 6);
+  const main = top[0];
+  const supporting = top.slice(1, 4);
+  const sourceNames = Array.from(new Set(top.map((x: any) => cleanText(x.source || "مصدر غير محدد", 120)))).slice(0, 6);
+  return [
+    "الإجابة المختصرة",
+    cleanText(main?.snippet || main?.title || ("توجد أدلة مرتبطة بسؤال: " + query), 900),
+    "",
+    "السياق والتفاصيل",
+    ...supporting.map((x: any) => "تضيف المصادر المتاحة أن " + cleanText(x.snippet || x.title, 700) + "."),
+    "",
+    "ما تؤكده الأدلة",
+    "تتفق النتائج المعروضة على وجود معلومات مرتبطة مباشرة بالسؤال، مع اختلاف درجة التفصيل بين المصادر. لا تُعامل أي معلومة إضافية غير ظاهرة في الأدلة على أنها مؤكدة.",
+    "",
+    "الخلاصة",
+    cleanText(main?.title || query, 300) + " — هذه خلاصة أولية مبنية على الأدلة المسترجعة، ويمكن توسيعها إلى مقال منظم داخل بيان.",
+    "",
+    "المصادر المستخدمة",
+    sourceNames.join("، ")
+  ].join("\n");
 };
 
 const internalSearch = async (query: string, env: Env) => {
