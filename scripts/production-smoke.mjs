@@ -1,6 +1,6 @@
 const base=(process.env.BAYAN_URL||"https://bayan.tahaomar411.workers.dev").replace(/\/$/,"");
 const checks=[
-  ["/","text/html"],["/health","application/json"],["/api/features","application/json"],
+  ["/","text/html"],["/health","application/json"],["/api/features","application/json"],["/api/trending","application/json"],["/api/gold","application/json"],
   ["/egypt","text/html"],["/science","text/html"],["/technology","text/html"],["/news","text/html"],
   ["/prices","text/html"],["/search","text/html"],["/sitemap.xml","application/xml"],["/robots.txt","text/plain"]
 ];
