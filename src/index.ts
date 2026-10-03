@@ -1863,6 +1863,16 @@ export default {
       return json({ query: q, intent, section, answer, article: generated ? { id: knowledge.articleId, title: generated.title, summary: generated.summary, body: generated.body } : null, items: search.results.map(withoutUrl), status: "ok", verification: generated ? "article_generated_from_retrieved_evidence" : "search_results_only", knowledge });
     }
 
+    if (path === "/api/knowledge/searches" && request.method === "GET") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      if (!await ensureKnowledgeSearchTable(env)) return json({ status: "database_unavailable", items: [] }, 503);
+      const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit") || 50)));
+      try {
+        const result = await env.DB!.prepare("SELECT id,query,language,intent,section,status,article_slug,source_count,provider_count,created_at FROM knowledge_searches ORDER BY created_at DESC LIMIT ?").bind(limit).all();
+        return json({ status: "ok", items: result.results || [], count: (result.results || []).length });
+      } catch { return json({ status: "database_error", items: [] }, 503); }
+    }
+
     if (path === "/api/knowledge/graph") {
       if (!await ensureKnowledgeTables(env)) return json({ status: "database_error", nodes: [], edges: [] }, 503);
       const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit") || 50)));
