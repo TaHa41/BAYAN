@@ -1162,7 +1162,9 @@ const internalSearch = async (query: string, env: Env) => {
     if (!current) unique.set(key, item);
     else current.provider = Array.from(new Set((String(current.provider) + "+" + String(item.provider)).split("+"))).join("+");
   }
-  const results = rerankResults(query, Array.from(unique.values())).slice(0, 16);
+  let results = rerankResults(query, Array.from(unique.values())).slice(0, 16);
+  const strong = results.filter((x: any) => !/facebook|instagram|youtube|tiktok|reddit/i.test(String(x.source || "") + " " + String(x.url || "")));
+  if (strong.length >= 4) results = strong.slice(0, 12);
   const providerCount = new Set(results.flatMap((x: any) => String(x.provider || "").split("+").filter(Boolean))).size;
   const sourceCount = new Set(results.map((x: any) => String(x.source || "").toLowerCase()).filter(Boolean)).size;
   return { ok: results.length > 0, status: results.length ? "multi_source" : "search_provider_not_configured", results, providerCount, sourceCount, attempts };
