@@ -30,6 +30,11 @@ const textOf = (d: any) =>
 const cleanText = (value: unknown, max = 900) =>
   String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
+const withoutUrl = (item: any) => {
+  const { url: _url, ...rest } = item;
+  return rest;
+};
+
 const sourceName = (item: any) =>
   cleanText(item?.source || item?.domain || item?.displayed_link || "Unknown source", 160);
 
@@ -147,7 +152,7 @@ export default {
       if (!env.OPENAI_API_KEY) {
         return json({
           query: q,
-          items: search.results.map(({ url: _url, ...item }) => item),
+          items: search.results.map(withoutUrl),
           status: "ok",
           answer: null,
           verification: "search_results_only"
@@ -172,7 +177,7 @@ export default {
         if (!response.ok) {
           return json({
             query: q,
-            items: search.results.map(({ url: _url, ...item }) => item),
+            items: search.results.map(withoutUrl),
             status: "ok",
             answer: null,
             verification: "search_results_only",
@@ -180,18 +185,18 @@ export default {
           });
         }
 
-        const data = await response.json();
+        const data = await response.json() as any;
         return json({
           query: q,
           answer: textOf(data),
-          items: search.results.map(({ url: _url, ...item }) => item),
+          items: search.results.map(withoutUrl),
           status: "ok",
           verification: "evidence_synthesized"
         });
       } catch {
         return json({
           query: q,
-          items: search.results.map(({ url: _url, ...item }) => item),
+          items: search.results.map(withoutUrl),
           status: "ok",
           answer: null,
           verification: "search_results_only",
@@ -268,7 +273,7 @@ export default {
         return json({
           answer: textOf(data),
           claims: [],
-          evidence: results.map(({ url: _url, ...item }) => item),
+          evidence: results.map(withoutUrl),
           confidence: results.length ? 0.7 : 0.3,
           warnings: [],
           policy: "external_sources_used_internally; no_external_links_to_visitor"
