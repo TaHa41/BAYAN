@@ -46,7 +46,24 @@ function home(){app.innerHTML='<section class="hero"><div><div class="eyebrow">B
     grid.innerHTML=items.map(a=>'<a class="card article-card" href="'+withLang("/article/"+a.id)+'"><span class="article-section">'+sectionIcon(a.section)+(window.BAYAN_CONTENT?.sectionMeta?.[a.section]||a.section)+'</span><h3>'+escapeHtml(a.title)+'</h3><p>'+escapeHtml(a.summary)+'</p><small>مقال معرفة محفوظ في بيان</small></a>').join("")+grid.innerHTML;
   }catch{}
 }
-function articlePage(slug){const a=(window.BAYAN_CONTENT?.articles||[]).find(x=>x.id===slug);const pair=content[slug]||[a?.title||"موضوع في بيان",a?.summary||"محتوى معرفي في بيان."];const body=a?.body||["سيُعرض المحتوى الكامل بعد اجتياز دورة الاسترجاع والتحليل والكتابة والتحقق."];app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isEn?"Article":"مقال")+'</div><div class="article-kicker">'+sectionIcon(a?.section||"news")+(a?.section?(window.BAYAN_CONTENT.sectionMeta[a.section]||a.section):"BAYAN")+'</div><h1 class="page-title">'+pair[0]+'</h1><p class="page-lead">'+pair[1]+'</p>'+summaryBlock(["الخلاصة تعرض الفكرة الأساسية قبل التفاصيل.","المقال يميز بين المعلومة والتفسير ويحتاج إلى مصادر قابلة للفحص.","وقت القراءة: "+(a?.readTime||"—")])+evidence()+adSlot("article")+'<article class="article-body card">'+body.map(p=>"<p>"+p+"</p>").join("")+'</article></section>'}async function dynamicKnowledgePage(kind,slug){
+async function articlePage(slug){
+const a=(window.BAYAN_CONTENT?.articles||[]).find(x=>x.id===slug);
+if(!a){
+  try{
+    const rr=await fetch("/api/knowledge?id="+encodeURIComponent(slug));
+    const dd=await rr.json();
+    const k=dd.article;
+    if(k){
+      app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / مقال معرفة</div><div class="article-kicker">'+sectionIcon(k.section)+(window.BAYAN_CONTENT?.sectionMeta?.[k.section]||k.section)+'</div><h1 class="page-title">'+escapeHtml(k.title)+'</h1><p class="page-lead">'+escapeHtml(k.summary)+'</p>'+summaryBlock(["مقال أصلي جرى توليده من الأدلة المسترجعة.","المادة محفوظة داخل قاعدة معرفة بيان ومصنفة تلقائيًا في قسمها.","يمكن تحديثها عند ظهور أدلة جديدة."])+evidence()+'<article class="article-body card">'+(k.body||[]).map(p=>"<p>"+escapeHtml(p)+"</p>").join("")+'</article></section>';
+      return;
+    }
+  }catch{}
+}
+const pair=content[slug]||[a?.title||"موضوع في بيان",a?.summary||"محتوى معرفي في بيان."];
+const body=a?.body||["سيُعرض المحتوى الكامل بعد اجتياز دورة الاسترجاع والتحليل والكتابة والتحقق."];
+app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isEn?"Article":"مقال")+'</div><div class="article-kicker">'+sectionIcon(a?.section||"news")+(a?.section?(window.BAYAN_CONTENT.sectionMeta[a.section]||a.section):"BAYAN")+'</div><h1 class="page-title">'+pair[0]+'</h1><p class="page-lead">'+pair[1]+'</p>'+summaryBlock(["الخلاصة تعرض الفكرة الأساسية قبل التفاصيل.","المقال يميز بين المعلومة والتفسير ويحتاج إلى مصادر قابلة للفحص.","وقت القراءة: "+(a?.readTime||"—")])+evidence()+adSlot("article")+'<article class="article-body card">'+body.map(p=>"<p>"+p+"</p>").join("")+'</article></section>';
+}
+async function dynamicKnowledgePage(kind,slug){
 const labels={person:isEn?"Person":"شخص",event:isEn?"Event":"حدث",topic:isEn?"Topic":"موضوع"};
 const label=labels[kind]||labels.topic;
 app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+label+'</div><div class="eyebrow">'+kind.toUpperCase()+'</div><h1 class="page-title">'+escHtml(slug.replace(/[-_]+/g," "))+'</h1><div id="dynamicState" class="card"><h3>'+ (isEn?"Researching and verifying…":"جارٍ البحث والتحقق…") +'</h3><p class="muted">'+(isEn?"BAYAN is retrieving evidence before writing the page.":"يجمع بيان الأدلة قبل كتابة الصفحة.")+'</p></div><div id="dynamicAnswer" class="card answer" style="display:none"></div>'+evidence()+'</section>';
