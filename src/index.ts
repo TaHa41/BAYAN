@@ -226,6 +226,73 @@ const ensureContributionTable = async (env: Env) => {
     return true;
   } catch { return false; }
 };
+const ensureAnalyticsTable = async (env: Env) => {
+  if (!env.DB) return false;
+  try {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS bayan_analytics_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      visitor_id TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      path TEXT NOT NULL,
+      query TEXT,
+      language TEXT NOT NULL DEFAULT 'ar',
+      created_at TEXT NOT NULL
+    )`).run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_bayan_analytics_time ON bayan_analytics_events(created_at DESC)").run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_bayan_analytics_type_time ON bayan_analytics_events(event_type,created_at DESC)").run();
+    return true;
+  } catch { return false; }
+};
+
+const analyticsVisitorKey = async (visitorId: string) => {
+  const data = new TextEncoder().encode(visitorId.trim().slice(0, 160));
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest)).slice(0, 16).map((x) => x.toString(16).padStart(2, "0")).join("");
+};
+
+const recordAnalyticsEvent = async (env: Env, visitorId: string, eventType: string, path: string, query = "", language = "ar") => {
+  if (!env.DB || !visitorId) return false;
+  const allowed = new Set(["page_view", "search"]);
+  if (!allowed.has(eventType)) return false;
+  if (!await ensureAnalyticsTable(env)) return false;
+  try {
+    const visitorKey = await analyticsVisitorKey(visitorId);
+    await env.DB.prepare(
+      "INSERT INTO bayan_analytics_events(visitor_id,event_type,path,query,language,created_at) VALUES(?,?,?,?,?,?)"
+    ).bind(
+      visitorKey,
+      eventType,
+      cleanText(path, 240) || "/",
+      cleanText(query, 500) || null,
+      language === "en" ? "en" : "ar",
+      new Date().toISOString()
+    ).run();
+    return true;
+  } catch { return false; }
+};
+
+const loadAnalytics = async (env: Env, hours: number) => {
+  if (!env.DB) return { status: "database_unavailable" };
+  if (!await ensureAnalyticsTable(env)) return { status: "database_unavailable" };
+  const since = new Date(Date.now() - hours * 60 * 60_000).toISOString();
+  const [views, visitors, searches, pages, queries] = await Promise.all([
+    env.DB.prepare("SELECT COUNT(*) AS count FROM bayan_analytics_events WHERE event_type='page_view' AND created_at>=?").bind(since).first<any>(),
+    env.DB.prepare("SELECT COUNT(DISTINCT visitor_id) AS count FROM bayan_analytics_events WHERE created_at>=?").bind(since).first<any>(),
+    env.DB.prepare("SELECT COUNT(*) AS count FROM bayan_analytics_events WHERE event_type='search' AND created_at>=?").bind(since).first<any>(),
+    env.DB.prepare("SELECT path, COUNT(*) AS count FROM bayan_analytics_events WHERE event_type='page_view' AND created_at>=? GROUP BY path ORDER BY count DESC LIMIT 10").bind(since).all<any>(),
+    env.DB.prepare("SELECT query, COUNT(*) AS count FROM bayan_analytics_events WHERE event_type='search' AND created_at>=? AND query IS NOT NULL AND query!='' GROUP BY query ORDER BY count DESC LIMIT 10").bind(since).all<any>()
+  ]);
+  return {
+    status: "ok",
+    since,
+    views: Number(views?.count || 0),
+    uniqueVisitors: Number(visitors?.count || 0),
+    searches: Number(searches?.count || 0),
+    topPages: pages.results || [],
+    topSearches: queries.results || []
+  };
+};
+
 const diagnosticMemory = new Map<string, number>();
 
 const safeErrorMessage = (error: unknown) => {
@@ -1120,6 +1187,28 @@ export default {
       const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || "";
       if (!env.BAYAN_AI_MANAGER_TOKEN || supplied !== env.BAYAN_AI_MANAGER_TOKEN) return json({ status: "forbidden" }, 403);
       return json(await runKnowledgeMaintenance(env));
+    }
+
+    if (path === "/api/analytics/event" && request.method === "POST") {
+      if (!allowRequest(request, 120)) return json({ status: "rate_limited" }, 429);
+      try {
+        const body = await request.json() as { visitorId?: string; eventType?: string; path?: string; query?: string; language?: string };
+        const visitorId = cleanText(body.visitorId, 160);
+        const eventType = cleanText(body.eventType, 30);
+        const eventPath = cleanText(body.path, 240) || "/";
+        if (!visitorId || !["page_view", "search"].includes(eventType) || !eventPath.startsWith("/")) {
+          return json({ status: "invalid_analytics_event" }, 400);
+        }
+        await recordAnalyticsEvent(env, visitorId, eventType, eventPath, cleanText(body.query, 500), body.language === "en" ? "en" : "ar");
+        return json({ status: "ok" });
+      } catch { return json({ status: "invalid_request" }, 400); }
+    }
+
+    if (path === "/api/analytics" && request.method === "GET") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      const requested = Number(url.searchParams.get("hours") || 24);
+      const hours = [24, 168, 720].includes(requested) ? requested : 24;
+      return json(await loadAnalytics(env, hours));
     }
 
     if (path === "/api/interest" && request.method === "POST") {
