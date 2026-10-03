@@ -113,7 +113,7 @@ export default {
 
     if (path === "/api/tools") {
       return json({
-        tools: ["search", "knowledge-search", "evidence-synthesis", "news", "gold", "maps", "image-search", "article", "summary", "verification", "repair", "live-weather", "live-fx", "ai"],
+        tools: ["search", "knowledge-search", "evidence-synthesis", "news", "gold", "maps", "image-search", "article", "summary", "verification", "repair", "live-weather", "live-fx", "ads", "ai"],
         providers: {
           openai: !!env.OPENAI_API_KEY,
           search: !!env.SEARCH_API_KEY,
@@ -149,6 +149,7 @@ export default {
     if (path === "/api/features") {
       return json({
         features: {
+          ads: env.ADSENSE_ENABLED === "true" && !!env.ADSENSE_CLIENT_ID,
           ai: !!env.OPENAI_API_KEY,
           webSearch: !!env.SEARCH_API_KEY,
           aiSearch: !!env.SEARCH_API_KEY && !!env.OPENAI_API_KEY,
