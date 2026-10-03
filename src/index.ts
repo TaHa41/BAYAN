@@ -2541,6 +2541,31 @@ export default {
       return json({ status: "ok", provider: "Google Maps", apiKeyConfigured: true });
     }
 
+    if (path === "/api/maps/search") {
+      if (!allowRequest(request, 20)) return json({ status: "rate_limited" }, 429);
+      const q = cleanText(url.searchParams.get("q"), 180);
+      if (!q) return json({ status: "query_required" }, 400);
+      try {
+        const response = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&q=" + encodeURIComponent(q), {
+          headers: { "user-agent": "BAYAN/0.6 (location search; contact via bayan.tahaomar411.workers.dev)" }
+        });
+        if (!response.ok) throw new Error("nominatim_http_" + response.status);
+        const data = await response.json() as any[];
+        const places = Array.isArray(data) ? data.map((x: any) => ({
+          name: cleanText(x.display_name || x.name || q, 300),
+          lat: Number(x.lat),
+          lon: Number(x.lon),
+          type: cleanText(x.type, 80),
+          category: cleanText(x.category, 80),
+          mapUrl: "https://www.openstreetmap.org/?mlat=" + encodeURIComponent(x.lat) + "&mlon=" + encodeURIComponent(x.lon) + "#map=16/" + encodeURIComponent(x.lat) + "/" + encodeURIComponent(x.lon)
+        })).filter(x => Number.isFinite(x.lat) && Number.isFinite(x.lon)) : [];
+        return json({ status: "ok", provider: "OpenStreetMap/Nominatim", places });
+      } catch (error) {
+        await reportBayanError(env, "api/maps/search", error);
+        return json({ status: "source_error", provider: "OpenStreetMap/Nominatim" }, 502);
+      }
+    }
+
     if (path === "/api/images") {
       const q = (url.searchParams.get("q") || "").trim().slice(0, 120);
       if (!q) return json({ status: "query_required" }, 400);
