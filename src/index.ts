@@ -18,9 +18,6 @@ interface Env {
   BAYAN_AI_MANAGER_TOKEN?: string;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_CHAT_ID?: string;
-  RESEND_API_KEY?: string;
-  BAYAN_OWNER_EMAIL?: string;
-  RESEND_FROM_EMAIL?: string;
   ASSETS?: Fetcher;
   AI?: any;
   AI_SEARCH?: any;
@@ -702,48 +699,18 @@ const sendBayanTelegram = async (env: Env, text: string, chatId?: string) => {
   }
 };
 
-const sendBayanEmail = async (env: Env, subject: string, text: string) => {
-  if (!env.RESEND_API_KEY || !env.BAYAN_OWNER_EMAIL) {
-    return { ok: false, configured: false, error: "email_not_configured" };
-  }
-  try {
-    const from = cleanText(env.RESEND_FROM_EMAIL || "BAYAN <onboarding@resend.dev>", 180);
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: "Bearer " + env.RESEND_API_KEY
-      },
-      body: JSON.stringify({
-        from,
-        to: [cleanText(env.BAYAN_OWNER_EMAIL, 240)],
-        subject: cleanText(subject, 180),
-        text: cleanText(text, 12000)
-      })
-    });
-    if (!response.ok) return { ok: false, configured: true, error: "resend_http_" + response.status };
-    const data: any = await response.json().catch(() => ({}));
-    return { ok: true, configured: true, id: data?.id || null };
-  } catch (error) {
-    return { ok: false, configured: true, error: safeErrorMessage(error) };
-  }
-};
-
 const sendBayanOwnerNotification = async (env: Env, subject: string, text: string) => {
-  const [telegram, email] = await Promise.all([
-    sendBayanTelegram(env, "🔔 " + cleanText(subject, 180) + "\n\n" + text.slice(0, 3600)),
-    sendBayanEmail(env, subject, text)
-  ]);
+  const telegram = await sendBayanTelegram(env, "🔔 " + cleanText(subject, 180) + "\n\n" + text.slice(0, 3600));
   console.log(JSON.stringify({
     event: "bayan_owner_notification",
     subject: cleanText(subject, 180),
     telegramDelivered: telegram.ok,
+    telegramChatId: telegram.chatId || null,
+    telegramSource: telegram.source || null,
     telegramError: telegram.error || null,
-    emailDelivered: email.ok,
-    emailError: email.error || null,
     timestamp: new Date().toISOString()
   }));
-  return { telegram, email };
+  return { telegram };
 };
 
 const discoverTelegramChat = async (env: Env) => {
@@ -2334,8 +2301,7 @@ export default {
           gnews: !!env.GNEWS_API_KEY,
           goldApi: !!env.GOLD_API_KEY,
           managerToken: !!env.BAYAN_AI_MANAGER_TOKEN,
-          emailNotifications: !!env.RESEND_API_KEY && !!env.BAYAN_OWNER_EMAIL
-        }
+                  }
       });
     }
 
