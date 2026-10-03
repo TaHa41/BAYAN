@@ -20,14 +20,45 @@ interface Env {
 
 const DEFAULT_OPENAI_MODEL = "gpt-5.6-luna";
 
-const json = (data: unknown, status = 200) =>
-  new Response(JSON.stringify(data, null, 2), {
-    status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      "cache-control": "no-store"
-    }
-  });
+const securityHeaders = (headers: Headers) => {
+  headers.set("x-content-type-options", "nosniff");
+  headers.set("referrer-policy", "strict-origin-when-cross-origin");
+  headers.set("x-frame-options", "SAMEORIGIN");
+  headers.set("permissions-policy", "camera=(), microphone=(), geolocation=()");
+  return headers;
+};
+
+const json = (data: unknown, status = 200) => {
+  const headers = securityHeaders(new Headers({
+    "content-type": "application/json; charset=utf-8",
+    "cache-control": "no-store"
+  }));
+  return new Response(JSON.stringify(data, null, 2), { status, headers });
+};
+
+const renderHtml = async (response: Response, requestUrl: URL) => {
+  const headers = securityHeaders(new Headers(response.headers));
+  if (!(headers.get("content-type") || "").includes("text/html")) {
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  }
+  let html = await response.text();
+  const language = requestUrl.searchParams.get("lang") === "en" ? "en" : "ar";
+  const direction = language === "en" ? "ltr" : "rtl";
+  const cleanPath = requestUrl.pathname || "/";
+  const canonical = requestUrl.origin + cleanPath + (language === "en" ? "?lang=en" : "");
+  const alternateAr = requestUrl.origin + cleanPath;
+  const alternateEn = requestUrl.origin + cleanPath + "?lang=en";
+  html = html.replace('<html lang="ar" dir="rtl">', '<html lang="' + language + '" dir="' + direction + '">');
+  html = html.replace("</head>",
+    '<link rel="canonical" href="' + canonical + '">' +
+    '<link rel="alternate" hreflang="ar" href="' + alternateAr + '">' +
+    '<link rel="alternate" hreflang="en" href="' + alternateEn + '">' +
+    '<link rel="alternate" hreflang="x-default" href="' + alternateAr + '">' +
+    '<meta name="robots" content="index,follow">' +
+    "</head>"
+  );
+  return new Response(html, { status: response.status, statusText: response.statusText, headers });
+};
 
 const textOf = (d: any) =>
   d?.output_text ||
@@ -446,9 +477,11 @@ export default {
     }
 
     if (env.ASSETS) {
-      const asset = await env.ASSETS.fetch(request);
-      if (asset.status !== 404 || path.includes(".")) return asset;
-      return env.ASSETS.fetch(new Request(new URL("/index.html", request.url), request));
+      let asset = await env.ASSETS.fetch(request);
+      if (asset.status === 404 && !path.includes(".")) {
+        asset = await env.ASSETS.fetch(new Request(new URL("/index.html", request.url), request));
+      }
+      return renderHtml(asset, url);
     }
 
     return json({ error: "Not Found", path }, 404);
