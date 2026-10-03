@@ -1861,15 +1861,21 @@ export default {
     if (path === "/api/gold") {
       if (!env.GOLD_API_KEY) return json({ status: "not_configured", provider: "GoldAPI", message: "Add GOLD_API_KEY as a Cloudflare Secret." }, 503);
       try {
+        const goldApiKey = env.GOLD_API_KEY;
         const requestGold = async (symbol: string) => {
           const response = await fetch("https://www.goldapi.io/api/" + symbol, {
-            headers: { "x-access-token": env.GOLD_API_KEY, "Content-Type": "application/json" }
+            headers: { "x-access-token": goldApiKey, "Content-Type": "application/json" }
           });
           if (!response.ok) return null;
           return await response.json() as any;
         };
+        const validGold = (data: any) =>
+          !!data &&
+          [data.price_gram_24k, data.price_gram_21k, data.price_gram_18k].every((value: unknown) =>
+            typeof value === "number" && Number.isFinite(value) && value > 0
+          );
         const local = await requestGold("XAU/EGP");
-        if (local) {
+        if (validGold(local)) {
           return json({
             status: "ok", provider: "GoldAPI", currency: "EGP",
             pricePerOunce: local.price || null, pricePerGram: local.price_gram_24k || null,
@@ -1882,7 +1888,7 @@ export default {
           });
         }
         const data = await requestGold("XAU/USD");
-        if (!data) return json({ status: "provider_error", provider: "GoldAPI" }, 502);
+        if (!validGold(data)) return json({ status: "provider_error", provider: "GoldAPI", message: "تعذر الحصول على بيانات ذهب مكتملة." }, 502);
         let egpPerUsd: number | null = null;
         try {
           const fx = await fetch("https://api.frankfurter.dev/v2/rate/USD/EGP");
