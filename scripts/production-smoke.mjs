@@ -39,9 +39,9 @@ try{
   const home=await fetch(base+"/",{redirect:"follow"});
   const html=await home.text();
   const ok=home.ok &&
-    /<link[^>]+rel=["']canonical["'][^>]+href=["'][^"']+["']/i.test(html) &&
-    /<meta[^>]+name=["']robots["'][^>]+content=["'][^"']+["']/i.test(html) &&
-    /<link[^>]+hreflang=["'](?:ar|en|x-default)["'][^>]+href=["'][^"']+["']/i.test(html) &&
+    /<link(?=[^>]*\brel=["'][^"']*\bcanonical\b)(?=[^>]*\bhref=["'][^"']+["'])[^>]*>/i.test(html) &&
+    /<meta(?=[^>]*\bname=["']robots["'])(?=[^>]*\bcontent=["'][^"']+["'])[^>]*>/i.test(html) &&
+    /<link(?=[^>]*\bhreflang=["'](?:ar|en|x-default)["'])(?=[^>]*\bhref=["'][^"']+["'])[^>]*>/i.test(html) &&
     /id=["']app["']/i.test(html);
   console.log((ok?"PASS":"FAIL")+" / HTML SEO/security contract");
   if(!ok) failed++;
