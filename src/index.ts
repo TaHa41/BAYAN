@@ -498,6 +498,7 @@ export default {
         const slug = await slugForQuery(q);
         const article = { slug, query: q, section, title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 8).map(withoutUrl), createdAt: new Date().toISOString() };
         const persistence = await saveKnowledgeArticle(env, article);
+        if (persistence.persisted) await refreshKnowledgeGraph(env, article);
         knowledge = { ...knowledge, status: "PUBLISHED", persisted: persistence.persisted, articleId: slug };
       }
       let answer = null;
