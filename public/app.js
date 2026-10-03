@@ -120,7 +120,7 @@ document.querySelector("#reviewStatus").onclick=async()=>{
     const config=d.configuration||{};
     const entries=Object.entries(labels).map(([key,label])=>{
       const ok=!!config[key];
-      return '<div class="card"><strong>'+escapeHtml(label)+'</strong><p class="muted">'+(ok?"✓ متاح":"✕ غير مضبوط")+'</p></div>';
+      return '<div class="card"><strong>'+escapeHtml(label)+'</strong><p class="muted">'+(ok?"متاح":"غير مضبوط")+'</p></div>';
     }).join("");
     const missing=Object.keys(labels).filter(key=>!config[key]).map(key=>labels[key]);
     const statusText=missing.length
@@ -206,13 +206,13 @@ async function articlePage(slug){
 const a=(window.BAYAN_CONTENT?.articles||[]).find(x=>x.id===slug);
 const renderArticle=(k,isPersisted)=>{
   const section=k.section||"news";
-  const body=Array.isArray(k.body)?k.body:(String(k.body||"").split(/\n+/).filter(Boolean));
+  const body=(Array.isArray(k.body)?k.body:(String(k.body||"").split(/\n+/).filter(Boolean))).map(x=>String(x||"").replace(/�+/g,"").replace(/[\u0000-\u001F\u007F]/g," ").replace(/\\u([0-9a-fA-F]{4})/g,(_,h)=>String.fromCharCode(parseInt(h,16))).trim()).filter(Boolean);
   const saved=(()=>{try{return JSON.parse(localStorage.getItem("bayan:saved-articles")||"[]").includes(k.id||slug)}catch{return false}})();
   const related=(window.BAYAN_CONTENT?.articles||[]).filter(x=>x.section===section&&x.id!==(k.id||slug)).slice(0,3);
   const sources=Array.isArray(k.sources)?k.sources:[];
   const sourceHtml=sources.length?"<section class=\"card article-sources\"><h2>المصادر المستخدمة</h2><p class=\"muted\">المصادر التالية استُخدمت للتحقق وبناء المقال، وليست بديلًا عن متن المقال.</p><ol>"+sources.slice(0,8).map(s=>"<li>"+escHtml(s.source||s.title||"مصدر")+(s.date?" · "+escHtml(s.date):"")+"</li>").join("")+"</ol></section>":"";
   const sourceLabel=isPersisted?"مقال معرفة محفوظ داخل بيان":"مقال معرفي في بيان";
-  const actions='<div class="actions article-actions"><button class="secondary" type="button" data-bayan-save="'+escHtml(k.id||slug)+'">'+(saved?"★ محفوظ":"☆ حفظ المقال")+'</button><button class="secondary" type="button" data-bayan-share="'+escHtml(k.title||"مقال بيان")+'">↗ مشاركة</button></div>';
+  const actions='<div class="actions article-actions"><button class="secondary" type="button" data-bayan-save="'+escHtml(k.id||slug)+'">'+(saved?"محفوظ":"حفظ المقال")+'</button><button class="secondary" type="button" data-bayan-share="'+escHtml(k.title||"مقال بيان")+'">مشاركة</button></div>';
   const relatedHtml=related.length?'<div class="section-head"><div><h2>اقرأ أيضًا</h2><p>مواد مرتبطة من نفس المجال.</p></div></div><div class="grid">'+related.map(x=>'<a class="card article-card" href="'+withLang("/article/"+x.id)+'"><span class="article-section">'+sectionIcon(x.section)+(window.BAYAN_CONTENT?.sectionMeta?.[x.section]||x.section)+'</span><h3>'+escHtml(x.title)+'</h3><p>'+escHtml(x.summary)+'</p></a>').join("")+'</div>':"";
   const heroImage=k.image?'<img loading="eager" class="news-image article-hero-image" src="'+escHtml(k.image)+'" alt="" referrerpolicy="no-referrer">':"";
   const articleHtml=body.map(line=>{
