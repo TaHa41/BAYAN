@@ -1011,6 +1011,7 @@ const evidenceFallbackAnswer = (query: string, results: any[]) => {
 const internalSearch = async (query: string, env: Env) => {
   const language = /[\u0600-\u06FF]/.test(query) ? "ar" : "en";
   const providers = [
+    env.AI_SEARCH ? "cloudflare_ai_search" : null,
     env.SEARCH_API_KEY ? "serpapi" : null,
     env.AI?.websearch ? "cloudflare_web_search" : null,
     "google_news_rss",
@@ -1020,6 +1021,20 @@ const internalSearch = async (query: string, env: Env) => {
 
   const tasks = providers.map(async (provider) => {
     try {
+      if (provider === "cloudflare_ai_search") {
+        const raw = await cloudflareKnowledgeSearch(env, query);
+        const chunks = Array.isArray(raw?.chunks) ? raw.chunks : [];
+        return chunks.slice(0, 8).map((item: any, index: number) => ({
+          rank: index + 1,
+          provider: "cloudflare_ai_search",
+          title: cleanText(item?.item?.key || item?.item?.metadata?.title || "BAYAN Knowledge", 220),
+          source: cleanText(item?.item?.metadata?.source || item?.item?.key || "BAYAN Knowledge", 160),
+          date: item?.item?.timestamp ? new Date(Number(item.item.timestamp) * 1000).toISOString() : null,
+          snippet: cleanText(item?.text, 900),
+          url: typeof item?.item?.key === "string" && /^https?:\/\//i.test(item.item.key) ? item.item.key : null,
+          score: typeof item?.score === "number" ? item.score : null
+        })).filter((x: any) => x.title && x.snippet);
+      }
       if (provider === "serpapi") {
         const endpoint = "https://serpapi.com/search.json?engine=google&hl=en&gl=eg&safe=active&num=8&q=" +
           encodeURIComponent(query) + "&api_key=" + encodeURIComponent(env.SEARCH_API_KEY || "");
@@ -1531,8 +1546,8 @@ export default {
 
         const prompt = shouldSearch && results.length
           ? evidencePrompt(language, input, results)
-          : "BAYAN knowledge answer.\nLanguage: " + language + "\nUser request: " + input +
-            "\nNo live search evidence was available for this request. Answer from the model's general knowledge only when you are confident. Clearly distinguish established knowledge from uncertainty, do not invent citations or claim that live verification occurred, and say Insufficient Evidence when the question requires current or source-specific verification.";
+          : "BAYAN general answer.\nLanguage: " + language + "\nUser request: " + input +
+            "\nNo live search evidence was available. For knowledge, analysis, coding, writing, mathematics, logic, and explanations, answer from general model knowledge when appropriate and state uncertainty when needed. Do not invent citations or claim that live verification occurred. For current, source-specific, or otherwise verification-dependent questions, say Insufficient Evidence if reliable evidence is unavailable.";
         let response: Response | null = null;
         let openaiFailure: string | null = null;
         let cloudflareFailure: string | null = null;
@@ -1545,7 +1560,7 @@ export default {
           }
         } else {
           const result = await cloudflareAiRun(env, DEFAULT_CLOUDFLARE_AI_MODEL, [
-            { role: "system", content: "You are BAYAN AI. Be neutral, evidence-first, explicit about uncertainty, and never fabricate. Use only the supplied evidence." },
+            { role: "system", content: "You are BAYAN AI. Be neutral, useful, explicit about uncertainty, and never fabricate. When verified evidence is supplied, use only that evidence for factual claims. When no evidence is supplied, you may answer general knowledge, reasoning, coding, writing, mathematics, and explanations without pretending they were live-verified. Never invent citations." },
             { role: "user", content: "Mode: " + (body.mode || "knowledge") + "\n" + prompt }
           ]);
           const aiAnswer = textOf(result);
@@ -1575,7 +1590,7 @@ export default {
           if (env.AI) {
             try {
               const result = await cloudflareAiRun(env, DEFAULT_CLOUDFLARE_AI_MODEL, [
-                { role: "system", content: "You are BAYAN AI. Be neutral, evidence-first, explicit about uncertainty, and never fabricate. Use only the supplied evidence." },
+                { role: "system", content: "You are BAYAN AI. Be neutral, useful, explicit about uncertainty, and never fabricate. When verified evidence is supplied, use only that evidence for factual claims. When no evidence is supplied, you may answer general knowledge, reasoning, coding, writing, mathematics, and explanations without pretending they were live-verified. Never invent citations." },
                 { role: "user", content: "Mode: " + (body.mode || "knowledge") + "\n" + prompt }
               ]);
               const aiAnswer = textOf(result);
