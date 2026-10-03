@@ -132,7 +132,7 @@ const renderHtml = async (response: Response, requestUrl: URL) => {
   const alternateAr = requestUrl.origin + cleanPath;
   const alternateEn = requestUrl.origin + cleanPath + "?lang=en";
   html = html.replace('<html lang="ar" dir="rtl">', '<html lang="' + language + '" dir="' + direction + '">');
-  const indexable = !cleanPath.startsWith("/search") && !cleanPath.startsWith("/ai");
+  const indexable = !cleanPath.startsWith("/search") && !cleanPath.startsWith("/ai") && !cleanPath.startsWith("/saved");
   const robots = indexable ? "index,follow" : "noindex,follow";
   const jsonLd = JSON.stringify({
     "@context": "https://schema.org",
@@ -840,7 +840,7 @@ const runRuntimeAudit = async (env: Env) => {
     if (!response.ok) throw new Error("assets_http_" + response.status);
     return { status: response.status };
   });
-  const publicRoutes = ["/", "/egypt", "/arab", "/world", "/science", "/economy", "/politics", "/technology", "/health", "/history-culture", "/people", "/sports", "/travel", "/arts", "/news", "/trending", "/prices", "/about", "/methodology", "/privacy", "/terms", "/contact", "/contribute", "/review"];
+  const publicRoutes = ["/", "/egypt", "/arab", "/world", "/science", "/economy", "/politics", "/technology", "/health", "/history-culture", "/people", "/sports", "/travel", "/arts", "/news", "/trending", "/prices", "/about", "/methodology", "/privacy", "/terms", "/contact", "/contribute", "/review", "/ai", "/saved"];
   for (const route of publicRoutes) {
     await check("page:" + route, async () => {
       if (!env.ASSETS) throw new Error("assets_binding_missing");
@@ -1242,7 +1242,12 @@ export default {
           news: !!env.GNEWS_API_KEY,
           gold: !!env.GOLD_API_KEY,
           maps: !!env.GOOGLE_MAPS_API_KEY,
-          images: true
+          images: true,
+          pwa: true,
+          savedArticles: true,
+          selfHealing: true,
+          runtimeAudit: true,
+          sourceAwareAI: true
         },
         rule: "Every generated answer must be evidence-first; insufficient evidence is surfaced instead of fabricated."
       });
