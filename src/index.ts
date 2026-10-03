@@ -2083,6 +2083,29 @@ export default {
       } catch { return json({ status: "invalid_request" }, 400); }
     }
 
+    if (path === "/api/requests/review" && request.method === "GET") {
+      if(!managerAuthorized(request,env)) return json({status:"forbidden",error:managerAuthError(env)},403);
+      if(!env.DB||!await ensureUserFeatureTables(env)) return json({status:"database_unavailable"},503);
+      const status=cleanText(url.searchParams.get("status"),40)||"PENDING_REVIEW";
+      try { const result=await env.DB.prepare("SELECT id,visitor_id,request_type,title,body,source,status,created_at,updated_at FROM user_requests WHERE status=? ORDER BY created_at DESC LIMIT 100").bind(status).all(); return json({status:"ok",items:result.results||[],count:(result.results||[]).length}); }
+      catch { return json({status:"database_error",items:[]},503); }
+    }
+    if (path === "/api/requests/review" && request.method === "POST") {
+      if(!managerAuthorized(request,env)) return json({status:"forbidden",error:managerAuthError(env)},403);
+      if(!env.DB||!await ensureUserFeatureTables(env)) return json({status:"database_unavailable"},503);
+      try {
+        const body=await request.json() as {id?:number;status?:string;note?:string};
+        const id=Number(body.id), status=["PENDING_REVIEW","IN_PROGRESS","RESOLVED","REJECTED","NEEDS_MORE_INFO"].includes(String(body.status))?String(body.status):"";
+        if(!Number.isInteger(id)||id<1||!status) return json({status:"invalid_review"},400);
+        const current=await env.DB.prepare("SELECT id,title,request_type FROM user_requests WHERE id=?").bind(id).first() as any;
+        if(!current) return json({status:"request_not_found"},404);
+        const now=new Date().toISOString();
+        await env.DB.prepare("UPDATE user_requests SET status=?,updated_at=? WHERE id=?").bind(status,now,id).run();
+        if(status==="RESOLVED"||status==="REJECTED") await sendBayanOwnerNotification(env,"تحديث طلب في بيان","الطلب رقم "+id+" ("+String(current.request_type)+") أصبح "+status+"\n\nالعنوان: "+String(current.title));
+        return json({status:"ok",id,requestStatus:status});
+      } catch { return json({status:"invalid_request"},400); }
+    }
+
     if (path === "/api/contributions/review" && request.method === "GET") {
       if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
       if (!await ensureContributionTable(env)) return json({ status: "database_unavailable" }, 503);
