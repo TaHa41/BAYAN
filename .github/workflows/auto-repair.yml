@@ -1,0 +1,64 @@
+name: BAYAN Auto Repair
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["BAYAN Guardian"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: bayan-auto-repair
+  cancel-in-progress: true
+
+jobs:
+  repair:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'failure' && vars.BAYAN_AUTO_REPAIR == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install
+        run: npm install
+      - name: Reproduce failure
+        env:
+          BAYAN_URL: https://bayan.tahaomar411.workers.dev
+          BAYAN_BASE_URL: https://bayan.tahaomar411.workers.dev
+        run: |
+          node scripts/production-smoke.mjs > smoke.txt 2>&1 || true
+          node scripts/ai-capability-smoke.mjs > ai.txt 2>&1 || true
+          cat smoke.txt ai.txt > repair-context.txt
+      - name: Generate minimal patch
+        if: ${{ secrets.OPENAI_API_KEY != '' }}
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
+        run: node scripts/ai-source-repair.mjs
+      - name: Apply and validate patch
+        if: ${{ hashFiles('repair.patch') != '' }}
+        run: |
+          git apply --check repair.patch
+          git apply repair.patch
+          npm run check
+      - name: Open repair PR
+        if: ${{ hashFiles('repair.patch') != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch="bayan/auto-repair-$GITHUB_RUN_ID"
+          git checkout -b "$branch"
+          git config user.name "BAYAN Repair Bot"
+          git config user.email "bayan-repair-bot@users.noreply.github.com"
+          git add src/index.ts public/app.js public/index.html scripts
+          git diff --cached --quiet && exit 0
+          git commit -m "fix: automated BAYAN production repair"
+          git push --set-upstream origin "$branch"
+          gh pr create --repo "${{ github.repository }}" --base "main" --head "$branch" --title "BAYAN auto repair: production regression" --body "Automated repair proposal generated from production diagnostics. CI validation passed before opening this PR. Review before merging."
+      - name: Report unavailable auto repair
+        if: ${{ secrets.OPENAI_API_KEY == '' }}
+        run: echo "Auto source repair is installed but disabled until OPENAI_API_KEY is configured."
