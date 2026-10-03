@@ -7,7 +7,7 @@ describe("BAYAN platform", () => {
       BAYAN_ENVIRONMENT: "test", BAYAN_VERSION: "0.6.0", BAYAN_COMMIT_SHA: "test",
     });
     expect(response.status).toBe(200);
-    const body = await response.json() as { status: string; environment: string; version: string };
+    const body = await response.json() as unknown as { status: string; environment: string; version: string };
     expect(body.status).toBe("ok"); expect(body.environment).toBe("test"); expect(body.version).toBe("0.6.0");
   });
   it("keeps the legacy health alias working for the runtime audit", async () => {
