@@ -66,15 +66,16 @@ const safeRenderRoute=(routePath)=>{try{renderRoute(routePath);}catch(error){con
 const updateWisdom=()=>{const wisdom=window.BAYAN_CONTENT?.wisdom||[];const w=document.querySelector("#wisdom");if(!w)return;const i=wisdom.length?Math.floor(Date.now()/30000)%wisdom.length:0;w.textContent=wisdom.length?(isEn?(wisdom[i].en||wisdom[i].ar):wisdom[i].ar):"السؤال الجيد بداية معرفة أفضل.";};
 safeRenderRoute(path);
 window.setInterval(updateWisdom,30000);
-nav.addEventListener("click",(event)=>{
+document.addEventListener("click",(event)=>{
   const link=event.target.closest("a");
   if(!link)return;
   const href=link.getAttribute("href");
-  if(!href||!href.startsWith("/"))return;
+  if(!href||!href.startsWith("/")||href.startsWith("//")||link.hasAttribute("download")||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
   event.preventDefault();
   const u=new URL(href,location.origin);
   history.pushState({}, "", u.pathname+u.search);
   safeRenderRoute(u.pathname.replace(/^\//,"").replace(/\/$/,""));
+  window.scrollTo({top:0,behavior:"smooth"});
 });
 window.addEventListener("popstate",()=>safeRenderRoute(location.pathname.replace(/^\//,"").replace(/\/$/,"")));
 if(localStorage.getItem("bayan-theme")==="light")document.body.classList.add("light");document.querySelector("#theme")?.addEventListener("click",()=>{document.body.classList.toggle("light");localStorage.setItem("bayan-theme",document.body.classList.contains("light")?"light":"dark")});document.querySelector("#language")?.addEventListener("click",()=>{const u=new URL(location.href);u.searchParams.set("lang",isEn?"ar":"en");location.href=u});document.querySelector("#year").textContent=new Date().getFullYear()})();
