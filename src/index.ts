@@ -126,7 +126,7 @@ export default {
           externalLinksToVisitors: false,
           evidenceFirst: true,
           insufficientEvidenceAllowed: true,
-          secretsServerOnly: true
+          sensitiveConfigServerOnly: true
         }
       });
     }
@@ -404,7 +404,8 @@ export default {
     if (path === "/api/markets") {
       const base = (url.searchParams.get("base") || "USD").toUpperCase();
       const quote = (url.searchParams.get("quote") || "EGP").toUpperCase();
-      if (!/^[A-Z]{3}$/.test(base) || !/^[A-Z]{3}$/.test(quote)) return json({ status: "invalid_currency" }, 400);
+      const supportedCurrencies = new Set(["USD", "EGP", "EUR", "GBP", "SAR", "AED"]);
+      if (!supportedCurrencies.has(base) || !supportedCurrencies.has(quote)) return json({ status: "invalid_currency" }, 400);
       try {
         const response = await fetch("https://api.frankfurter.app/latest?from=" + base + "&to=" + quote);
         if (!response.ok) return json({ status: "source_error", source: "Frankfurter" }, 502);
