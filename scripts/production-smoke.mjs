@@ -1,29 +1,22 @@
 const base=(process.env.BAYAN_URL||"https://bayan.tahaomar411.workers.dev").replace(/\/$/,"");
 const checks=[
-  ["/","text/html"],
-  ["/health","application/json"],
-  ["/api/features","application/json"],
-  ["/api/search?q=ما%20هو%20بيان&lang=ar","application/json"],
-  ["/api/markets?base=USD&quote=EGP","application/json"],
-  ["/api/weather?city=Cairo","application/json"],
-  ["/sitemap.xml","application/xml"],
-  ["/robots.txt","text/plain"]
+  ["/","text/html"],["/health","application/json"],["/api/features","application/json"],
+  ["/egypt","text/html"],["/science","text/html"],["/technology","text/html"],["/news","text/html"],
+  ["/prices","text/html"],["/search","text/html"],["/sitemap.xml","application/xml"],["/robots.txt","text/plain"]
 ];
-const failures=[];
-const results=[];
+let failed=0;
 for(const [path,type] of checks){
   try{
-    const r=await fetch(base+path,{redirect:"follow",cache:"no-store"});
-    const contentType=r.headers.get("content-type")||"";
-    const text=await r.text();
-    const ok=r.ok && contentType.includes(type);
-    results.push({path,status:r.status,contentType,ok});
-    if(!ok) failures.push({path,status:r.status,contentType,body:text.slice(0,300)});
-  }catch(error){
-    failures.push({path,error:String(error)});
-    results.push({path,status:0,ok:false});
-  }
+    const res=await fetch(base+path,{redirect:"follow"});
+    const body=await res.text();
+    const ct=res.headers.get("content-type")||"";
+    const html=type==="text/html";
+    const nonblank=body.trim().length>0;
+    const notError=!html||(!/Internal Server Error|Unhandled exception|Cannot read properties|undefined is not/i.test(body));
+    const ok=res.ok&&nonblank&&ct.includes(type.split(";")[0])&&notError;
+    console.log(`${ok?"PASS":"FAIL"} ${res.status} ${path} bytes=${body.length} type=${ct}`);
+    if(!ok)failed++;
+  }catch(e){console.log(`FAIL ${path} ${e.message}`);failed++;}
 }
-const html=results.find(x=>x.path==="/");
-console.log(JSON.stringify({base,checkedAt:new Date().toISOString(),ok:failures.length===0,results,failures},null,2));
-if(failures.length) process.exit(1);
+if(failed){console.error(`Production smoke failed: ${failed}`);process.exit(1);}
+console.log("Production smoke passed.");
