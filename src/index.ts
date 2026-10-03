@@ -170,8 +170,17 @@ const textOf = (d: any) => {
   return joined.trim() || "Insufficient Evidence";
 };
 
+const normalizeGeneratedText = (value: unknown) => String(value ?? "")
+  .replace(/�+/g, "")
+  .replace(/\\u([0-9a-fA-F]{4})/g, (_m, hex) => String.fromCharCode(parseInt(hex, 16)))
+  .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ")
+  .replace(/[ \t]+/g, " ")
+  .replace(/^[#*_]+\s*/g, "")
+  .replace(/\s+([،؛:.!?؟])/g, "$1")
+  .trim();
+
 const cleanText = (value: unknown, max = 900) =>
-  String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
+  normalizeGeneratedText(value).slice(0, max);
 
 const withoutUrl = (item: any) => {
   const { url: _url, ...rest } = item;
@@ -693,8 +702,10 @@ const generateKnowledgeArticle = async (env: Env, language: string, query: strin
   const evidence = await buildArticleEvidence(env, results);
   if (!evidence.trim()) return null;
   const prompt = [
-    "BAYAN — اكتب مقال معرفة أصليًا كاملًا، وليس قائمة نتائج بحث أو تجميع عناوين.",
+    "BAYAN — اكتب مقال معرفة أصليًا كاملًا يجيب عن سؤال القارئ مباشرة، وليس قائمة نتائج بحث أو تجميع عناوين.",
     "اللغة: " + language,
+    "السؤال الذي يجب أن يجيب عنه المقال هو: " + query,
+    "ابدأ من الإجابة الأساسية على السؤال بوضوح، ثم اشرح التفاصيل والسياق. لا تجعل القارئ يستنتج الإجابة من المقتطفات بنفسه.",
     "الموضوع: " + query,
     "",
     "قواعد إلزامية:",
@@ -709,7 +720,11 @@ const generateKnowledgeArticle = async (env: Env, language: string, query: strin
     "9) لا تنسخ أي نص من المصادر حرفيًا، ولا تخترع أسماء أو تواريخ أو أرقام أو اقتباسات أو مصادر.",
     "10) لا تضع قسم Sources داخل النص؛ المصادر ستُعرض تلقائيًا أسفل المقال.",
     "11) لا تكتب عبارات مثل: وفقًا لنتيجة بحث، المصدر الأول، المصدر الثاني. استخدم أسماء المصادر فقط عند الحاجة لتوضيح اختلاف أو إسناد معلومة.",
-    "12) أعد نص المقال فقط، دون JSON ودون شرح للتعليمات."
+    "12) أعد نص المقال فقط، دون JSON ودون شرح للتعليمات.",
+    "13) يجب أن تكون كل فقرة مكتملة ومترابطة، وألا تكون مجرد إعادة صياغة لعنوان أو مقتطف مصدر.",
+    "14) لا تستخدم رموزًا زخرفية أو إيموجي أو علامات غير ضرورية داخل المقال. استخدم العربية وعلامات الترقيم الطبيعية فقط.",
+    "15) إذا كان السؤال مباشرًا، يجب أن تحتوي المقدمة على إجابة مباشرة ومفهومة، ثم يأتي التفصيل.",
+    "16) لا تضع عبارات افتتاحية عامة مثل: هذا المقال يتناول، أو فيما يلي، إذا كان يمكن البدء بالإجابة نفسها."
   ].join("\n");
   try {
     let text = "";
@@ -729,7 +744,7 @@ const generateKnowledgeArticle = async (env: Env, language: string, query: strin
       } catch {}
     }
     if (!text || text === "Insufficient Evidence") return buildEvidenceArticleFallback(query, results);
-    const lines = text.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+    const lines = text.split(/\r?\n/).map((x) => normalizeGeneratedText(x)).filter(Boolean);
     const title = cleanText((lines[0] || query).replace(/^#+\s*/, ""), 240);
     const body = lines.slice(1).filter((x) => !/^(المصادر|sources)\s*:??$/i.test(x));
     const summaryIndex = body.findIndex((x) => !/^#{1,6}\s/.test(x) && !/^[-*]\s/.test(x));
