@@ -40,11 +40,33 @@ document.querySelector("#refreshLive").onclick=liveDataHome; liveDataHome();
 }
 async function recommendations(){const box=document.querySelector("#personalizedGrid");if(!box)return;try{const local=JSON.parse(localStorage.getItem("bayan:interests")||"{}");const localSections=Object.entries(local).sort((a,b)=>Number(b[1])-Number(a[1])).map(x=>x[0]);const rr=await fetch("/api/recommendations?visitorId="+encodeURIComponent(visitorId));const dd=await rr.json();const serverItems=Array.isArray(dd.articles)?dd.articles:[];const staticItems=Array.isArray(window.BAYAN_CONTENT?.articles)?window.BAYAN_CONTENT.articles.filter(a=>localSections.includes(a.section)).sort((a,b)=>localSections.indexOf(a.section)-localSections.indexOf(b.section)):[];const seen=new Set(),items=[...serverItems,...staticItems].filter(a=>{const id=a.id||a.slug;if(!id||seen.has(id))return false;seen.add(id);return true;});if(!items.length){box.innerHTML='<article class="card"><h3>لم نعرف اهتماماتك بعد</h3><p class="muted">تصفح الأقسام التي تهمك، وسيبني بيان اقتراحاتك تدريجيًا.</p></article>';return;}box.innerHTML=items.slice(0,6).map(a=>'<a class="card article-card" href="'+withLang("/article/"+(a.id||a.slug))+'"><h3>'+escapeHtml(a.title)+'</h3><p>'+escapeHtml(a.summary)+'</p></a>').join("");}catch{box.innerHTML='<article class="card"><p class="muted">ستظهر اقتراحاتك بعد تفاعل إضافي مع الموقع.</p></article>';}}
 function reviewPage(){
-app.innerHTML='<section class="page"><div class="eyebrow">BAYAN REVIEW</div><h1 class="page-title">مراجعة مساهمات الزوار</h1><p class="page-lead">هذه الصفحة خاصة بإدارة بيان. أدخل مفتاح المراجعة لمشاهدة المساهمات التي أرسلها الزوار ولم تُنشر تلقائيًا.</p><div class="card"><label>مفتاح المراجعة<input id="reviewToken" class="select" type="password" placeholder="BAYAN manager token"></label><div class="actions"><button id="reviewLoad" class="primary" type="button">عرض المساهمات</button><button id="reviewTest" class="secondary" type="button">اختبار النظام وإرسال تقرير</button><button id="reviewStatus" class="secondary" type="button">فحص إعدادات النظام</button></div><p id="reviewState" class="muted"></p></div><div id="reviewList" class="grid"></div></section>';
+app.innerHTML='<section class="page"><div class="eyebrow">BAYAN REVIEW</div><h1 class="page-title">مراجعة مساهمات الزوار</h1><p class="page-lead">هذه الصفحة خاصة بإدارة بيان. أدخل مفتاح المراجعة لمشاهدة المساهمات التي أرسلها الزوار ولم تُنشر تلقائيًا.</p><div class="card"><label>مفتاح المراجعة<input id="reviewToken" class="select" type="password" placeholder="BAYAN manager token"></label><div class="actions"><button id="reviewLoad" class="primary" type="button">عرض المساهمات</button><button id="reviewTest" class="secondary" type="button">اختبار النظام وإرسال تقرير</button><button id="reviewStatus" class="secondary" type="button">فحص إعدادات النظام</button><button id="telegramSetup" class="secondary" type="button">ربط Telegram واستخراج CHAT_ID</button><button id="telegramTest" class="secondary" type="button">اختبار Telegram</button></div><p id="reviewState" class="muted"></p></div><div id="reviewList" class="grid"></div></section>';
 const token=document.querySelector("#reviewToken"),state=document.querySelector("#reviewState"),list=document.querySelector("#reviewList");
 try{const saved=sessionStorage.getItem("bayan:review-token");if(saved)token.value=saved;}catch{}
 async function load(){const t=token.value.trim();if(!t){state.textContent="أدخل مفتاح المراجعة.";return;}try{sessionStorage.setItem("bayan:review-token",t);}catch{}state.textContent="جارٍ تحميل المساهمات…";try{const r=await fetch("/api/contributions/review",{headers:{authorization:"Bearer "+t}}),d=await r.json();if(!r.ok){state.textContent="مفتاح المراجعة غير صحيح أو خدمة الإدارة غير متاحة. استخدم BAYAN_AI_MANAGER_TOKEN وليس RESEND_API_KEY.";list.innerHTML="";return;}state.textContent="عدد المساهمات قيد المراجعة: "+(d.count||0);list.innerHTML=(d.items||[]).map(x=>'<article class="card"><span class="number">#'+escapeHtml(x.id)+' · '+escapeHtml(x.status)+'</span><h3>'+escapeHtml(x.title)+'</h3><p>'+escapeHtml(x.body)+'</p>'+(x.source?'<p class="muted">المصدر: '+escapeHtml(x.source)+'</p>':"")+'<small>'+escapeHtml(x.created_at||"")+'</small><div class="actions"><button class="secondary review-action" data-id="'+escapeHtml(x.id)+'" data-status="VERIFIED">تم التحقق</button><button class="secondary review-action" data-id="'+escapeHtml(x.id)+'" data-status="NEEDS_MORE_INFO">تحتاج معلومات</button><button class="secondary review-action" data-id="'+escapeHtml(x.id)+'" data-status="REJECTED">رفض</button></div></article>').join("")||'<article class="card"><h3>لا توجد مساهمات جديدة</h3><p class="muted">عندما يرسل شخص معلومة ستظهر هنا بحالة PENDING_REVIEW.</p></article>';}catch{state.textContent="تعذر الاتصال بخدمة المراجعة."}}
 document.querySelector("#reviewLoad").onclick=load;
+document.querySelector("#telegramSetup").onclick=async()=>{
+  const t=token.value.trim();
+  if(!t){state.textContent="أدخل BAYAN_AI_MANAGER_TOKEN أولًا.";return;}
+  state.textContent="جارٍ البحث عن محادثة Telegram…";
+  try{
+    const r=await fetch("/api/ai/manager/telegram/setup",{headers:{authorization:"Bearer "+t}});
+    const d=await r.json();
+    if(!r.ok){state.textContent="تعذر الوصول لإعداد Telegram.";return;}
+    if(d.chatId) state.textContent="تم العثور على CHAT_ID: "+d.chatId+" — احفظه الآن في Cloudflare Secret باسم TELEGRAM_CHAT_ID.";
+    else state.textContent="لم أجد رسالة Telegram بعد. افتح البوت واضغط Start وأرسل /start ثم جرّب الزر مرة أخرى.";
+  }catch{state.textContent="تعذر الاتصال بإعداد Telegram."}
+};
+document.querySelector("#telegramTest").onclick=async()=>{
+  const t=token.value.trim();
+  if(!t){state.textContent="أدخل BAYAN_AI_MANAGER_TOKEN أولًا.";return;}
+  state.textContent="جارٍ إرسال اختبار Telegram…";
+  try{
+    const r=await fetch("/api/ai/manager/telegram/test",{method:"POST",headers:{authorization:"Bearer "+t}});
+    const d=await r.json();
+    state.textContent=d.delivered?"تم إرسال رسالة اختبار Telegram بنجاح.":"فشل إرسال Telegram: "+(d.error||"تأكد من TELEGRAM_CHAT_ID.");
+  }catch{state.textContent="تعذر الاتصال باختبار Telegram."}
+};
 document.querySelector("#reviewTest").onclick=async()=>{
   const t=token.value.trim();
   if(!t){state.textContent="أدخل BAYAN_AI_MANAGER_TOKEN أولًا. لا تستخدم RESEND_API_KEY هنا.";return;}
