@@ -45,3 +45,11 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/production-smoke.mjs
+      - name: BAYAN AI capability benchmark
+        if: steps.credentials.outputs.configured == 'true'
+        shell: bash
+        env:
+          BAYAN_BASE_URL: https://bayan.tahaomar411.workers.dev
+        run: |
+          set -euo pipefail
+          node scripts/ai-capability-smoke.mjs
