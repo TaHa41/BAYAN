@@ -1754,7 +1754,7 @@ export default {
 
     if (path === "/api/tools") {
       return json({
-        tools: ["search", "knowledge-search", "evidence-synthesis", "news", "gold", "maps", "image-search", "article", "summary", "verification", "repair", "live-weather", "live-fx", "ads", "ai", "ai-gateway", "browser-audit"],
+        tools: ["search", "knowledge-search", "evidence-synthesis", "news", "gold", "maps", "image-search", "article", "summary", "verification", "repair", "repair-skills", "live-weather", "live-fx", "ads", "ai", "ai-gateway", "web-search-fallback", "browser-audit"],
         providers: {
           openai: !!env.OPENAI_API_KEY,
           search: !!env.SEARCH_API_KEY,
@@ -1764,6 +1764,10 @@ export default {
           maps: !!env.GOOGLE_MAPS_API_KEY
         },
         model: env.OPENAI_MODEL ?? DEFAULT_OPENAI_MODEL,
+        searchProvider: env.SEARCH_PROVIDER?.trim().toLowerCase() || DEFAULT_SEARCH_PROVIDER,
+        searchProviderChain: [env.SEARCH_PROVIDER?.trim().toLowerCase() || DEFAULT_SEARCH_PROVIDER, ...SEARCH_PROVIDER_CHAIN]
+          .filter((x, i, a) => SEARCH_PROVIDER_CHAIN.includes(x) && a.indexOf(x) === i),
+        aiSearchInstance: env.AI_SEARCH_INSTANCE?.trim() || DEFAULT_AI_SEARCH_INSTANCE,
         policy: {
           externalLinksToVisitors: false,
           evidenceFirst: true,
@@ -1784,6 +1788,56 @@ export default {
           sectionTop: env.ADSENSE_SLOT_SECTION_TOP || null,
           article: env.ADSENSE_SLOT_ARTICLE || null,
           homeBottom: env.ADSENSE_SLOT_HOME_BOTTOM || null
+        }
+      });
+    }
+
+    if (path === "/api/diagnostics") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      let lastAudit: any = null;
+      try {
+        if (env.DB) {
+          lastAudit = await env.DB.prepare(
+            "SELECT checked_at, healthy, details_json FROM runtime_audits ORDER BY checked_at DESC LIMIT 1"
+          ).first<any>();
+        }
+      } catch {}
+      return json({
+        status: "ok",
+        service: "BAYAN",
+        environment: env.BAYAN_ENVIRONMENT || "unknown",
+        version: env.BAYAN_VERSION || "0.8.0",
+        commit: env.BAYAN_COMMIT_SHA || "unknown",
+        capabilities: {
+          assets: !!env.ASSETS,
+          database: !!env.DB,
+          workersAI: !!env.AI,
+          aiSearch: !!env.AI_SEARCH,
+          browser: !!env.BROWSER,
+          openAI: !!env.OPENAI_API_KEY,
+          webSearch: !!env.AI?.websearch,
+          wikimediaEnterprise: !!env.WIKIMEDIA_ENTERPRISE_TOKEN,
+          telegram: !!env.TELEGRAM_BOT_TOKEN
+        },
+        ai: {
+          primaryModel: env.OPENAI_MODEL?.trim() || DEFAULT_OPENAI_MODEL,
+          fallbackModels: OPENAI_FALLBACK_MODELS,
+          cloudflarePrimary: DEFAULT_CLOUDFLARE_AI_MODEL,
+          cloudflareFallbacks: CLOUDFLARE_AI_FALLBACK_MODELS,
+          searchProviderChain: [env.SEARCH_PROVIDER?.trim().toLowerCase() || DEFAULT_SEARCH_PROVIDER, ...SEARCH_PROVIDER_CHAIN]
+            .filter((x, i, a) => SEARCH_PROVIDER_CHAIN.includes(x) && a.indexOf(x) === i),
+          aiSearchInstance: env.AI_SEARCH_INSTANCE?.trim() || DEFAULT_AI_SEARCH_INSTANCE
+        },
+        lastRuntimeAudit: lastAudit ? {
+          checkedAt: lastAudit.checked_at,
+          healthy: Number(lastAudit.healthy) === 1,
+          details: (() => { try { return JSON.parse(lastAudit.details_json || "[]"); } catch { return []; } })()
+        } : null,
+        repairPolicy: {
+          runtimeOnly: true,
+          sourceCodeMutationAllowed: false,
+          destructiveActionsAllowed: false,
+          humanReviewRequiredForCodeChanges: true
         }
       });
     }
