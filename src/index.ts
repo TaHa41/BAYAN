@@ -817,8 +817,47 @@ export default {
       const id = Number(body.id);
       const status = ["PENDING_REVIEW","VERIFIED","REJECTED","NEEDS_MORE_INFO"].includes(String(body.status)) ? String(body.status) : "";
       if (!Number.isInteger(id) || id < 1 || !status) return json({ status: "invalid_review" }, 400);
-      await env.DB.prepare("UPDATE visitor_contributions SET status=?, reviewer_note=?, reviewed_at=? WHERE id=?").bind(status, cleanText(body.note, 1000) || null, new Date().toISOString(), id).run();
-      return json({ status: "updated", id, moderation: status });
+      const current = await env.DB.prepare("SELECT id, title, body, source, status FROM visitor_contributions WHERE id=?").bind(id).first() as any;
+      if (!current) return json({ status: "contribution_not_found" }, 404);
+      const now = new Date().toISOString();
+      let publishedArticle: any = null;
+      if (status === "VERIFIED") {
+        const articleSlug = await slugForQuery(String(current.title) + "\n" + String(current.body));
+        const rawSource = cleanText(current.source, 500);
+        const source = rawSource ? {
+          source: rawSource,
+          domain: (() => { try { return new URL(rawSource).hostname; } catch { return rawSource; } })(),
+          url: /^https?:\/\//i.test(rawSource) ? rawSource : null,
+          date: null,
+          snippet: "مصدر قدمه أحد الزوار وتمت مراجعته داخل بيان."
+        } : {
+          source: "مساهمة زائر تمت مراجعتها داخل بيان",
+          domain: "BAYAN",
+          url: null,
+          date: null,
+          snippet: "معلومة مقدمة من المجتمع وتمت مراجعتها."
+        };
+        const article = {
+          slug: articleSlug,
+          query: String(current.title),
+          section: sectionForIntent(queryIntent(String(current.title) + " " + String(current.body)), String(current.title)),
+          title: cleanText(current.title, 240),
+          summary: cleanText(current.body, 500),
+          body: [cleanText(current.body, 6000)],
+          sources: [source],
+          createdAt: now
+        };
+        const persistence = await saveKnowledgeArticle(env, article);
+        if (!persistence.persisted) return json({ status: "database_unavailable", id, moderation: "PENDING_REVIEW" }, 503);
+        await refreshKnowledgeGraph(env, article);
+        publishedArticle = { id: articleSlug, section: article.section, title: article.title };
+      }
+      await env.DB.prepare("UPDATE visitor_contributions SET status=?, reviewer_note=?, reviewed_at=? WHERE id=?")
+        .bind(status, cleanText(body.note, 1000) || null, now, id).run();
+      if (status === "VERIFIED") {
+        await sendBayanEmail(env, "تم التحقق من مساهمة في بيان", "تمت مراجعة المساهمة رقم " + id + " ونشرها في قاعدة المعرفة.\n\nالعنوان: " + String(current.title) + "\n\nالمقالة: /article/" + publishedArticle.id);
+      }
+      return json({ status: "updated", id, moderation: status, article: publishedArticle });
     }
 
     if (path === "/api/knowledge") {
