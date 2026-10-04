@@ -67,6 +67,14 @@ jobs:
             exit 0
           fi
           echo "Deployment preconditions satisfied."
+      - name: Repair legacy contribution schema before migrations
+        if: steps.credentials.outputs.configured == 'true' && steps.source.outputs.current == 'true'
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.147.0"
+          command: d1 execute bayan-knowledge --remote --command "SELECT name FROM pragma_table_info('visitor_contributions') WHERE name IN ('reviewer_note','reviewed_at')" --json
       - name: Apply D1 migrations
         if: steps.credentials.outputs.configured == 'true' && steps.source.outputs.current == 'true'
         uses: cloudflare/wrangler-action@v4
