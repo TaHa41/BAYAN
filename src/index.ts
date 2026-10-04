@@ -2738,17 +2738,20 @@ export default {
       try {
         const body = await request.json() as any;
         const slug = cleanText(body?.slug, 240);
-        const imageUrl = cleanText(body?.imageUrl, 2000);
+        let imageUrl = cleanText(body?.imageUrl, 2000);
         if (!slug) return json({ status: "slug_required" }, 400);
         if (imageUrl && !/^https?:\/\//i.test(imageUrl)) return json({ status: "invalid_image_url" }, 400);
-        const article = await env.DB.prepare("SELECT slug,title,source_url FROM knowledge_articles WHERE slug=?").bind(slug).first<any>();
+        const article = await env.DB.prepare("SELECT slug,title,source_url,hero_image_url FROM knowledge_articles WHERE slug=?").bind(slug).first<any>();
         if (!article) return json({ status: "article_not_found" }, 404);
+        let imageMeta: any = null;
+        if (body?.auto === true) imageMeta = await chooseNewsImage(String(article.title), String(article.source_url || ""), null, "BAYAN editorial image");
+        if (body?.auto === true && imageMeta?.url) imageUrl = imageMeta.url;
         const now = new Date().toISOString();
         const clear = !imageUrl;
         await env.DB.prepare("UPDATE knowledge_articles SET hero_image_url=?,hero_image_alt=?,hero_image_credit=?,hero_image_source=?,hero_image_license=?,hero_image_status=?,updated_at=? WHERE slug=?")
-          .bind(clear ? null : imageUrl, clear ? null : cleanText(body?.alt || article.title,240), clear ? null : cleanText(body?.credit || "Manager selected",160), clear ? null : cleanText(body?.sourceUrl || article.source_url || "",2000) || null, clear ? null : cleanText(body?.license || "",160) || null, clear ? "NONE" : cleanText(body?.rightsStatus || "manager_verified",40), now, slug).run();
+          .bind(clear ? null : imageUrl, clear ? null : cleanText(body?.alt || imageMeta?.alt || article.title,240), clear ? null : cleanText(body?.credit || imageMeta?.credit || "Manager selected",160), clear ? null : cleanText(body?.sourceUrl || imageMeta?.sourceUrl || article.source_url || "",2000) || null, clear ? null : cleanText(body?.license || imageMeta?.license || "",160) || null, clear ? "NONE" : cleanText(body?.rightsStatus || imageMeta?.rightsStatus || "manager_verified",40), now, slug).run();
         await sendBayanOwnerNotification(env, clear ? "تمت إزالة صورة مقال" : "تم تحديث صورة مقال في بيان", "المقال: " + slug + (clear ? "\nتمت إزالة الصورة الرئيسية." : "\nتم تعيين صورة رئيسية جديدة."));
-        return json({ status: "ok", slug, image: clear ? null : imageUrl });
+        return json({ status: "ok", slug, image: clear ? null : imageUrl, imageMeta: imageMeta || null });
       } catch (error) { return json({ status: "invalid_request", error: safeErrorMessage(error) }, 400); }
     }
 
