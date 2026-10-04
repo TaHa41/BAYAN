@@ -1975,6 +1975,7 @@ export default {
     }
 
     if (path === "/api/search/compare" && request.method === "GET") {
+      if (!allowRequest(request, 30)) return json({ status: "rate_limited" }, 429);
       const q=cleanText(url.searchParams.get("q"),500);
       const lang=(url.searchParams.get("lang")||"ar").toLowerCase()==="en"?"en":"ar";
       if(!q) return json({status:"empty_query",sources:[]});
@@ -1993,6 +1994,7 @@ export default {
     }
 
     if (path === "/api/search/article") {
+      if (!allowRequest(request, 10)) return json({ status: "rate_limited" }, 429);
       const q = cleanText(url.searchParams.get("q"), 500);
       const rank = Math.max(1, Math.min(16, Number(url.searchParams.get("rank") || 1)));
       const lang = (url.searchParams.get("lang") || "ar").toLowerCase() === "en" ? "en" : "ar";
@@ -2012,6 +2014,7 @@ export default {
       return json({ status: "ok", query: q, section, persisted: persistence.persisted, article: { id: slug, title: article.title, summary: article.summary, body: article.body, source: article.sources[0]?.source || "BAYAN evidence", date: article.sources[0]?.date || null, rank } });
     }
     if (path === "/api/trending/article") {
+      if (!allowRequest(request, 10)) return json({ status: "rate_limited" }, 429);
       try {
         const title = cleanText(url.searchParams.get("title"), 500);
         const sourceUrl = cleanText(url.searchParams.get("url"), 2000);
@@ -2977,6 +2980,7 @@ export default {
     }
 
     if (path === "/api/markets") {
+      if (!allowRequest(request, 30)) return json({ status: "rate_limited" }, 429);
       const base = (url.searchParams.get("base") || "USD").toUpperCase();
       const quote = (url.searchParams.get("quote") || "EGP").toUpperCase();
       const supportedCurrencies = new Set(["USD", "EGP", "EUR", "GBP", "SAR", "AED"]);
