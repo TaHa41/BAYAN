@@ -125,6 +125,17 @@ const token=document.querySelector("#reviewToken"),state=document.querySelector(
 try{const saved=sessionStorage.getItem("bayan:review-token");if(saved)token.value=saved;}catch{}
 async function load(){const t=token.value.trim();if(!t){state.textContent="أدخل مفتاح المراجعة.";return;}try{sessionStorage.setItem("bayan:review-token",t);}catch{}state.textContent="جارٍ تحميل المساهمات…";try{const r=await fetch("/api/contributions/review",{headers:{authorization:"Bearer "+t}}),d=await r.json();if(!r.ok){state.textContent="مفتاح المراجعة غير صحيح أو خدمة الإدارة غير متاحة. استخدم BAYAN_AI_MANAGER_TOKEN وليس RESEND_API_KEY.";list.innerHTML="";return;}state.textContent="عدد المساهمات قيد المراجعة: "+(d.count||0);list.innerHTML=(d.items||[]).map(x=>'<article class="card"><span class="number">#'+escapeHtml(x.id)+' · '+escapeHtml(x.status)+'</span><h3>'+escapeHtml(x.title)+'</h3><p>'+escapeHtml(x.body)+'</p>'+(x.source?'<p class="muted">المصدر: '+escapeHtml(x.source)+'</p>':"")+'<small>'+escapeHtml(x.created_at||"")+'</small><div class="actions"><button class="secondary review-action" data-id="'+escapeHtml(x.id)+'" data-status="VERIFIED">تم التحقق</button><button class="secondary review-action" data-id="'+escapeHtml(x.id)+'" data-status="NEEDS_MORE_INFO">تحتاج معلومات</button><button class="secondary review-action" data-id="'+escapeHtml(x.id)+'" data-status="REJECTED">رفض</button></div></article>').join("")||'<article class="card"><h3>لا توجد مساهمات جديدة</h3><p class="muted">عندما يرسل شخص معلومة ستظهر هنا بحالة PENDING_REVIEW.</p></article>';}catch{state.textContent="تعذر الاتصال بخدمة المراجعة."}}
 document.querySelector("#reviewLoad").onclick=load;
+document.querySelector("#reviewStatus").onclick=async()=>{
+  const t=token.value.trim();
+  if(!t){state.textContent=isEn?"Enter the BAYAN manager token first.":"أدخل مفتاح إدارة بيان أولًا.";return;}
+  state.textContent=isEn?"Checking system configuration…":"جارٍ فحص إعدادات النظام…";
+  try{
+    const r=await fetch("/api/diagnostics",{headers:{authorization:"Bearer "+t}});
+    const d=await r.json();
+    if(!r.ok){state.textContent=isEn?"The manager key is invalid or diagnostics are unavailable.":"المفتاح غير صحيح أو خدمة التشخيص غير متاحة.";return;}
+    state.textContent=(isEn?"System OK · version ":"النظام يعمل · الإصدار ")+String(d.version||"unknown")+" · "+(d.lastRuntimeAudit?.healthy?(isEn?"last audit healthy":"آخر فحص سليم"):(isEn?"last audit needs attention":"آخر فحص يحتاج مراجعة"));
+  }catch{state.textContent=isEn?"Unable to reach diagnostics.":"تعذر الاتصال بخدمة التشخيص."}
+};
 document.querySelector("#telegramSetup").onclick=async()=>{
   const t=token.value.trim();
   if(!t){state.textContent="أدخل BAYAN_AI_MANAGER_TOKEN أولًا.";return;}
