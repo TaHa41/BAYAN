@@ -45,6 +45,7 @@ if (!sw.includes("/manifest.en.json")) failures.push("service worker does not ca
 if (!sw.includes("/?lang=en")) failures.push("service worker does not cache the English offline shell");
 if (!read("public/manifest.en.json").includes('"lang": "en"')) failures.push("English PWA manifest missing");
 if (!source.includes("slugForQuery(q, lang)") || !source.includes("slugForQuery(input, language)")) failures.push("language-aware article slug persistence missing");
+if (!source.includes("SELECT slug,language FROM knowledge_articles WHERE query=? AND status='PUBLISHED'")) failures.push("multilingual article hreflang sibling resolution missing");
 if (!source.includes("languageContamination") || !source.includes("wrong_output_language")) failures.push("article output-language validation missing");
 if (!source.includes("independentSources.size < 2")) failures.push("article publication evidence gate missing");
 if (!source.includes("const sourceIdentity") || !source.includes("new URL(rawUrl).hostname")) failures.push("article evidence source identity normalization missing");
