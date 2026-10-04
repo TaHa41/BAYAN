@@ -2743,6 +2743,37 @@ export default {
       return json({ status: "updated", id, moderation: status, publication: status === "VERIFIED" ? "QUEUED_FOR_INDEPENDENT_EVIDENCE" : "not_published" });
     }
 
+    if (path === "/api/ai/manager/ai-request" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({status:"forbidden",error:managerAuthError(env)},403);
+      if (!env.DB) return json({status:"database_unavailable"},503);
+      try {
+        const body=await request.json() as any;
+        const requestText=cleanText(body?.request,5000);
+        if(!requestText) return json({status:"request_required"},400);
+        await ensureRepairQueue(env);
+        const now=new Date().toISOString();
+        const context="manager AI request: "+requestText;
+        const signature="MANUAL|"+context;
+        await env.DB.prepare("INSERT INTO repair_jobs(signature,context,error_text,status,phase,risk_level,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(signature) DO UPDATE SET context=excluded.context,error_text=excluded.error_text,status='QUEUED',phase='DETECTED',next_attempt_at=NULL,updated_at=excluded.updated_at")
+          .bind(signature,context,requestText,"QUEUED","DETECTED","AI_FIX_VERIFY",now,now).run();
+        const job=await env.DB.prepare("SELECT id,status,phase,context,created_at,updated_at FROM repair_jobs WHERE signature=?").bind(signature).first<any>();
+        await sendBayanOwnerNotification(env,"طلب جديد من مهندس بيان", "طلب الإدارة:
+"+requestText+"
+
+تم وضعه في Repair Queue ليمر بالتشخيص والإصلاح والتحقق قبل الدمج.");
+        return json({status:"queued",job});
+      } catch(error) { return json({status:"request_failed",error:safeErrorMessage(error)},400); }
+    }
+
+    if (path === "/api/ai/manager/ai-request" && request.method === "GET") {
+      if (!managerAuthorized(request, env)) return json({status:"forbidden",error:managerAuthError(env)},403);
+      if (!env.DB || !await ensureRepairQueue(env)) return json({status:"database_unavailable",requests:[]},503);
+      try {
+        const rows=await env.DB.prepare("SELECT id,status,phase,context,error_text,diagnosis,last_action,risk_level,base_sha,branch,pr_number,verification_json,created_at,updated_at,resolved_at,last_verified_at FROM repair_jobs WHERE context LIKE 'manager AI request:%' ORDER BY created_at DESC LIMIT 20").all();
+        return json({status:"ok",requests:rows.results||[]});
+      } catch(error) { return json({status:"database_error",requests:[],error:safeErrorMessage(error)},503); }
+    }
+
     if (path === "/api/ai/manager/articles" && request.method === "GET") {
       if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
       if (!env.DB || !await ensureKnowledgeTables(env)) return json({ status: "database_unavailable", articles: [] }, 503);
