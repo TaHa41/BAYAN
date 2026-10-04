@@ -182,6 +182,10 @@ const renderHtml = async (response: Response, requestUrl: URL, env?: Env) => {
     "/prices": { ar: ["الأسعار والأسواق — بيان", "متابعة الذهب وأسعار الصرف ومؤشرات الأسواق مع توضيح المصدر ووقت التحديث."], en: ["Prices & Markets — BAYAN", "Gold, exchange rates and market indicators with source and update context."] },
     "/tools": { ar: ["أدوات بيان — الطقس والخرائط والصور", "أدوات مباشرة للطقس والبحث عن الأماكن واكتشاف الصور مع معلومات المصدر والترخيص."], en: ["BAYAN Tools — Weather, Maps & Images", "Live tools for weather, place search and image discovery with source and licensing information."] },
     "/methodology": { ar: ["منهجية بيان", "كيف يجمع بيان المعلومات ويفحص المصادر ويبني الإجابات والمقالات."], en: ["BAYAN Methodology", "How BAYAN researches sources, checks evidence and builds answers and articles."] },
+    "/privacy": { ar: ["الخصوصية — بيان", "كيف يتعامل بيان مع بيانات الزوار والتحليلات والإعلانات."], en: ["Privacy — BAYAN", "How BAYAN handles visitor data, private analytics and advertising." ] },
+    "/terms": { ar: ["الشروط — بيان", "قواعد استخدام منصة بيان ومحتواها وأدواتها."], en: ["Terms — BAYAN", "Rules for using BAYAN, its content and tools." ] },
+    "/contact": { ar: ["تواصل مع بيان", "طرق إرسال الملاحظات وتصحيح المعلومات والإبلاغ عن المشكلات."], en: ["Contact BAYAN", "How to send feedback, corrections and problem reports." ] },
+    "/contribute": { ar: ["ساهم بمعلومة — بيان", "إرسال معلومات ومصادر وتصحيحات للمراجعة قبل النشر."], en: ["Contribute Information — BAYAN", "Submit information, sources and corrections for review before publication." ] },
     "/about": { ar: ["عن بيان", "تعرف على منصة بيان وأهدافها وطريقة تقديم المعرفة والمعلومات."], en: ["About BAYAN", "Learn about BAYAN, its goals and its approach to presenting knowledge and information."] }
   };
   const seo = seoPages[cleanPath] || (cleanPath.startsWith("/article/") ? {
