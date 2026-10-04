@@ -64,6 +64,8 @@ if (!read("public/app.js").includes("function savedPage()") || !read("public/app
 if (!source.includes("await setCooldown")) failures.push("provider cooldown persistence missing");
 if (/const (aiProviderCooldown|diagnosticMemory|repairMemory) = new Map/.test(source)) failures.push("request/provider cooldown uses mutable module state");
 if (!guardian.includes("AI repair diagnosis")) failures.push("Guardian AI diagnosis step missing");
+if (guardian.includes("steps.ai_classification")) failures.push("Guardian references a nonexistent AI classification step");
+if (!guardian.includes("steps.ai.outcome == 'failure'")) failures.push("Guardian AI failure does not trigger repair diagnosis");
 if (!guardian.includes("PIPESTATUS[0]") || !guardian.includes('cat ai-report.txt >> "$GITHUB_OUTPUT"')) failures.push("Guardian does not preserve AI benchmark output when the benchmark exits non-zero");
 if (!guardian.includes("ai-diagnosis.json")) failures.push("Guardian diagnosis artifact missing");
 if (!aiSmoke.includes("EXTERNAL_DEPENDENCY=AI_PROVIDER_QUOTA")) failures.push("AI capability smoke lacks external quota classification");
