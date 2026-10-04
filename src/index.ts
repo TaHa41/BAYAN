@@ -564,7 +564,13 @@ const queueBayanRepair = async (env: Env, context: string, error: unknown) => {
     const signature = context + "|" + safe;
     const now = new Date().toISOString();
     await env.DB.prepare(
-      "INSERT INTO repair_jobs (signature,context,error_text,status,phase,created_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(signature) DO UPDATE SET updated_at=excluded.updated_at"
+      "INSERT INTO repair_jobs (signature,context,error_text,status,phase,created_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(signature) DO UPDATE SET
+        context=excluded.context,
+        error_text=excluded.error_text,
+        updated_at=excluded.updated_at,
+        status=CASE WHEN repair_jobs.status IN ('RESOLVED','ROLLED_BACK','FAILED') THEN 'QUEUED' ELSE repair_jobs.status END,
+        phase=CASE WHEN repair_jobs.status IN ('RESOLVED','ROLLED_BACK','FAILED') THEN 'DETECTED' ELSE repair_jobs.phase END,
+        next_attempt_at=CASE WHEN repair_jobs.status IN ('RESOLVED','ROLLED_BACK','FAILED') THEN NULL ELSE repair_jobs.next_attempt_at END
     ).bind(signature, cleanText(context, 240), safe, "QUEUED", "DETECTED", now, now).run();
   } catch {}
 };
@@ -618,8 +624,8 @@ const processBayanRepairQueue = async (env: Env, currentAudit?: any) => {
             .bind("runtime_audit_retry", "نجح فحص runtime الحالي؛ أغلقت المهمة دون تشغيل audit ثانٍ.", new Date().toISOString(), new Date().toISOString(), job.id).run();
           continue;
         }
-        await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI',phase='WAITING_HUMAN',last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
-          .bind("runtime_audit_degraded", "فحص runtime الحالي ما زال متدهورًا؛ تم تأجيل إعادة المحاولة لمنع تكرار استهلاك subrequests.", new Date(Date.now() + 15 * 60_000).toISOString(), new Date().toISOString(), job.id).run();
+        await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI',phase='PATCHING',last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
+          .bind("runtime_audit_degraded", "فحص runtime الحالي ما زال متدهورًا؛ تم تمرير الدليل إلى مسار AI Auto Repair بدل إعادة تشغيل audit داخل نفس Worker.", new Date(Date.now() + 10 * 60_000).toISOString(), new Date().toISOString(), job.id).run();
         continue;
       }
 
