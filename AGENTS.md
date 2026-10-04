@@ -1,44 +1,42 @@
 # BAYAN Engineering Playbook
 
 ## Mission
-Keep BAYAN evidence-first, resilient, and operational. Prefer safe automatic recovery over silent failure.
+Keep BAYAN evidence-first, bilingual, resilient, observable and deployable. Fix root causes instead of masking symptoms.
 
-## Rules
-- Never expose API keys, manager tokens, authorization headers, or other secrets in logs, emails, UI, commits, or issues.
+## Non-negotiable rules
+- Never expose API keys, manager tokens, authorization headers, or secrets.
 - Never publish unsupported or single-source claims as verified facts.
-- Search/news answers should prefer independent sources and label limited evidence.
+- Never turn search snippets into an editorial article when article generation or verification fails.
+- English mode must use English UI strings and English article fields; never silently fall back to Arabic content.
 - Visitor contributions remain PENDING_REVIEW until a manager verifies them.
-- Verified contributions may enter the knowledge database only after the review action succeeds.
-- Technical failures must be observable through console errors/Cloudflare Issues and sent to the configured Telegram owner channel.
-- AI failures should use the configured fallback chain before returning Insufficient Evidence.
-- The runtime AI may attempt safe operational recovery first: retry, fallback provider, temporary provider cooldown, or alternate search source. It must not edit source code, secrets, permissions, or production data autonomously.
+- Technical failures must be observable through Cloudflare Issues and the configured Telegram owner channel.
+- AI failures must use the configured fallback chain before returning Insufficient Evidence.
+- Runtime self-healing may retry, fail over, cooldown providers, queue repair work and verify recovery. It may not edit source code, secrets, permissions or production data autonomously.
+
+## Review standard
+A repository-wide change is incomplete until the affected runtime path, tests, static guards, build and production smoke checks pass.
 
 ## Repair loop
-1. Reproduce the failure from logs/Issues.
-2. Identify the smallest safe code/config change.
-3. Add or update a regression test when practical.
-4. Run typecheck, tests, and Wrangler dry-run.
-5. Review the diff for secrets and unintended behavior.
-6. Deploy only after validation.
+1. Reproduce the exact route, input, timestamp, commit and environment.
+2. Classify the failure.
+3. Gather logs, response contracts, provider state, bindings and the smallest relevant code path.
+4. Separate evidence from hypotheses.
+5. Apply the smallest reversible root-cause fix.
+6. Add a regression test or deterministic guard.
+7. Run typecheck, tests, frontend syntax checks and Wrangler dry-run.
+8. Deploy only after validation.
+9. Verify the affected production path, not only /api/health.
+10. Record the fix and make repeated failures harder to reintroduce.
 
-## Runtime self-healing
-1. Detect and reproduce the failure.
-2. Ask the configured AI for a diagnosis and a safe recovery proposal.
-3. Execute only allowlisted operational actions.
-4. Re-test the affected path.
-5. Send the outcome to Telegram.
-6. If a source-code/configuration change is required, create a repair proposal for review rather than changing production code.
+## Repository-wide upgrade checklist
+When performing a major upgrade, inspect every tracked file and every directory:
+- Worker runtime and route contracts
+- frontend HTML/CSS/JS/content/PWA/service worker/ads
+- D1 schema and every migration
+- scripts and smoke tests
+- CI, deployment and Guardian workflows
+- TypeScript configuration and package toolchain
+- tests and release guards
+- operational documentation
 
-## Cloudflare Issues automation
-Issues may send diagnostic context to a coding agent. The agent should inspect this playbook and the connected repository, propose/test a fix, and leave deployment for review.
-
-## AI repair skills
-The canonical AI repair skill set is documented in docs/AI_REPAIR_PLAYBOOK.md. The Guardian must use it for incident diagnosis. Treat the playbook as operational guidance, not permission to modify source code automatically.
-
-## Current platform guidance
-- Prefer Cloudflare bindings over REST calls for Cloudflare services.
-- Use durable background primitives for long-running retryable work when the required bindings are configured.
-- Keep request-scoped state out of module-level mutable variables.
-- Always await or waitUntil asynchronous work.
-- Keep provider fallbacks explicit and observable.
-- Treat AI Search namespace/instance configuration as deployment configuration, not hard-coded infrastructure.
+Do not change a file merely to update its timestamp. A file is considered reviewed when its current behavior is verified or deliberately left unchanged because no upgrade is required.
