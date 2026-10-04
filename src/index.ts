@@ -1141,10 +1141,18 @@ const generateKnowledgeArticle = async (env: Env, language: string, query: strin
   }
 };
 const knowledgeRateLimit = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_MAX_KEYS = 5000;
+let rateLimitSweepCounter = 0;
 
 const allowRequest = (request: Request, limit = 60) => {
   const now = Date.now();
-  const key = request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || "anonymous";
+  if ((++rateLimitSweepCounter & 255) === 0 || knowledgeRateLimit.size >= RATE_LIMIT_MAX_KEYS) {
+    for (const [storedKey, bucket] of knowledgeRateLimit) {
+      if (bucket.resetAt <= now || knowledgeRateLimit.size >= RATE_LIMIT_MAX_KEYS) knowledgeRateLimit.delete(storedKey);
+      if (knowledgeRateLimit.size < RATE_LIMIT_MAX_KEYS * 0.9) break;
+    }
+  }
+  const key = request.headers.get("cf-connecting-ip") || "anonymous";
   const current = knowledgeRateLimit.get(key);
   if (!current || current.resetAt <= now) {
     knowledgeRateLimit.set(key, { count: 1, resetAt: now + 60_000 });
