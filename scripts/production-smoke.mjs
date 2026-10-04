@@ -81,6 +81,35 @@ try{
 }catch(e){console.log("FAIL /tools page "+e.message);failed++;}
 
 try{
+  const robots=await fetchWithTimeout(base+"/robots.txt",{redirect:"follow"});
+  const robotsBody=await robots.text();
+  const robotsType=robots.headers.get("content-type")||"";
+  const sitemapUrl=base+"/sitemap.xml";
+  const robotsOk=robots.ok && robotsType.includes("text/plain") &&
+    /User-agent:\s*\*/i.test(robotsBody) &&
+    /Allow:\s*\//i.test(robotsBody) &&
+    robotsBody.includes("Sitemap: "+sitemapUrl);
+  console.log((robotsOk?"PASS":"FAIL")+" robots.txt SEO discovery contract");
+  if(!robotsOk) failed++;
+}catch(e){console.log("FAIL robots.txt SEO discovery contract "+e.message);failed++;}
+
+try{
+  const sitemap=await fetchWithTimeout(base+"/sitemap.xml",{redirect:"follow"});
+  const sitemapBody=await sitemap.text();
+  const sitemapType=sitemap.headers.get("content-type")||"";
+  const rootAr="<loc>"+base+"/</loc>";
+  const rootEn="<loc>"+base+"/?lang=en</loc>";
+  const sitemapOk=sitemap.ok && sitemapType.includes("application/xml") &&
+    /<urlset\b[^>]*xmlns=["']https:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9["']/i.test(sitemapBody) &&
+    sitemapBody.includes(rootAr) &&
+    sitemapBody.includes(rootEn) &&
+    /hreflang=["']ar["']/i.test(sitemapBody) &&
+    /hreflang=["']en["']/i.test(sitemapBody);
+  console.log((sitemapOk?"PASS":"FAIL")+" sitemap discovery/content contract");
+  if(!sitemapOk) failed++;
+}catch(e){console.log("FAIL sitemap discovery/content contract "+e.message);failed++;}
+
+try{
   const home=await fetchWithTimeout(base+"/",{redirect:"follow"});
   const html=await home.text();
   const tags=[...html.matchAll(/<link\b[^>]*>/gi)].map(m=>m[0]);
