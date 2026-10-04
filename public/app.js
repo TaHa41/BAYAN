@@ -77,6 +77,7 @@ function summaryBlock(items){return '<section class="summary"><h2>'+(isEn?"Quick
   if(!trendBox&&!newsBox)return;
   const lang=isEn?"en":"ar";
   const esc=(v)=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  const formatDate=(v)=>{if(!v)return"";const d=new Date(v);if(Number.isNaN(d.getTime()))return String(v);return new Intl.DateTimeFormat(isEn?"en-GB":"ar-EG",{dateStyle:"medium",timeZone:"Africa/Cairo"}).format(d)};
   try{
     const [trendRes,newsRes]=await Promise.all([
       fetch("/api/trending?lang="+lang),
@@ -89,7 +90,7 @@ function summaryBlock(items){return '<section class="summary"><h2>'+(isEn?"Quick
     }
     if(newsBox){
       const articles=Array.isArray(news.articles)?news.articles.slice(0,3):[];
-      newsBox.innerHTML=articles.length?articles.map(x=>'<a class="signal-item" href="'+esc(x.url||("/search?q="+encodeURIComponent(x.title||"")))+'" target="'+(x.url?"_blank":"_self")+'" rel="'+(x.url?"noopener noreferrer":"")+'"><strong>'+esc(x.title)+'</strong><small>'+esc(x.source?.name||"مصدر مباشر")+(x.publishedAt?" · "+esc(x.publishedAt):"")+'</small></a>').join(""):'<p class="muted">'+(isEn?"No recent news is available right now.":"لم تصل أخبار حديثة قابلة للعرض الآن.")+'</p>';
+      newsBox.innerHTML=articles.length?articles.map(x=>'<a class="signal-item" href="'+esc(x.url||("/search?q="+encodeURIComponent(x.title||"")))+'" target="'+(x.url?"_blank":"_self")+'" rel="'+(x.url?"noopener noreferrer":"")+'"><strong>'+esc(x.title)+'</strong><small>'+esc(x.source?.name||(isEn?"Direct source":"مصدر مباشر"))+(x.publishedAt?" · "+esc(formatDate(x.publishedAt)):"")+'</small></a>').join(""):'<p class="muted">'+(isEn?"No recent news is available right now.":"لم تصل أخبار حديثة قابلة للعرض الآن.")+'</p>';
     }
   }catch{
     if(trendBox)trendBox.innerHTML='<p class="muted">'+(isEn?"Unable to update signals temporarily.":"تعذر تحديث الإشارات مؤقتًا.")+'</p>';
