@@ -93,16 +93,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if gh issue list --repo "${{ github.repository }}" --state open --search "BAYAN Guardian: AI provider quota in:title" --json number --jq 'length' | grep -q '^0        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          DIAGNOSIS="$(cat ai-diagnosis.json 2>/dev/null || true)"
-          gh issue create --repo "${{ github.repository }}" --title "BAYAN Guardian: AI capability regression" --body "$(printf 'AI capability benchmark failed on %s. The site smoke test remained healthy.\n\n%s' "${{ github.sha }}" "$DIAGNOSIS")" || true
-
-      - name: Guardian result
-        if: steps.smoke.outcome == 'failure'
-        run: exit 1
-; then
+          if gh issue list --repo "${{ github.repository }}" --state open --search "BAYAN Guardian: AI provider quota in:title" --json number --jq 'length' | grep -q '^0$'; then
             gh issue create --repo "${{ github.repository }}" --title "BAYAN Guardian: AI provider quota" --body "$(printf 'The production site remained healthy, but AI providers are currently unavailable because of external quota/credit limits on %s.\n\n%s' "${{ github.sha }}" "$(cat ai-report.txt 2>/dev/null || true)")" || true
           fi
 
