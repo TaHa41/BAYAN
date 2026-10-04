@@ -1059,11 +1059,20 @@ const articleQualityCheck = (text: string, query: string, intent: string, eviden
   };
 };
 
+const sourceIdentity = (item: any) => {
+  const rawUrl = String(item?.url || "").trim();
+  try {
+    const host = new URL(rawUrl).hostname.toLowerCase().replace(/^www\./, "");
+    if (host) return host;
+  } catch {}
+  const domain = String(item?.domain || "").toLowerCase().replace(/^www\./, "").trim();
+  if (domain) return domain;
+  return String(item?.provider || item?.source || "").toLowerCase().replace(/^www\./, "").trim();
+};
+
 const generateKnowledgeArticle = async (env: Env, language: string, query: string, results: any[]) => {
   const intent = editorialIntent(query);
-  const independentSources = new Set(
-    results.map((x: any) => String(x?.source || x?.domain || x?.provider || "").toLowerCase().replace(/^www\./, "").trim()).filter(Boolean)
-  );
+  const independentSources = new Set(results.map(sourceIdentity).filter(Boolean));
   if (independentSources.size < 2) return null;
   const evidence = await buildArticleEvidence(env, results);
   if (!evidence.trim()) return null;
