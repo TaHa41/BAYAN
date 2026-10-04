@@ -25,6 +25,7 @@ if (!deploy.includes("actions/checkout@v7")) failures.push("deployment checkout 
 const ci = read(".github/workflows/ci.yml");
 if (!ci.includes("actions/checkout@v7") || !ci.includes("actions/setup-node@v7") || !ci.includes("node-version: 24")) failures.push("CI toolchain is outdated");
 if (!guardian.includes("actions/setup-node@v7") || !guardian.includes("node-version: 24")) failures.push("Guardian Node toolchain is outdated");
+if (!guardian.includes("shell: bash") || !guardian.includes("production-smoke.mjs | tee smoke-report.txt") || !guardian.includes("ai-capability-smoke.mjs | tee ai-report.txt")) failures.push("Guardian does not propagate piped script failures");
 if (!wrangler.includes('"observability"') || !wrangler.includes('"issues"')) failures.push("observability configuration missing");
 if (!wrangler.includes('"binding": "AI"') || !wrangler.includes('"remote": true')) failures.push("Workers AI remote binding configuration missing");
 if (!source.includes("gpt-6-luna") || !source.includes("gpt-6.1-sol")) failures.push("OpenAI fallback chain missing");
