@@ -65,6 +65,8 @@ if (!source.includes("contribution-schema")) failures.push("runtime audit does n
 if (!source.includes("language === \"en\" ? \"Insufficient Evidence:")) failures.push("English AI fallback missing");
 if (source.includes('notification: "telegram"')) failures.push("AI route advertises a Telegram notification that is not actually sent");
 if (!source.includes('warnings: ["AI provider error", "No unverified answer was generated."]') || !source.includes("}, 503);")) failures.push("AI provider outage does not degrade honestly to 503");
+if (/loadHomeNewsAndDiscovery/.test(read("public/app.js")) && /target="_blank"/.test(read("public/app.js").slice(read("public/app.js").indexOf("async function loadHomeNewsAndDiscovery"), read("public/app.js").indexOf("async function liveDataHome")))) failures.push("homepage live news/trending navigation can expose external links");
+if (!guardian.includes("set -o pipefail") || !guardian.includes("production-smoke.mjs | tee smoke-report.txt")) failures.push("Guardian production smoke pipeline can hide failures");
 if (!read("public/app.js").includes("function renderRoute(routePath)") || !read("public/app.js").includes("safeRenderRoute") || !read("public/app.js").includes("safeRenderRoute(path)")) failures.push("frontend SPA router/render bootstrap missing");
 if (!read("public/app.js").includes("const safeHref=")) failures.push("frontend external URL safety helper missing");
 if (!source.includes("language: lang, title: generated.title")) failures.push("trending article language persistence missing");
