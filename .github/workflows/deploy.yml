@@ -82,6 +82,16 @@ jobs:
           if ! grep -q 'reviewed_at' <<<"$schema"; then
             npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE visitor_contributions ADD COLUMN reviewed_at TEXT" --yes
           fi
+          repair_schema="$(npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "SELECT name FROM pragma_table_info('repair_jobs') WHERE name IN ('phase','root_cause','risk_level','base_sha','branch','pr_number','verification_json','rollback_count','last_verified_at')" --json)"
+          grep -q 'phase' <<<"$repair_schema" || npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE repair_jobs ADD COLUMN phase TEXT NOT NULL DEFAULT 'DETECTED'" --yes
+          grep -q 'root_cause' <<<"$repair_schema" || npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE repair_jobs ADD COLUMN root_cause TEXT" --yes
+          grep -q 'risk_level' <<<"$repair_schema" || npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE repair_jobs ADD COLUMN risk_level TEXT NOT NULL DEFAULT 'AI_FIX_VERIFY'" --yes
+          grep -q 'base_sha' <<<"$repair_schema" || npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE repair_jobs ADD COLUMN base_sha TEXT" --yes
+          grep -q 'branch' <<<"$repair_schema" || npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE repair_jobs ADD COLUMN branch TEXT" --yes
+          grep -q 'pr_number' <<<"$repair_schema" || npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE repair_jobs ADD COLUMN pr_number INTEGER" --yes
+          grep -q 'verification_json' <<<"$repair_schema" || npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE repair_jobs ADD COLUMN verification_json TEXT" --yes
+          grep -q 'rollback_count' <<<"$repair_schema" || npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE repair_jobs ADD COLUMN rollback_count INTEGER NOT NULL DEFAULT 0" --yes
+          grep -q 'last_verified_at' <<<"$repair_schema" || npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE repair_jobs ADD COLUMN last_verified_at TEXT" --yes
       - name: Apply D1 migrations
         if: steps.credentials.outputs.configured == 'true' && steps.source.outputs.current == 'true'
         uses: cloudflare/wrangler-action@v4
