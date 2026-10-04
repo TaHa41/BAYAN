@@ -41,6 +41,7 @@ if (!source.includes("language === \"en\" ? \"Insufficient Evidence:")) failures
 if (!source.includes("await setCooldown")) failures.push("provider cooldown persistence missing");
 if (/const (aiProviderCooldown|diagnosticMemory|repairMemory) = new Map/.test(source)) failures.push("request/provider cooldown uses mutable module state");
 if (!guardian.includes("AI repair diagnosis")) failures.push("Guardian AI diagnosis step missing");
+if (/\\\\n/.test(read("scripts/production-smoke.mjs"))) failures.push("production smoke contains literal newline escape");
 if (!guardian.includes("ai-diagnosis.json")) failures.push("Guardian diagnosis artifact missing");
 
 const numbers = migrations.map((x) => Number(x.split("_")[0]));
