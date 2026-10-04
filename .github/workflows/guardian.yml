@@ -59,18 +59,6 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
           exit "$exit_code"
 
-      - name: Classify AI benchmark dependency state
-        id: ai_classification
-        if: always() && steps.smoke.outcome == 'success'
-        shell: bash
-        run: |
-          report="$(cat ai-report.txt 2>/dev/null || true)"
-          if grep -q 'EXTERNAL_DEPENDENCY=AI_PROVIDER_QUOTA' <<< "$report"; then
-            echo "quota=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "quota=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: AI repair diagnosis
         id: diagnosis
         if: steps.smoke.outcome == 'failure' || (steps.ai.outcome == 'failure' && steps.ai_classification.outputs.quota != 'true')
