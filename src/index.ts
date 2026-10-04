@@ -2383,6 +2383,7 @@ export default {
         const body = await request.json() as { input?: string; mode?: string; live?: boolean };
         const input = body.input?.trim().slice(0, 2000);
         if (!input) return json({ error: "input_required" }, 400);
+        const language = /[\u0600-\u06FF]/.test(input) ? "ar" : "en";
 
         if (!env.OPENAI_API_KEY && !env.AI) {
           const fallbackSearch = await internalSearch(input, env);
@@ -2406,7 +2407,6 @@ export default {
           }, 503);
         }
 
-        const language = /[\u0600-\u06FF]/.test(input) ? "ar" : "en";
         const shouldSearch = body.live !== false && !["code", "write"].includes(String(body.mode || "knowledge").toLowerCase());
         let results: any[] = [];
 
