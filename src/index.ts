@@ -2159,11 +2159,15 @@ export default {
       if (!search.ok) return json({ query: q, items: [], status: search.status }, 503);
       const intent = queryIntent(q);
       const section = sectionForIntent(intent, q);
-      // Search responses must not wait for article generation or persistence.
-      // Queue enrichment for the background worker instead.
+      // Search remains fast for the visitor, while the same request starts the
+      // evidence-gated article queue in the background. The scheduled worker remains
+      // the durable retry path for provider/database failures.
       let knowledge: any = { query: q, section, status: "DISCOVERED", persisted: false };
       if (ctx?.waitUntil) {
-        ctx?.waitUntil(queueContentTopic(env, q, section, lang, 100).catch(() => false));
+        ctx.waitUntil((async () => {
+          const queued = await queueContentTopic(env, q, section, lang, 100).catch(() => false);
+          if (queued) await processContentQueue(env, 1).catch(() => undefined);
+        })());
         knowledge.status = "QUEUED_FOR_ARTICLE";
       }
 
