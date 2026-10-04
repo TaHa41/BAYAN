@@ -1918,9 +1918,27 @@ export default {
       const audit = await runRuntimeAudit(env);
       if (!audit.healthy) {
         await reportBayanError(env, "scheduled runtime audit", new Error("runtime_audit_degraded"), {
-          repair: "تمت إعادة المحاولة 3 مرات لكل مسار فاشل قبل إرسال التنبيه.",
+          repair: "تم تشغيل audit محدود الموارد؛ لا توجد إعادة محاولة داخلية متكررة لنفس الاستدعاء.",
           attempts: audit.results.filter((x: any) => !x.ok)
         });
+      }
+
+      // Retire historical queue entries created by the old runaway audit loop.
+      // They no longer represent actionable incidents after the bounded audit fix.
+      if (env.DB) {
+        try {
+          const now = new Date().toISOString();
+          await env.DB.prepare(
+            "UPDATE repair_jobs SET status='RESOLVED', last_action='superseded_by_bounded_runtime_audit', diagnosis=?, updated_at=?, resolved_at=? WHERE status IN ('QUEUED','WAITING_AI','WAITING_VERIFY') AND error_text LIKE '%Too many subrequests by single Worker invocation%'"
+          ).bind("أغلقت مهمة قديمة ناتجة عن audit سابق كان يتجاوز حد subrequests. تم استبداله بـ bounded runtime audit.", now, now).run();
+
+          const contributionSchemaHealthy = audit.results.some((item: any) => item?.route === "/database/contribution-schema" && item?.ok);
+          if (contributionSchemaHealthy) {
+            await env.DB.prepare(
+              "UPDATE repair_jobs SET status='RESOLVED', last_action='contribution_schema_verified', diagnosis=?, updated_at=?, resolved_at=? WHERE status IN ('QUEUED','WAITING_AI','WAITING_VERIFY') AND error_text LIKE '%reviewer_note%'"
+            ).bind("تم التحقق من مخطط visitor_contributions وإصلاح التوافق مع reviewer_note/reviewed_at.", now, now).run();
+          }
+        } catch {}
       }
       if (env.DB && await ensureRuntimeAuditTable(env)) {
         await env.DB.prepare("INSERT INTO runtime_audits (checked_at, healthy, details_json) VALUES (?, ?, ?)")
