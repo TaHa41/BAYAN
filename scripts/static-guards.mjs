@@ -38,6 +38,7 @@ if (!schema.includes("title_en") || !schema.includes("body_en")) failures.push("
 if (!migrations.includes("0009_multilingual_article_integrity.sql")) failures.push("multilingual integrity migration missing");
 if (!sw.includes("bayan-shell-v2")) failures.push("service worker cache version not upgraded");
 if (!sw.includes("/manifest.en.json")) failures.push("service worker does not cache English manifest");
+if (!sw.includes("/?lang=en")) failures.push("service worker does not cache the English offline shell");
 if (!read("public/manifest.en.json").includes('"lang": "en"')) failures.push("English PWA manifest missing");
 if (!source.includes("slugForQuery(q, lang)") || !source.includes("slugForQuery(input, language)")) failures.push("language-aware article slug persistence missing");
 if (!source.includes("languageContamination") || !source.includes("wrong_output_language")) failures.push("article output-language validation missing");
