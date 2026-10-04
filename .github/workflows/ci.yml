@@ -20,7 +20,14 @@ jobs:
         with:
           node-version: 24
       - name: Install
-        run: npm install
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f package-lock.json ]]; then
+            npm ci
+          else
+            npm install
+          fi
       - name: Static release guards
         run: npm run guards
 
