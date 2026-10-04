@@ -100,7 +100,7 @@ try{
   const rootAr="<loc>"+base+"/</loc>";
   const rootEn="<loc>"+base+"/?lang=en</loc>";
   const sitemapOk=sitemap.ok && sitemapType.includes("application/xml") &&
-    /<urlset\b[^>]*xmlns=["']https:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9["']/i.test(sitemapBody) &&
+    /<urlset\b[^>]*xmlns=["']https?:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9["']/i.test(sitemapBody) &&
     sitemapBody.includes(rootAr) &&
     sitemapBody.includes(rootEn) &&
     /hreflang=["']ar["']/i.test(sitemapBody) &&
