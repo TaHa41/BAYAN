@@ -735,7 +735,8 @@ const telegramApi = async (env: Env, method: string, body?: Record<string, unkno
   const response = await fetch("https://api.telegram.org/bot" + env.TELEGRAM_BOT_TOKEN + "/" + method, {
     method: body ? "POST" : "GET",
     headers: body ? { "content-type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(8000)
   });
   let data: any = null;
   try { data = await response.json(); } catch {}
