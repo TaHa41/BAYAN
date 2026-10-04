@@ -762,12 +762,7 @@ const sendBayanTelegram = async (env: Env, text: string, chatId?: string) => {
         }
       }
     }
-    const discovered = await discoverTelegramChat(env);
-    const destination = cleanText(discovered?.chatId || "", 120);
-    if (!destination && discovered?.source === "webhook") return { ok: false, error: "telegram_getupdates_conflict_webhook_configured" };
-    if (!destination) return { ok: false, error: "telegram_chat_id_missing_start_bot_first" };
-    await telegramApi(env, "sendMessage", { chat_id: destination, text: message });
-    return { ok: true, chatId: destination, source: "discovered" };
+    return { ok: false, error: "telegram_chat_id_not_configured" };
   } catch (error) {
     return { ok: false, error: safeErrorMessage(error) };
   }
@@ -2687,8 +2682,18 @@ export default {
       if (!managerAuthorized(request, env)) return json({ error: "unauthorized" }, 401);
       try {
         const chat = await discoverTelegramChat(env);
-        const probe = chat ? await sendBayanTelegram(env, "✅ تم اكتشاف محادثة Telegram بنجاح من BAYAN.\n\nيمكن الآن إرسال التنبيهات تلقائيًا. يظل TELEGRAM_CHAT_ID الاختياري هو المسار الثابت المفضل.") : { ok: false, error: "telegram_chat_id_missing_start_bot_first" };
-        return json({ status: chat ? (probe.ok ? "chat_found_and_test_sent" : "chat_found_send_failed") : "chat_not_found", configured: !!env.TELEGRAM_BOT_TOKEN, chatId: chat?.chatId || null, username: chat?.username || null, firstName: chat?.firstName || null, delivered: !!probe.ok, error: probe.error || null, next: chat ? "يفضل حفظ chatId كـ TELEGRAM_CHAT_ID لتثبيت وجهة التنبيهات." : "افتح البوت واضغط Start وأرسل /start ثم أعد الفحص." });
+        return json({
+          status: chat ? "chat_found" : "chat_not_found",
+          configured: !!env.TELEGRAM_BOT_TOKEN,
+          chatId: chat?.chatId || null,
+          username: chat?.username || null,
+          firstName: chat?.firstName || null,
+          delivered: false,
+          error: null,
+          next: chat
+            ? "احفظ chatId كـ TELEGRAM_CHAT_ID أولًا. لن يرسل بيان أي تقرير إلى محادثة مكتشفة تلقائيًا."
+            : "افتح البوت واضغط Start وأرسل /start ثم أعد الفحص."
+        });
       } catch (error) { return json({ status: "telegram_error", error: safeErrorMessage(error) }, 502); }
     }
 
