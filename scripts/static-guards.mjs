@@ -66,6 +66,8 @@ if (!read("migrations/0010_contribution_reviewer_note.sql").includes("Compatibil
 if (!source.includes("contribution-schema")) failures.push("runtime audit does not verify contribution schema");
 if (!source.includes("language === \"en\" ? \"Insufficient Evidence:")) failures.push("English AI fallback missing");
 if (source.includes('notification: "telegram"')) failures.push("AI route advertises a Telegram notification that is not actually sent");
+if (source.includes('source: "discovered_fallback"') || source.includes("const fallback = cleanText(discovered?.chatId")) failures.push("Telegram notifications can fall back to an automatically discovered chat");
+if (!source.includes("Discovery is informational") || !source.includes("production notifications must target an explicitly configured destination")) failures.push("Telegram explicit-destination safety guard missing");
 if (!source.includes('warnings: ["AI provider error", "No unverified answer was generated."]') || !source.includes("}, 503);")) failures.push("AI provider outage does not degrade honestly to 503");
 if (/loadHomeNewsAndDiscovery/.test(read("public/app.js")) && /target="_blank"/.test(read("public/app.js").slice(read("public/app.js").indexOf("async function loadHomeNewsAndDiscovery"), read("public/app.js").indexOf("async function liveDataHome")))) failures.push("homepage live news/trending navigation can expose external links");
 if (!guardian.includes("set -o pipefail") || !guardian.includes("production-smoke.mjs | tee smoke-report.txt")) failures.push("Guardian production smoke pipeline can hide failures");
