@@ -39,7 +39,7 @@ jobs:
         run: node --check public/app.js
 
       - name: Runtime script syntax check
-        run: node --check scripts/production-smoke.mjs && node --check scripts/ai-capability-smoke.mjs && node --check scripts/ai-guardian.mjs && node --check scripts/static-guards.mjs
+        run: node --check scripts/production-smoke.mjs && node --check scripts/ai-capability-smoke.mjs && node --check scripts/ai-guardian.mjs && node --check scripts/ai-autorepair.mjs && node --check scripts/static-guards.mjs
 
       - name: Build validation
         run: npm run build
