@@ -3243,6 +3243,49 @@ export default {
       }
     }
 
+    if (path === "/api/ai/manager/repair-request" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      if (!env.DB) return json({ status: "database_unavailable" }, 503);
+      try {
+        const body = await request.json() as { request?: string; mode?: string };
+        const requestText = cleanText(String(body?.request || "").trim(), 4000);
+        const mode = body?.mode === "diagnose" ? "DIAGNOSE_ONLY" : "AI_FIX_REQUEST";
+        if (requestText.length < 10) return json({ status: "invalid_request", error: "repair_request_too_short" }, 400);
+        await ensureRepairQueue(env);
+        const now = new Date().toISOString();
+        const signature = "MANUAL:" + mode + ":" + requestText;
+        await env.DB.prepare(
+          "INSERT INTO repair_jobs (signature,context,error_text,status,phase,risk_level,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(signature) DO UPDATE SET context=excluded.context,error_text=excluded.error_text,status='QUEUED',phase='DETECTED',next_attempt_at=NULL,updated_at=excluded.updated_at"
+        ).bind(
+          signature,
+          "Manual manager request — " + mode + "\nRequested change/problem: " + requestText,
+          requestText,
+          "QUEUED",
+          "DETECTED",
+          "AI_FIX_VERIFY",
+          now,
+          now
+        ).run();
+        const job = await env.DB.prepare("SELECT id,status,phase,created_at FROM repair_jobs WHERE signature=? LIMIT 1").bind(signature).first<any>();
+        await sendBayanOwnerNotification(
+          env,
+          mode === "DIAGNOSE_ONLY" ? "طلب تشخيص جديد من لوحة إدارة بيان" : "طلب إصلاح جديد من لوحة إدارة بيان",
+          "رقم الطلب: " + String(job?.id || "unknown") + "\n\n" + requestText
+        );
+        try { await processBayanRepairQueue(env); } catch {}
+        const latest = await env.DB.prepare("SELECT id,status,phase,diagnosis,last_action,updated_at FROM repair_jobs WHERE id=?").bind(Number(job?.id || 0)).first<any>();
+        return json({
+          status: "queued",
+          id: Number(job?.id || 0),
+          mode,
+          job: latest || job || null,
+          message: mode === "DIAGNOSE_ONLY" ? "تم وضع الطلب في طابور التشخيص." : "تم وضع الطلب في طابور التشخيص والإصلاح والتحقق."
+        }, 202);
+      } catch (error) {
+        return json({ status: "invalid_request", error: safeErrorMessage(error) }, 400);
+      }
+    }
+
     if (path === "/api/ai/manager/repairs/retry-all" && request.method === "POST") {
       if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
       if (!env.DB) return json({ status: "database_unavailable" }, 503);
