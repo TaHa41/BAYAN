@@ -1490,7 +1490,13 @@ const rssNewsSearch = async (query = "", language = "ar") => {
     const key = (item.url || item.title).toLowerCase();
     if (!unique.has(key)) unique.set(key, item);
   }
-  const ranked = rerankResults(query, Array.from(unique.values()).slice(0, 30)).slice(0, 12);\n  const enriched = await Promise.all(ranked.map(async (item: any, index: number) => {\n    if (item.image || !item.url || index >= 10) return item;\n    const image = await rssArticleImage(item.url);\n    return image ? { ...item, image } : item;\n  }));\n  return enriched;
+  const ranked = rerankResults(query, Array.from(unique.values()).slice(0, 30)).slice(0, 12);
+  const enriched = await Promise.all(ranked.map(async (item: any, index: number) => {
+    if (item.image || !item.url || index >= 10) return item;
+    const image = await rssArticleImage(item.url);
+    return image ? { ...item, image } : item;
+  }));
+  return enriched;
 };
 
 const wikimediaEnterpriseLookup = async (env: Env, query: string, language = "ar") => {
