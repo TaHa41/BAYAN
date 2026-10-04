@@ -30,7 +30,7 @@ The release gate runs static guards, TypeScript checks, unit tests, frontend syn
 Pushes to `main` run CI. A successful CI run triggers the production deployment workflow, which applies D1 migrations, deploys the Worker, runs production smoke tests and then runs the AI capability benchmark.
 
 ## Database
-Migrations in `migrations/` are append-only. The canonical schema is kept in `schema.sql`. Multilingual article fields are introduced by migration 0009.
+Migrations in `migrations/` are append-only. The canonical schema is kept in `schema.sql`. Multilingual article fields are introduced by migration 0009; contribution schema repair is tracked through migration 0010.
 
 ## Reliability
 See `docs/AI_REPAIR_PLAYBOOK.md` for the evidence-first repair process. Automated recovery is limited to reversible operational actions; source-code, secret, permission and destructive data changes require controlled review/deployment.
