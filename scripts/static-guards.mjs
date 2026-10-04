@@ -9,6 +9,9 @@ const deploy = read(".github/workflows/deploy.yml");
 const wrangler = read("wrangler.jsonc");
 const source = read("src/index.ts");
 const guardian = read(".github/workflows/guardian.yml");
+const schema = read("schema.sql");
+const sw = read("public/sw.js");
+const migrations = readdirSync("migrations").filter((x) => /^\\d+_.*\\.sql$/.test(x)).sort();
 
 if (pkg.version !== "0.9.0") failures.push("package version is not 0.9.0");
 if (!env.includes("BAYAN_VERSION=0.9.0")) failures.push(".env.example version drift");
@@ -19,6 +22,10 @@ if (!source.includes('SEARCH_PROVIDER') || !source.includes('SEARCH_PROVIDER_CHA
 if (!source.includes('AI_SEARCH_INSTANCE')) failures.push("AI Search instance configuration missing");
 if (!source.includes('path === "/api/diagnostics"')) failures.push("protected diagnostics route missing");
 if (!source.includes("repair-skills")) failures.push("repair skills capability missing");
+if (!source.includes("title_en") || !source.includes("body_en")) failures.push("multilingual article storage missing");
+if (!schema.includes("title_en") || !schema.includes("body_en")) failures.push("canonical schema missing multilingual fields");
+if (!migrations.includes("0009_multilingual_article_integrity.sql")) failures.push("multilingual integrity migration missing");
+if (!sw.includes("bayan-shell-v2")) failures.push("service worker cache version not upgraded");
 if (!source.includes("await setCooldown")) failures.push("provider cooldown persistence missing");
 if (/const (aiProviderCooldown|diagnosticMemory|repairMemory) = new Map/.test(source)) failures.push("request/provider cooldown uses mutable module state");
 if (!guardian.includes("AI repair diagnosis")) failures.push("Guardian AI diagnosis step missing");
