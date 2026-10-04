@@ -392,7 +392,48 @@ function renderRoute(routePath){
 document.body.dataset.section=routePath||"home";
 if(validInterestSectionForClient(routePath)){recordInterest(routePath,"view");recordAnalytics("page_view","/"+routePath);}else{recordAnalytics("page_view",routePath?"/"+routePath:"/");}
 nav.querySelectorAll("a").forEach(a=>a.classList.toggle("active",a.getAttribute("href")?.split("?")[0]==="/"+routePath));
-if(!routePath)home();else if(routePath==="ai")ai();else if(routePath==="search")searchPage();else if(routePath==="prices")pricesPage();else if(routePath==="saved")savedPage();else if(routePath==="tools")toolsPage();else if(routePath.startsWith("article/"))articlePage(routePath.split("/")[1]);else if(routePath.startsWith("person/"))dynamicKnowledgePage("person",routePath.split("/")[1]);else if(routePath.startsWith("event/"))dynamicKnowledgePage("event",routePath.split("/")[1]);else if(routePath.startsWith("topic/"))dynamicKnowledgePage("topic",routePath.split("/")[1]);else if(routePath==="contribute"){contributionPage();}else if((routePath==="review"||routePath==="admin")){reviewPage();}else if(info[routePath]){const x=info[routePath];app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isEn?x[1]:x[0])+'</div><h1 class="page-title">'+(isEn?x[1]:x[0])+'</h1><p class="page-lead">'+(isEn?(x[3]||x[2]):x[2])+'</p>'+summaryBlock(["الوضوح قبل السرعة.","المصادر والتحقق جزء من طريقة عمل المنصة.","أي معلومة غير مؤكدة تُعامل على أنها غير مؤكدة."])+'</section>'}else if(routePath==="news")newsPage();else if(routePath==="trending")trendingPage();else if(sections.some(x=>x[0]===routePath))sectionPage(routePath);else app.innerHTML='<section class="page"><h1 class="page-title">404</h1><p class="page-lead">هذه الصفحة غير متاحة.</p></section>';if(!routePath){liveDataHome();recommendations();}const wisdom=window.BAYAN_CONTENT?.wisdom||[];const wisdomAt=Math.floor(Date.now()/30000);const wisdomIndex=wisdom.length?wisdomAt%wisdom.length:0;const w=document.querySelector("#wisdom");if(w){w.textContent=wisdom.length?(isEn?(wisdom[wisdomIndex].en||wisdom[wisdomIndex].ar):wisdom[wisdomIndex].ar):"السؤال الجيد بداية معرفة أفضل.";}
+if(!routePath)home();else if(routePath==="ai")ai();else if(routePath==="search")searchPage();else if(routePath==="prices")pricesPage();else if(routePath==="saved")savedPage();else if(routePath==="tools")toolsPage();else if(routePath.startsWith("article/"))articlePage(routePath.split("/")[1]);else if(routePath.startsWith("person/"))dynamicKnowledgePage("person",routePath.split("/")[1]);else if(routePath.startsWith("event/"))dynamicKnowledgePage("event",routePath.split("/")[1]);else if(routePath.startsWith("topic/"))dynamicKnowledgePage("topic",routePath.split("/")[1]);else if(routePath==="contribute"){contributionPage();}else if(routePath==="review"||routePath==="admin"){managerSubPage("dashboard");}else if(routePath.startsWith("review/")){managerSubPage(routePath.slice(7));}else if(info[routePath]){const x=info[routePath];app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isEn?x[1]:x[0])+'</div><h1 class="page-title">'+(isEn?x[1]:x[0])+'</h1><p class="page-lead">'+(isEn?(x[3]||x[2]):x[2])+'</p>'+summaryBlock(["الوضوح قبل السرعة.","المصادر والتحقق جزء من طريقة عمل المنصة.","أي معلومة غير مؤكدة تُعامل على أنها غير مؤكدة."])+'</section>'}else if(routePath==="news")newsPage();else if(routePath==="trending")trendingPage();else if(sections.some(x=>x[0]===routePath))sectionPage(routePath);else app.innerHTML='<section class="page"><h1 class="page-title">404</h1><p class="page-lead">هذه الصفحة غير متاحة.</p></section>';if(!routePath){liveDataHome();recommendations();}const wisdom=window.BAYAN_CONTENT?.wisdom||[];const wisdomAt=Math.floor(Date.now()/30000);const wisdomIndex=wisdom.length?wisdomAt%wisdom.length:0;const w=document.querySelector("#wisdom");if(w){w.textContent=wisdom.length?(isEn?(wisdom[wisdomIndex].en||wisdom[wisdomIndex].ar):wisdom[wisdomIndex].ar):"السؤال الجيد بداية معرفة أفضل.";}
+}
+function managerSubPage(kind){
+ reviewPage();
+ document.querySelector(".manager-nav-wrap")?.remove();
+ const map={
+  dashboard:["manager","لوحة التحكم","Dashboard"],
+  "ai-repair":["ai-repair","BAYAN AI","BAYAN AI"],
+  content:["content","المحتوى والمقالات","Content & Articles"],
+  contributions:["contributions","المساهمات","Contributions"],
+  repairs:["repairs","الإصلاحات","Repairs"],
+  news:["manager-news","الأخبار والصور","News & Images"],
+  analytics:["analytics","الإحصاءات","Analytics"],
+  telegram:["telegram","Telegram","Telegram"]
+ };
+ const target=map[kind]?map[kind][0]:"manager";
+ const keep=new Set([target,"reviewToken"]);
+ document.querySelectorAll("#app .page > *").forEach(el=>{
+   if(el.classList.contains("eyebrow")||el.classList.contains("page-title")||el.classList.contains("page-lead")||el.id==="reviewToken"||el.closest("#"+target)) return;
+   if(target==="manager" && el.id==="managerDashboard") return;
+   if(target==="analytics" && el.id==="analyticsPanel") return;
+   if(el.id==="manager-auth") return;
+   if(el.classList.contains("card") && !el.id) el.style.display="none";
+ });
+ const authCard=[...document.querySelectorAll("#app .card")].find(x=>x.querySelector("#reviewToken"));
+ if(authCard) authCard.id="manager-auth";
+ document.querySelector("#manager-auth")?.style.removeProperty("display");
+ document.querySelectorAll("#app .page > *").forEach(el=>{
+   if(el.id==="manager" && target!=="manager") el.style.display="none";
+   if(el.id==="analytics" && target!=="analytics") el.style.display="none";
+ });
+ const titleEl=document.querySelector(".page-title");
+ if(titleEl) titleEl.textContent=isEn?map[kind]?.[2]||"Dashboard":map[kind]?.[1]||"لوحة التحكم";
+ const tab=document.createElement("div");
+ tab.className="manager-edge-control";
+ tab.innerHTML='<button id="managerEdgeBtn" type="button" aria-label="'+(isEn?"Open management menu":"فتح قائمة الإدارة")+'" aria-expanded="false">☰</button><div id="managerEdgeMenu" class="manager-edge-menu" hidden><div class="manager-edge-head"><strong>'+(isEn?"BAYAN Manager":"إدارة بيان")+'</strong><button id="managerEdgeClose" type="button">×</button></div><nav>'+Object.entries(map).map(([key,v])=>'<a href="/review/'+key+(isEn?"?lang=en":"")+'" class="'+(key===kind?"active":"")+'"><span>'+({dashboard:"⚙","ai-repair:"✦",content:"▤",contributions:"＋",repairs:"⌁",news:"◉",analytics:"▥",telegram:"➤"}[key])+'</span><b>'+(isEn?v[2]:v[1])+'</b></a>').join("")+'</nav></div>';
+ document.body.appendChild(tab);
+ const btn=tab.querySelector("#managerEdgeBtn"),menu=tab.querySelector("#managerEdgeMenu");
+ btn.onclick=()=>{menu.hidden=!menu.hidden;btn.setAttribute("aria-expanded",String(!menu.hidden));};
+ tab.querySelector("#managerEdgeClose").onclick=()=>{menu.hidden=true;btn.setAttribute("aria-expanded","false");};
+ document.addEventListener("keydown",e=>{if(e.key==="Escape"){menu.hidden=true;btn.setAttribute("aria-expanded","false");}},{once:false});
+ window.scrollTo({top:0,behavior:"smooth"});
 }
 const safeRenderRoute=(routePath)=>{try{renderRoute(routePath);}catch(error){const app=document.querySelector("#app");if(app)app.innerHTML='<section class="page"><h1 class="page-title">تعذر عرض هذه الصفحة</h1><p class="page-lead">تم احتواء الخطأ حتى لا تظهر الصفحة فارغة.</p><button class="primary" type="button" onclick="location.reload()">إعادة المحاولة</button>';console.error("BAYAN route error",error);}};
 const updateWisdom=()=>{const wisdom=window.BAYAN_CONTENT?.wisdom||[];const w=document.querySelector("#wisdom");if(!w)return;const i=wisdom.length?Math.floor(Date.now()/30000)%wisdom.length:0;w.textContent=wisdom.length?(isEn?(wisdom[i].en||wisdom[i].ar):wisdom[i].ar):"السؤال الجيد بداية معرفة أفضل.";};
