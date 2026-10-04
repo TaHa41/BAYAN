@@ -45,6 +45,30 @@ jobs:
           set -o pipefail
           node scripts/production-smoke.mjs | tee smoke-report.txt
 
+      - name: Self-healing repair signal
+        id: repair_signal
+        if: steps.smoke.outcome == 'success'
+        continue-on-error: true
+        env:
+          BAYAN_AI_MANAGER_TOKEN: ${{ secrets.BAYAN_AI_MANAGER_TOKEN }}
+          BAYAN_URL: https://bayan.tahaomar411.workers.dev
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${BAYAN_AI_MANAGER_TOKEN:-}" ]]; then
+            echo "SELF_HEALING_SIGNAL=SKIPPED_TOKEN_NOT_CONFIGURED" | tee repair-signal.txt
+            exit 0
+          fi
+          response="$(curl --fail-with-body --silent --show-error --max-time 15 \
+            -H "Authorization: Bearer $BAYAN_AI_MANAGER_TOKEN" \
+            "$BAYAN_URL/api/ai/manager/repair-signal")"
+          printf '%s\n' "$response" | tee repair-signal.txt
+          status="$(node -e 'const x=JSON.parse(process.argv[1]); console.log(x.status||"unknown")' "$response")"
+          if [[ "$status" == "degraded" ]]; then
+            echo "BAYAN self-healing signal is degraded; routing verified evidence to AI repair." >&2
+            exit 1
+          fi
+
       - name: AI capability diagnostics
         id: ai
         if: steps.smoke.outcome == 'success'
@@ -63,7 +87,7 @@ jobs:
 
       - name: AI repair diagnosis
         id: diagnosis
-        if: steps.smoke.outcome == 'failure' || steps.ai.outcome == 'failure'
+        if: steps.smoke.outcome == 'failure' || steps.ai.outcome == 'failure' || steps.repair_signal.outcome == 'failure'
         continue-on-error: true
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -76,15 +100,18 @@ jobs:
             echo "Commit: ${GITHUB_SHA}"
             echo "Smoke outcome: ${{ steps.smoke.outcome }}"
             echo "AI benchmark outcome: ${{ steps.ai.outcome }}"
+            echo "Self-healing signal outcome: ${{ steps.repair_signal.outcome }}"
             echo "--- production smoke ---"
             cat smoke-report.txt 2>/dev/null || true
             echo "--- AI benchmark ---"
             cat ai-report.txt 2>/dev/null || true
+            echo "--- self-healing repair signal ---"
+            cat repair-signal.txt 2>/dev/null || true
           } > diagnostic-input.txt
           DIAGNOSTIC_REPORT="$(cat diagnostic-input.txt)" node scripts/ai-guardian.mjs | tee ai-diagnosis.json
 
       - name: Create production incident
-        if: steps.smoke.outcome == 'failure'
+        if: steps.smoke.outcome == 'failure' || steps.repair_signal.outcome == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -123,6 +150,7 @@ jobs:
             smoke-report.txt
             ai-report.txt
             ai-diagnosis.json
+            repair-signal.txt
           if-no-files-found: ignore
           retention-days: 7
 
