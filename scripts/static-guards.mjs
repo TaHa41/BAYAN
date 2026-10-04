@@ -15,12 +15,12 @@ const sw = read("public/sw.js");
 const app = read("public/app.js");
 const migrations = readdirSync("migrations").filter((x) => /^\d+_.*\.sql$/.test(x)).sort();
 
-if (pkg.version !== "0.9.0") failures.push("package version is not 0.9.0");
+if (pkg.version !== "0.10.0") failures.push("package version is not 0.10.0");
 if (Object.values(pkg.devDependencies || {}).some((v) => typeof v === "string" && /[~^*]/.test(v))) failures.push("direct devDependencies must be exact-pinned until package-lock.json is committed");
 if (!read(".github/workflows/bootstrap-lockfile.yml").includes("npm install --package-lock-only")) failures.push("lockfile bootstrap workflow is missing");
-if (!env.includes("BAYAN_VERSION=0.9.0")) failures.push(".env.example version drift");
+if (!env.includes("BAYAN_VERSION=0.10.0")) failures.push(".env.example version drift");
 if (!env.includes("SEARCH_PROVIDER=ceramic") || !env.includes("WIKIMEDIA_ENTERPRISE_TOKEN") || !env.includes("AI_SEARCH_INSTANCE")) failures.push(".env.example integration coverage drift");
-if (!deploy.includes("--var BAYAN_VERSION:0.9.0")) failures.push("deploy workflow version drift");
+if (!deploy.includes("--var BAYAN_VERSION:0.10.0")) failures.push("deploy workflow version drift");
 if (!deploy.includes("workflow_run.conclusion == 'success'")) failures.push("production deploy is not restricted to successful CI");
 if (!deploy.includes("Deployment preconditions satisfied.") || !deploy.includes("deployment is intentionally skipped")) failures.push("deployment precondition decision is not explicit");
 if (!deploy.includes("Verify deployment source is current main") || !deploy.includes("git ls-remote origin refs/heads/main")) failures.push("production deploy source verification missing");
