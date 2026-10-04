@@ -231,28 +231,29 @@ Important fields/relationships:
 - knowledge_articles stores Arabic and English article fields plus evidence/source JSON, status, freshness and review timing.
 - visitor_interest_events references visitor_profiles with ON DELETE CASCADE.
 - visitor_contributions is review-gated and includes reviewer_note/reviewed_at.
-- repair_jobs is signature-deduplicated and stateful.
+- repair_jobs is signature-deduplicated and stateful, including phase, root cause, risk, branch, verification and rollback metadata.
 - analytics stores hashed visitor keys rather than raw visitor identifiers.
 - saved_articles is keyed by visitor_id + article_slug.
 - knowledge graph uses entities and edges with SUPPORTED_BY relationships.
 
 ## 8. Autonomous repair model
 
-The current system is intentionally conservative.
+The current system is intentionally bounded rather than unrestricted.
 
 Automatic actions allowed:
-- bounded retries;
-- provider fallback;
+- bounded retries and provider fallback;
 - provider/model cooldown;
-- queueing and retrying repair jobs;
-- runtime verification;
-- browser representative-route verification;
-- Telegram owner notification;
-- AI diagnosis based only on captured evidence.
+- queueing and deduplicating repair jobs;
+- AI diagnosis from captured evidence;
+- isolated application-code repair patches;
+- guards, typecheck, tests and Wrangler build verification;
+- explicit CI verification on the repair branch;
+- production deployment and Guardian verification through the normal pipeline;
+- Telegram owner notification.
 
-Automatic source-code edits, secret changes, permission changes, destructive database operations and publication of visitor submissions are explicitly forbidden.
+Secrets, permissions, authentication, security boundaries, destructive database operations, billing/external accounts and visitor-content publication remain human-gated.
 
-This is the correct safety boundary for production. “Autonomous” should mean autonomous diagnosis/recovery of reversible runtime conditions, not an AI silently rewriting production source code.
+A repair is RESOLVED only after the deployed production commit passes the affected smoke/Guardian checks. Generated code alone is never success.
 
 Scheduled loop currently:
 1. runtime audit;
