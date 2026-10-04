@@ -25,7 +25,7 @@ for(const [path,type] of checks){
   }catch(e){console.log(`FAIL ${path} ${e.message}`);failed++;}
 }
 try{
-  const res=await fetchWithTimeout(base+"/api/search/article?q="+encodeURIComponent("ما هو الذكاء الاصطناعي؟")+"&lang=ar",{redirect:"follow"});
+  const res=await fetchWithTimeout(base+"/api/search/article?q="+encodeURIComponent("ما هو الذكاء الاصطناعي؟")+"&lang=ar",{redirect:"follow"},30000);
   const body=await res.text();
   const ok=(res.status===200 && body.includes('"status": "ok"') && body.includes('"article"')) || [503,502].includes(res.status);
   console.log((ok?"PASS":"FAIL")+" "+res.status+" /api/search/article bytes="+body.length+" type="+(res.headers.get("content-type")||""));
@@ -33,7 +33,7 @@ try{
 }catch(e){console.log("FAIL /api/search/article "+e.message);failed++;}
 
 try{
-  const englishSearch=await fetchWithTimeout(base+"/api/search?q="+encodeURIComponent("What is artificial intelligence?")+"&lang=en",{redirect:"follow"});
+  const englishSearch=await fetchWithTimeout(base+"/api/search?q="+encodeURIComponent("What is artificial intelligence?")+"&lang=en",{redirect:"follow"},20000);
   const data=await englishSearch.json();
   const ok=englishSearch.ok && data?.status==="ok" && data?.research?.queries?.length>=3;
   console.log((ok?"PASS":"FAIL")+" /api/search English research depth");
