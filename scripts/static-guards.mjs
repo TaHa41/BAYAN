@@ -19,7 +19,7 @@ if (!env.includes("BAYAN_VERSION=0.9.0")) failures.push(".env.example version dr
 if (!env.includes("SEARCH_PROVIDER=ceramic") || !env.includes("WIKIMEDIA_ENTERPRISE_TOKEN") || !env.includes("AI_SEARCH_INSTANCE")) failures.push(".env.example integration coverage drift");
 if (!deploy.includes("--var BAYAN_VERSION:0.9.0")) failures.push("deploy workflow version drift");
 if (!deploy.includes("workflow_run.conclusion == 'success'")) failures.push("production deploy is not restricted to successful CI");
-if (!deploy.includes("Enforce deployment preconditions") || !deploy.includes("Refusing to report success")) failures.push("deployment can succeed while privileged deployment steps are skipped");
+if (!deploy.includes("Deployment preconditions satisfied.") || !deploy.includes("deployment is intentionally skipped")) failures.push("deployment precondition decision is not explicit");
 if (!deploy.includes("Verify deployment source is current main") || !deploy.includes("git ls-remote origin refs/heads/main")) failures.push("production deploy source verification missing");
 if ((deploy.match(/steps\.source\.outputs\.current == 'true'/g) || []).length < 3) failures.push("production deploy stale-source guard is not applied to all privileged steps");
 if ((deploy.match(/wranglerVersion: "4.146.0"/g) || []).length < 2) failures.push("deployment Wrangler version is not pinned");
@@ -72,6 +72,8 @@ if (!source.includes('warnings: ["AI provider error", "No unverified answer was 
 if (/loadHomeNewsAndDiscovery/.test(read("public/app.js")) && /target="_blank"/.test(read("public/app.js").slice(read("public/app.js").indexOf("async function loadHomeNewsAndDiscovery"), read("public/app.js").indexOf("async function liveDataHome")))) failures.push("homepage live news/trending navigation can expose external links");
 if (!guardian.includes("set -o pipefail") || !guardian.includes("production-smoke.mjs | tee smoke-report.txt")) failures.push("Guardian production smoke pipeline can hide failures");
 if (!read("public/app.js").includes("function renderRoute(routePath)") || !read("public/app.js").includes("safeRenderRoute") || !read("public/app.js").includes("safeRenderRoute(path)")) failures.push("frontend SPA router/render bootstrap missing");
+if (!read("public/app.js").includes("function home()")) failures.push("frontend homepage renderer missing");
+if (!source.includes('content-security-policy')) failures.push("baseline content security policy missing");
 if (!read("public/app.js").includes("const safeHref=")) failures.push("frontend external URL safety helper missing");
 if (!source.includes("language: lang, title: generated.title")) failures.push("trending article language persistence missing");
 if (!read("scripts/production-smoke.mjs").includes("publicApiContracts")) failures.push("production API contract coverage missing");
