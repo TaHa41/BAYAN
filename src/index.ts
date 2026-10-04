@@ -563,15 +563,17 @@ const queueBayanRepair = async (env: Env, context: string, error: unknown) => {
     const safe = safeErrorMessage(error);
     const signature = context + "|" + safe;
     const now = new Date().toISOString();
-    await env.DB.prepare(
-      "INSERT INTO repair_jobs (signature,context,error_text,status,phase,created_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(signature) DO UPDATE SET
+    await env.DB.prepare(`
+      INSERT INTO repair_jobs (signature,context,error_text,status,phase,created_at,updated_at)
+      VALUES (?,?,?,?,?,?,?)
+      ON CONFLICT(signature) DO UPDATE SET
         context=excluded.context,
         error_text=excluded.error_text,
         updated_at=excluded.updated_at,
         status=CASE WHEN repair_jobs.status IN ('RESOLVED','ROLLED_BACK','FAILED') THEN 'QUEUED' ELSE repair_jobs.status END,
         phase=CASE WHEN repair_jobs.status IN ('RESOLVED','ROLLED_BACK','FAILED') THEN 'DETECTED' ELSE repair_jobs.phase END,
         next_attempt_at=CASE WHEN repair_jobs.status IN ('RESOLVED','ROLLED_BACK','FAILED') THEN NULL ELSE repair_jobs.next_attempt_at END
-    ).bind(signature, cleanText(context, 240), safe, "QUEUED", "DETECTED", now, now).run();
+    `).bind(signature, cleanText(context, 240), safe, "QUEUED", "DETECTED", now, now).run();
   } catch {}
 };
 
