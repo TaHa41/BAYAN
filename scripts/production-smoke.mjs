@@ -2,7 +2,7 @@ const base=(process.env.BAYAN_URL||"https://bayan.tahaomar411.workers.dev").repl
 const checks=[
   ["/","text/html"],["/api/health","application/json"],["/api/features","application/json"],["/api/trending","application/json"],["/api/gold","application/json"],
   ["/egypt","text/html"],["/arab","text/html"],["/world","text/html"],["/science","text/html"],["/economy","text/html"],["/politics","text/html"],["/technology","text/html"],["/history-culture","text/html"],["/people","text/html"],["/sports","text/html"],["/travel","text/html"],["/arts","text/html"],["/news","text/html"],["/trending","text/html"],
-  ["/prices","text/html"],["/tools","text/html"],["/search","text/html"],["/ai","text/html"],["/saved","text/html"],["/contribute","text/html"],["/review","text/html"],["/manifest.json","application/json"],["/sw.js","text/javascript"],["/sitemap.xml","application/xml"],["/robots.txt","text/plain"]
+  ["/prices","text/html"],["/tools","text/html"],["/search","text/html"],["/ai","text/html"],["/saved","text/html"],["/contribute","text/html"],["/review","text/html"],["/manifest.json","application/json"],["/manifest.en.json","application/json"],["/sw.js","text/javascript"],["/sitemap.xml","application/xml"],["/robots.txt","text/plain"]
 ];
 let failed=0;
 for(const [path,type] of checks){
@@ -93,11 +93,11 @@ try{
   if(!ok) failed++;
 }catch(e){console.log("FAIL frontend language-switch contract "+e.message);failed++;}
 try{
-  const englishRoutes=["/","/egypt","/science","/technology","/news","/prices","/search","/ai","/saved","/contribute"];
+  const englishRoutes=["/","/egypt","/science","/technology","/news","/prices","/tools","/about","/methodology","/search","/ai","/saved","/contribute"];
   for(const route of englishRoutes){
     const response=await fetch(base+route+"?lang=en",{redirect:"follow"});
     const html=await response.text();
-    const ok=response.ok && /<html[^>]+lang=["']en["'][^>]+dir=["']ltr["']/i.test(html);
+    const forbidden=["بحث","القائمة","المظهر","عن بيان","المنهجية","ساهم بمعلومة","المحفوظات","أدوات بيان","إدارة بيان","المعلومة أولًا. الدليل قبل الادعاء.","لماذا السماء زرقاء؟","علوم وفهم — المنهج العلمي وموضوعات علمية"];\n    const ok=response.ok && /<html[^>]+lang=["']en["'][^>]+dir=["']ltr["']/i.test(html) && !forbidden.some(term=>html.includes(term));
     console.log((ok?"PASS":"FAIL")+" English route "+route);
     if(!ok) failed++;
   }
