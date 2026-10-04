@@ -15,7 +15,7 @@ if (!key) {
   process.exit(0);
 }
 
-const model = process.env.OPENAI_MODEL || "gpt-5.6-sol";
+const model = process.env.OPENAI_MODEL || "gpt-6-luna";
 const prompt = [
   "BAYAN Site Guardian.",
   "Diagnose the supplied production/CI report using the repair skills below.",
