@@ -9,7 +9,7 @@ Current release marker: 0.9.0
 
 The GitHub-connected workspace exposes the repository with admin/write access. The repository tree has now been independently enumerated through the GitHub contents API and the current tracked project surface is known. The Worker source is 3,221 lines / ~188.4k characters; the frontend app is 348 lines / ~86.7k characters. All currently enumerated files in the repository are listed below and the text-bearing files were inspected for behavior or configuration.
 
-Exact current inventory: root files `.env.example`, `.gitignore`, `AGENTS.md`, `DEPLOY_TRIGGER.md`, `README.md`, `package.json`, `schema.sql`, `tsconfig.json`, `wrangler.jsonc`; `.github/workflows/{ci.yml,deploy.yml,guardian.yml}`; `docs/{AI_REPAIR_PLAYBOOK.md,BAYAN_SYSTEM_REFERENCE_2026-10-04.md}`; `migrations/0001_knowledge_articles.sql` through `0010_contribution_reviewer_note.sql`; `src/index.ts`, `src/app/content.ts`; `public/{ad-manager.js,app.js,content-data.js,google159baf09db9cb3cf.html,index.html,logo.svg,manifest.en.json,manifest.json,styles.css,sw.js}`; `scripts/{ai-capability-smoke.mjs,ai-guardian.mjs,production-smoke.mjs,static-guards.mjs}`; `tests/unit/{health.test.ts,project-guards.test.ts}`. No additional directory entries are currently exposed by the repository tree.
+Exact current inventory: root files `.env.example`, `.gitignore`, `AGENTS.md`, `DEPLOY_TRIGGER.md`, `README.md`, `package.json`, `schema.sql`, `tsconfig.json`, `wrangler.jsonc`; `.github/workflows/{ai-repair.yml,ai-rollback.yml,bootstrap-lockfile.yml,ci.yml,deploy.yml,guardian.yml}`; `docs/{AI_REPAIR_PLAYBOOK.md,BAYAN_SYSTEM_REFERENCE_2026-10-04.md,BAYAN_SYSTEM_SPEC.md}`; `migrations/0001_knowledge_articles.sql` through `0012_repair_engine_state.sql`; `src/index.ts`, `src/app/content.ts`; `public/{ad-manager.js,app.js,content-data.js,google159baf09db9cb3cf.html,index.html,logo.svg,manifest.en.json,manifest.json,styles.css,sw.js}`; `scripts/{ai-autorepair.mjs,ai-capability-smoke.mjs,ai-guardian.mjs,production-smoke.mjs,static-guards.mjs}`; `tests/unit/{health.test.ts,project-guards.test.ts}`. No additional directory entries are currently exposed by the repository tree.
 
 This is a verified inventory of the current GitHub `main` tree, not a claim that generated build artifacts or ignored local files exist.
 
@@ -367,7 +367,7 @@ D. Baseline HTTP security headers:
 - TypeScript 7.0.2, Vitest 5.0.3 and Workers Types 5.20261003.1 are current stable versions verified during this audit. Wrangler was upgraded from 4.146.0 to 4.147.0 because the latest release added the needed observability configuration support. 
 
 - Node 24 remains the appropriate CI runtime because it is LTS.
-- AI source-code self-editing remains disabled intentionally.
+- AI source-code repair is enabled through `scripts/ai-autorepair.mjs`, but it is bounded to a small reversible diff and cannot merge until CI, deployment and Guardian verification succeed. Failed AI repair commits have a separate safe rollback workflow.
 - Search provider outage is treated as an external dependency rather than fabricated success.
 
 ## 14. Remaining high-priority audit passes
