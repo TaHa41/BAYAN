@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: bayan-deploy-production
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
