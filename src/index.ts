@@ -207,6 +207,31 @@ const renderHtml = async (response: Response, requestUrl: URL, env?: Env) => {
 
   html = html.replace('<html lang="ar" dir="rtl">', '<html lang="' + language + '" dir="' + direction + '">');
   html = html.replace(/<link rel="manifest" href="[^"]+">/i, '<link rel="manifest" href="' + (language === "en" ? "/manifest.en.json" : "/manifest.json") + '">');
+  if (language === "en") {
+    const replacements: Record<string, string> = {
+      "BAYAN | بيان": "BAYAN",
+      "BAYAN — الصفحة الرئيسية": "BAYAN — Home",
+      "ماذا تريد أن تعرف؟": "What do you want to know?",
+      "بحث": "Search",
+      "المظهر": "Theme",
+      "القائمة": "Menu",
+      "التنقل الرئيسي": "Main navigation",
+      "المعلومة أولًا. الدليل قبل الادعاء.": "Information first. Evidence before claims.",
+      "عن بيان": "About BAYAN",
+      "المنهجية": "Methodology",
+      "ساهم بمعلومة": "Contribute information",
+      "الخصوصية": "Privacy",
+      "الشروط": "Terms",
+      "تواصل": "Contact",
+      "المحفوظات": "Saved",
+      "أدوات بيان": "BAYAN Tools",
+      "إدارة بيان": "BAYAN Management"
+    };
+    for (const [ar, en] of Object.entries(replacements)) html = html.split(ar).join(en);
+    for (const route of ["/about","/methodology","/contribute","/privacy","/terms","/contact","/saved","/tools","/review"]) {
+      html = html.replace(new RegExp('href="' + route.replace("/", "\\/") + '"', "g"), 'href="' + route + '?lang=en"');
+    }
+  }
   const indexable = !cleanPath.startsWith("/search") && !cleanPath.startsWith("/ai") && !cleanPath.startsWith("/saved") && !cleanPath.startsWith("/review") && !cleanPath.startsWith("/admin");
   const robots = indexable ? "index,follow" : "noindex,follow";
   const jsonLd = JSON.stringify(articleSeo ? {
