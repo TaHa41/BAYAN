@@ -19,6 +19,7 @@ if (!env.includes("BAYAN_VERSION=0.9.0")) failures.push(".env.example version dr
 if (!env.includes("SEARCH_PROVIDER=ceramic") || !env.includes("WIKIMEDIA_ENTERPRISE_TOKEN") || !env.includes("AI_SEARCH_INSTANCE")) failures.push(".env.example integration coverage drift");
 if (!deploy.includes("--var BAYAN_VERSION:0.9.0")) failures.push("deploy workflow version drift");
 if (!deploy.includes("workflow_run.conclusion == 'success'")) failures.push("production deploy is not restricted to successful CI");
+if (!deploy.includes("Enforce deployment preconditions") || !deploy.includes("Refusing to report success")) failures.push("deployment can succeed while privileged deployment steps are skipped");
 if (!deploy.includes("Verify deployment source is current main") || !deploy.includes("git ls-remote origin refs/heads/main")) failures.push("production deploy source verification missing");
 if ((deploy.match(/steps\.source\.outputs\.current == 'true'/g) || []).length < 3) failures.push("production deploy stale-source guard is not applied to all privileged steps");
 if ((deploy.match(/wranglerVersion: "4.146.0"/g) || []).length < 2) failures.push("deployment Wrangler version is not pinned");
