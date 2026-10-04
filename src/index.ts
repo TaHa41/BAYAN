@@ -1553,30 +1553,21 @@ const wikipediaSearch = async (query: string, language = "ar") => {
   const host = language === "en" ? "en.wikipedia.org" : "ar.wikipedia.org";
   const cleanQuery = cleanText(query.replace(/^(?:ما هو|ما هي|من هو|من هي|أين|لماذا|متى|who is|what is|where is|why|when)\\s+/i, "").replace(/[؟?!،,.:;]+$/g, "").trim(), 240) || query;
   try {
-    const rest = "https://" + host + "/w/rest.php/v1/search/page?q=" + encodeURIComponent(cleanQuery) + "&limit=8";
-    const response = await fetch(rest, { headers: { "Api-User-Agent": "BAYAN/1.0 (knowledge search)" }, signal: AbortSignal.timeout(5000) });
-    if (response.ok) {
-      const data = await response.json() as any;
-      const pages = Array.isArray(data?.pages) ? data.pages : [];
-      const results = pages.map((item: any, index: number) => ({
-        rank: index + 1, title: cleanText(item?.title, 220), source: "Wikipedia",
-        date: null, snippet: stripMarkup(item?.description || item?.excerpt || "", 700),
-        url: typeof item?.key === "string" ? "https://" + host + "/wiki/" + encodeURIComponent(item.key) : null
-      })).filter((x: any) => x.title && x.snippet);
-      if (results.length) return results;
-    }
-  } catch {}
-  try {
-    const api = "https://" + host + "/w/api.php?action=query&list=search&srsearch=" + encodeURIComponent(cleanQuery) + "&srlimit=8&format=json&origin=*";
-    const response = await fetch(api, { headers: { "Api-User-Agent": "BAYAN/1.0 (knowledge search)" }, signal: AbortSignal.timeout(5000) });
-    if (!response.ok) return [];
+    const api = "https://" + host + "/w/api.php?action=opensearch&search=" + encodeURIComponent(cleanQuery) + "&limit=8&namespace=0&format=json&origin=*";
+    const response = await fetch(api, { headers: { "user-agent": "BAYAN/1.0 (knowledge search)" }, signal: AbortSignal.timeout(5000) });
+    if (!response.ok) throw new Error("http_" + response.status);
     const data = await response.json() as any;
-    return (Array.isArray(data?.query?.search) ? data.query.search : []).map((item: any, index: number) => ({
-      rank: index + 1, title: cleanText(item?.title, 220), source: "Wikipedia",
-      date: null, snippet: stripMarkup(item?.snippet || "", 700),
-      url: typeof item?.title === "string" ? "https://" + host + "/wiki/" + encodeURIComponent(item.title.replace(/\\s+/g, "_")) : null
+    const titles = Array.isArray(data?.[1]) ? data[1] : [];
+    const descriptions = Array.isArray(data?.[2]) ? data[2] : [];
+    const urls = Array.isArray(data?.[3]) ? data[3] : [];
+    const results = titles.map((title: any, index: number) => ({
+      rank: index + 1, title: cleanText(title, 220), source: "Wikipedia",
+      date: null, snippet: cleanText(descriptions[index] || title, 700),
+      url: typeof urls[index] === "string" ? urls[index] : null
     })).filter((x: any) => x.title && x.snippet);
-  } catch { return []; }
+    if (results.length) return results;
+  } catch {}
+  return [];
 };
 const evidenceFallbackAnswer = (query: string, results: any[], language = "ar") => {
   if (!results.length) return null;
