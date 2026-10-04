@@ -2745,6 +2745,44 @@ export default {
       } catch (error) { return json({ status: "database_error", articles: [], error: safeErrorMessage(error) }, 503); }
     }
 
+    if (path === "/api/ai/manager/article" && request.method === "GET") {
+      if (!managerAuthorized(request, env)) return json({ status:"forbidden", error:managerAuthError(env) },403);
+      if (!env.DB || !await ensureKnowledgeTables(env)) return json({status:"database_unavailable"},503);
+      const slug=cleanText(url.searchParams.get("slug"),240);
+      if(!slug) return json({status:"slug_required"},400);
+      const article=await env.DB.prepare("SELECT * FROM knowledge_articles WHERE slug=?").bind(slug).first<any>();
+      if(!article) return json({status:"article_not_found"},404);
+      return json({status:"ok",article});
+    }
+
+    if (path === "/api/ai/manager/article/revisions" && request.method === "GET") {
+      if (!managerAuthorized(request, env)) return json({status:"forbidden",error:managerAuthError(env)},403);
+      if (!env.DB || !await ensureUserFeatureTables(env)) return json({status:"database_unavailable"},503);
+      const slug=cleanText(url.searchParams.get("slug"),240);
+      if(!slug) return json({status:"slug_required"},400);
+      const rows=await env.DB.prepare("SELECT id,article_slug,title,summary,body,sources_json,created_at FROM article_revisions WHERE article_slug=? ORDER BY created_at DESC LIMIT 20").bind(slug).all();
+      return json({status:"ok",revisions:rows.results||[]});
+    }
+
+    if (path === "/api/ai/manager/article/restore" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({status:"forbidden",error:managerAuthError(env)},403);
+      if (!env.DB || !await ensureUserFeatureTables(env) || !await ensureKnowledgeTables(env)) return json({status:"database_unavailable"},503);
+      try {
+        const body=await request.json() as any;
+        const slug=cleanText(body?.slug,240);
+        const revisionId=Number(body?.revisionId||0);
+        const revision=await env.DB.prepare("SELECT * FROM article_revisions WHERE id=? AND article_slug=?").bind(revisionId,slug).first<any>();
+        if(!revision) return json({status:"revision_not_found"},404);
+        const current=await env.DB.prepare("SELECT * FROM knowledge_articles WHERE slug=?").bind(slug).first<any>();
+        if(!current) return json({status:"article_not_found"},404);
+        const now=new Date().toISOString();
+        await env.DB.prepare("INSERT INTO article_revisions(article_slug,title,summary,body,sources_json,created_at) VALUES(?,?,?,?,?,?)").bind(slug,current.title,current.summary,current.body,current.sources_json||"[]",now).run();
+        await env.DB.prepare("UPDATE knowledge_articles SET title=?,summary=?,body=?,sources_json=?,updated_at=? WHERE slug=?").bind(revision.title,revision.summary,revision.body,revision.sources_json||"[]",now,slug).run();
+        await sendBayanOwnerNotification(env,"تم استرجاع نسخة قديمة من مقال","المقال: "+slug+"\nالنسخة: "+revisionId);
+        return json({status:"ok",slug,revisionId,updatedAt:now});
+      } catch(error) { return json({status:"restore_failed",error:safeErrorMessage(error)},400); }
+    }
+
     if (path === "/api/ai/manager/article/edit" && request.method === "POST") {
       if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
       if (!env.DB || !await ensureKnowledgeTables(env)) return json({ status: "database_unavailable" }, 503);
@@ -2765,8 +2803,11 @@ export default {
         const imageUrl = cleanText(body?.imageUrl, 2000) || article.hero_image_url || null;
         if (imageUrl && !/^https?:\/\//i.test(imageUrl)) return json({ status:"invalid_image_url" },400);
         const now = new Date().toISOString();
-        await env.DB.prepare("UPDATE knowledge_articles SET title=?,summary=?,body=?,title_en=?,summary_en=?,body_en=?,section=?,source_url=?,hero_image_url=?,hero_image_alt=?,hero_image_credit=?,hero_image_source=?,hero_image_license=?,hero_image_status=?,updated_at=? WHERE slug=?")
-          .bind(title,summary,bodyText,titleEn,summaryEn,bodyEn,section,sourceUrl,imageUrl,cleanText(body?.imageAlt || article.hero_image_alt || title,240),cleanText(body?.imageCredit || article.hero_image_credit || "",160)||null,cleanText(body?.imageSource || article.hero_image_source || "",2000)||null,cleanText(body?.imageLicense || article.hero_image_license || "",160)||null,imageUrl?(cleanText(body?.imageRightsStatus || article.hero_image_status || "manager_verified",40)):"NONE",now,slug).run();
+        await ensureUserFeatureTables(env);
+        await env.DB.prepare("INSERT INTO article_revisions(article_slug,title,summary,body,sources_json,created_at) VALUES(?,?,?,?,?,?)").bind(slug,article.title,article.summary,article.body,article.sources_json||"[]",now).run();
+        const sourcesJson = Array.isArray(body?.sources) ? JSON.stringify(body.sources.slice(0,20).map((x:any)=>({title:cleanText(x?.title||"",240),source:cleanText(x?.source||"",160),url:cleanText(x?.url||"",2000),date:x?.date||null}))) : article.sources_json || "[]";
+        await env.DB.prepare("UPDATE knowledge_articles SET title=?,summary=?,body=?,title_en=?,summary_en=?,body_en=?,section=?,source_url=?,sources_json=?,hero_image_url=?,hero_image_alt=?,hero_image_credit=?,hero_image_source=?,hero_image_license=?,hero_image_status=?,updated_at=? WHERE slug=?")
+          .bind(title,summary,bodyText,titleEn,summaryEn,bodyEn,section,sourceUrl,sourcesJson,imageUrl,cleanText(body?.imageAlt || article.hero_image_alt || title,240),cleanText(body?.imageCredit || article.hero_image_credit || "",160)||null,cleanText(body?.imageSource || article.hero_image_source || "",2000)||null,cleanText(body?.imageLicense || article.hero_image_license || "",160)||null,imageUrl?(cleanText(body?.imageRightsStatus || article.hero_image_status || "manager_verified",40)):"NONE",now,slug).run();
         await sendBayanOwnerNotification(env,"تم تعديل مقال من إدارة بيان","المقال: "+slug+"\nتم تحديث المحتوى/البيانات من لوحة الإدارة.");
         return json({ status:"ok", slug, updatedAt:now });
       } catch(error) { return json({status:"invalid_request",error:safeErrorMessage(error)},400); }
