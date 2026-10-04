@@ -47,7 +47,7 @@ package.json currently declares:
 Assessment on 2026-10-04:
 - TypeScript 7.0.2: current stable.
 - Vitest 5.0.3: current stable.
-- Wrangler 4.146.0: current stable verified.
+- Wrangler 4.147.0: current stable verified and now pinned in package/CI/deploy.
 - @cloudflare/workers-types 5.20261003.1: current stable verified.
 - Node 24 in CI: Active/Maintenance LTS line and appropriate production choice; Node 26 is Current, so it should not replace Node 24 merely to chase a newer major.
 - package-lock.json is absent from the verified repository tree. CI currently uses `npm install` rather than `npm ci`; this remains the main reproducibility/performance gap. A lockfile should be generated from a real dependency installation and committed only after CI validates it; it should not be fabricated from incomplete metadata.
@@ -363,7 +363,8 @@ D. Baseline HTTP security headers:
 - CSP baseline and HSTS were added to the common response-header path.
 
 ### Confirmed, not blindly changed
-- Dependency versions are already current enough; no major-version upgrade was justified.
+- TypeScript 7.0.2, Vitest 5.0.3 and Workers Types 5.20261003.1 are current stable versions verified during this audit. Wrangler was upgraded from 4.146.0 to 4.147.0 because the latest release added the needed observability configuration support. 
+
 - Node 24 remains the appropriate CI runtime because it is LTS.
 - AI source-code self-editing remains disabled intentionally.
 - Search provider outage is treated as an external dependency rather than fabricated success.
@@ -382,6 +383,12 @@ D. Baseline HTTP security headers:
 10. Run final CI -> deployment -> production smoke -> Guardian verification on the final main commit.
 
 ## 15. Current verification state
+
+Latest verified audit commit: `03e5f028843beb94a5070d5ce438a81fe75c388e2`.
+
+The latest CI run passed all quality stages. The corresponding production deployment applied D1 migrations, deployed Worker version `69b8728f-bb0f-4882-b4dc-f2abe5395c03`, production smoke passed, and the AI capability benchmark passed. This is the first full end-to-end verification of the newest audit changes.
+
+The smoke run also exposed and resolved two important issues during the audit: unbounded smoke-test requests and excessive second-round search retrieval. Search article/English search checks are now bounded independently, while runtime search expansion waits for fewer than three initial results instead of six.
 
 Latest main sequence after this audit:
 - homepage restoration: 3a72a304b1b41bc529355e3cb0783fdeaac64801
