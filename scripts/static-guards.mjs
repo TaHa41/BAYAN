@@ -10,9 +10,9 @@ const wrangler = read("wrangler.jsonc");
 const source = read("src/index.ts");
 const guardian = read(".github/workflows/guardian.yml");
 
-if (pkg.version !== "0.8.0") failures.push("package version is not 0.8.0");
-if (!env.includes("BAYAN_VERSION=0.8.0")) failures.push(".env.example version drift");
-if (!deploy.includes("--var BAYAN_VERSION:0.8.0")) failures.push("deploy workflow version drift");
+if (pkg.version !== "0.9.0") failures.push("package version is not 0.8.0");
+if (!env.includes("BAYAN_VERSION=0.9.0")) failures.push(".env.example version drift");
+if (!deploy.includes("--var BAYAN_VERSION:0.9.0")) failures.push("deploy workflow version drift");
 if (!wrangler.includes('"observability"') || !wrangler.includes('"issues"')) failures.push("observability configuration missing");
 if (!source.includes("gpt-6-luna") || !source.includes("gpt-6.1-sol")) failures.push("OpenAI fallback chain missing");
 if (!source.includes('SEARCH_PROVIDER') || !source.includes('SEARCH_PROVIDER_CHAIN')) failures.push("search provider fallback chain missing");
