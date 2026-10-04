@@ -4,11 +4,11 @@ import worker from "../../src/index";
 describe("BAYAN platform", () => {
   it("returns safe health metadata", async () => {
     const response = await worker.fetch(new Request("https://bayan.test/api/health"), {
-      BAYAN_ENVIRONMENT: "test", BAYAN_VERSION: "0.7.0", BAYAN_COMMIT_SHA: "test",
+      BAYAN_ENVIRONMENT: "test", BAYAN_VERSION: "0.9.0", BAYAN_COMMIT_SHA: "test",
     });
     expect(response.status).toBe(200);
     const body = await response.json() as unknown as { status: string; environment: string; version: string };
-    expect(body.status).toBe("ok"); expect(body.environment).toBe("test"); expect(body.version).toBe("0.7.0");
+    expect(body.status).toBe("ok"); expect(body.environment).toBe("test"); expect(body.version).toBe("0.9.0");
   });
   it("keeps the health section separate from the API health endpoint", async () => {
     const asset=new Response("<!doctype html><html><body>BAYAN health section</body></html>",{status:200,headers:{"content-type":"text/html"}});
@@ -41,7 +41,7 @@ describe("BAYAN platform", () => {
       OPENAI_API_KEY: "secret",
       SEARCH_PROVIDER: "ceramic",
       AI_SEARCH_INSTANCE: "bayan-knowledge",
-      BAYAN_VERSION: "0.8.0",
+      BAYAN_VERSION: "0.9.0",
       BAYAN_COMMIT_SHA: "test"
     });
     expect(allowed.status).toBe(200);
