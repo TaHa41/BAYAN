@@ -2167,12 +2167,12 @@ export default {
           .trim();
         const city = weatherQuery || (lang === "ar" ? "القاهرة" : "Cairo");
         try {
-          const geo = await fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(city) + "&count=5&language=" + lang + "&format=json");
+          const geo = await fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(city) + "&count=5&language=" + lang + "&format=json", { signal: AbortSignal.timeout(5000) });
           if (geo.ok) {
             const gd = await geo.json() as any;
             const place = gd.results?.[0];
             if (place) {
-              const weather = await fetch("https://api.open-meteo.com/v1/forecast?latitude=" + place.latitude + "&longitude=" + place.longitude + "&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto");
+              const weather = await fetch("https://api.open-meteo.com/v1/forecast?latitude=" + place.latitude + "&longitude=" + place.longitude + "&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto", { signal: AbortSignal.timeout(5000) });
               if (weather.ok) {
                 const wd = await weather.json() as any;
                 const current = wd.current;
