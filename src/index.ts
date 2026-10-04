@@ -2901,7 +2901,7 @@ export default {
         await ensureRuntimeAuditTable(env);
         const audit = await env.DB.prepare("SELECT checked_at,healthy,details_json FROM runtime_audits ORDER BY checked_at DESC LIMIT 1").first<any>();
         const recentCutoff = new Date(Date.now() - 20 * 60_000).toISOString();
-        const jobs = await env.DB.prepare("SELECT id,context,error_text,status,phase,risk_level,attempts,updated_at FROM repair_jobs WHERE status IN ('QUEUED','DIAGNOSING','WAITING_VERIFY') AND updated_at>=? ORDER BY updated_at DESC LIMIT 10").bind(recentCutoff).all<any>();
+        const jobs = await env.DB.prepare("SELECT id,context,error_text,status,phase,risk_level,attempts,updated_at FROM repair_jobs WHERE status IN ('QUEUED','DIAGNOSING','PATCHING','TESTING','WAITING_VERIFY') AND updated_at>=? AND phase NOT IN ('EXTERNAL_DEPENDENCY','RESOLVED','ROLLED_BACK') ORDER BY updated_at DESC LIMIT 10").bind(recentCutoff).all<any>();
         const runtimeDegraded = !!audit && Number(audit.healthy) !== 1 && String(audit.checked_at || "") >= recentCutoff;
         const repairable = runtimeDegraded || (jobs.results || []).length > 0;
         return json({
