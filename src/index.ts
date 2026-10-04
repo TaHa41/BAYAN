@@ -2745,6 +2745,33 @@ export default {
       } catch (error) { return json({ status: "database_error", articles: [], error: safeErrorMessage(error) }, 503); }
     }
 
+    if (path === "/api/ai/manager/article/edit" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      if (!env.DB || !await ensureKnowledgeTables(env)) return json({ status: "database_unavailable" }, 503);
+      try {
+        const body = await request.json() as any;
+        const slug = cleanText(body?.slug, 240);
+        if (!slug) return json({ status: "slug_required" }, 400);
+        const article = await env.DB.prepare("SELECT * FROM knowledge_articles WHERE slug=?").bind(slug).first<any>();
+        if (!article) return json({ status: "article_not_found" }, 404);
+        const title = cleanText(body?.title, 500) || article.title;
+        const summary = cleanText(body?.summary, 4000) || article.summary;
+        const bodyText = cleanText(body?.body, 30000) || article.body;
+        const titleEn = cleanText(body?.titleEn, 500) || article.title_en || null;
+        const summaryEn = cleanText(body?.summaryEn, 4000) || article.summary_en || null;
+        const bodyEn = cleanText(body?.bodyEn, 30000) || article.body_en || null;
+        const section = cleanText(body?.section, 80) || article.section;
+        const sourceUrl = cleanText(body?.sourceUrl, 2000) || article.source_url || null;
+        const imageUrl = cleanText(body?.imageUrl, 2000) || article.hero_image_url || null;
+        if (imageUrl && !/^https?:\/\//i.test(imageUrl)) return json({ status:"invalid_image_url" },400);
+        const now = new Date().toISOString();
+        await env.DB.prepare("UPDATE knowledge_articles SET title=?,summary=?,body=?,title_en=?,summary_en=?,body_en=?,section=?,source_url=?,hero_image_url=?,hero_image_alt=?,hero_image_credit=?,hero_image_source=?,hero_image_license=?,hero_image_status=?,updated_at=? WHERE slug=?")
+          .bind(title,summary,bodyText,titleEn,summaryEn,bodyEn,section,sourceUrl,imageUrl,cleanText(body?.imageAlt || article.hero_image_alt || title,240),cleanText(body?.imageCredit || article.hero_image_credit || "",160)||null,cleanText(body?.imageSource || article.hero_image_source || "",2000)||null,cleanText(body?.imageLicense || article.hero_image_license || "",160)||null,imageUrl?(cleanText(body?.imageRightsStatus || article.hero_image_status || "manager_verified",40)):"NONE",now,slug).run();
+        await sendBayanOwnerNotification(env,"تم تعديل مقال من إدارة بيان","المقال: "+slug+"\nتم تحديث المحتوى/البيانات من لوحة الإدارة.");
+        return json({ status:"ok", slug, updatedAt:now });
+      } catch(error) { return json({status:"invalid_request",error:safeErrorMessage(error)},400); }
+    }
+
     if (path === "/api/ai/manager/article/image" && request.method === "POST") {
       if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
       if (!env.DB || !await ensureKnowledgeTables(env)) return json({ status: "database_unavailable" }, 503);
