@@ -11,7 +11,7 @@ const source = read("src/index.ts");
 const guardian = read(".github/workflows/guardian.yml");
 const schema = read("schema.sql");
 const sw = read("public/sw.js");
-const migrations = readdirSync("migrations").filter((x) => /^\\d+_.*\\.sql$/.test(x)).sort();
+const migrations = readdirSync("migrations").filter((x) => /^\d+_.*\.sql$/.test(x)).sort();
 
 if (pkg.version !== "0.9.0") failures.push("package version is not 0.9.0");
 if (!env.includes("BAYAN_VERSION=0.9.0")) failures.push(".env.example version drift");
