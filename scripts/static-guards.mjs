@@ -60,6 +60,9 @@ if (!source.includes("language === \"en\" ? \"Insufficient Evidence:")) failures
 if (source.includes('notification: "telegram"')) failures.push("AI route advertises a Telegram notification that is not actually sent");
 if (!source.includes('warnings: ["AI provider error", "No unverified answer was generated."]') || !source.includes("}, 503);")) failures.push("AI provider outage does not degrade honestly to 503");
 if (!read("public/app.js").includes("function renderRoute(routePath)") || !read("public/app.js").includes("safeRenderRoute") || !read("public/app.js").includes("safeRenderRoute(path)")) failures.push("frontend SPA router/render bootstrap missing");
+if (!read("public/app.js").includes("const safeHref=")) failures.push("frontend external URL safety helper missing");
+if (!source.includes("language: lang, title: generated.title")) failures.push("trending article language persistence missing");
+if (!read("scripts/production-smoke.mjs").includes("publicApiContracts")) failures.push("production API contract coverage missing");
 if (!read("public/app.js").includes("function savedPage()") || !read("public/app.js").includes("function toolsPage()")) failures.push("frontend saved/tools routes missing");
 if (!source.includes("await setCooldown")) failures.push("provider cooldown persistence missing");
 if (/const (aiProviderCooldown|diagnosticMemory|repairMemory) = new Map/.test(source)) failures.push("request/provider cooldown uses mutable module state");
