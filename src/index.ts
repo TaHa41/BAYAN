@@ -1269,6 +1269,11 @@ const browserRenderedCheck = async (env: Env, route: string) => {
   const hasEmptyApp = /<main[^>]+id=["']app["'][^>]*>\s*<\/main>/i.test(html);
   const recovery = /وضع الاسترداد|تعذر تحميل الصفحة|Unable to load page|Internal Server Error|Unhandled exception/i.test(html);
   if (!html.trim() || !hasApp || hasEmptyApp || recovery) throw new Error("browser_render_degraded_" + route);
+  if (route.includes("lang=en")) {
+    const forbiddenEnglishUi = ["بحث", "القائمة", "المظهر", "عن بيان", "المنهجية", "ساهم بمعلومة", "المحفوظات", "أدوات بيان", "إدارة بيان", "المعلومة أولًا. الدليل قبل الادعاء."];
+    const leaked = forbiddenEnglishUi.filter((term) => html.includes(term));
+    if (leaked.length) throw new Error("english_ui_arabic_leak_" + leaked.slice(0, 4).join("|"));
+  }
   return { rendered: true, bytes: html.length };
 };
 
@@ -1316,7 +1321,7 @@ const runRuntimeAudit = async (env: Env) => {
   });
   // Browser Run is expensive; rotate one representative SPA route per audit cycle.
   // This still gives continuous coverage without multiplying browser calls every 5 minutes.
-  const browserRoutes = ["/", "/news", "/search?q=بيان"];
+  const browserRoutes = ["/", "/news", "/science", "/?lang=en", "/science?lang=en"];
   const browserRoute = browserRoutes[Math.floor(Date.now() / 300000) % browserRoutes.length];
   await check("browser:" + browserRoute, async () => browserRenderedCheck(env, browserRoute));
   await check("/search", async () => {
