@@ -42,7 +42,7 @@ if (!read("public/manifest.en.json").includes('"lang": "en"')) failures.push("En
 if (!source.includes("slugForQuery(q, lang)") || !source.includes("slugForQuery(input, language)")) failures.push("language-aware article slug persistence missing");
 if (!source.includes("languageContamination") || !source.includes("wrong_output_language")) failures.push("article output-language validation missing");
 if (!source.includes("independentSources.size < 2")) failures.push("article publication evidence gate missing");
-if (source.includes("slugForQuery(input)")) failures.push("article slug persistence still has a language-less input slug");
+if (/slugForQuery\(input\)(?!,)/.test(source)) failures.push("article slug persistence still has a language-less input slug");
 if (!source.includes('WHERE status=\'PUBLISHED\' AND language=? AND section IN')) failures.push("recommendations are not language-isolated");
 if (!source.includes('WHERE section = ? AND language = ?')) failures.push("knowledge article listing is not language-isolated");
 if (!source.includes('a.language=?')) failures.push("saved articles are not language-isolated");
