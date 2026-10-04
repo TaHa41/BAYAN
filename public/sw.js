@@ -7,5 +7,5 @@ self.addEventListener("fetch",event=>{
  const u=new URL(event.request.url);
  if(u.origin!==location.origin||event.request.method!=="GET"||u.pathname.startsWith("/api/")) return;
  if(!CACHEABLE.has(u.pathname)&&!u.pathname.startsWith("/assets/")) return;
- event.respondWith(fetch(event.request).then(r=>{const copy=r.clone();if(r.ok)caches.open(CACHE).then(c=>c.put(event.request,copy)).catch(()=>{});return r}).catch(()=>caches.match(event.request).then(r=>r||caches.match("/"))));
+ event.respondWith(fetch(event.request).then(r=>{const copy=r.clone();if(r.ok)caches.open(CACHE).then(c=>c.put(event.request,copy)).catch(()=>{});return r}).catch(()=>{const fallback=u.searchParams.get("lang")==="en"?"/?lang=en":"/";return caches.match(event.request).then(r=>r||caches.match(fallback));}));
 });
