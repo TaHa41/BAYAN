@@ -101,23 +101,22 @@ jobs:
           DIAGNOSIS="$(cat ai-diagnosis.json 2>/dev/null || true)"
           gh issue create --repo "${{ github.repository }}" --title "BAYAN Guardian: production regression" --body "$(printf 'Production smoke failed on %s.\n\n%s' "${{ github.sha }}" "$DIAGNOSIS")" || true
 
-      - name: Create AI provider dependency incident
-        if: steps.smoke.outcome == 'success' && steps.ai.outcome == 'failure' && steps.ai_classification.outputs.quota == 'true'
+      - name: Route AI benchmark incident
+        if: always() && steps.smoke.outcome == 'success' && steps.ai.outcome == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
           set -euo pipefail
-          if gh issue list --repo "${{ github.repository }}" --state open --search "BAYAN Guardian: AI provider quota in:title" --json number --jq 'length' | grep -q '^0$'; then
-            gh issue create --repo "${{ github.repository }}" --title "BAYAN Guardian: AI provider quota" --body "$(printf 'The production site remained healthy, but AI providers are currently unavailable because of external quota/credit limits on %s.\n\n%s' "${{ github.sha }}" "$(cat ai-report.txt 2>/dev/null || true)")" || true
+          report="$(cat ai-report.txt 2>/dev/null || true)"
+          if grep -q 'EXTERNAL_DEPENDENCY=AI_PROVIDER_QUOTA' <<< "$report"; then
+            if gh issue list --repo "${{ github.repository }}" --state open --search "BAYAN Guardian: AI provider quota in:title" --json number --jq 'length' | grep -q '^0$'; then
+              gh issue create --repo "${{ github.repository }}" --title "BAYAN Guardian: AI provider quota" --body "$(printf 'The production site remained healthy, but AI providers are currently unavailable because of external quota/credit limits on %s.\n\n%s' "${{ github.sha }}" "$report")" || true
+            fi
+          else
+            DIAGNOSIS="$(cat ai-diagnosis.json 2>/dev/null || true)"
+            gh issue create --repo "${{ github.repository }}" --title "BAYAN Guardian: AI capability regression" --body "$(printf 'AI capability benchmark failed on %s. The site smoke test remained healthy.\n\n%s\n\n%s' "${{ github.sha }}" "$DIAGNOSIS" "$report")" || true
           fi
-
-      - name: Create AI quality incident
-        if: steps.smoke.outcome == 'success' && steps.ai.outcome == 'failure' && steps.ai_classification.outputs.quota != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          DIAGNOSIS="$(cat ai-diagnosis.json 2>/dev/null || true)"
-          gh issue create --repo "${{ github.repository }}" --title "BAYAN Guardian: AI capability regression" --body "$(printf 'AI capability benchmark failed on %s. The site smoke test remained healthy.\n\n%s' "${{ github.sha }}" "$DIAGNOSIS")" || true
 
       - name: Guardian result
         if: steps.smoke.outcome == 'failure'
