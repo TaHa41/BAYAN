@@ -44,6 +44,7 @@ if (!migrations.includes("0009_multilingual_article_integrity.sql")) failures.pu
 if (!sw.includes("bayan-shell-v2")) failures.push("service worker cache version not upgraded");
 if (!sw.includes("/manifest.en.json")) failures.push("service worker does not cache English manifest");
 if (!sw.includes("/?lang=en")) failures.push("service worker does not cache the English offline shell");
+if (!sw.includes('u.searchParams.get("lang")==="en"?"/?lang=en":"/"')) failures.push("service worker English offline fallback is not language-safe");
 if (!read("public/manifest.en.json").includes('"lang": "en"')) failures.push("English PWA manifest missing");
 if (!source.includes("slugForQuery(q, lang)") || !source.includes("slugForQuery(input, language)")) failures.push("language-aware article slug persistence missing");
 if (!source.includes("SELECT slug,language FROM knowledge_articles WHERE query=? AND status='PUBLISHED'")) failures.push("multilingual article hreflang sibling resolution missing");
