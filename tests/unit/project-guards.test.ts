@@ -35,6 +35,20 @@ describe("BAYAN repository contracts", () => {
     expect(files.map((x: string) => Number(x.split("_")[0]))).toEqual(files.map((_x: string, i: number) => i + 1));
   });
 
+  it("keeps article publication language and evidence gates", () => {
+    const source = readFileSync("src/index.ts", "utf8");
+    expect(source).toContain("languageContamination");
+    expect(source).toContain("independentSources.size < 2");
+    expect(source).not.toMatch(/slugForQuery\(input\)(?!,)/);
+    expect(source).toContain("slugForQuery(input, language)");
+    expect(source).toContain("WHERE section = ? AND language = ?");
+    expect(source).toContain("AND language=? AND section IN");
+    expect(source).toContain('path === "/api/contributions" && request.method === "POST")');
+    expect(source).toContain('path === "/api/requests" && request.method === "POST")');
+    expect(source).toContain('path === "/api/search/article"');
+    expect(source).toContain('path === "/api/trending/article"');
+  });
+
   it("keeps English UI contract in the frontend source", () => {
     const app = readFileSync("public/app.js", "utf8");
     expect(app).toContain("isEn");

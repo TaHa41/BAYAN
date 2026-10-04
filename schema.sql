@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS visitor_profiles (
 );
 CREATE TABLE IF NOT EXISTS visitor_interest_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT, visitor_id TEXT NOT NULL, section TEXT NOT NULL,
-  event_type TEXT NOT NULL, weight REAL NOT NULL DEFAULT 1, created_at TEXT NOT NULL
+  event_type TEXT NOT NULL, weight REAL NOT NULL DEFAULT 1, created_at TEXT NOT NULL,
+  FOREIGN KEY(visitor_id) REFERENCES visitor_profiles(visitor_id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_interest_events_visitor_time ON visitor_interest_events(visitor_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_interest_events_section_time ON visitor_interest_events(section, created_at DESC);

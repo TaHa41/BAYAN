@@ -38,8 +38,16 @@ if (!schema.includes("title_en") || !schema.includes("body_en")) failures.push("
 if (!migrations.includes("0009_multilingual_article_integrity.sql")) failures.push("multilingual integrity migration missing");
 if (!sw.includes("bayan-shell-v2")) failures.push("service worker cache version not upgraded");
 if (!sw.includes("/manifest.en.json")) failures.push("service worker does not cache English manifest");
+if (!sw.includes("/?lang=en")) failures.push("service worker does not cache the English offline shell");
 if (!read("public/manifest.en.json").includes('"lang": "en"')) failures.push("English PWA manifest missing");
 if (!source.includes("slugForQuery(q, lang)") || !source.includes("slugForQuery(input, language)")) failures.push("language-aware article slug persistence missing");
+if (!source.includes("languageContamination") || !source.includes("wrong_output_language")) failures.push("article output-language validation missing");
+if (!source.includes("independentSources.size < 2")) failures.push("article publication evidence gate missing");
+if (/slugForQuery\(input\)(?!,)/.test(source)) failures.push("article slug persistence still has a language-less input slug");
+if (!source.includes('WHERE status=\'PUBLISHED\' AND language=? AND section IN')) failures.push("recommendations are not language-isolated");
+if (!source.includes('WHERE section = ? AND language = ?')) failures.push("knowledge article listing is not language-isolated");
+if (!source.includes('a.language=?')) failures.push("saved articles are not language-isolated");
+if (!schema.includes("FOREIGN KEY(visitor_id) REFERENCES visitor_profiles(visitor_id) ON DELETE CASCADE")) failures.push("canonical schema is missing the interest-event visitor foreign key");
 if (!source.includes("language === \"en\" ? \"Insufficient Evidence:")) failures.push("English AI fallback missing");
 if (!source.includes("await setCooldown")) failures.push("provider cooldown persistence missing");
 if (/const (aiProviderCooldown|diagnosticMemory|repairMemory) = new Map/.test(source)) failures.push("request/provider cooldown uses mutable module state");
