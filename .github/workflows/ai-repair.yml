@@ -122,7 +122,7 @@ jobs:
           done
 
       - name: Merge only after CI success
-        if: steps.repair.outcome == 'success'
+        if: steps.repair.outcome == 'success' && steps.classify.outputs.rollback_candidate != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
