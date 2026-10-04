@@ -248,7 +248,7 @@ const renderHtml = async (response: Response, requestUrl: URL, env?: Env) => {
   } : {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    name: "BAYAN | بيان",
+    name: language === "en" ? "BAYAN" : "BAYAN | بيان",
     url: requestUrl.origin + "/",
     inLanguage: ["ar", "en"],
     potentialAction: {
