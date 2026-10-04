@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS repair_jobs (
 CREATE INDEX IF NOT EXISTS idx_repair_jobs_status_next ON repair_jobs(status,next_attempt_at);
 
 CREATE INDEX IF NOT EXISTS idx_content_queue_retry ON content_queue(status,next_attempt_at,priority);
+CREATE INDEX IF NOT EXISTS idx_content_queue_status_priority ON content_queue(status,priority DESC,created_at ASC);
 
 CREATE TABLE IF NOT EXISTS bayan_analytics_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
