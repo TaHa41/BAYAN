@@ -743,9 +743,46 @@ const telegramApi = async (env: Env, method: string, body?: Record<string, unkno
   return data;
 };
 
+const ensureManagerSettings = async (env: Env) => {
+  if (!env.DB) return false;
+  try {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS bayan_manager_settings (
+      setting_key TEXT PRIMARY KEY,
+      setting_value TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`).run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_bayan_manager_settings_updated ON bayan_manager_settings(updated_at DESC)").run();
+    return true;
+  } catch { return false; }
+};
+
+const getManagerSetting = async (env: Env, key: string) => {
+  if (!env.DB) return null;
+  try {
+    await ensureManagerSettings(env);
+    const row = await env.DB.prepare("SELECT setting_value FROM bayan_manager_settings WHERE setting_key=?").bind(key).first() as any;
+    return row?.setting_value ? String(row.setting_value) : null;
+  } catch { return null; }
+};
+
+const setManagerSetting = async (env: Env, key: string, value: string) => {
+  if (!env.DB) return false;
+  try {
+    await ensureManagerSettings(env);
+    await env.DB.prepare("INSERT INTO bayan_manager_settings(setting_key,setting_value,updated_at) VALUES(?,?,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=excluded.updated_at")
+      .bind(key, cleanText(value, 240), new Date().toISOString()).run();
+    return true;
+  } catch { return false; }
+};
+
+const getTelegramChatId = async (env: Env) => {
+  const managed = await getManagerSetting(env, "telegram.chat_id");
+  return cleanText(managed || env.TELEGRAM_CHAT_ID || "", 120);
+};
+
 const sendBayanTelegram = async (env: Env, text: string, chatId?: string) => {
   const message = cleanText(text, 4000);
-  const configured = cleanText(chatId || env.TELEGRAM_CHAT_ID || "", 120);
+  const configured = cleanText(chatId || await getTelegramChatId(env) || "", 120);
   if (!configured) return { ok: false, error: "telegram_chat_id_not_configured" };
   try {
     await telegramApi(env, "sendMessage", { chat_id: configured, text: message });
