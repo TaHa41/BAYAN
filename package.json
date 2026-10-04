@@ -13,9 +13,9 @@
     "check": "npm run guards && npm run typecheck && node --check public/app.js && npm test && npm run build"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261002.1",
-    "typescript": "^5.8.0",
-    "vitest": "^3.2.0",
-    "wrangler": "^4.68.1"
+    "@cloudflare/workers-types": "^5.20261003.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3",
+    "wrangler": "^4.146.0"
   }
 }
