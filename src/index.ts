@@ -2438,7 +2438,7 @@ export default {
       }
       await env.DB!.prepare("UPDATE visitor_contributions SET status=?, reviewer_note=?, reviewed_at=? WHERE id=?")
         .bind(status, cleanText(body.note, 1000) || null, now, id).run();
-      return json({ status: "updated", id, moderation: status, article: publishedArticle });
+      return json({ status: "updated", id, moderation: status, publication: status === "VERIFIED" ? "QUEUED_FOR_INDEPENDENT_EVIDENCE" : "not_published" });
     }
 
     if (path === "/api/knowledge") {
