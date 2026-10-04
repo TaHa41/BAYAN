@@ -42,6 +42,10 @@ if (!source.includes('path === "/api/health" || path === "/health"')) failures.p
 if (!read("scripts/production-smoke.mjs").includes('["/health","application/json"]')) failures.push("production smoke does not verify /health");
 if (!read("scripts/production-smoke.mjs").includes("fetchWithTimeout") || !read("scripts/production-smoke.mjs").includes("AbortController")) failures.push("production smoke requests are not timeout-bounded");
 if (!source.includes("geocoding-api.open-meteo.com") || !source.includes("AbortSignal.timeout(5000)")) failures.push("live weather search dependencies are not timeout-bounded");
+if (!source.includes("bayan_manager_settings") || !source.includes("telegram.chat_id")) failures.push("manager Telegram settings persistence is missing");
+if (!source.includes("/api/ai/manager/telegram/status") || !source.includes("/api/ai/manager/telegram/configure")) failures.push("Telegram manager control endpoints are missing");
+if (!source.includes("/api/ai/manager/repairs/retry-all")) failures.push("manager bulk repair control is missing");
+if (!app.includes("BAYAN CONTROL CENTER") || !app.includes("telegramSave") || !app.includes("repairsRetryAll")) failures.push("manager control UI is incomplete");
 if (!source.includes('path === "/api/diagnostics"')) failures.push("protected diagnostics route missing");
 if (!source.includes("repair-skills")) failures.push("repair skills capability missing");
 if (!source.includes("title_en") || !source.includes("body_en")) failures.push("multilingual article storage missing");
