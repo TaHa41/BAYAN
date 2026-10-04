@@ -1551,25 +1551,33 @@ const wikimediaEnterpriseLookup = async (env: Env, query: string, language = "ar
 
 const wikipediaSearch = async (query: string, language = "ar") => {
   const host = language === "en" ? "en.wikipedia.org" : "ar.wikipedia.org";
-  const endpoint = "https://" + host + "/w/rest.php/v1/search/page?q=" + encodeURIComponent(query) + "&limit=8";
+  const cleanQuery = cleanText(query.replace(/^(?:ما هو|ما هي|من هو|من هي|أين|لماذا|متى|who is|what is|where is|why|when)\\s+/i, "").replace(/[؟?!،,.:;]+$/g, "").trim(), 240) || query;
   try {
-    const response = await fetch(endpoint, { headers: { "Api-User-Agent": "BAYAN/1.0 (knowledge search)" } });
+    const rest = "https://" + host + "/w/rest.php/v1/search/page?q=" + encodeURIComponent(cleanQuery) + "&limit=8";
+    const response = await fetch(rest, { headers: { "Api-User-Agent": "BAYAN/1.0 (knowledge search)" }, signal: AbortSignal.timeout(5000) });
+    if (response.ok) {
+      const data = await response.json() as any;
+      const pages = Array.isArray(data?.pages) ? data.pages : [];
+      const results = pages.map((item: any, index: number) => ({
+        rank: index + 1, title: cleanText(item?.title, 220), source: "Wikipedia",
+        date: null, snippet: stripMarkup(item?.description || item?.excerpt || "", 700),
+        url: typeof item?.key === "string" ? "https://" + host + "/wiki/" + encodeURIComponent(item.key) : null
+      })).filter((x: any) => x.title && x.snippet);
+      if (results.length) return results;
+    }
+  } catch {}
+  try {
+    const api = "https://" + host + "/w/api.php?action=query&list=search&srsearch=" + encodeURIComponent(cleanQuery) + "&srlimit=8&format=json&origin=*";
+    const response = await fetch(api, { headers: { "Api-User-Agent": "BAYAN/1.0 (knowledge search)" }, signal: AbortSignal.timeout(5000) });
     if (!response.ok) return [];
     const data = await response.json() as any;
-    const pages = Array.isArray(data?.pages) ? data.pages : [];
-    return pages.map((item: any, index: number) => ({
-      rank: index + 1,
-      title: cleanText(item?.title, 220),
-      source: "Wikipedia",
-      date: null,
-      snippet: stripMarkup(item?.description || item?.excerpt || "", 700),
-      url: typeof item?.key === "string" ? "https://" + host + "/wiki/" + encodeURIComponent(item.key) : null
+    return (Array.isArray(data?.query?.search) ? data.query.search : []).map((item: any, index: number) => ({
+      rank: index + 1, title: cleanText(item?.title, 220), source: "Wikipedia",
+      date: null, snippet: stripMarkup(item?.snippet || "", 700),
+      url: typeof item?.title === "string" ? "https://" + host + "/wiki/" + encodeURIComponent(item.title.replace(/\\s+/g, "_")) : null
     })).filter((x: any) => x.title && x.snippet);
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 };
-
 const evidenceFallbackAnswer = (query: string, results: any[], language = "ar") => {
   if (!results.length) return null;
   const top = results.slice(0, 6);
