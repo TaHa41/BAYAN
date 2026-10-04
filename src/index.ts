@@ -1391,6 +1391,41 @@ const runRuntimeAudit = async (env: Env) => {
   return { checkedAt: new Date().toISOString(), healthy: results.every((x) => x.ok), results, durationMs: Date.now() - started };
 };
 
+const predictBayanIssues = async (env: Env) => {
+  if (!env.DB) return { healthy: true, issues: [] as any[] };
+  try {
+    const rows = await env.DB.prepare(
+      "SELECT checked_at, healthy, details_json FROM runtime_audits ORDER BY checked_at DESC LIMIT 6"
+    ).all<any>();
+    const audits = Array.isArray(rows.results) ? rows.results : [];
+    const failures = new Map<string, { count: number; latest: string; errors: string[] }>();
+    for (const audit of audits) {
+      let details: any[] = [];
+      try { details = Array.isArray(JSON.parse(audit.details_json || "[]")) ? JSON.parse(audit.details_json || "[]") : []; } catch {}
+      for (const item of details) {
+        if (item?.ok) continue;
+        const route = cleanText(item?.route || "unknown", 180);
+        const entry = failures.get(route) || { count: 0, latest: String(audit.checked_at || ""), errors: [] };
+        entry.count++;
+        entry.latest = entry.latest || String(audit.checked_at || "");
+        if (item?.error) entry.errors.push(cleanText(item.error, 320));
+        failures.set(route, entry);
+      }
+    }
+    const issues = Array.from(failures.entries())
+      .filter(([, item]) => item.count >= 2)
+      .map(([route, item]) => ({
+        route,
+        consecutiveOrRepeatedFailures: item.count,
+        latest: item.latest,
+        errors: Array.from(new Set(item.errors)).slice(0, 3)
+      }));
+    return { healthy: issues.length === 0, issues };
+  } catch (error) {
+    return { healthy: true, issues: [], error: safeErrorMessage(error) };
+  }
+};
+
 const queryIntent = (query: string) => editorialIntent(query);
 
 const decodeHtmlEntities = (value: string) => String(value || "")
@@ -1831,6 +1866,26 @@ export default {
         await env.DB.prepare("INSERT INTO runtime_audits (checked_at, healthy, details_json) VALUES (?, ?, ?)")
           .bind(audit.checkedAt, audit.healthy ? 1 : 0, JSON.stringify(audit.results)).run();
         await env.DB.prepare("DELETE FROM runtime_audits WHERE id NOT IN (SELECT id FROM runtime_audits ORDER BY checked_at DESC LIMIT 100)").run();
+        const prediction = await predictBayanIssues(env);
+        if (!prediction.healthy) {
+          for (const issue of prediction.issues.slice(0, 3)) {
+            const signature = "predictive:" + issue.route;
+            if (!(await isCooldownActive("predictive-alert", signature))) {
+              await queueBayanRepair(
+                env,
+                "predictive runtime degradation: " + issue.route,
+                new Error(JSON.stringify(issue))
+              );
+              await setCooldown("predictive-alert", signature, 30 * 60);
+            }
+          }
+          await sendBayanOwnerNotification(
+            env,
+            "تنبيه استباقي من بيان",
+            "تم رصد تكرار فشل لمسارات قبل اعتباره عطلًا منفردًا. أُضيفت الحالات إلى Repair Queue للتحقق الآمن.\n" +
+            prediction.issues.slice(0, 3).map((x: any) => x.route + " · " + x.consecutiveOrRepeatedFailures + " مرات").join("\n")
+          );
+        }
       }
       await runKnowledgeMaintenance(env);
       await enqueueProactiveTopics(env);
