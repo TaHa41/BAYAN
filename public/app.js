@@ -179,7 +179,7 @@ document.querySelector("#reviewStatus").onclick=async()=>{const t=token.value.tr
 document.querySelector("#telegramTest").onclick=async()=>{const t=token.value.trim();if(!t){state.textContent=isEn?"Enter the manager token first.":"أدخل مفتاح الإدارة أولًا.";return;}try{const r=await fetch("/api/ai/manager/telegram/test",{method:"POST",headers:{authorization:"Bearer "+t}}),d=await r.json();state.textContent=r.ok?(isEn?"Telegram test sent successfully.":"تم إرسال اختبار Telegram بنجاح."):(isEn?"Telegram test failed: ":"فشل اختبار Telegram: ")+String(d?.error||d?.status||r.status);}catch{state.textContent=isEn?"Telegram connection failed.":"تعذر الاتصال بـTelegram."}};
 document.addEventListener("click",async e=>{const b=e.target.closest(".review-action");if(!b)return;const t=token.value.trim();if(!t)return;try{const r=await fetch("/api/contributions/review",{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+t},body:JSON.stringify({id:Number(b.dataset.id),status:b.dataset.status})});if(r.ok)load();else state.textContent=isEn?"Moderation failed.":"فشلت عملية المراجعة.";}catch{state.textContent=isEn?"Moderation connection failed.":"تعذر تنفيذ المراجعة."}});
 loadAnalytics();
-}function articlePage(slug){
+}async function articlePage(slug){
 const a=(window.BAYAN_CONTENT?.articles||[]).find(x=>x.id===slug);
 const renderArticle=(k,isPersisted)=>{
   const section=k.section||"news";
