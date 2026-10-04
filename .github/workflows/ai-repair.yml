@@ -42,6 +42,22 @@ jobs:
         run: |
           gh run download ${{ github.event.workflow_run.id }} --repo "${{ github.repository }}" --name guardian-diagnostics --dir guardian-diagnostics || true
 
+      - name: Avoid patching an already repaired commit
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="${{ github.event.workflow_run.head_sha || github.sha }}"
+          message="$(gh api "repos/${{ github.repository }}/commits/$sha" --jq '.commit.message')"
+          if grep -q '^fix(ai): autonomous repair for ' <<< "$message"; then
+            echo "rollback_candidate=true" >> "$GITHUB_OUTPUT"
+            echo "The failed commit is already an autonomous AI repair; Safe Rollback owns recovery."
+          else
+            echo "rollback_candidate=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Autonomous repair
         id: repair
         env:
@@ -62,7 +78,7 @@ jobs:
           node scripts/ai-autorepair.mjs | tee ai-repair-result.json
 
       - name: Create repair pull request
-        if: steps.repair.outcome == 'success'
+        if: steps.repair.outcome == 'success' && steps.classify.outputs.rollback_candidate != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
