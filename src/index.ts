@@ -210,7 +210,6 @@ const renderHtml = async (response: Response, requestUrl: URL, env?: Env) => {
   if (language === "en") {
     const replacements: Record<string, string> = {
       "BAYAN | بيان": "BAYAN",
-      "بيان": "BAYAN",
       "BAYAN — الصفحة الرئيسية": "BAYAN — Home",
       "ماذا تريد أن تعرف؟": "What do you want to know?",
       "بحث": "Search",
@@ -226,7 +225,8 @@ const renderHtml = async (response: Response, requestUrl: URL, env?: Env) => {
       "تواصل": "Contact",
       "المحفوظات": "Saved",
       "أدوات بيان": "BAYAN Tools",
-      "إدارة بيان": "BAYAN Management"
+      "إدارة بيان": "BAYAN Management",
+      "بيان": "BAYAN"
     };
     for (const [ar, en] of Object.entries(replacements)) html = html.split(ar).join(en);
     for (const route of ["/about","/methodology","/contribute","/privacy","/terms","/contact","/saved","/tools","/review"]) {
