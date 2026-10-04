@@ -32,7 +32,8 @@ if (!ci.includes("actions/checkout@v7") || !ci.includes("actions/setup-node@v7")
 if (!guardian.includes("actions/setup-node@v7") || !guardian.includes("node-version: 24")) failures.push("Guardian Node toolchain is outdated");
 if (!guardian.includes("ref: ${{ github.event.workflow_run.head_sha || github.sha }}")) failures.push("Guardian is not pinned to the deployed commit");
 
-if (!guardian.includes("shell: bash") || !guardian.includes("production-smoke.mjs | tee smoke-report.txt") || !guardian.includes("ai-capability-smoke.mjs | tee ai-report.txt")) failures.push("Guardian does not propagate piped script failures");
+if (!guardian.includes("shell: bash") || !guardian.includes("production-smoke.mjs | tee smoke-report.txt") || !guardian.includes("ai-capability-smoke.mjs | tee ai-report.txt")) failures.push("Guardian does not propagate piped script failures");\nif (!guardian.includes("AI repair gate") || !guardian.includes("EXTERNAL_DEPENDENCY=AI_PROVIDER_QUOTA") || !guardian.includes("ai_repair_gate.outcome == 'failure'")) failures.push("Guardian does not route repairable AI regressions while excluding external quota failures");
+
 if (!wrangler.includes('"observability"') || !wrangler.includes('"issues"')) failures.push("observability configuration missing");
 if (!wrangler.includes('"redactQueryString": true')) failures.push("observability query-string redaction missing");
 if (!wrangler.includes('"head_sampling_rate": 0.25')) failures.push("trace sampling budget is not bounded");
