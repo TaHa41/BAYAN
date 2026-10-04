@@ -46,7 +46,7 @@ if (!read("scripts/production-smoke.mjs").includes('["/health","application/json
 if (!read("scripts/production-smoke.mjs").includes("fetchWithTimeout") || !read("scripts/production-smoke.mjs").includes("AbortController")) failures.push("production smoke requests are not timeout-bounded");
 if (!source.includes("geocoding-api.open-meteo.com") || !source.includes("AbortSignal.timeout(5000)")) failures.push("live weather search dependencies are not timeout-bounded");
 if (!source.includes("bayan_manager_settings") || !source.includes("telegram.chat_id")) failures.push("manager Telegram settings persistence is missing");
-if (!source.includes("path === "/api/news"") || !source.includes("Google News RSS") || !source.includes("GNews")) failures.push("news provider chain is incomplete");
+if (!source.includes(`path === "/api/news"`) || !source.includes("Google News RSS") || !source.includes("GNews")) failures.push("news provider chain is incomplete");
 if (!source.includes("provider_unavailable") || !source.includes("articles: []")) failures.push("news failure contract is incomplete");
 if (!app.includes("news") || !app.includes("articleReady")) failures.push("news article UI contract is incomplete");
 if (!source.includes("/api/ai/manager/telegram/status") || !source.includes("/api/ai/manager/telegram/configure")) failures.push("Telegram manager control endpoints are missing");
