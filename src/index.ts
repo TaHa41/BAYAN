@@ -1695,7 +1695,7 @@ export default {
     }
   },
 
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response> {
     try {
       const url = new URL(request.url);
     const path = url.pathname;
@@ -2026,7 +2026,7 @@ export default {
       // Queue enrichment for the background worker instead.
       let knowledge: any = { query: q, section, status: "DISCOVERED", persisted: false };
       if (ctx?.waitUntil) {
-        ctx.waitUntil(queueContentTopic(env, q, section, lang, 100).catch(() => false));
+        ctx?.waitUntil(queueContentTopic(env, q, section, lang, 100).catch(() => false));
         knowledge.status = "QUEUED_FOR_ARTICLE";
       }
 
