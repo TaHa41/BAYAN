@@ -32,7 +32,7 @@ describe("BAYAN repository contracts", () => {
   it("keeps database migrations contiguous and includes multilingual hardening", () => {
     const files = readdirSync("migrations").filter((x) => /^\d+_.*\.sql$/.test(x)).sort();
     expect(files.at(-1)).toBe("0009_multilingual_article_integrity.sql");
-    expect(files.map(x => Number(x.split("_")[0]))).toEqual(files.map((_, i) => i + 1));
+    expect(files.map((x: string) => Number(x.split("_")[0]))).toEqual(files.map((_x: string, i: number) => i + 1));
   });
 
   it("keeps English UI contract in the frontend source", () => {
