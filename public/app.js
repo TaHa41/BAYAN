@@ -408,14 +408,15 @@ function managerSubPage(kind){
   telegram:["telegram","Telegram","Telegram"]
  };
  const target=map[kind]?map[kind][0]:"manager";
- const keep=new Set([target,"reviewToken"]);
  document.querySelectorAll("#app .page > *").forEach(el=>{
-   if(el.classList.contains("eyebrow")||el.classList.contains("page-title")||el.classList.contains("page-lead")||el.id==="reviewToken"||el.closest("#"+target)) return;
-   if(target==="manager" && el.id==="managerDashboard") return;
-   if(target==="analytics" && el.id==="analyticsPanel") return;
+   if(el.classList.contains("eyebrow")||el.classList.contains("page-title")||el.classList.contains("page-lead")) return;
    if(el.id==="manager-auth") return;
-   if(el.classList.contains("card") && !el.id) el.style.display="none";
+   el.style.display="none";
  });
+ const targetEl=document.querySelector("#"+target);
+ if(targetEl) targetEl.style.removeProperty("display");
+ if(target==="manager"){document.querySelector("#managerDashboard")?.style.removeProperty("display");}
+ if(target==="analytics"){document.querySelector("#analyticsPanel")?.style.removeProperty("display");}
  const authCard=[...document.querySelectorAll("#app .card")].find(x=>x.querySelector("#reviewToken"));
  if(authCard) authCard.id="manager-auth";
  document.querySelector("#manager-auth")?.style.removeProperty("display");
