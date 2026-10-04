@@ -125,5 +125,47 @@ try{
   console.log((ok?"PASS":"FAIL")+" /api/features capability contract");
   if(!ok) failed++;
 }catch(e){console.log("FAIL /api/features capability contract "+e.message);failed++;}
+
+async function contractGet(path, validator, label){
+  try{
+    const response=await fetch(base+path,{redirect:"follow"});
+    const data=await response.json().catch(()=>null);
+    const ok=validator(response,data);
+    console.log((ok?"PASS":"FAIL")+" "+label+" status="+response.status);
+    if(!ok) failed++;
+  }catch(e){console.log("FAIL "+label+" "+e.message);failed++;}
+}
+const publicApiContracts=[
+  ["/api/tools",(r,d)=>r.ok&&d?.tools?.includes("search"),"API tools contract"],
+  ["/api/ads/config",(r,d)=>r.ok&&typeof d?.enabled==="boolean","API ads contract"],
+  ["/api/features",(r,d)=>r.ok&&d?.features?.pwa===true,"API features contract"],
+  ["/api/search/compare?q="+encodeURIComponent("ما هي عاصمة مصر؟")+"&lang=ar",(r,d)=>r.ok&&d?.status==="ok"&&Array.isArray(d?.sources),"API source comparison contract"],
+  ["/api/knowledge?lang=en&limit=3",(r,d)=>r.ok&&d?.status==="ok"&&Array.isArray(d?.articles),"API English knowledge contract"],
+  ["/api/knowledge/graph?limit=3",(r,d)=>r.ok&&d?.status==="ok"&&Array.isArray(d?.nodes)&&Array.isArray(d?.edges),"API knowledge graph contract"],
+  ["/api/saved?visitorId=smoke-contract&lang=en",(r,d)=>r.ok&&d?.status==="ok"&&Array.isArray(d?.articles),"API saved contract"],
+  ["/api/article/history?slug=smoke-contract",(r,d)=>r.ok&&d?.status==="ok"&&Array.isArray(d?.revisions),"API history contract"],
+  ["/api/notifications?visitorId=smoke-contract",(r,d)=>r.ok&&d?.status==="ok"&&Array.isArray(d?.topics),"API notifications contract"],
+  ["/api/news?lang=en",(r,d)=>[200,503].includes(r.status)&&Array.isArray(d?.articles),"API English news contract"],
+  ["/api/trending?lang=en",(r,d)=>[200,503].includes(r.status)&&Array.isArray(d?.signals),"API English trending contract"],
+  ["/api/maps/config",(r,d)=>[200,503].includes(r.status)&&typeof d?.status==="string","API maps contract"],
+  ["/api/weather?city=Cairo",(r,d)=>[200,404,502].includes(r.status)&&typeof d?.status==="string","API weather contract"],
+  ["/api/markets?base=USD&quote=EGP",(r,d)=>[200,404,502].includes(r.status)&&typeof d?.status==="string","API FX contract"],
+  ["/api/images?q=cat",(r,d)=>[200,502].includes(r.status)&&typeof d?.status==="string","API image contract"]
+];
+for(const [path,validator,label] of publicApiContracts) await contractGet(path,validator,label);
+
+const protectedApiContracts=[
+  "/api/diagnostics","/api/analytics","/api/knowledge/searches","/api/requests/review","/api/contributions/review",
+  "/api/ai/manager/repairs","/api/ai/manager/status"
+];
+for(const path of protectedApiContracts){
+  try{
+    const response=await fetch(base+path,{redirect:"follow"});
+    const ok=response.status===403;
+    console.log((ok?"PASS":"FAIL")+" protected route "+path+" status="+response.status);
+    if(!ok) failed++;
+  }catch(e){console.log("FAIL protected route "+path+" "+e.message);failed++;}
+}
+
 if(failed){console.error(`Production smoke failed: ${failed}`);process.exit(1);}
 console.log("Production smoke passed.");
