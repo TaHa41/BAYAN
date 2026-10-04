@@ -106,13 +106,14 @@ try{
     const shellLeaks=forbiddenShell.filter((value)=>html.includes(value));
     const visibleHtml=html.replace(/<script[\s\S]*?<\/script>/gi,"").replace(/<style[\s\S]*?<\/style>/gi,"");
     const visibleArabic=/[\u0600-\u06FF]/.test(visibleHtml);
+    const visibleArabicContext=(visibleHtml.match(/.{0,100}[\u0600-\u06FF].{0,100}/)||[])[0]||null;
     const jsonLdArabic=[...html.matchAll(/<script[^>]+type=["\']application\/ld\+json["\'][^>]*>([\s\S]*?)<\/script>/gi)].some((m)=>/[\u0600-\u06FF]/.test(m[1]||""));
     const englishFooterLinks=[...html.matchAll(/<a[^>]+href="([^"]+\?lang=en)"[^>]*>/gi)].map((m)=>m[1]);
     const footerLinksOk=["/about?lang=en","/methodology?lang=en","/contribute?lang=en","/privacy?lang=en","/terms?lang=en","/contact?lang=en","/saved?lang=en","/tools?lang=en","/review?lang=en"].every((x)=>englishFooterLinks.includes(x));
     const shellLeak=shellLeaks.length>0 || visibleArabic || jsonLdArabic;
     const ok=response.ok && htmlLanguageOk && manifestIsEnglish && titleOk && !shellLeak && footerLinksOk;
     console.log((ok?"PASS":"FAIL")+" English route "+route);
-    if(!ok) console.log("EN_ROUTE_DEBUG",JSON.stringify({route,status:response.status,htmlLanguageOk,manifestIsEnglish,titleOk,shellLeaks,visibleArabic,jsonLdArabic,footerLinksOk,head:html.slice(0,1200)}));
+    if(!ok) console.log("EN_ROUTE_DEBUG",JSON.stringify({route,status:response.status,htmlLanguageOk,manifestIsEnglish,titleOk,shellLeaks,visibleArabic,jsonLdArabic,visibleArabicContext,footerLinksOk,head:html.slice(0,1200)}));
     if(!ok) failed++;
   }
 }catch(e){console.log("FAIL English route coverage "+e.message);failed++;}
