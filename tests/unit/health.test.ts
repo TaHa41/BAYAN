@@ -9,6 +9,9 @@ describe("BAYAN platform", () => {
     expect(response.status).toBe(200);
     const body = await response.json() as unknown as { status: string; environment: string; version: string };
     expect(body.status).toBe("ok"); expect(body.environment).toBe("test"); expect(body.version).toBe("0.9.0");
+    expect(response.headers.get("content-security-policy")).toContain("base-uri 'self'");
+    expect(response.headers.get("strict-transport-security")).toContain("max-age=31536000");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
   it("keeps the compatibility health endpoint separate from the API health endpoint", async () => {
     const response=await worker.fetch(new Request("https://bayan.test/health"), {
