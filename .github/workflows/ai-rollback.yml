@@ -1,0 +1,100 @@
+name: BAYAN AI Safe Rollback
+
+on:
+  workflow_run:
+    workflows: ["BAYAN Guardian"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: bayan-ai-rollback
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout current main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Classify failed production commit
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="${{ github.event.workflow_run.head_sha || github.sha }}"
+          current="$(git rev-parse origin/main)"
+          message="$(gh api "repos/${{ github.repository }}/commits/$sha" --jq '.commit.message')"
+          echo "sha=$sha"
+          echo "message=$message"
+          if [[ "$sha" != "$current" ]]; then
+            echo "rollback=false" >> "$GITHUB_OUTPUT"
+            echo "Main advanced after the failed deployment; rollback is skipped."
+          elif grep -q '^fix(ai): autonomous repair for ' <<< "$message"; then
+            echo "rollback=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "rollback=false" >> "$GITHUB_OUTPUT"
+            echo "The failed commit was not an autonomous AI repair commit."
+          fi
+
+      - name: Revert AI repair in isolated branch
+        if: steps.classify.outputs.rollback == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="${{ github.event.workflow_run.head_sha || github.sha }}"
+          branch="ai-rollback/${sha:0:12}"
+          git checkout -b "$branch"
+          git revert --no-edit "$sha"
+          git push origin "$branch"
+          gh pr create --repo "${{ github.repository }}" --base main --head "$branch"             --title "revert(ai): rollback failed autonomous repair ${sha:0:12}"             --body "BAYAN Guardian detected a production regression on an autonomous AI repair commit. This isolated rollback reverts that repair; CI, deployment and Guardian remain the verification gates."
+
+      - name: Verify rollback branch with CI
+        if: steps.classify.outputs.rollback == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="${{ github.event.workflow_run.head_sha || github.sha }}"
+          branch="ai-rollback/${sha:0:12}"
+          gh workflow run "BAYAN CI" --repo "${{ github.repository }}" --ref "$branch"
+          for i in {1..30}; do
+            sleep 10
+            run="$(gh run list --repo "${{ github.repository }}" --workflow "BAYAN CI" --branch "$branch" --limit 1 --json status,conclusion --jq '.[0]')"
+            current="$(node -e 'const x=JSON.parse(process.argv[1]); console.log(x.status)' "$run")"
+            conclusion="$(node -e 'const x=JSON.parse(process.argv[1]); console.log(x.conclusion||"")' "$run")"
+            echo "CI status=$current conclusion=$conclusion"
+            if [[ "$current" == "completed" ]]; then
+              [[ "$conclusion" == "success" ]] || { echo "Rollback CI failed."; exit 1; }
+              break
+            fi
+            [[ "$i" != "30" ]] || { echo "Rollback CI timed out."; exit 1; }
+          done
+
+      - name: Merge verified rollback
+        if: steps.classify.outputs.rollback == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="${{ github.event.workflow_run.head_sha || github.sha }}"
+          branch="ai-rollback/${sha:0:12}"
+          pr="$(gh pr list --repo "${{ github.repository }}" --head "$branch" --json number --jq '.[0].number')"
+          [[ -n "$pr" ]] || { echo "Rollback PR was not found."; exit 1; }
+          gh pr merge "$pr" --repo "${{ github.repository }}" --squash --delete-branch
