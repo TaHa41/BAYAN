@@ -52,6 +52,9 @@ describe("BAYAN repository contracts", () => {
     expect(source).toContain('path === "/api/trending/article"');
     expect(source).toContain('path === "/api/ai/manager/articles"');
     expect(source).toContain('path === "/api/ai/manager/article/image"');
+    expect(source).toContain('path === "/api/ai/manager/article/edit"');
+    expect(source).toContain('path === "/api/ai/manager/article/duplicate"');
+    expect(source).toContain('path === "/api/ai/manager/article/validate"');
     expect(source).toContain('path === "/api/ai/manager/article/status"');
     expect(source).toContain('path === "/api/ai/manager/news-diagnostics"');
     expect(source).toContain('hero_image_url');
@@ -72,6 +75,9 @@ describe("BAYAN repository contracts", () => {
     expect(app).toContain("!isEn||a.enTitle");
     expect(app).toContain("managerArticlesLoad");
     expect(app).toContain("article-auto-image");
+    expect(app).toContain("article-edit");
+    expect(app).toContain("article-validate");
+    expect(app).toContain("article-duplicate");
     expect(app).toContain("newsDiagnostics");
 
   });
