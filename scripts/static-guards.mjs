@@ -56,6 +56,9 @@ if (!source.includes('WHERE status=\'PUBLISHED\' AND language=? AND section IN')
 if (!source.includes('WHERE section = ? AND language = ?')) failures.push("knowledge article listing is not language-isolated");
 if (!source.includes('a.language=?')) failures.push("saved articles are not language-isolated");
 if (!schema.includes("FOREIGN KEY(visitor_id) REFERENCES visitor_profiles(visitor_id) ON DELETE CASCADE")) failures.push("canonical schema is missing the interest-event visitor foreign key");
+if (!read("migrations/0003_content_interest_engine.sql").includes("reviewer_note TEXT")) failures.push("canonical contribution migration is missing reviewer_note");
+if (!read("migrations/0010_contribution_reviewer_note.sql").includes("Compatibility marker")) failures.push("contribution schema compatibility migration missing");
+if (!source.includes("contribution-schema")) failures.push("runtime audit does not verify contribution schema");
 if (!source.includes("language === \"en\" ? \"Insufficient Evidence:")) failures.push("English AI fallback missing");
 if (source.includes('notification: "telegram"')) failures.push("AI route advertises a Telegram notification that is not actually sent");
 if (!source.includes('warnings: ["AI provider error", "No unverified answer was generated."]') || !source.includes("}, 503);")) failures.push("AI provider outage does not degrade honestly to 503");
