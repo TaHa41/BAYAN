@@ -11,7 +11,7 @@ Keep BAYAN evidence-first, bilingual, resilient, observable and deployable. Fix 
 - Visitor contributions remain PENDING_REVIEW until a manager verifies them.
 - Technical failures must be observable through Cloudflare Issues and the configured Telegram owner channel.
 - AI failures must use the configured fallback chain before returning Insufficient Evidence.
-- Runtime self-healing may retry, fail over, cooldown providers, queue repair work and verify recovery. It may not edit source code, secrets, permissions or production data autonomously.
+- Runtime self-healing is a bounded software-engineering pipeline. It may create isolated application-code repair branches, run guards/typecheck/tests/build, and request CI/deploy/production verification. It may not change secrets, permissions, authentication, security controls or destructive production data autonomously.
 
 ## Review standard
 A repository-wide change is incomplete until the affected runtime path, tests, static guards, build and production smoke checks pass.
@@ -22,11 +22,13 @@ A repository-wide change is incomplete until the affected runtime path, tests, s
 3. Gather logs, response contracts, provider state, bindings and the smallest relevant code path.
 4. Separate evidence from hypotheses.
 5. Apply the smallest reversible root-cause fix.
-6. Add a regression test or deterministic guard.
-7. Run typecheck, tests, frontend syntax checks and Wrangler dry-run.
-8. Deploy only after validation.
-9. Verify the affected production path, not only /api/health.
-10. Record the fix and make repeated failures harder to reintroduce.
+6. Produce the smallest reversible patch in an isolated repair branch.
+7. Add a regression test or deterministic guard.
+8. Run typecheck, tests, frontend syntax checks and Wrangler dry-run.
+9. Run normal CI and deploy only after validation.
+10. Verify the affected production path, not only /api/health.
+11. Resolve only after Guardian confirms the deployed commit.
+12. Record the fix and make repeated failures harder to reintroduce.
 
 ## Repository-wide upgrade checklist
 When performing a major upgrade, inspect every tracked file and every directory:
