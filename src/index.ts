@@ -2775,6 +2775,39 @@ export default {
       return json({ status: "ok", jobs: result.results || [] });
     }
 
+    if (path === "/api/ai/manager/control" && request.method === "GET") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      if (!env.DB) return json({ status: "database_unavailable" }, 503);
+      try {
+        await ensureRepairQueue(env);
+        await ensureRuntimeAuditTable(env);
+        const [queued, running, failed, resolved, audits, pendingContributions, pendingRequests] = await Promise.all([
+          env.DB.prepare("SELECT COUNT(*) AS count FROM repair_jobs WHERE status='QUEUED'").first() as Promise<any>,
+          env.DB.prepare("SELECT COUNT(*) AS count FROM repair_jobs WHERE status='RUNNING'").first() as Promise<any>,
+          env.DB.prepare("SELECT COUNT(*) AS count FROM repair_jobs WHERE status='FAILED'").first() as Promise<any>,
+          env.DB.prepare("SELECT COUNT(*) AS count FROM repair_jobs WHERE status='RESOLVED'").first() as Promise<any>,
+          env.DB.prepare("SELECT checked_at,healthy,details_json FROM runtime_audits ORDER BY checked_at DESC LIMIT 1").first() as Promise<any>,
+          env.DB.prepare("SELECT COUNT(*) AS count FROM visitor_contributions WHERE status='PENDING_REVIEW'").first() as Promise<any>,
+          env.DB.prepare("SELECT COUNT(*) AS count FROM user_requests WHERE status='PENDING_REVIEW'").first() as Promise<any>
+        ]);
+        return json({
+          status:"ok",
+          runtime: audits || null,
+          repairs:{queued:Number(queued?.count||0),running:Number(running?.count||0),failed:Number(failed?.count||0),resolved:Number(resolved?.count||0)},
+          moderation:{contributions:Number(pendingContributions?.count||0),requests:Number(pendingRequests?.count||0)},
+          checkedAt:new Date().toISOString()
+        });
+      } catch(error) { return json({status:"manager_control_error",error:safeErrorMessage(error)},503); }
+    }
+
+    if (path === "/api/ai/manager/repairs/retry-all" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      if (!env.DB) return json({ status: "database_unavailable" }, 503);
+      await ensureRepairQueue(env);
+      const result = await env.DB.prepare("UPDATE repair_jobs SET status='QUEUED',next_attempt_at=NULL,updated_at=? WHERE status IN ('FAILED','WAITING')").bind(new Date().toISOString()).run();
+      return json({status:"ok",queued:Number(result.meta?.changes||0)});
+    }
+
     if (path === "/api/ai/manager/repairs/retry" && request.method === "POST") {
       if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
       if (!env.DB) return json({ status: "database_unavailable" }, 503);
