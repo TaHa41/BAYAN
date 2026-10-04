@@ -47,6 +47,8 @@ describe("BAYAN repository contracts", () => {
     expect(source).toContain('path === "/api/requests" && request.method === "POST")');
     expect(source).toContain('path === "/api/search/article"');
     expect(source).toContain('path === "/api/trending/article"');
+    expect(source).not.toContain("سؤال جديد إلى اسأل بيان");
+
     expect(source).toContain('/article/egypt-basics');
     expect(source).toContain('/article/trending-data');
 
