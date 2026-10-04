@@ -37,7 +37,7 @@ CREATE INDEX IF NOT EXISTS idx_knowledge_edges_from ON knowledge_edges(from_key)
 CREATE INDEX IF NOT EXISTS idx_knowledge_edges_to ON knowledge_edges(to_key);
 CREATE TABLE IF NOT EXISTS content_queue (
   id INTEGER PRIMARY KEY AUTOINCREMENT, topic TEXT NOT NULL, section TEXT NOT NULL,
-  language TEXT NOT NULL DEFAULT 'ar', priority INTEGER NOT NULL DEFAULT 0,
+  language TEXT NOT NULL DEFAULT 'ar', priority INTEGER NOT NULL DEFAULT 50,
   attempts INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'QUEUED',
   created_at TEXT NOT NULL, processed_at TEXT, next_attempt_at TEXT
 );
