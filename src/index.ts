@@ -629,9 +629,9 @@ const processBayanRepairQueue = async (env: Env, currentAudit?: any) => {
           .bind(repair.action, cleanText(repair.result, 4000), new Date(Date.now() + 15 * 60_000).toISOString(), new Date().toISOString(), job.id).run();
         continue;
       }
-      if (repair.action === "diagnose_only") {
-        await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI',last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
-          .bind(repair.action, cleanText(repair.diagnosis || repair.result, 4000), new Date(Date.now() + 30 * 60_000).toISOString(), new Date().toISOString(), job.id).run();
+          if (repair.action === "external_repair_required") {
+        await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI',phase='PATCHING',last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
+          .bind(repair.action, cleanText(repair.diagnosis || repair.result, 4000), new Date(Date.now() + 10 * 60_000).toISOString(), new Date().toISOString(), job.id).run();
         continue;
       }
       const isQuota = /4006|daily free allocation|429|quota|allocation/i.test(JSON.stringify(repair));
@@ -690,8 +690,8 @@ const attemptBayanSelfRepair = async (env: Env, context: string, error: unknown)
   }
   return {
     attempted: true,
-    action: "diagnose_only",
-    result: "تم تحليل الخطأ آليًا، لكن لم يُسمح بإجراء تغيير غير مؤكد أو تعديل كود تلقائي.",
+    action: "external_repair_required",
+    result: "تم تصنيف المشكلة كإصلاح برمجي/تشغيلي يحتاج مسار مهندس الإصلاح الذاتي في GitHub مع CI وProduction verification؛ لم يتم الادعاء بإصلاح غير منفذ.",
     diagnosis: cleanText(diagnosis, 1200), diagnosisProvider
   };
 };
@@ -1467,10 +1467,23 @@ const runRuntimeAudit = async (env: Env) => {
   const browserRoutes = ["/", "/news", "/science", "/search?lang=en", "/ai?lang=en", "/trending?lang=en", "/prices?lang=en", "/saved?lang=en", "/contribute?lang=en", "/review?lang=en", "/tools?lang=en", "/about?lang=en", "/methodology?lang=en"];
   const browserRoute = browserRoutes[Math.floor(Date.now() / 300000) % browserRoutes.length];
   await check("browser:" + browserRoute, async () => browserRenderedCheck(env, browserRoute));
+  // Browser rendering is a secondary diagnostic signal. A browser/provider degradation
+  // must not make the core Worker/D1 audit unhealthy or flood the repair queue.
+  const browserResult = results[results.length - 1];
+  if (browserResult?.route === "browser:" + browserRoute && !browserResult.ok) {
+    browserResult.severity = "warning";
+    browserResult.repairable = true;
+  }
 
   // Do not run internalSearch from the 5-minute audit. It can fan out to multiple
   // external providers and was a major contributor to the subrequest-limit failures.
-  return { checkedAt: new Date().toISOString(), healthy: results.every((x) => x.ok), results, durationMs: Date.now() - started };
+  return {
+    checkedAt: new Date().toISOString(),
+    healthy: results.filter((x) => x.severity !== "warning").every((x) => x.ok),
+    results,
+    warnings: results.filter((x) => x.severity === "warning").map((x) => ({ route: x.route, error: x.error })),
+    durationMs: Date.now() - started
+  };
 };
 const predictBayanIssues = async (env: Env) => {
   if (!env.DB) return { healthy: true, issues: [] as any[] };
@@ -1495,7 +1508,9 @@ const predictBayanIssues = async (env: Env) => {
     }
     const issues = Array.from(failures.entries())
       .filter(([, item]) => item.count >= 2)
-      .filter(([, item]) => !item.errors.some((error) => /Too many subrequests by single Worker invocation/i.test(error)))
+      .filter(([, item]) => !item.errors.some((error) =>
+        /Too many subrequests by single Worker invocation|browser_render_degraded_|cloudflare_ai.*(4006|daily free allocation)|openai_http_429|cloudflare_web_search_(ceramic|exa|linkup).*failed/i.test(error)
+      ))
       .map(([route, item]) => ({
         route,
         consecutiveOrRepeatedFailures: item.count,
