@@ -1,5 +1,4 @@
--- Repair migration: the original contribution migration omitted reviewer_note.
--- Keep this additive and idempotent at the migration level by relying on D1's
--- one-time migration execution; the runtime schema guard also tolerates
--- already-repaired databases.
-ALTER TABLE visitor_contributions ADD COLUMN reviewer_note TEXT;
+-- Compatibility marker for the contribution schema repair.
+-- Fresh databases receive reviewer_note from migration 0003.
+-- Legacy databases are repaired by ensureContributionTable at runtime because
+-- SQLite/D1 does not support ALTER TABLE ... ADD COLUMN IF NOT EXISTS safely.
