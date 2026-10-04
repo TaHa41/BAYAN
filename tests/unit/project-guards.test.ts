@@ -51,6 +51,8 @@ describe("BAYAN repository contracts", () => {
     expect(source).toContain('path === "/api/search/article"');
     expect(source).toContain('path === "/api/trending/article"');
     expect(source).toContain('path === "/api/ai/manager/articles"');
+    expect(source).toContain('path === "/api/ai/manager/ai-request"');
+    expect(source).toContain('path === "/api/ai/manager/article/edit"');
     expect(source).toContain('path === "/api/ai/manager/article/image"');
     expect(source).toContain('path === "/api/ai/manager/article/edit"');
     expect(source).toContain('path === "/api/ai/manager/article/duplicate"');
@@ -77,6 +79,9 @@ describe("BAYAN repository contracts", () => {
     expect(app).not.toContain('isEn?(a.enTitle||a.title):a.title');
     expect(app).toContain("!isEn||a.enTitle");
     expect(app).toContain("managerArticlesLoad");
+    expect(app).toContain("managerAISend");
+    expect(app).toContain("article-edit");
+    expect(app).toContain("article-save");
     expect(app).toContain("article-auto-image");
     expect(app).toContain("article-edit");
     expect(app).toContain("article-validate");
