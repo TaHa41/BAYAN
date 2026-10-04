@@ -2381,7 +2381,7 @@ export default {
         if (!env.DB || !visitorId || !title || contribution.length < 20) return json({ status: "invalid_contribution" }, 400);
         if (!await ensureContributionTable(env)) return json({ status: "database_unavailable" }, 503);
         await env.DB.prepare("INSERT INTO visitor_contributions(visitor_id,title,body,source,status,created_at) VALUES(?,?,?,?, 'PENDING_REVIEW',?)").bind(visitorId,title,contribution,source||null,new Date().toISOString()).run();
-        const notified = await sendBayanOwnerNotification(env, "مساهمة جديدة في بيان: " + title, "وصلت مساهمة جديدة وتحتاج مراجعة.\n\nالعنوان: " + title + "\n\nالمحتوى:\n" + contribution + "\n\nالمصدر: " + (source || "غير مذكور") + "\n\nالحالة: PENDING_REVIEW\n\nصفحة المراجعة: /review");
+        const notified = await sendBayanOwnerNotification(env, "مساهمة جديدة في بيان: " + title, "وصلت مساهمة جديدة وتحتاج مراجعة.\n\nالعنوان: " + title + "\n\nتم حفظ المحتوى داخل لوحة المراجعة فقط؛ لم يتم إرسال نص المساهمة أو بياناته الخام عبر Telegram.\n\nالحالة: PENDING_REVIEW\n\nصفحة المراجعة: /review");
         return json({ status: "received", moderation: "PENDING_REVIEW", notification: notified }, 201);
       } catch { return json({ status: "invalid_request" }, 400); }
     }
