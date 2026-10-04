@@ -73,3 +73,15 @@ main{width:min(1280px,92%)}.hero{min-height:590px;grid-template-columns:minmax(0
 .manager-side-nav{background:color-mix(in srgb,var(--surface) 94%,transparent);backdrop-filter:blur(22px)}
 @media(max-width:900px){.hero{gap:32px}.hero-visual{min-height:290px}}
 @media(max-width:560px){.header-inner{padding:9px 0}.brand-logo{width:39px;height:39px}.searchbar{height:47px}.hero{padding:48px 0 28px}.hero h1{font-size:47px}.hero-visual{min-height:245px}.page{padding-top:40px}.card{padding:18px}}
+
+/* Dedicated BAYAN Manager page switcher */
+.manager-edge-control{position:fixed;inset-inline-end:0;top:42%;z-index:10050;display:flex;align-items:center}
+.manager-edge-control>button{width:38px;height:54px;border:1px solid var(--line);border-inline-end:0;border-radius:13px 0 0 13px;background:var(--surface);color:var(--text);box-shadow:0 8px 30px rgba(0,0,0,.2);font-size:20px;font-weight:900;cursor:pointer}
+.manager-edge-menu{position:fixed;inset-inline-end:0;top:calc(42% - 145px);width:min(290px,82vw);padding:12px;background:color-mix(in srgb,var(--surface) 96%,transparent);backdrop-filter:blur(22px);border:1px solid var(--line);border-inline-end:0;border-radius:16px 0 0 16px;box-shadow:0 18px 55px rgba(0,0,0,.24)}
+.manager-edge-head{display:flex;align-items:center;justify-content:space-between;padding:4px 5px 12px;margin-bottom:8px;border-bottom:1px solid var(--line)}
+.manager-edge-head button{border:0;background:transparent;color:var(--muted);font-size:24px;cursor:pointer}
+.manager-edge-menu nav{display:grid;gap:5px}
+.manager-edge-menu nav a{display:flex;align-items:center;gap:11px;padding:11px;border-radius:11px;color:var(--text);text-decoration:none}
+.manager-edge-menu nav a:hover,.manager-edge-menu nav a.active{background:color-mix(in srgb,var(--accent) 10%,var(--surface2));color:var(--accent)}
+.manager-edge-menu nav a span{width:30px;height:30px;display:grid;place-items:center;border-radius:8px;background:var(--surface2);font-weight:900}
+@media(max-width:560px){.manager-edge-control{top:38%}.manager-edge-menu{top:calc(38% - 145px);width:min(280px,86vw)}.manager-edge-control>button{width:36px;height:50px}}
