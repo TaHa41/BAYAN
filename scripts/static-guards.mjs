@@ -19,6 +19,7 @@ if (!env.includes("SEARCH_PROVIDER=ceramic") || !env.includes("WIKIMEDIA_ENTERPR
 if (!deploy.includes("--var BAYAN_VERSION:0.9.0")) failures.push("deploy workflow version drift");
 if (!deploy.includes("head_branch == 'main'")) failures.push("production deploy is not restricted to main CI");
 if (!deploy.includes("Verify deployment source is current main") || !deploy.includes("git ls-remote origin refs/heads/main")) failures.push("production deploy source verification missing");
+if ((deploy.match(/steps\.source\.outputs\.current == 'true'/g) || []).length < 3) failures.push("production deploy stale-source guard is not applied to all privileged steps");
 if ((deploy.match(/wranglerVersion: "4.146.0"/g) || []).length < 2) failures.push("deployment Wrangler version is not pinned");
 if (!deploy.includes("actions/checkout@v7")) failures.push("deployment checkout action is outdated");
 const ci = read(".github/workflows/ci.yml");
