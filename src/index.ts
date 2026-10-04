@@ -299,8 +299,8 @@ const sectionForIntent = (intent: string, query = "") => {
   return "world";
 };
 
-const slugForQuery = async (query: string) => {
-  const data = new TextEncoder().encode(query.trim().toLowerCase());
+const slugForQuery = async (query: string, language = "ar") => {
+  const data = new TextEncoder().encode(language.trim().toLowerCase() + "|" + query.trim().toLowerCase());
   const digest = await crypto.subtle.digest("SHA-256", data);
   return "knowledge-" + Array.from(new Uint8Array(digest)).slice(0, 10).map((x) => x.toString(16).padStart(2, "0")).join("");
 };
@@ -786,6 +786,10 @@ const ensureKnowledgeTables = async (env: Env) => {
       title TEXT NOT NULL,
       summary TEXT NOT NULL,
       body TEXT NOT NULL,
+      language TEXT NOT NULL DEFAULT 'ar',
+      title_en TEXT,
+      summary_en TEXT,
+      body_en TEXT,
       sources_json TEXT NOT NULL DEFAULT '[]',
       status TEXT NOT NULL DEFAULT 'PUBLISHED',
       created_at TEXT NOT NULL,
@@ -805,6 +809,11 @@ const ensureKnowledgeTables = async (env: Env) => {
       created_at TEXT NOT NULL
     )`).run();
     await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_knowledge_articles_section_updated ON knowledge_articles(section, updated_at DESC)").run();
+    try { await env.DB.prepare("ALTER TABLE knowledge_articles ADD COLUMN language TEXT NOT NULL DEFAULT 'ar'").run(); } catch {}
+    try { await env.DB.prepare("ALTER TABLE knowledge_articles ADD COLUMN title_en TEXT").run(); } catch {}
+    try { await env.DB.prepare("ALTER TABLE knowledge_articles ADD COLUMN summary_en TEXT").run(); } catch {}
+    try { await env.DB.prepare("ALTER TABLE knowledge_articles ADD COLUMN body_en TEXT").run(); } catch {}
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_knowledge_articles_language_status ON knowledge_articles(language,status,updated_at DESC)").run();
     await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_knowledge_articles_status_updated ON knowledge_articles(status, updated_at DESC)").run();
     return true;
   } catch { return false; }
@@ -861,9 +870,13 @@ const saveKnowledgeArticle = async (env: Env, article: any) => {
     if (!await ensureKnowledgeTables(env)) return { persisted: false, reason: "knowledge_schema_unavailable" };
     const bodyText = article.body.join("\n");
     const sourcesJson = JSON.stringify(article.sources || []);
-    const existing = await env.DB.prepare("SELECT title,summary,body FROM knowledge_articles WHERE slug=?").bind(article.slug).first() as any;
-    const sql = "INSERT INTO knowledge_articles (slug, query, section, title, summary, body, sources_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?) ON CONFLICT(slug) DO UPDATE SET section=excluded.section, title=excluded.title, summary=excluded.summary, body=excluded.body, sources_json=excluded.sources_json, status='PUBLISHED', updated_at=excluded.updated_at";
-    await env.DB.prepare(sql).bind(article.slug, article.query, article.section, article.title, article.summary, bodyText, sourcesJson, article.createdAt, article.createdAt).run();
+    const existing = await env.DB.prepare("SELECT title,summary,body,title_en,summary_en,body_en FROM knowledge_articles WHERE slug=?").bind(article.slug).first() as any;
+    const language = article.language === "en" ? "en" : "ar";
+    const titleEn = language === "en" ? article.title : null;
+    const summaryEn = language === "en" ? article.summary : null;
+    const bodyEn = language === "en" ? bodyText : null;
+    const sql = "INSERT INTO knowledge_articles (slug, query, section, language, title, summary, body, title_en, summary_en, body_en, sources_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?) ON CONFLICT(slug) DO UPDATE SET section=excluded.section, language=excluded.language, title=excluded.title, summary=excluded.summary, body=excluded.body, title_en=excluded.title_en, summary_en=excluded.summary_en, body_en=excluded.body_en, sources_json=excluded.sources_json, status='PUBLISHED', updated_at=excluded.updated_at";
+    await env.DB.prepare(sql).bind(article.slug, article.query, article.section, language, article.title, article.summary, bodyText, titleEn, summaryEn, bodyEn, sourcesJson, article.createdAt, article.createdAt).run();
     if (await ensureUserFeatureTables(env) && (!existing || existing.title !== article.title || existing.body !== bodyText || existing.summary !== article.summary)) {
       await env.DB.prepare("INSERT INTO article_revisions(article_slug,title,summary,body,sources_json,created_at) VALUES(?,?,?,?,?,?)").bind(article.slug,article.title,article.summary,bodyText,sourcesJson,article.createdAt).run();
     }
@@ -876,8 +889,8 @@ const loadKnowledgeArticles = async (env: Env, section?: string, limit = 30) => 
   try {
     if (!await ensureKnowledgeTables(env)) return [];
     const safeLimit = Math.max(1, Math.min(100, limit));
-    const result = section ? await env.DB.prepare("SELECT slug, query, section, title, summary, body, sources_json, status, created_at, updated_at FROM knowledge_articles WHERE section = ? ORDER BY created_at DESC LIMIT ?").bind(section, safeLimit).all() : await env.DB.prepare("SELECT slug, query, section, title, summary, body, sources_json, status, created_at, updated_at FROM knowledge_articles ORDER BY created_at DESC LIMIT ?").bind(safeLimit).all();
-    return (result.results || []).map((row: any) => ({ id: row.slug, query: row.query, section: row.section, title: row.title, summary: row.summary, body: String(row.body || "").split(/\n+/).filter(Boolean), sources: (() => { try { return JSON.parse(row.sources_json || "[]"); } catch { return []; } })(), status: row.status, createdAt: row.created_at, updatedAt: row.updated_at }));
+    const result = section ? await env.DB.prepare("SELECT slug, query, section, language, title, summary, body, title_en, summary_en, body_en, sources_json, status, created_at, updated_at FROM knowledge_articles WHERE section = ? ORDER BY created_at DESC LIMIT ?").bind(section, safeLimit).all() : await env.DB.prepare("SELECT slug, query, section, language, title, summary, body, title_en, summary_en, body_en, sources_json, status, created_at, updated_at FROM knowledge_articles ORDER BY created_at DESC LIMIT ?").bind(safeLimit).all();
+    return (result.results || []).map((row: any) => ({ id: row.slug, query: row.query, section: row.section, language: row.language || "ar", title: row.title, summary: row.summary, enTitle: row.title_en || undefined, enSummary: row.summary_en || undefined, enBody: row.body_en ? String(row.body_en).split(/\n+/).filter(Boolean) : undefined, body: String(row.body || "").split(/\n+/).filter(Boolean), sources: (() => { try { return JSON.parse(row.sources_json || "[]"); } catch { return []; } })(), status: row.status, createdAt: row.created_at, updatedAt: row.updated_at }));
   } catch { return []; }
 };
 
@@ -1193,8 +1206,9 @@ const processContentQueue = async (env: Env, maxJobs = 3) => {
       if ((search.sourceCount || 0) < 2) throw new Error("insufficient_independent_sources");
       const generated = await generateKnowledgeArticle(env, String(row.language || "ar"), String(row.topic), search.results);
       if (!generated) throw new Error("generation_unavailable");
-      const slug = await slugForQuery(String(row.topic));
-      const article = { slug, query: String(row.topic), section: String(row.section), title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 12).map(withoutUrl), createdAt: now };
+      const language = String(row.language || "ar") === "en" ? "en" : "ar";
+      const slug = await slugForQuery(String(row.topic), language);
+      const article = { slug, query: String(row.topic), section: String(row.section), language, title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 12).map(withoutUrl), createdAt: now };
       const persistence = await saveKnowledgeArticle(env, article);
       if (!persistence.persisted) throw new Error("database_write_failed");
       await refreshKnowledgeGraph(env, article);
