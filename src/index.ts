@@ -1019,7 +1019,7 @@ const articleQualityCheck = (text: string, query: string, intent: string, eviden
     ok: words.length >= minimumWords &&
       headings.length >= requiredHeadings &&
       enoughTopic &&
-      !repeated && !rawEvidenceOverlap && !bad && hasSteps,
+      !repeated && !rawEvidenceOverlap && !bad && !languageContamination && hasSteps,
     reasons: [
       words.length < minimumWords ? "too_short" : null,
       headings.length < requiredHeadings ? "too_few_sections" : null,
@@ -1035,6 +1035,10 @@ const articleQualityCheck = (text: string, query: string, intent: string, eviden
 
 const generateKnowledgeArticle = async (env: Env, language: string, query: string, results: any[]) => {
   const intent = editorialIntent(query);
+  const independentSources = new Set(
+    results.map((x: any) => String(x?.source || x?.domain || x?.provider || "").toLowerCase().replace(/^www\./, "").trim()).filter(Boolean)
+  );
+  if (independentSources.size < 2) return null;
   const evidence = await buildArticleEvidence(env, results);
   if (!evidence.trim()) return null;
   const basePrompt = [
