@@ -1705,6 +1705,7 @@ const evidencePrompt = (language: string, query: string, results: any[]) => {
 
   return "BAYAN evidence synthesis.\n" +
     "Language: " + language + "\n" +
+    (language === "en" ? "Write every visitor-facing sentence in clear natural English. Do not switch to Arabic.\n" : "اكتب كل جملة موجهة للزائر بالعربية الواضحة ولا تنتقل إلى الإنجليزية.\n") +
     "User request: " + query + "\n\n" +
     "Use ONLY the supplied search evidence. Do not invent facts, dates, numbers, quotations, people, events, URLs, or sources.\n" +
     "If the evidence conflicts, say that it conflicts and distinguish the claims.\n" +
@@ -2395,7 +2396,7 @@ export default {
           }
           await sendBayanOwnerNotification(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان، لكن لم يتوفر مزود بحث أو AI لإجابته:\n\n" + input);
           return json({
-            answer: "Insufficient Evidence: لا يتوفر حاليًا مزود بحث أو ذكاء اصطناعي يمكنه التحقق من هذا الطلب.",
+            answer: language === "en" ? "Insufficient Evidence: no search or AI provider is currently available to verify this request." : "Insufficient Evidence: لا يتوفر حاليًا مزود بحث أو ذكاء اصطناعي يمكنه التحقق من هذا الطلب.",
             claims: [], evidence: [], confidence: 0,
             warnings: ["No AI or search provider is configured"]
           }, 503);
@@ -2413,7 +2414,7 @@ export default {
         if (shouldSearch && !results.length && String(body.mode || "knowledge").toLowerCase() !== "knowledge") {
           await reportBayanError(env, "api/ai evidence retrieval", new Error("no_search_evidence"));
           return json({
-            answer: "Insufficient Evidence: لم أجد مصادر بحث كافية للتحقق من هذه المعلومة.",
+            answer: language === "en" ? "Insufficient Evidence: I could not find enough search evidence to verify this information." : "Insufficient Evidence: لم أجد مصادر بحث كافية للتحقق من هذه المعلومة.",
             claims: [],
             evidence: [],
             confidence: 0,
@@ -2495,7 +2496,7 @@ export default {
             } catch (error) { cloudflareFailure = safeErrorMessage(error); }
           }
           return json({
-            answer: "Insufficient Evidence: تعذر إكمال التحقق الآن.",
+            answer: language === "en" ? "Insufficient Evidence: verification could not be completed right now." : "Insufficient Evidence: تعذر إكمال التحقق الآن.",
             claims: [],
             evidence: [],
             confidence: 0,
