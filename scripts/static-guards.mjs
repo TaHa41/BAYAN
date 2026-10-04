@@ -49,6 +49,8 @@ if (!source.includes('WHERE section = ? AND language = ?')) failures.push("knowl
 if (!source.includes('a.language=?')) failures.push("saved articles are not language-isolated");
 if (!schema.includes("FOREIGN KEY(visitor_id) REFERENCES visitor_profiles(visitor_id) ON DELETE CASCADE")) failures.push("canonical schema is missing the interest-event visitor foreign key");
 if (!source.includes("language === \"en\" ? \"Insufficient Evidence:")) failures.push("English AI fallback missing");
+if (!read("public/app.js").includes("function renderRoute(routePath)") || !read("public/app.js").includes("safeRenderRoute") || !read("public/app.js").includes("safeRenderRoute(path)")) failures.push("frontend SPA router/render bootstrap missing");
+if (!read("public/app.js").includes("function savedPage()") || !read("public/app.js").includes("function toolsPage()")) failures.push("frontend saved/tools routes missing");
 if (!source.includes("await setCooldown")) failures.push("provider cooldown persistence missing");
 if (/const (aiProviderCooldown|diagnosticMemory|repairMemory) = new Map/.test(source)) failures.push("request/provider cooldown uses mutable module state");
 if (!guardian.includes("AI repair diagnosis")) failures.push("Guardian AI diagnosis step missing");
