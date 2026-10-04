@@ -9,6 +9,7 @@ const deploy = read(".github/workflows/deploy.yml");
 const wrangler = read("wrangler.jsonc");
 const source = read("src/index.ts");
 const guardian = read(".github/workflows/guardian.yml");
+const aiSmoke = read("scripts/ai-capability-smoke.mjs");
 const schema = read("schema.sql");
 const sw = read("public/sw.js");
 const migrations = readdirSync("migrations").filter((x) => /^\d+_.*\.sql$/.test(x)).sort();
