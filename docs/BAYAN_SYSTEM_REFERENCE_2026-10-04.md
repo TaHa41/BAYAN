@@ -7,9 +7,9 @@ Current release marker: 0.9.0
 
 ## 1. Verified audit scope
 
-The GitHub-connected workspace exposes the repository with admin/write access. The repository tree has now been independently enumerated through the GitHub contents API and the current tracked project surface is known. The Worker source is 3,221 lines / ~188.4k characters; the frontend app is 348 lines / ~86.7k characters. All currently enumerated files in the repository are listed below and the text-bearing files were inspected for behavior or configuration.
+The GitHub-connected workspace exposes the repository with admin/write access. The repository tree has been independently enumerated through the GitHub Git tree API; the current main branch contains 60 tracked paths. The Worker, frontend, D1 migrations, scripts, workflows, tests, PWA assets and documentation were reviewed for behavior/configuration, and the new autonomous repair paths were added to the reviewed surface.
 
-Exact current inventory: root files `.env.example`, `.gitignore`, `AGENTS.md`, `DEPLOY_TRIGGER.md`, `README.md`, `package.json`, `schema.sql`, `tsconfig.json`, `wrangler.jsonc`; `.github/workflows/{ai-repair.yml,ai-rollback.yml,bootstrap-lockfile.yml,ci.yml,deploy.yml,guardian.yml}`; `docs/{AI_REPAIR_PLAYBOOK.md,BAYAN_SYSTEM_REFERENCE_2026-10-04.md,BAYAN_SYSTEM_SPEC.md}`; `migrations/0001_knowledge_articles.sql` through `0012_repair_engine_state.sql`; `src/index.ts`, `src/app/content.ts`; `public/{ad-manager.js,app.js,content-data.js,google159baf09db9cb3cf.html,index.html,logo.svg,manifest.en.json,manifest.json,styles.css,sw.js}`; `scripts/{ai-autorepair.mjs,ai-capability-smoke.mjs,ai-guardian.mjs,production-smoke.mjs,static-guards.mjs}`; `tests/unit/{health.test.ts,project-guards.test.ts}`. No additional directory entries are currently exposed by the repository tree.
+Exact current inventory: root files `.env.example`, `.gitignore`, `AGENTS.md`, `DEPLOY_TRIGGER.md`, `README.md`, `package.json`, `package-lock.json`, `schema.sql`, `tsconfig.json`, `wrangler.jsonc`; `.github/workflows/{ai-repair.yml,ai-rollback.yml,bootstrap-lockfile.yml,ci.yml,deploy.yml,guardian.yml}`; `docs/{AI_REPAIR_PLAYBOOK.md,BAYAN_SYSTEM_REFERENCE_2026-10-04.md,BAYAN_SYSTEM_SPEC.md}`; `migrations/0001_knowledge_articles.sql` through `0012_repair_engine_state.sql`; `src/index.ts`, `src/app/content.ts`; `public/{ad-manager.js,app.js,content-data.js,google159baf09db9cb3cf.html,index.html,logo.svg,manifest.en.json,manifest.json,styles.css,sw.js}`; `scripts/{ai-autorepair.mjs,ai-capability-smoke.mjs,ai-guardian.mjs,production-smoke.mjs,static-guards.mjs}`; `tests/unit/{health.test.ts,project-guards.test.ts}`. No additional directory entries are currently exposed by the repository tree.
 
 This is a verified inventory of the current GitHub `main` tree, not a claim that generated build artifacts or ignored local files exist.
 
@@ -37,12 +37,12 @@ This is a verified inventory of the current GitHub `main` tree, not a claim that
 
 ## 3. Dependency/toolchain reference
 
-package.json currently declares:
-- TypeScript ^7.0.2
-- Wrangler ^4.146.0
-- Vitest ^5.0.3
-- @cloudflare/workers-types ^5.20261003.1
-- @types/node ^26.4.0
+package.json currently declares exact-pinned development dependencies:
+- TypeScript 7.0.2
+- Wrangler 4.147.0
+- Vitest 5.0.3
+- @cloudflare/workers-types 5.20261003.1
+- @types/node 26.4.0
 
 Assessment on 2026-10-04:
 - TypeScript 7.0.2: current stable.
@@ -50,7 +50,7 @@ Assessment on 2026-10-04:
 - Wrangler 4.147.0: current stable verified and now pinned in package/CI/deploy.
 - @cloudflare/workers-types 5.20261003.1: current stable verified.
 - Node 24 in CI: Active/Maintenance LTS line and appropriate production choice; Node 26 is Current, so it should not replace Node 24 merely to chase a newer major.
-- package-lock.json is absent from the verified repository tree. CI currently uses `npm install` rather than `npm ci`; this remains the main reproducibility/performance gap. A lockfile should be generated from a real dependency installation and committed only after CI validates it; it should not be fabricated from incomplete metadata.
+- package-lock.json is now present in the verified repository tree. CI and the bootstrap workflow use the lockfile when available, with npm install retained only as the explicit bootstrap fallback.
 
 No blind dependency major upgrade was performed because the verified dependency set is already current enough and forced upgrades can introduce breaking changes without a lockfile-backed test run.
 
