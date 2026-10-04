@@ -1,4 +1,10 @@
 const base=(process.env.BAYAN_URL||"https://bayan.tahaomar411.workers.dev").replace(/\/$/,"");
+const fetchWithTimeout=async(url,init={},timeoutMs=12000)=>{
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeoutMs);
+  try{return await fetch(url,{...init,signal:init.signal||controller.signal});}
+  finally{clearTimeout(timer);}
+};
 const checks=[
   ["/","text/html"],["/api/health","application/json"],["/health","application/json"],["/api/features","application/json"],["/api/trending","application/json"],["/api/gold","application/json"],
   ["/egypt","text/html"],["/arab","text/html"],["/world","text/html"],["/science","text/html"],["/economy","text/html"],["/politics","text/html"],["/technology","text/html"],["/history-culture","text/html"],["/people","text/html"],["/sports","text/html"],["/travel","text/html"],["/arts","text/html"],["/news","text/html"],["/trending","text/html"],
@@ -7,7 +13,7 @@ const checks=[
 let failed=0;
 for(const [path,type] of checks){
   try{
-    const res=await fetch(base+path,{redirect:"follow"});
+    const res=await fetchWithTimeout(base+path,{redirect:"follow"});
     const body=await res.text();
     const ct=res.headers.get("content-type")||"";
     const html=type==="text/html";
@@ -19,7 +25,7 @@ for(const [path,type] of checks){
   }catch(e){console.log(`FAIL ${path} ${e.message}`);failed++;}
 }
 try{
-  const res=await fetch(base+"/api/search/article?q="+encodeURIComponent("ما هو الذكاء الاصطناعي؟")+"&lang=ar",{redirect:"follow"});
+  const res=await fetchWithTimeout(base+"/api/search/article?q="+encodeURIComponent("ما هو الذكاء الاصطناعي؟")+"&lang=ar",{redirect:"follow"});
   const body=await res.text();
   const ok=(res.status===200 && body.includes('"status": "ok"') && body.includes('"article"')) || [503,502].includes(res.status);
   console.log((ok?"PASS":"FAIL")+" "+res.status+" /api/search/article bytes="+body.length+" type="+(res.headers.get("content-type")||""));
@@ -27,14 +33,14 @@ try{
 }catch(e){console.log("FAIL /api/search/article "+e.message);failed++;}
 
 try{
-  const englishSearch=await fetch(base+"/api/search?q="+encodeURIComponent("What is artificial intelligence?")+"&lang=en",{redirect:"follow"});
+  const englishSearch=await fetchWithTimeout(base+"/api/search?q="+encodeURIComponent("What is artificial intelligence?")+"&lang=en",{redirect:"follow"});
   const data=await englishSearch.json();
   const ok=englishSearch.ok && data?.status==="ok" && data?.research?.queries?.length>=3;
   console.log((ok?"PASS":"FAIL")+" /api/search English research depth");
   if(!ok) failed++;
 }catch(e){console.log("FAIL /api/search English research depth "+e.message);failed++;}
 try{
-  const weather=await fetch(base+"/api/search?q="+encodeURIComponent("طقس الغردقة")+"&lang=ar",{redirect:"follow"});
+  const weather=await fetchWithTimeout(base+"/api/search?q="+encodeURIComponent("طقس الغردقة")+"&lang=ar",{redirect:"follow"});
   const data=await weather.json();
   const ok=weather.ok && data?.intent==="weather" && data?.weather?.city;
   console.log((ok?"PASS":"FAIL")+" /api/search weather routing");
@@ -43,7 +49,7 @@ try{
 
 // Deep contract checks for the endpoints that can appear healthy while returning the wrong payload.
 try{
-  const health=await fetch(base+"/api/health",{redirect:"follow"});
+  const health=await fetchWithTimeout(base+"/api/health",{redirect:"follow"});
   const data=await health.json();
   const ok=health.ok && data?.status==="ok" && !!data?.service && !!data?.version && !!data?.commit &&
     health.headers.get("x-content-type-options")==="nosniff";
@@ -51,7 +57,7 @@ try{
   if(!ok) failed++;
 }catch(e){console.log("FAIL /health contract "+e.message);failed++;}
 try{
-  const toolsPage=await fetch(base+"/tools",{redirect:"follow"});
+  const toolsPage=await fetchWithTimeout(base+"/tools",{redirect:"follow"});
   const toolsHtml=await toolsPage.text();
   const ok=toolsPage.ok && /BAYAN TOOLS|أدوات بيان|Weather|الطقس/i.test(toolsHtml);
   console.log((ok?"PASS":"FAIL")+" /tools page");
@@ -59,7 +65,7 @@ try{
 }catch(e){console.log("FAIL /tools page "+e.message);failed++;}
 
 try{
-  const home=await fetch(base+"/",{redirect:"follow"});
+  const home=await fetchWithTimeout(base+"/",{redirect:"follow"});
   const html=await home.text();
   const tags=[...html.matchAll(/<link\b[^>]*>/gi)].map(m=>m[0]);
   const meta=[...html.matchAll(/<meta\b[^>]*>/gi)].map(m=>m[0]);
@@ -72,7 +78,7 @@ try{
   if(!ok) failed++;
 }catch(e){console.log("FAIL / HTML SEO/security contract "+e.message);failed++;}
 try{
-  const appJs=await (await fetch(base+"/app.js",{redirect:"follow"})).text();
+  const appJs=await (await fetchWithTimeout(base+"/app.js",{redirect:"follow"})).text();
   const routerOk=/function renderRoute\(routePath\)/.test(appJs) && /safeRenderRoute\(path\)/.test(appJs) && /function savedPage\(\)/.test(appJs) && /function toolsPage\(\)/.test(appJs);
   const ok=/querySelector\("#language"\)/.test(appJs) &&
     /addEventListener\("click"/.test(appJs) &&
@@ -82,7 +88,7 @@ try{
   if(!ok) failed++;
 }catch(e){console.log("FAIL frontend language-switch contract "+e.message);failed++;}
 try{
-  const en=await fetch(base+"/?lang=en",{redirect:"follow"});
+  const en=await fetchWithTimeout(base+"/?lang=en",{redirect:"follow"});
   const html=await en.text();
   const links=[...html.matchAll(/<link\b[^>]*>/gi)].map(m=>m[0]);
   const hasEnCanonical=links.some(t=>/\brel=["']canonical["']/i.test(t)&&/\bhref=["'][^"']*\?lang=en["']/i.test(t));
@@ -96,7 +102,7 @@ try{
 try{
   const englishRoutes=["/","/egypt","/science","/technology","/news","/prices","/tools","/about","/methodology","/search","/ai","/saved","/contribute"];
   for(const route of englishRoutes){
-    const response=await fetch(base+route+"?lang=en",{redirect:"follow"});
+    const response=await fetchWithTimeout(base+route+"?lang=en",{redirect:"follow"});
     const html=await response.text();
     const manifestIsEnglish=html.includes('href="/manifest.en.json"') || html.includes("href='/manifest.en.json'");
     const htmlLanguageOk=/<html[^>]+lang=["']en["'][^>]+dir=["']ltr["']/i.test(html);
@@ -119,7 +125,7 @@ try{
   }
 }catch(e){console.log("FAIL English route coverage "+e.message);failed++;}
 try{
-  const features=await (await fetch(base+"/api/features",{redirect:"follow"})).json();
+  const features=await (await fetchWithTimeout(base+"/api/features",{redirect:"follow"})).json();
   const f=features?.features||{};
   const ok=f.pwa===true && f.savedArticles===true && f.selfHealing===true && f.runtimeAudit===true && f.sourceAwareAI===true;
   console.log((ok?"PASS":"FAIL")+" /api/features capability contract");
@@ -128,7 +134,7 @@ try{
 
 async function contractGet(path, validator, label){
   try{
-    const response=await fetch(base+path,{redirect:"follow"});
+    const response=await fetchWithTimeout(base+path,{redirect:"follow"});
     const data=await response.json().catch(()=>null);
     const ok=validator(response,data);
     console.log((ok?"PASS":"FAIL")+" "+label+" status="+response.status);
@@ -160,7 +166,7 @@ const protectedApiContracts=[
 ];
 for(const path of protectedApiContracts){
   try{
-    const response=await fetch(base+path,{redirect:"follow"});
+    const response=await fetchWithTimeout(base+path,{redirect:"follow"});
     const ok=response.status===403;
     console.log((ok?"PASS":"FAIL")+" protected route "+path+" status="+response.status);
     if(!ok) failed++;
