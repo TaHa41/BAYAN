@@ -2413,7 +2413,6 @@ export default {
       const current = await env.DB!.prepare("SELECT id, title, body, source, status FROM visitor_contributions WHERE id=?").bind(id).first() as any;
       if (!current) return json({ status: "contribution_not_found" }, 404);
       const now = new Date().toISOString();
-      let publishedArticle: any = null;
       if (status === "VERIFIED") {
         const sourceUrls = [...cleanText(current.source, 1200).matchAll(/https?:\/\/[^\s,]+/gi)]
           .map((match) => match[0].replace(/[).]+$/, ""))
@@ -2433,9 +2432,6 @@ export default {
       }
       await env.DB!.prepare("UPDATE visitor_contributions SET status=?, reviewer_note=?, reviewed_at=? WHERE id=?")
         .bind(status, cleanText(body.note, 1000) || null, now, id).run();
-      if (status === "VERIFIED") {
-        await sendBayanOwnerNotification(env, "تم التحقق من مساهمة في بيان", "تمت مراجعة المساهمة رقم " + id + " ونشرها في قاعدة المعرفة.\n\nالعنوان: " + String(current.title) + "\n\nالمقالة: /article/" + publishedArticle.id);
-      }
       return json({ status: "updated", id, moderation: status, article: publishedArticle });
     }
 
