@@ -41,7 +41,9 @@ jobs:
         env:
           BAYAN_URL: https://bayan.tahaomar411.workers.dev
         shell: bash
-        run: node scripts/production-smoke.mjs | tee smoke-report.txt
+        run: |
+          set -o pipefail
+          node scripts/production-smoke.mjs | tee smoke-report.txt
 
       - name: AI capability diagnostics
         id: ai
