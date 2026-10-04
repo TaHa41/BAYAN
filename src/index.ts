@@ -611,7 +611,7 @@ const processBayanRepairQueue = async (env: Env, currentAudit?: any) => {
             .bind("verification_passed", verification.details, JSON.stringify(verification), new Date().toISOString(), new Date().toISOString(), new Date().toISOString(), job.id).run();
           continue;
         }
-        await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI', phase='WAITING_HUMAN', last_action=?, diagnosis=?, next_attempt_at=?, updated_at=? WHERE id=?")
+        await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI', phase='PATCHING', last_action=?, diagnosis=?, next_attempt_at=?, updated_at=? WHERE id=?")
           .bind("verification_failed", verification.details, new Date(Date.now() + 10 * 60_000).toISOString(), new Date().toISOString(), job.id).run();
         continue;
       }
@@ -626,12 +626,15 @@ const processBayanRepairQueue = async (env: Env, currentAudit?: any) => {
             .bind("runtime_audit_retry", "نجح فحص runtime الحالي؛ أغلقت المهمة دون تشغيل audit ثانٍ.", new Date().toISOString(), new Date().toISOString(), job.id).run();
           continue;
         }
-        await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI',phase='PATCHING',last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
-          .bind("runtime_audit_degraded", "فحص runtime الحالي ما زال متدهورًا؛ تم تمرير الدليل إلى مسار AI Auto Repair بدل إعادة تشغيل audit داخل نفس Worker.", new Date(Date.now() + 10 * 60_000).toISOString(), new Date().toISOString(), job.id).run();
-        continue;
+        // Do not stop at a queue state: pass the bounded audit evidence into the repair classifier.
+        // The classifier never edits code in the Worker; GitHub AI Auto Repair owns code changes.
       }
 
-      const repair = await attemptBayanSelfRepair(env, job.context, new Error(job.error_text));
+      const auditEvidence = currentAudit?.results
+        ? JSON.stringify(currentAudit.results).slice(0, 5000)
+        : "";
+      const repairContext = job.context + (auditEvidence ? "\nRuntime audit evidence: " + auditEvidence : "");
+      const repair = await attemptBayanSelfRepair(env, repairContext, new Error(job.error_text));
       if (repair.action === "cooldown") {
         await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI',phase='EXTERNAL_DEPENDENCY',last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
           .bind(repair.action, cleanText(repair.result, 4000), new Date(Date.now() + 15 * 60_000).toISOString(), new Date().toISOString(), job.id).run();
