@@ -1406,7 +1406,7 @@ const runRuntimeAudit = async (env: Env) => {
     }
   };
 
-  await check("/api/health", async () => ({ service: "BAYAN", version: env.BAYAN_VERSION || "0.9.1" }));
+  await check("/api/health", async () => ({ service: "BAYAN", version: env.BAYAN_VERSION || "0.9.0" }));
 
   await check("/assets", async () => {
     if (!env.ASSETS) throw new Error("assets_binding_missing");
@@ -1993,7 +1993,7 @@ export default {
       return json({
         status: "ok",
         service: "BAYAN",
-        version: env.BAYAN_VERSION ?? "0.9.1",
+        version: env.BAYAN_VERSION ?? "0.9.0",
         commit: env.BAYAN_COMMIT_SHA ?? "local",
         environment: env.BAYAN_ENVIRONMENT ?? "development",
         timestamp: new Date().toISOString()
@@ -2104,7 +2104,7 @@ export default {
         status: "ok",
         service: "BAYAN",
         environment: env.BAYAN_ENVIRONMENT || "unknown",
-        version: env.BAYAN_VERSION || "0.9.1",
+        version: env.BAYAN_VERSION || "0.9.0",
         commit: env.BAYAN_COMMIT_SHA || "unknown",
         capabilities: {
           assets: !!env.ASSETS,
