@@ -744,27 +744,14 @@ const telegramApi = async (env: Env, method: string, body?: Record<string, unkno
 const sendBayanTelegram = async (env: Env, text: string, chatId?: string) => {
   const message = cleanText(text, 4000);
   const configured = cleanText(chatId || env.TELEGRAM_CHAT_ID || "", 120);
+  if (!configured) return { ok: false, error: "telegram_chat_id_not_configured" };
   try {
-    if (configured) {
-      try {
-        await telegramApi(env, "sendMessage", { chat_id: configured, text: message });
-        return { ok: true, chatId: configured, source: "configured" };
-      } catch (configuredError) {
-        const firstError = safeErrorMessage(configuredError);
-        const discovered = await discoverTelegramChat(env);
-        const fallback = cleanText(discovered?.chatId || "", 120);
-        if (!fallback || fallback === configured) return { ok: false, error: firstError };
-        try {
-          await telegramApi(env, "sendMessage", { chat_id: fallback, text: message });
-          return { ok: true, chatId: fallback, source: "discovered_fallback", previousError: firstError };
-        } catch (fallbackError) {
-          return { ok: false, error: firstError + " | fallback: " + safeErrorMessage(fallbackError) };
-        }
-      }
-    }
-    return { ok: false, error: "telegram_chat_id_not_configured" };
+    await telegramApi(env, "sendMessage", { chat_id: configured, text: message });
+    return { ok: true, chatId: configured, source: chatId ? "explicit" : "configured" };
   } catch (error) {
-    return { ok: false, error: safeErrorMessage(error) };
+    // Never fall back to an automatically discovered chat. Discovery is informational
+    // only; production notifications must target an explicitly configured destination.
+    return { ok: false, error: safeErrorMessage(error), chatId: configured, source: chatId ? "explicit" : "configured" };
   }
 };
 
