@@ -1374,6 +1374,10 @@ const runRuntimeAudit = async (env: Env) => {
       return { contentType: response.headers.get("content-type") || "", spaFallback: route !== "/" };
     });
   }
+  await check("/database/contribution-schema", async () => {
+    if (!await ensureContributionTable(env)) throw new Error("contribution_schema_unavailable");
+    return { reviewerNote: true };
+  });
   await check("/database", async () => {
     if (!env.DB) throw new Error("database_binding_missing");
     await env.DB.prepare("SELECT 1 AS ok").first();
