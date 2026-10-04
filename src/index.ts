@@ -959,21 +959,9 @@ const buildEvidenceArticleFallback = (query: string, results: any[]) => {
   const usable = results.filter((x: any) => x?.title && x?.snippet).slice(0, 8);
   const sources = new Set(usable.map((x: any) => String(x.source || x.provider || "").toLowerCase()).filter(Boolean));
   if (!usable.length || !sources.size) return null;
-  return {
-    title: "ملخص الأدلة المتاحة عن " + cleanText(query, 180),
-    summary: "تعذر إنشاء مقال تحريري كامل من الأدلة الحالية؛ لذلك يعرض بيان ملخصًا واضحًا للأدلة بدل تقديم مقتطفات المصادر على أنها مقال.",
-    body: [
-      "## حالة المادة",
-      "لم تستوف المادة المسترجعة شروط بناء مقال تحريري كامل يمكن التحقق من ترابطه وجودة لغته. لذلك لا يعرض بيان نصًا مولدًا على أنه مقال نهائي.",
-      "## أبرز ما تقوله المصادر",
-      ...usable.slice(0, 5).map((x: any) => cleanEvidenceText(x.snippet || x.title, 900)),
-      "## حدود التحقق",
-      "هذه النقاط ملخصات للأدلة المسترجعة وليست نصًا تحريريًا كاملًا. قد تحتاج بعض التفاصيل إلى مصدر أحدث أو مصدر مستقل إضافي قبل صياغة مقال نهائي.",
-      "## الخلاصة",
-      "المتاح حاليًا هو ملخص أدلة، وليس مقالًا مكتملًا. لن يملأ بيان الفجوات بتخمينات أو نصوص غير متحقق منها."
-    ],
-    evidenceOnly: true
-  };
+  // Never persist a source-dump as a "full article". If editorial generation
+  // fails validation, the caller must keep the material in evidence-only state.
+  return null;
 };
 
 const articleQualityCheck = (text: string, query: string, intent: string, evidence: string) => {
@@ -2061,11 +2049,28 @@ export default {
       if (!answer) answer = evidenceFallbackAnswer(q, search.results);
       await logSearch({
         query: q, language: lang, intent, section,
-        status: generated ? "PUBLISHED" : "DISCOVERED",
-        articleSlug: generated ? knowledge.articleId : "",
+        status: "DISCOVERED",
+        articleSlug: "",
         sourceCount: search.sourceCount, providerCount: search.providerCount
       });
-      return json({ query: q, intent, section, answer, article: generated ? { id: knowledge.articleId, title: generated.title, summary: generated.summary, body: generated.body } : null, items: search.results.map(withoutUrl), status: "ok", verification: generated ? "article_generated_from_retrieved_evidence" : "search_results_only", research: { queries: search.researchQueries, sourceCount: search.sourceCount, providerCount: search.providerCount, independentSources: search.independentSources, coverage: search.coverage }, knowledge });
+      return json({
+        query: q,
+        intent,
+        section,
+        answer,
+        article: null,
+        items: search.results.map(withoutUrl),
+        status: "ok",
+        verification: "search_results_only",
+        research: {
+          queries: search.researchQueries,
+          sourceCount: search.sourceCount,
+          providerCount: search.providerCount,
+          independentSources: search.independentSources,
+          coverage: search.coverage
+        },
+        knowledge
+      });
     }
 
     if (path === "/api/knowledge/searches" && request.method === "GET") {
