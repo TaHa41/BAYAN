@@ -4,6 +4,7 @@ on:
   workflow_run:
     workflows: ["BAYAN CI"]
     types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -24,6 +25,20 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
+      - name: Verify deployment source is current main
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="${{ github.event.workflow_run.head_sha || github.sha }}"
+          current="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          if [[ "$target" == "$current" ]]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+            echo "Deployment source $target is the current main commit."
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping stale CI deployment: tested $target, current main is $current."
+          fi
       - name: Check Cloudflare credentials
         id: credentials
         env:
@@ -40,7 +55,7 @@ jobs:
           fi
 
       - name: Apply D1 migrations
-        if: steps.credentials.outputs.configured == 'true'
+        if: steps.credentials.outputs.configured == 'true' && steps.source.outputs.current == 'true'
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
