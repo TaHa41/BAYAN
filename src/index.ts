@@ -1539,7 +1539,11 @@ const researchQueries = (query: string) => {
 
 const internalSearch = async (query: string, env: Env) => {
   const language = /[\u0600-\u06FF]/.test(query) ? "ar" : "en";
-  const research = researchQueries(query);
+  const allResearch = researchQueries(query);
+  // Fast path: start with the user's exact query. Expand only when evidence is thin.
+  // This prevents routine searches from waiting for five research angles and every provider.
+  const primaryQueries = allResearch.slice(0, 1);
+  const expandedQueries = allResearch.slice(1, 2);
   const providers = [
     env.AI_SEARCH ? "cloudflare_ai_search" : null,
     env.SEARCH_API_KEY ? "serpapi" : null,
@@ -1597,10 +1601,26 @@ const internalSearch = async (query: string, env: Env) => {
     }
   };
 
-  const tasks = research.flatMap((researchQuery) => providers.map((provider) => searchOne(researchQuery, provider)));
-  const settled = await Promise.all(tasks);
-  const enterprise = await wikimediaEnterpriseLookup(env, query, language);
-  const merged = [...enterprise, ...settled.flat()].filter((x: any) => x.title && x.snippet);
+  const runQueries = async (queries: string[]) => {
+    const settled = await Promise.all(queries.flatMap((researchQuery) => providers.map((provider) => searchOne(researchQuery, provider))));
+    return settled.flat();
+  };
+
+  // Wikimedia runs in parallel with the first provider batch instead of adding its latency.
+  const enterprisePromise = wikimediaEnterpriseLookup(env, query, language).catch((error) => {
+    attempts.push({ provider: "wikimedia_enterprise", query, ok: false, error: safeErrorMessage(error) });
+    return [];
+  });
+  let rawResults = await runQueries(primaryQueries);
+  const enterprise = await enterprisePromise;
+  rawResults = [...enterprise, ...rawResults];
+
+  // Only spend another provider round-trip when the first pass is genuinely weak.
+  if (rawResults.length < 6 && expandedQueries.length) {
+    rawResults = rawResults.concat(await runQueries(expandedQueries));
+  }
+
+  const merged = rawResults.filter((x: any) => x.title && x.snippet);
   const unique = new Map<string, any>();
   for (const item of merged) {
     const key = item.url || (item.title + "|" + item.source).toLowerCase();
@@ -1620,7 +1640,7 @@ const internalSearch = async (query: string, env: Env) => {
     }).filter(Boolean)
   ).size;
   const coverage = {
-    researchAngles: research.length,
+    researchAngles: allResearch.length,
     sourceCount,
     providerCount,
     independentSources,
@@ -1639,11 +1659,10 @@ const internalSearch = async (query: string, env: Env) => {
     sourceCount,
     independentSources,
     coverage,
-    researchQueries: research,
+    researchQueries: allResearch,
     attempts
   };
 };
-
 const evidencePrompt = (language: string, query: string, results: any[]) => {
   const evidence = results
     .map((x) => "[" + x.rank + "] " + x.title + " | " + x.source + " | " + (x.date || "date unavailable") + "\n" + x.snippet)
@@ -2015,22 +2034,14 @@ export default {
       if (!search.ok) return json({ query: q, items: [], status: search.status }, 503);
       const intent = queryIntent(q);
       const section = sectionForIntent(intent, q);
-      const generated = await generateKnowledgeArticle(env, lang, q, search.results);
+      // Search responses must not wait for article generation or persistence.
+      // Queue enrichment for the background worker instead.
       let knowledge: any = { query: q, section, status: "DISCOVERED", persisted: false };
-      if (generated) {
-        const slug = await slugForQuery(q);
-        const article = { slug, query: q, section, title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
-        const persistence = await saveKnowledgeArticle(env, article);
-        if (persistence.persisted) {
-          await refreshKnowledgeGraph(env, article);
-          knowledge = { ...knowledge, status: "PUBLISHED", persisted: true, articleId: slug };
-        } else {
-          knowledge = { ...knowledge, status: "QUEUED_FOR_PERSISTENCE_RETRY", persisted: false, articleId: slug };
-        }
-      } else {
+      try {
         const queued = await queueContentTopic(env, q, section, lang, 100);
-        knowledge = { ...knowledge, status: queued ? "QUEUED_FOR_ARTICLE" : "DISCOVERED" };
-      }
+        knowledge.status = queued ? "QUEUED_FOR_ARTICLE" : "DISCOVERED";
+      } catch {}
+
       let answer = null;
       if (env.OPENAI_API_KEY) {
         try {
