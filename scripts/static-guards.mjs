@@ -95,7 +95,7 @@ if (!read("public/app.js").includes("function savedPage()") || !read("public/app
 if (!source.includes("await setCooldown")) failures.push("provider cooldown persistence missing");
 if (!source.includes("predictBayanIssues") || !source.includes("predictive runtime degradation")) failures.push("predictive runtime degradation detection missing");
 if (!read("docs/BAYAN_SYSTEM_SPEC.md").includes("Self-healing AI engineer contract")) failures.push("complete BAYAN AI repair specification missing");
-if (!read("migrations/0011_repair_engine_state.sql").includes("phase TEXT")) failures.push("repair-engine state migration missing");
+if (!read("migrations/0012_repair_engine_state.sql").includes("phase TEXT")) failures.push("repair-engine state migration missing");
 if (!source.includes('path === "/api/ai/manager/repair-signal"')) failures.push("protected self-healing repair signal endpoint missing");
 if (!guardian.includes("Self-healing repair signal") || !guardian.includes("BAYAN_AI_MANAGER_TOKEN")) failures.push("Guardian is not connected to the self-healing repair signal");
 if (!read(".github/workflows/ai-rollback.yml").includes("git revert --no-edit")) failures.push("safe rollback workflow missing");
