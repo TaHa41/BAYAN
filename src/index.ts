@@ -1507,12 +1507,30 @@ const wikipediaSearch = async (query: string, language = "ar") => {
   }
 };
 
-const evidenceFallbackAnswer = (query: string, results: any[]) => {
+const evidenceFallbackAnswer = (query: string, results: any[], language = "ar") => {
   if (!results.length) return null;
   const top = results.slice(0, 6);
   const main = top[0];
   const supporting = top.slice(1, 4);
-  const sourceNames = Array.from(new Set(top.map((x: any) => cleanText(x.source || "مصدر غير محدد", 120)))).slice(0, 6);
+  const sourceNames = Array.from(new Set(top.map((x: any) => cleanText(x.source || (language === "en" ? "Unspecified source" : "مصدر غير محدد"), 120)))).slice(0, 6);
+  if (language === "en") {
+    return [
+      "Short answer",
+      cleanText(main?.snippet || main?.title || ("The available evidence is related to: " + query), 900),
+      "",
+      "Context and details",
+      ...supporting.map((x: any) => "The available sources add: " + cleanText(x.snippet || x.title, 700) + "."),
+      "",
+      "What the evidence supports",
+      "The retrieved results contain information directly related to the question, with different levels of detail across sources. Information not present in the retrieved evidence is not treated as established.",
+      "",
+      "Conclusion",
+      cleanText(main?.title || query, 300) + " — this is an initial evidence-based summary and is not presented as a fully verified article.",
+      "",
+      "Sources used",
+      sourceNames.join(", ")
+    ].join("\n");
+  }
   return [
     "الإجابة المختصرة",
     cleanText(main?.snippet || main?.title || ("توجد أدلة مرتبطة بسؤال: " + query), 900),
@@ -1944,7 +1962,7 @@ export default {
         return json({ error: "full_article_generation_unavailable", status: "queued_for_retry" }, 503);
       }
       const section = sectionForIntent(queryIntent(q), q);
-      const slug = await slugForQuery(q);
+      const slug = await slugForQuery(q, lang);
       const article = { slug, query: q, section, title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
       const persistence = await saveKnowledgeArticle(env, article);
       if (persistence.persisted) await refreshKnowledgeGraph(env, article);
@@ -1961,7 +1979,7 @@ export default {
         if (!search.ok || !search.results.length) return json({ error: "article_source_unavailable", status: search.status }, 503);
         const generated = await generateKnowledgeArticle(env, lang, title, search.results);
         if (!generated) return json({ error: "full_article_generation_unavailable" }, 503);
-        const slug = await slugForQuery("trending:" + title);
+        const slug = await slugForQuery("trending:" + title, lang);
         const article = { slug, query: title, section: "news", title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
         const persistence = await saveKnowledgeArticle(env, article);
         if (persistence.persisted) await refreshKnowledgeGraph(env, article);
@@ -2075,7 +2093,7 @@ export default {
           answer = textOf(result);
         } catch {}
       }
-      if (!answer) answer = evidenceFallbackAnswer(q, search.results);
+      if (!answer) answer = evidenceFallbackAnswer(q, search.results, lang);
       await logSearch({
         query: q, language: lang, intent, section,
         status: "DISCOVERED",
@@ -2364,7 +2382,7 @@ export default {
         if (!env.OPENAI_API_KEY && !env.AI) {
           const fallbackSearch = await internalSearch(input, env);
           if (fallbackSearch.ok && fallbackSearch.results.length) {
-            const fallbackAnswer = evidenceFallbackAnswer(input, fallbackSearch.results);
+            const fallbackAnswer = evidenceFallbackAnswer(input, fallbackSearch.results, language);
             await sendBayanOwnerNotification(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان:\n\n" + input + "\n\nلم يتوفر مولد AI، فتم إرجاع الأدلة المسترجعة فقط:\n\n" + fallbackAnswer);
             return json({
               answer: fallbackAnswer,
@@ -2428,9 +2446,9 @@ export default {
             try {
               const generated = await generateKnowledgeArticle(env, language, input, results);
               if (generated) {
-                const slug = await slugForQuery(input);
+                const slug = await slugForQuery(input, language);
                 const section = sectionForIntent(queryIntent(input), input);
-                const knowledgeArticle = { slug, query: input, section, title: generated.title, summary: generated.summary, body: generated.body, sources: results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
+                const knowledgeArticle = { slug, query: input, section, language, title: generated.title, summary: generated.summary, body: generated.body, sources: results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
                 const persistence = await saveKnowledgeArticle(env, knowledgeArticle);
                 if (persistence.persisted) await refreshKnowledgeGraph(env, knowledgeArticle);
                 article = { id: slug, section, title: generated.title, summary: generated.summary, persisted: persistence.persisted };
