@@ -98,6 +98,9 @@ if (!read("docs/BAYAN_SYSTEM_SPEC.md").includes("Self-healing AI engineer contra
 if (!read("migrations/0011_repair_engine_state.sql").includes("phase TEXT")) failures.push("repair-engine state migration missing");
 if (!source.includes('path === "/api/ai/manager/repair-signal"')) failures.push("protected self-healing repair signal endpoint missing");
 if (!guardian.includes("Self-healing repair signal") || !guardian.includes("BAYAN_AI_MANAGER_TOKEN")) failures.push("Guardian is not connected to the self-healing repair signal");
+if (!read(".github/workflows/ai-rollback.yml").includes("git revert --no-edit")) failures.push("safe rollback workflow missing");
+if (!read(".github/workflows/ai-repair.yml").includes("rollback_candidate")) failures.push("AI repair workflow does not hand failed AI commits to rollback");
+
 const autorepair = read("scripts/ai-autorepair.mjs");
 if (!autorepair.includes("docs/BAYAN_SYSTEM_SPEC.md") || !autorepair.includes("maximum 4 changed files") || !autorepair.includes("CI_VERIFY")) failures.push("autonomous repair engine lacks bounded architecture-aware verification");
 
