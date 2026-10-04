@@ -43,6 +43,10 @@ describe("BAYAN repository contracts", () => {
     expect(source).toContain("slugForQuery(input, language)");
     expect(source).toContain("WHERE section = ? AND language = ?");
     expect(source).toContain("AND language=? AND section IN");
+    expect(source).toContain('path === "/api/contributions" && request.method === "POST")');
+    expect(source).toContain('path === "/api/requests" && request.method === "POST")');
+    expect(source).toContain('path === "/api/search/article"');
+    expect(source).toContain('path === "/api/trending/article"');
   });
 
   it("keeps English UI contract in the frontend source", () => {
