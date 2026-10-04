@@ -9,6 +9,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: read
 
 concurrency:
   group: bayan-ai-repair
@@ -34,6 +35,13 @@ jobs:
       - name: Install
         run: npm install
 
+      - name: Download Guardian diagnostics
+        if: github.event_name == 'workflow_run'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download ${{ github.event.workflow_run.id }} --repo "${{ github.repository }}" --name guardian-diagnostics --dir guardian-diagnostics || true
+
       - name: Autonomous repair
         id: repair
         env:
@@ -43,8 +51,15 @@ jobs:
           REPAIR_REPORT: |
             BAYAN Guardian failed for commit ${{ github.event.workflow_run.head_sha || github.sha }}.
             Workflow: ${{ github.event.workflow_run.html_url || 'manual run' }}
+            Production diagnostics are in guardian-diagnostics/ when available.
             Inspect the repository and repair the confirmed production failure.
-        run: node scripts/ai-autorepair.mjs | tee ai-repair-result.json
+        run: |
+          if [[ -d guardian-diagnostics ]]; then
+            cat guardian-diagnostics/* 2>/dev/null > repair-input.txt || true
+          fi
+          REPAIR_REPORT="$(cat repair-input.txt 2>/dev/null || echo 'No Guardian artifact was available; inspect CI and production paths.')"
+          export REPAIR_REPORT
+          node scripts/ai-autorepair.mjs | tee ai-repair-result.json
 
       - name: Create repair pull request
         if: steps.repair.outcome == 'success'
