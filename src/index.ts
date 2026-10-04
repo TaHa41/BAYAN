@@ -1396,7 +1396,7 @@ const runRuntimeAudit = async (env: Env) => {
   });
   // Browser Run is expensive; rotate one representative SPA route per audit cycle.
   // This still gives continuous coverage without multiplying browser calls every 5 minutes.
-  const browserRoutes = ["/", "/news", "/science", "/?lang=en", "/science?lang=en", "/tools?lang=en", "/about?lang=en"];
+  const browserRoutes = ["/", "/news", "/science", "/search?lang=en", "/ai?lang=en", "/trending?lang=en", "/prices?lang=en", "/saved?lang=en", "/contribute?lang=en", "/review?lang=en", "/tools?lang=en", "/about?lang=en", "/methodology?lang=en"];
   const browserRoute = browserRoutes[Math.floor(Date.now() / 300000) % browserRoutes.length];
   await check("browser:" + browserRoute, async () => browserRenderedCheck(env, browserRoute));
   await check("/search", async () => {
