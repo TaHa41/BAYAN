@@ -2764,11 +2764,22 @@ export default {
         if (env.GNEWS_API_KEY) {
           const endpoint = q ? "search" : "top-headlines";
           const api = "https://gnews.io/api/v4/" + endpoint + "?lang=" + lang + "&max=10&apikey=" + encodeURIComponent(env.GNEWS_API_KEY) + (q ? "&q=" + encodeURIComponent(q) : "&category=general");
-          const response = await fetch(api);
-          if (response.ok) {
-            const data = await response.json() as any;
-            return json({ status: "ok", provider: "GNews", articles: (data.articles || []).slice(0,10).map((article: any) => ({ title: cleanText(article.title, 240), description: cleanText(article.description || article.content, 900), content: cleanText(article.content, 1600), publishedAt: article.publishedAt || null, source: { name: cleanText(article.source?.name, 160) }, image: typeof article.image === "string" ? article.image : null })), totalArticles: data.totalArticles || 0 });
-          }
+          try {
+            const response = await fetch(api, { signal: AbortSignal.timeout(7000) });
+            if (response.ok) {
+              const data = await response.json() as any;
+              const articles = (data.articles || []).slice(0,10).map((article: any) => ({
+                title: cleanText(article.title, 240),
+                description: cleanText(article.description || article.content, 900),
+                content: cleanText(article.content, 1600),
+                publishedAt: article.publishedAt || null,
+                source: { name: cleanText(article.source?.name, 160) },
+                image: typeof article.image === "string" ? article.image : null,
+                url: typeof article.url === "string" ? article.url : null
+              }));
+              if (articles.length) return json({ status: "ok", provider: "GNews", articles, totalArticles: data.totalArticles || articles.length });
+            }
+          } catch {}
         }
 
         const searchQuery = q || (lang === "ar" ? "أحدث الأخبار اليوم" : "latest verified news today");
@@ -2783,7 +2794,8 @@ export default {
               content: item.snippet,
               publishedAt: item.date || null,
               source: { name: item.source },
-              image: null
+              image: item.image || null,
+              url: item.url || null
             })),
             totalArticles: rss.length
           });
@@ -2805,8 +2817,9 @@ export default {
           });
         }
         return json({ status: "provider_unavailable", provider: "GNews/Search", articles: [], totalArticles: 0 }, 503);
-      } catch {
-        return json({ status: "provider_error", provider: "GNews/Search" }, 502);
+      } catch (error) {
+        await reportBayanError(env, "api/news", error, { repair: "تمت محاولة GNews ثم RSS ثم البحث الداخلي قبل إعلان فشل مزود الأخبار." });
+        return json({ status: "provider_error", provider: "GNews/Search", articles: [], totalArticles: 0, error: safeErrorMessage(error) }, 502);
       }
     }
 
