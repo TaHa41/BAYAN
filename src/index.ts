@@ -2745,6 +2745,33 @@ export default {
       } catch (error) { return json({ status: "database_error", articles: [], error: safeErrorMessage(error) }, 503); }
     }
 
+    if (path === "/api/ai/manager/article/edit" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      if (!env.DB || !await ensureKnowledgeTables(env)) return json({ status: "database_unavailable" }, 503);
+      try {
+        const body = await request.json() as any;
+        const slug = cleanText(body?.slug, 240);
+        if (!slug) return json({ status: "slug_required" }, 400);
+        const article = await env.DB.prepare("SELECT * FROM knowledge_articles WHERE slug=?").bind(slug).first<any>();
+        if (!article) return json({ status: "article_not_found" }, 404);
+        const title = cleanText(body?.title, 500) || article.title;
+        const summary = cleanText(body?.summary, 4000) || article.summary;
+        const bodyText = cleanText(body?.body, 30000) || article.body;
+        const titleEn = cleanText(body?.titleEn, 500) || article.title_en || null;
+        const summaryEn = cleanText(body?.summaryEn, 4000) || article.summary_en || null;
+        const bodyEn = cleanText(body?.bodyEn, 30000) || article.body_en || null;
+        const section = cleanText(body?.section, 80) || article.section;
+        const sourceUrl = cleanText(body?.sourceUrl, 2000) || article.source_url || null;
+        const imageUrl = cleanText(body?.imageUrl, 2000) || article.hero_image_url || null;
+        if (imageUrl && !/^https?:\/\//i.test(imageUrl)) return json({ status:"invalid_image_url" },400);
+        const now = new Date().toISOString();
+        await env.DB.prepare("UPDATE knowledge_articles SET title=?,summary=?,body=?,title_en=?,summary_en=?,body_en=?,section=?,source_url=?,hero_image_url=?,hero_image_alt=?,hero_image_credit=?,hero_image_source=?,hero_image_license=?,hero_image_status=?,updated_at=? WHERE slug=?")
+          .bind(title,summary,bodyText,titleEn,summaryEn,bodyEn,section,sourceUrl,imageUrl,cleanText(body?.imageAlt || article.hero_image_alt || title,240),cleanText(body?.imageCredit || article.hero_image_credit || "",160)||null,cleanText(body?.imageSource || article.hero_image_source || "",2000)||null,cleanText(body?.imageLicense || article.hero_image_license || "",160)||null,imageUrl?(cleanText(body?.imageRightsStatus || article.hero_image_status || "manager_verified",40)):"NONE",now,slug).run();
+        await sendBayanOwnerNotification(env,"تم تعديل مقال من إدارة بيان","المقال: "+slug+"\nتم تحديث المحتوى/البيانات من لوحة الإدارة.");
+        return json({ status:"ok", slug, updatedAt:now });
+      } catch(error) { return json({status:"invalid_request",error:safeErrorMessage(error)},400); }
+    }
+
     if (path === "/api/ai/manager/article/image" && request.method === "POST") {
       if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
       if (!env.DB || !await ensureKnowledgeTables(env)) return json({ status: "database_unavailable" }, 503);
@@ -2766,6 +2793,39 @@ export default {
         await sendBayanOwnerNotification(env, clear ? "تمت إزالة صورة مقال" : "تم تحديث صورة مقال في بيان", "المقال: " + slug + (clear ? "\nتمت إزالة الصورة الرئيسية." : "\nتم تعيين صورة رئيسية جديدة."));
         return json({ status: "ok", slug, image: clear ? null : imageUrl, imageMeta: imageMeta || null });
       } catch (error) { return json({ status: "invalid_request", error: safeErrorMessage(error) }, 400); }
+    }
+
+    if (path === "/api/ai/manager/article/duplicate" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      if (!env.DB || !await ensureKnowledgeTables(env)) return json({ status: "database_unavailable" }, 503);
+      try {
+        const body = await request.json() as any;
+        const slug = cleanText(body?.slug,240);
+        const source = await env.DB.prepare("SELECT * FROM knowledge_articles WHERE slug=?").bind(slug).first<any>();
+        if (!source) return json({status:"article_not_found"},404);
+        const newSlug = (slug+"-draft-"+Date.now()).slice(0,240);
+        await env.DB.prepare("INSERT INTO knowledge_articles (slug,query,section,language,title,summary,body,title_en,summary_en,body_en,sources_json,status,hero_image_url,hero_image_alt,hero_image_credit,hero_image_source,hero_image_license,hero_image_status,source_url,created_at,updated_at) SELECT ?,query,section,language,title,summary,body,title_en,summary_en,body_en,sources_json,'DRAFT',hero_image_url,hero_image_alt,hero_image_credit,hero_image_source,hero_image_license,hero_image_status,source_url,?,? FROM knowledge_articles WHERE slug=?").bind(newSlug,new Date().toISOString(),new Date().toISOString(),slug).run();
+        return json({status:"ok",slug:newSlug});
+      } catch(error) { return json({status:"duplicate_failed",error:safeErrorMessage(error)},400); }
+    }
+
+    if (path === "/api/ai/manager/article/validate" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      if (!env.DB || !await ensureKnowledgeTables(env)) return json({ status: "database_unavailable" }, 503);
+      try {
+        const body = await request.json() as any;
+        const slug = cleanText(body?.slug,240);
+        const a = await env.DB.prepare("SELECT * FROM knowledge_articles WHERE slug=?").bind(slug).first<any>();
+        if (!a) return json({status:"article_not_found"},404);
+        const issues:string[]=[];
+        if (!cleanText(a.title,500)) issues.push("missing_title");
+        if (!cleanText(a.body,30000)) issues.push("missing_body");
+        if (!cleanText(a.summary,4000)) issues.push("missing_summary");
+        if (!cleanText(a.sources_json,30000)) issues.push("missing_sources");
+        try { const sources=JSON.parse(a.sources_json||"[]"); if(!Array.isArray(sources)||sources.length<2) issues.push("insufficient_sources"); } catch { issues.push("invalid_sources_json"); }
+        if (a.status==="PUBLISHED" && !a.hero_image_url && a.section==="news") issues.push("news_missing_hero_image");
+        return json({status:"ok",slug,valid:issues.length===0,issues});
+      } catch(error) { return json({status:"validation_failed",error:safeErrorMessage(error)},400); }
     }
 
     if (path === "/api/ai/manager/article/status" && request.method === "POST") {
