@@ -15,7 +15,7 @@ async function loadAdSense(clientId){
 function mountSlot(node,clientId,slot){
   if(!node||!clientId||!slot)return;
   node.hidden=false;
-  node.innerHTML='<div class="ad-label">إعلان</div><ins class="adsbygoogle bayan-ad" style="display:block" data-ad-client="'+esc(clientId)+'" data-ad-slot="'+esc(slot)+'" data-ad-format="auto" data-full-width-responsive="true"></ins>';
+  node.innerHTML='<div class="ad-label">'+(document.documentElement.lang==="en"?"Advertisement":"إعلان")+'</div><ins class="adsbygoogle bayan-ad" style="display:block" data-ad-client="'+esc(clientId)+'" data-ad-slot="'+esc(slot)+'" data-ad-format="auto" data-full-width-responsive="true"></ins>';
   try{(window.adsbygoogle=window.adsbygoogle||[]).push({});}catch{}
 }
 async function init(){
