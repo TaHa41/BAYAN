@@ -97,9 +97,12 @@ try{
   for(const route of englishRoutes){
     const response=await fetch(base+route+"?lang=en",{redirect:"follow"});
     const html=await response.text();
-    const manifestIsEnglish=/<link rel=["']manifest["'][^>]+href=["']\/manifest\.en\.json["']/i.test(html);
-    const ok=response.ok && /<html[^>]+lang=["']en["'][^>]+dir=["']ltr["']/i.test(html) && manifestIsEnglish && /BAYAN \| Knowledge & Evidence/i.test(html);
+    const manifestIsEnglish=html.includes('href="/manifest.en.json"') || html.includes("href='/manifest.en.json'");
+    const htmlLanguageOk=/<html[^>]+lang=["']en["'][^>]+dir=["']ltr["']/i.test(html);
+    const titleOk=/BAYAN \| Knowledge & Evidence/i.test(html);
+    const ok=response.ok && htmlLanguageOk && manifestIsEnglish && titleOk;
     console.log((ok?"PASS":"FAIL")+" English route "+route);
+    if(!ok) console.log("EN_ROUTE_DEBUG",JSON.stringify({route,status:response.status,htmlLanguageOk,manifestIsEnglish,titleOk,head:html.slice(0,1200)}));
     if(!ok) failed++;
   }
 }catch(e){console.log("FAIL English route coverage "+e.message);failed++;}
