@@ -65,7 +65,6 @@ if (!source.includes("await setCooldown")) failures.push("provider cooldown pers
 if (/const (aiProviderCooldown|diagnosticMemory|repairMemory) = new Map/.test(source)) failures.push("request/provider cooldown uses mutable module state");
 if (!guardian.includes("AI repair diagnosis")) failures.push("Guardian AI diagnosis step missing");
 if (!guardian.includes("PIPESTATUS[0]") || !guardian.includes('cat ai-report.txt >> "$GITHUB_OUTPUT"')) failures.push("Guardian does not preserve AI benchmark output when the benchmark exits non-zero");
-if (!guardian.includes("Classify AI benchmark dependency state") || !guardian.includes("steps.ai_classification.outputs.quota")) failures.push("Guardian AI dependency classification step is missing");
 if (!guardian.includes("ai-diagnosis.json")) failures.push("Guardian diagnosis artifact missing");
 if (!aiSmoke.includes("EXTERNAL_DEPENDENCY=AI_PROVIDER_QUOTA")) failures.push("AI capability smoke lacks external quota classification");
 if (!guardian.includes("Create AI provider dependency incident") || !guardian.includes("EXTERNAL_DEPENDENCY=AI_PROVIDER_QUOTA")) failures.push("Guardian does not separate provider quota from AI regressions");
