@@ -1975,7 +1975,7 @@ export default {
       return json({
         status: "ok",
         service: "BAYAN",
-        version: env.BAYAN_VERSION ?? "0.9.0",
+        version: env.BAYAN_VERSION ?? "0.9.1",
         commit: env.BAYAN_COMMIT_SHA ?? "local",
         environment: env.BAYAN_ENVIRONMENT ?? "development",
         timestamp: new Date().toISOString()
@@ -2086,7 +2086,7 @@ export default {
         status: "ok",
         service: "BAYAN",
         environment: env.BAYAN_ENVIRONMENT || "unknown",
-        version: env.BAYAN_VERSION || "0.9.0",
+        version: env.BAYAN_VERSION || "0.9.1",
         commit: env.BAYAN_COMMIT_SHA || "unknown",
         capabilities: {
           assets: !!env.ASSETS,
