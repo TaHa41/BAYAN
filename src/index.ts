@@ -3449,9 +3449,24 @@ export default {
     }
 
     if (path === "/robots.txt") {
-      return new Response("User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: /sitemap.xml\n", {
-        headers: { "content-type": "text/plain; charset=utf-8" }
-      });
+      // Google expects the Sitemap directive to identify the canonical sitemap URL.
+      // Keep API/internal endpoints out of crawling while leaving public content discoverable.
+      const sitemapUrl = new URL("/sitemap.xml", request.url).toString();
+      return new Response(
+        "User-agent: *\n" +
+        "Allow: /\n" +
+        "Disallow: /api/\n" +
+        "Disallow: /admin\n" +
+        "Disallow: /review\n" +
+        "Disallow: /saved\n" +
+        "Sitemap: " + sitemapUrl + "\n",
+        {
+          headers: {
+            "content-type": "text/plain; charset=utf-8",
+            "cache-control": "public, max-age=3600"
+          }
+        }
+      );
     }
 
     if (path === "/sitemap.xml") {
