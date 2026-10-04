@@ -7,9 +7,11 @@ Current release marker: 0.9.0
 
 ## 1. Verified audit scope
 
-The GitHub-connected workspace exposes the repository with admin/write access. The current TypeScript Worker was fetched in full for structural analysis (3,164 lines / ~185.7k characters), and the current frontend app was fetched in full (348 lines / ~86.4k characters). Core configuration, schema, CI/deploy/Guardian workflows, release guards, runtime smoke scripts, AI benchmark/Guardian, service worker, manifests, content data, advertising loader and repair playbook were also inspected.
+The GitHub-connected workspace exposes the repository with admin/write access. The repository tree has now been independently enumerated through the GitHub contents API and the current tracked project surface is known. The Worker source is 3,221 lines / ~188.4k characters; the frontend app is 348 lines / ~86.7k characters. All currently enumerated files in the repository are listed below and the text-bearing files were inspected for behavior or configuration.
 
-Important tooling limitation: the available GitHub connector does not expose a repository-tree/list-files operation and its code-search endpoint currently returns no results for this repository. Therefore this document distinguishes verified files from files whose existence/name could not be independently enumerated. No unseen file is claimed as reviewed.
+Exact current inventory: root files `.env.example`, `.gitignore`, `AGENTS.md`, `DEPLOY_TRIGGER.md`, `README.md`, `package.json`, `schema.sql`, `tsconfig.json`, `wrangler.jsonc`; `.github/workflows/{ci.yml,deploy.yml,guardian.yml}`; `docs/{AI_REPAIR_PLAYBOOK.md,BAYAN_SYSTEM_REFERENCE_2026-10-04.md}`; `migrations/0001_knowledge_articles.sql` through `0010_contribution_reviewer_note.sql`; `src/index.ts`, `src/app/content.ts`; `public/{ad-manager.js,app.js,content-data.js,google159baf09db9cb3cf.html,index.html,logo.svg,manifest.en.json,manifest.json,styles.css,sw.js}`; `scripts/{ai-capability-smoke.mjs,ai-guardian.mjs,production-smoke.mjs,static-guards.mjs}`; `tests/unit/{health.test.ts,project-guards.test.ts}`. No additional directory entries are currently exposed by the repository tree.
+
+This is a verified inventory of the current GitHub `main` tree, not a claim that generated build artifacts or ignored local files exist.
 
 ## 2. Runtime architecture
 
@@ -48,7 +50,7 @@ Assessment on 2026-10-04:
 - Wrangler 4.146.0: current stable verified.
 - @cloudflare/workers-types 5.20261003.1: current stable verified.
 - Node 24 in CI: Active/Maintenance LTS line and appropriate production choice; Node 26 is Current, so it should not replace Node 24 merely to chase a newer major.
-- package-lock.json was not found at the expected repository path during this audit. CI currently uses npm install rather than npm ci. This is a reproducibility/performance improvement candidate for the next controlled pass once the complete repository tree is exposed.
+- package-lock.json is absent from the verified repository tree. CI currently uses `npm install` rather than `npm ci`; this remains the main reproducibility/performance gap. A lockfile should be generated from a real dependency installation and committed only after CI validates it; it should not be fabricated from incomplete metadata.
 
 No blind dependency major upgrade was performed because the verified dependency set is already current enough and forced upgrades can introduce breaking changes without a lockfile-backed test run.
 
@@ -387,9 +389,25 @@ Latest main sequence after this audit:
 - release guards: 1d55cbfccc5985ba746823e63f46f9418ea43ef1
 - review listener: b4167ea26525835bfe9d0cb131d10a8c83920810
 
-The GitHub connector currently reports no status entries and no associated workflow runs for the latest push commit. Therefore production deployment of the final audit changes is NOT claimed as verified yet. The code changes are committed to main; live production verification must wait for visible CI/deployment results.
+The latest audit changes are committed to `main`, but the connector has not yet exposed a successful CI/deployment result for the newest commit. Therefore production deployment of these newest changes is NOT claimed as verified. The repository is ready for CI validation, followed by deployment and affected-route smoke verification.
 
-## 16. Reference principle
+## 16. Current migration inventory
+
+The actual migration sequence is:
+1. `0001_knowledge_articles.sql`
+2. `0002_knowledge_graph_freshness.sql`
+3. `0003_content_interest_engine.sql`
+4. `0004_reliability_self_healing.sql`
+5. `0005_private_analytics.sql`
+6. `0006_contribution_schema_repair.sql`
+7. `0007_search_and_notification_upgrade.sql`
+8. `0008_persistent_reader_features.sql`
+9. `0009_multilingual_article_integrity.sql`
+10. `0010_contribution_reviewer_note.sql`
+
+The canonical `schema.sql` intentionally represents the final consolidated schema. Migration history is append-only and must not be renamed to match old documentation.
+
+## 17. Reference principle
 
 BAYAN should never convert an unavailable dependency into a fake success. Every future upgrade should follow:
 
