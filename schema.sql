@@ -1,18 +1,40 @@
 -- BAYAN D1 schema
 CREATE TABLE IF NOT EXISTS knowledge_articles (
-  slug TEXT PRIMARY KEY, query TEXT NOT NULL, section TEXT NOT NULL,
-  title TEXT NOT NULL, summary TEXT NOT NULL, body TEXT NOT NULL,
-  language TEXT NOT NULL DEFAULT 'ar', title_en TEXT, summary_en TEXT, body_en TEXT,
-  sources_json TEXT NOT NULL DEFAULT '[]', status TEXT NOT NULL DEFAULT 'PUBLISHED',
-  freshness_score REAL, next_review_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  query TEXT NOT NULL,
+  section TEXT NOT NULL,
+  title TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  body TEXT NOT NULL,
+  sources_json TEXT NOT NULL DEFAULT '[]',
+  status TEXT NOT NULL DEFAULT 'PUBLISHED',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  freshness_score REAL NOT NULL DEFAULT 1,
+  next_review_at TEXT,
+  language TEXT NOT NULL DEFAULT 'ar',
+  title_en TEXT,
+  summary_en TEXT,
+  body_en TEXT
 );
+CREATE INDEX IF NOT EXISTS idx_knowledge_articles_section_created
+  ON knowledge_articles(section, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_knowledge_articles_query
+  ON knowledge_articles(query);
 CREATE TABLE IF NOT EXISTS knowledge_entities (
   entity_key TEXT PRIMARY KEY, entity_type TEXT NOT NULL, label TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS knowledge_edges (
-  from_key TEXT NOT NULL, to_key TEXT NOT NULL, relation TEXT NOT NULL, created_at TEXT NOT NULL,
-  PRIMARY KEY(from_key,to_key,relation)
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  from_key TEXT NOT NULL,
+  to_key TEXT NOT NULL,
+  relation TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE(from_key, to_key, relation)
 );
+CREATE INDEX IF NOT EXISTS idx_knowledge_edges_from ON knowledge_edges(from_key);
+CREATE INDEX IF NOT EXISTS idx_knowledge_edges_to ON knowledge_edges(to_key);
 CREATE TABLE IF NOT EXISTS content_queue (
   id INTEGER PRIMARY KEY AUTOINCREMENT, topic TEXT NOT NULL, section TEXT NOT NULL,
   language TEXT NOT NULL DEFAULT 'ar', priority INTEGER NOT NULL DEFAULT 0,
@@ -25,9 +47,10 @@ CREATE TABLE IF NOT EXISTS visitor_profiles (
 );
 CREATE TABLE IF NOT EXISTS visitor_interest_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT, visitor_id TEXT NOT NULL, section TEXT NOT NULL,
-  event_type TEXT NOT NULL, weight INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL
+  event_type TEXT NOT NULL, weight REAL NOT NULL DEFAULT 1, created_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_interest_visitor_section ON visitor_interest_events(visitor_id,section,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_interest_events_visitor_time ON visitor_interest_events(visitor_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_interest_events_section_time ON visitor_interest_events(section, created_at DESC);
 CREATE TABLE IF NOT EXISTS visitor_contributions (
   id INTEGER PRIMARY KEY AUTOINCREMENT, visitor_id TEXT NOT NULL, title TEXT NOT NULL,
   body TEXT NOT NULL, source TEXT, status TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
