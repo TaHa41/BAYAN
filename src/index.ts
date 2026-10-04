@@ -2498,9 +2498,9 @@ export default {
                 try {
                   const generated = await generateKnowledgeArticle(env, language, input, results);
                   if (generated) {
-                    const slug = await slugForQuery(input);
+                    const slug = await slugForQuery(input, language);
                     const section = sectionForIntent(queryIntent(input), input);
-                    const knowledgeArticle = { slug, query: input, section, title: generated.title, summary: generated.summary, body: generated.body, sources: results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
+                    const knowledgeArticle = { slug, query: input, section, language, title: generated.title, summary: generated.summary, body: generated.body, sources: results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
                     const persistence = await saveKnowledgeArticle(env, knowledgeArticle);
                     if (persistence.persisted) await refreshKnowledgeGraph(env, knowledgeArticle);
                     article = { id: slug, section, title: generated.title, summary: generated.summary, persisted: persistence.persisted };
@@ -2533,9 +2533,9 @@ export default {
           try {
             const generated = await generateKnowledgeArticle(env, language, input, results);
             if (generated) {
-              const slug = await slugForQuery(input);
+              const slug = await slugForQuery(input, language);
               const section = sectionForIntent(queryIntent(input), input);
-              const knowledgeArticle = { slug, query: input, section, title: generated.title, summary: generated.summary, body: generated.body, sources: results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
+              const knowledgeArticle = { slug, query: input, section, language, title: generated.title, summary: generated.summary, body: generated.body, sources: results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
               const persistence = await saveKnowledgeArticle(env, knowledgeArticle);
               if (persistence.persisted) await refreshKnowledgeGraph(env, knowledgeArticle);
               article = { id: slug, section, title: generated.title, summary: generated.summary, persisted: persistence.persisted };
