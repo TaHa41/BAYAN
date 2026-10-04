@@ -31,7 +31,7 @@ describe("BAYAN repository contracts", () => {
 
   it("keeps database migrations contiguous and includes multilingual hardening", () => {
     const files = readdirSync("migrations").filter((x) => /^\d+_.*\.sql$/.test(x)).sort();
-    expect(files.at(-1)).toBe("0013_content_operations_and_news_images.sql");
+    expect(files.at(-1)).toBe("0015_news_cache_resilience.sql");
     expect(files.map((x: string) => Number(x.split("_")[0]))).toEqual(files.map((_x: string, i: number) => i + 1));
   });
 
@@ -56,6 +56,9 @@ describe("BAYAN repository contracts", () => {
     expect(source).toContain('path === "/api/ai/manager/article/duplicate"');
     expect(source).toContain('path === "/api/ai/manager/article/validate"');
     expect(source).toContain('path === "/api/ai/manager/article/status"');
+    expect(source).toContain('path === "/api/ai/manager/article"');
+    expect(source).toContain('news_cache');
+    expect(source).toContain('article_revisions');
     expect(source).toContain('path === "/api/ai/manager/news-diagnostics"');
     expect(source).toContain('hero_image_url');
     expect(source).toContain('resolveLicensedEditorialImage');
