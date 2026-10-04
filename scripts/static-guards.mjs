@@ -36,6 +36,8 @@ if (!source.includes("gpt-6-luna") || !source.includes("gpt-6.1-sol")) failures.
 if (!source.includes('SEARCH_PROVIDER') || !source.includes('SEARCH_PROVIDER_CHAIN')) failures.push("search provider fallback chain missing");
 if (!source.includes("configuredSearchProviders") || !source.includes("providerOrder")) failures.push("configured search provider priority is not applied");
 if (!source.includes('AI_SEARCH_INSTANCE')) failures.push("AI Search instance configuration missing");
+if (!source.includes('path === "/api/health" || path === "/health"')) failures.push("health compatibility route missing");
+if (!read("scripts/production-smoke.mjs").includes('["/health","application/json"]')) failures.push("production smoke does not verify /health");
 if (!source.includes('path === "/api/diagnostics"')) failures.push("protected diagnostics route missing");
 if (!source.includes("repair-skills")) failures.push("repair skills capability missing");
 if (!source.includes("title_en") || !source.includes("body_en")) failures.push("multilingual article storage missing");
