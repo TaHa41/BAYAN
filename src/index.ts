@@ -1707,7 +1707,7 @@ export default {
     }
   },
 
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       const url = new URL(request.url);
     const path = url.pathname;
@@ -2037,10 +2037,10 @@ export default {
       // Search responses must not wait for article generation or persistence.
       // Queue enrichment for the background worker instead.
       let knowledge: any = { query: q, section, status: "DISCOVERED", persisted: false };
-      try {
-        const queued = await queueContentTopic(env, q, section, lang, 100);
-        knowledge.status = queued ? "QUEUED_FOR_ARTICLE" : "DISCOVERED";
-      } catch {}
+      if (ctx?.waitUntil) {
+        ctx.waitUntil(queueContentTopic(env, q, section, lang, 100).catch(() => false));
+        knowledge.status = "QUEUED_FOR_ARTICLE";
+      }
 
       let answer = null;
       if (env.OPENAI_API_KEY) {
