@@ -103,7 +103,13 @@ jobs:
             fi
           else
             DIAGNOSIS="$(cat ai-diagnosis.json 2>/dev/null || true)"
-            gh issue create --repo "${{ github.repository }}" --title "BAYAN Guardian: AI capability regression" --body "$(printf 'AI capability benchmark failed on %s. The site smoke test remained healthy.\n\n%s\n\n%s' "${{ github.sha }}" "$DIAGNOSIS" "$report")" || true
+            if grep -q '"status":"skipped"' <<< "$DIAGNOSIS"; then
+              echo "AI benchmark diagnosis was skipped because the diagnostic provider is not configured; no false regression incident will be opened."
+            elif grep -q 'OPENAI_API_KEY is not configured' <<< "$DIAGNOSIS"; then
+              echo "AI benchmark diagnosis provider is not configured; no false regression incident will be opened."
+            else
+              gh issue create --repo "${{ github.repository }}" --title "BAYAN Guardian: AI capability regression" --body "$(printf 'AI capability benchmark failed on %s. The site smoke test remained healthy.\n\n%s\n\n%s' "${{ github.sha }}" "$DIAGNOSIS" "$report")" || true
+            fi
           fi
 
       - name: Guardian result
