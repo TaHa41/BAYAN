@@ -1266,7 +1266,7 @@ const runRuntimeAudit = async (env: Env) => {
     }
     results.push({ route: name, ok: false, status: 0, latencyMs: Date.now() - t, attempt: 3, error: safeErrorMessage(lastError) });
   };
-  await check("/api/health", async () => ({ service: "BAYAN", version: env.BAYAN_VERSION || "0.7.0" }));
+  await check("/api/health", async () => ({ service: "BAYAN", version: env.BAYAN_VERSION || "0.9.0" }));
   await check("/assets", async () => {
     if (!env.ASSETS) throw new Error("assets_binding_missing");
     const response = await env.ASSETS.fetch(new Request("https://bayan.internal/"));
@@ -1704,7 +1704,7 @@ export default {
       return json({
         status: "ok",
         service: "BAYAN",
-        version: env.BAYAN_VERSION ?? "0.7.0",
+        version: env.BAYAN_VERSION ?? "0.9.0",
         commit: env.BAYAN_COMMIT_SHA ?? "local",
         environment: env.BAYAN_ENVIRONMENT ?? "development",
         timestamp: new Date().toISOString()
@@ -1813,7 +1813,7 @@ export default {
         status: "ok",
         service: "BAYAN",
         environment: env.BAYAN_ENVIRONMENT || "unknown",
-        version: env.BAYAN_VERSION || "0.8.0",
+        version: env.BAYAN_VERSION || "0.9.0",
         commit: env.BAYAN_COMMIT_SHA || "unknown",
         capabilities: {
           assets: !!env.ASSETS,
