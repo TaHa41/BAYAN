@@ -205,7 +205,7 @@ const renderHtml = async (response: Response, requestUrl: URL, env?: Env) => {
   const finalDescription = seoSummary ? cleanText(seoSummary, 300) : seo[language][1];
   const [resolvedTitle, resolvedDescription] = [finalTitle, finalDescription];
 
-  html = html.replace('<html lang="ar" dir="rtl">', '<html lang="' + language + '" dir="' + direction + '">');
+  html = html.replace('<html lang="ar" dir="rtl">', '<html lang="' + language + '" dir="' + direction + '">');\n  html = html.replace(/<link rel="manifest" href="[^"]+">/i, '<link rel="manifest" href="' + (language === "en" ? "/manifest.en.json" : "/manifest.json") + '">');
   const indexable = !cleanPath.startsWith("/search") && !cleanPath.startsWith("/ai") && !cleanPath.startsWith("/saved") && !cleanPath.startsWith("/review") && !cleanPath.startsWith("/admin");
   const robots = indexable ? "index,follow" : "noindex,follow";
   const jsonLd = JSON.stringify(articleSeo ? {
@@ -1780,7 +1780,7 @@ export default {
       }
     }
 
-    if (path === "/api/search/web") {
+    if (path === "/api/search/web") {\n      if (!allowRequest(request, 30)) return json({ ok: false, error: "rate_limited" }, 429);
       const query = cleanText(url.searchParams.get("q"), 1024);
       const provider = ["ceramic", "exa", "linkup"].includes(url.searchParams.get("provider") || "")
         ? url.searchParams.get("provider")!
@@ -1795,7 +1795,7 @@ export default {
       }
     }
 
-    if (path === "/api/knowledge/search") {
+    if (path === "/api/knowledge/search") {\n      if (!allowRequest(request, 30)) return json({ ok: false, error: "rate_limited" }, 429);
       const query = cleanText(url.searchParams.get("q"), 1024);
       if (!query) return json({ ok: false, error: "query_required" }, 400);
       try {
@@ -1991,7 +1991,7 @@ export default {
       }
     }
 
-    if (path === "/api/search") {
+    if (path === "/api/search") {\n      if (!allowRequest(request, 40)) return json({ ok: false, error: "rate_limited" }, 429);
       const q = url.searchParams.get("q")?.trim().slice(0, 500) ?? "";
       const lang = (url.searchParams.get("lang") || "ar").toLowerCase() === "en" ? "en" : "ar";
       if (!q) return json({ query: "", items: [], status: "empty_query" });
@@ -2686,7 +2686,7 @@ export default {
       return json({ status: failed.length || !telegram.ok ? "degraded" : "healthy", delivered: telegram.ok, telegramError: telegram.error || null, checks, failed, report });
     }
 
-    if (path === "/api/news") {
+    if (path === "/api/news") {\n      if (!allowRequest(request, 30)) return json({ status: "rate_limited" }, 429);
       const q = (url.searchParams.get("q") || "").trim();
       try {
         const lang = (url.searchParams.get("lang") || "ar").toLowerCase();
@@ -2741,7 +2741,7 @@ export default {
       }
     }
 
-    if (path === "/api/trending") {
+    if (path === "/api/trending") {\n      if (!allowRequest(request, 30)) return json({ status: "rate_limited" }, 429);
       try {
         const lang = (url.searchParams.get("lang") || "ar").toLowerCase() === "en" ? "en" : "ar";
         let items = await rssNewsSearch("", lang);
@@ -2771,7 +2771,7 @@ export default {
       }
     }
 
-    if (path === "/api/gold") {
+    if (path === "/api/gold") {\n      if (!allowRequest(request, 20)) return json({ status: "rate_limited" }, 429);
       try {
         const validGold = (data: any) =>
           !!data &&
@@ -2877,7 +2877,7 @@ export default {
       }
     }
 
-    if (path === "/api/images") {
+    if (path === "/api/images") {\n      if (!allowRequest(request, 20)) return json({ status: "rate_limited" }, 429);
       const q = (url.searchParams.get("q") || "").trim().slice(0, 120);
       if (!q) return json({ status: "query_required" }, 400);
       try {
@@ -2896,7 +2896,7 @@ export default {
       }
     }
 
-    if (path === "/api/weather") {
+    if (path === "/api/weather") {\n      if (!allowRequest(request, 30)) return json({ status: "rate_limited" }, 429);
       const city = (url.searchParams.get("city") || "").trim().slice(0, 80);
       if (!city) return json({ status: "city_required" }, 400);
       try {
