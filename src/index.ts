@@ -2208,6 +2208,7 @@ export default {
     }
 
     if (path === "/api/knowledge/graph") {
+      if (!allowRequest(request, 30)) return json({ status: "rate_limited" }, 429);
       if (!await ensureKnowledgeTables(env)) return json({ status: "database_error", nodes: [], edges: [] }, 503);
       const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit") || 50)));
       if (!env.DB) return json({ status: "not_configured", nodes: [], edges: [] }, 503);
@@ -2284,6 +2285,7 @@ export default {
     }
 
     if (path === "/api/recommendations") {
+      if (!allowRequest(request, 30)) return json({ status: "rate_limited" }, 429);
       const visitorId = cleanText(url.searchParams.get("visitorId"), 100);
       const language = url.searchParams.get("lang") === "en" ? "en" : "ar";
       if (!env.DB || !visitorId) return json({ status: "ok", articles: [] });
@@ -2299,6 +2301,7 @@ export default {
     }
 
     if (path === "/api/saved" && request.method === "GET") {
+      if (!allowRequest(request, 60)) return json({ status: "rate_limited" }, 429);
       const visitorId = cleanText(url.searchParams.get("visitorId"), 100);
       const language = url.searchParams.get("lang") === "en" ? "en" : "ar";
       if (!visitorId || !env.DB || !await ensureUserFeatureTables(env)) return json({ status: "ok", articles: [] });
@@ -2317,6 +2320,7 @@ export default {
       } catch { return json({status:"invalid_request"},400); }
     }
     if (path === "/api/article/history" && request.method === "GET") {
+      if (!allowRequest(request, 30)) return json({ status: "rate_limited" }, 429);
       const slug=cleanText(url.searchParams.get("slug"),240);
       if(!slug||!env.DB||!await ensureUserFeatureTables(env)) return json({status:"ok",revisions:[]});
       try { const result=await env.DB.prepare("SELECT id,article_slug,title,summary,body,sources_json,created_at FROM article_revisions WHERE article_slug=? ORDER BY created_at DESC LIMIT 30").bind(slug).all(); return json({status:"ok",revisions:result.results||[]}); }
@@ -2335,6 +2339,7 @@ export default {
       } catch { return json({status:"invalid_request"},400); }
     }
     if (path === "/api/notifications" && request.method === "GET") {
+      if (!allowRequest(request, 60)) return json({ status: "rate_limited" }, 429);
       const visitorId=cleanText(url.searchParams.get("visitorId"),100);
       if(!visitorId||!env.DB||!await ensureUserFeatureTables(env)) return json({status:"ok",enabled:false,topics:[]});
       try { const row=await env.DB.prepare("SELECT enabled,language,topics_json FROM notification_preferences WHERE visitor_id=?").bind(visitorId).first() as any; return json({status:"ok",enabled:!!row?.enabled,language:row?.language||"ar",topics:row?.topics_json?JSON.parse(row.topics_json):[]}); }
@@ -2435,6 +2440,7 @@ export default {
     }
 
     if (path === "/api/knowledge") {
+      if (!allowRequest(request, 30)) return json({ status: "rate_limited" }, 429);
       const section = cleanText(url.searchParams.get("section"), 80) || undefined;
       const id = cleanText(url.searchParams.get("id"), 120) || undefined;
       const limit = Number(url.searchParams.get("limit") || 30);
@@ -2914,6 +2920,7 @@ export default {
     }
 
     if (path === "/api/maps/config") {
+      if (!allowRequest(request, 30)) return json({ status: "rate_limited" }, 429);
       if (!env.GOOGLE_MAPS_API_KEY) return json({ status: "not_configured", provider: "Google Maps" }, 503);
       return json({ status: "ok", provider: "Google Maps", apiKeyConfigured: true });
     }
