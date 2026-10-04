@@ -67,7 +67,7 @@ if (!guardian.includes("AI repair diagnosis")) failures.push("Guardian AI diagno
 if (!guardian.includes("PIPESTATUS[0]") || !guardian.includes('cat ai-report.txt >> "$GITHUB_OUTPUT"')) failures.push("Guardian does not preserve AI benchmark output when the benchmark exits non-zero");
 if (!guardian.includes("ai-diagnosis.json")) failures.push("Guardian diagnosis artifact missing");
 if (!aiSmoke.includes("EXTERNAL_DEPENDENCY=AI_PROVIDER_QUOTA")) failures.push("AI capability smoke lacks external quota classification");
-if (!guardian.includes("Create AI provider dependency incident") || !guardian.includes("EXTERNAL_DEPENDENCY=AI_PROVIDER_QUOTA")) failures.push("Guardian does not separate provider quota from AI regressions");
+if (!guardian.includes("Route AI benchmark incident") || !guardian.includes("EXTERNAL_DEPENDENCY=AI_PROVIDER_QUOTA") || !guardian.includes("gh issue create")) failures.push("Guardian does not separate provider quota from AI regressions");
 
 const numbers = migrations.map((x) => Number(x.split("_")[0]));
 for (let i = 0; i < numbers.length; i++) {
