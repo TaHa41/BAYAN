@@ -303,9 +303,14 @@ document.addEventListener("click",(event)=>{
     event.preventDefault();
     event.stopPropagation();
     const id=save.getAttribute("data-bayan-save");
+    const section=save.getAttribute("data-bayan-section")||"";
     let list=[];try{list=JSON.parse(localStorage.getItem("bayan:saved-articles")||"[]")}catch{}
-    if(list.includes(id)){list=list.filter(x=>x!==id);save.textContent="☆ حفظ المقال";}else{list.unshift(id);save.textContent="★ محفوظ";}
-    localStorage.setItem("bayan:saved-articles",JSON.stringify(list.slice(0,100)));const article=(window.BAYAN_CONTENT?.articles||[]).find(x=>x.id===id);if(article)recordInterest(article.section,"save");
+    const removing=list.includes(id);
+    if(removing){list=list.filter(x=>x!==id);save.textContent=isEn?"☆ Save article":"☆ حفظ المقال";}
+    else{list.unshift(id);save.textContent=isEn?"★ Saved":"★ محفوظ";}
+    localStorage.setItem("bayan:saved-articles",JSON.stringify(list.slice(0,100)));
+    if(section)recordInterest(section,"save");
+    fetch("/api/saved",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({visitorId,articleSlug:id,action:removing?"remove":"save"})}).catch(()=>{});
     return;
   }
   const share=event.target.closest("[data-bayan-share]");
