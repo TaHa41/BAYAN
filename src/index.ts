@@ -2786,6 +2786,73 @@ export default {
       return json({ status: result.meta?.changes ? "queued" : "not_found", id });
     }
 
+    if (path === "/api/ai/manager/telegram/status" && request.method === "GET") {
+      if (!managerAuthorized(request, env)) return json({ error: "unauthorized" }, 401);
+      try {
+        const target = await getTelegramChatId(env);
+        const [me, webhook] = await Promise.all([
+          telegramApi(env, "getMe"),
+          telegramApi(env, "getWebhookInfo")
+        ]);
+        return json({
+          status: "ok",
+          botConfigured: !!env.TELEGRAM_BOT_TOKEN,
+          bot: me?.result ? {
+            id: me.result.id || null,
+            username: cleanText(me.result.username || "", 120),
+            name: cleanText(me.result.first_name || "", 120)
+          } : null,
+          chatConfigured: !!target,
+          chatId: target || null,
+          chatSource: (await getManagerSetting(env, "telegram.chat_id")) ? "manager" : (env.TELEGRAM_CHAT_ID ? "secret" : "not_configured"),
+          webhook: {
+            configured: !!webhook?.result?.url,
+            url: cleanText(webhook?.result?.url || "", 500),
+            pendingUpdates: Number(webhook?.result?.pending_update_count || 0),
+            lastError: cleanText(webhook?.result?.last_error_message || "", 300)
+          }
+        });
+      } catch (error) {
+        return json({
+          status: "telegram_error",
+          botConfigured: !!env.TELEGRAM_BOT_TOKEN,
+          chatConfigured: !!(await getTelegramChatId(env)),
+          error: safeErrorMessage(error)
+        }, 502);
+      }
+    }
+
+    if (path === "/api/ai/manager/telegram/configure" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({ error: "unauthorized" }, 401);
+      const body = await request.json() as any;
+      const chatId = cleanText(String(body?.chatId || "").trim(), 120);
+      if (!chatId || !/^-?\\d{3,30}$/.test(chatId)) return json({ status: "invalid_chat_id", error: "telegram_chat_id_invalid" }, 400);
+      try {
+        const probe = await telegramApi(env, "sendMessage", { chat_id: chatId, text: "✅ تم ربط لوحة إدارة بيان بهذا الحساب. ستصل تنبيهات النظام هنا." });
+        if (!probe?.ok) return json({ status: "telegram_send_failed", error: "telegram_chat_validation_failed" }, 502);
+        if (!await setManagerSetting(env, "telegram.chat_id", chatId)) return json({ status: "database_unavailable" }, 503);
+        return json({ status: "ok", configured: true, chatId, delivered: true });
+      } catch (error) {
+        return json({ status: "telegram_configure_failed", error: safeErrorMessage(error) }, 502);
+      }
+    }
+
+    if (path === "/api/ai/manager/telegram/clear" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({ error: "unauthorized" }, 401);
+      if (!await setManagerSetting(env, "telegram.chat_id", "")) return json({ status: "database_unavailable" }, 503);
+      return json({ status: "ok", configured: !!env.TELEGRAM_CHAT_ID, source: env.TELEGRAM_CHAT_ID ? "secret_fallback" : "none" });
+    }
+
+    if (path === "/api/ai/manager/telegram/delete-webhook" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({ error: "unauthorized" }, 401);
+      try {
+        const result = await telegramApi(env, "deleteWebhook", { drop_pending_updates: false });
+        return json({ status: result?.ok ? "ok" : "telegram_failed", webhookRemoved: !!result?.ok });
+      } catch (error) {
+        return json({ status: "telegram_error", error: safeErrorMessage(error) }, 502);
+      }
+    }
+
     if (path === "/api/ai/manager/telegram/setup" && request.method === "GET") {
       if (!managerAuthorized(request, env)) return json({ error: "unauthorized" }, 401);
       try {
