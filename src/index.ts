@@ -1698,6 +1698,19 @@ const rssNewsSearch = async (query = "", language = "ar") => {
   return enriched;
 };
 
+const enrichNewsImages = async (items: any[]) => {
+  const output = items.slice();
+  const missing = output.map((item, index) => ({ item, index })).filter((x) => !x.item?.image).slice(0, 4);
+  const resolved = await Promise.all(missing.map(async ({ item, index }) => ({
+    index,
+    image: await resolveLicensedEditorialImage(String(item.title || ""))
+  })));
+  for (const item of resolved) {
+    if (item.image?.url) output[item.index] = { ...output[item.index], image: item.image.url, imageMeta: item.image };
+  }
+  return output;
+};
+
 const wikimediaEnterpriseLookup = async (env: Env, query: string, language = "ar") => {
   if (!env.WIKIMEDIA_ENTERPRISE_TOKEN) return [];
   const name = cleanText(query
