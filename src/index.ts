@@ -2716,6 +2716,77 @@ export default {
       return json({ status: "updated", id, moderation: status, publication: status === "VERIFIED" ? "QUEUED_FOR_INDEPENDENT_EVIDENCE" : "not_published" });
     }
 
+    if (path === "/api/ai/manager/articles" && request.method === "GET") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      if (!env.DB || !await ensureKnowledgeTables(env)) return json({ status: "database_unavailable", articles: [] }, 503);
+      const status = cleanText(url.searchParams.get("status"), 30);
+      const section = cleanText(url.searchParams.get("section"), 80);
+      const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit") || 50)));
+      try {
+        let result: any;
+        if (status && section) result = await env.DB.prepare("SELECT slug,query,section,language,title,summary,status,hero_image_url,hero_image_alt,hero_image_credit,hero_image_source,hero_image_license,hero_image_status,source_url,created_at,updated_at FROM knowledge_articles WHERE status=? AND section=? ORDER BY updated_at DESC LIMIT ?").bind(status,section,limit).all();
+        else if (status) result = await env.DB.prepare("SELECT slug,query,section,language,title,summary,status,hero_image_url,hero_image_alt,hero_image_credit,hero_image_source,hero_image_license,hero_image_status,source_url,created_at,updated_at FROM knowledge_articles WHERE status=? ORDER BY updated_at DESC LIMIT ?").bind(status,limit).all();
+        else if (section) result = await env.DB.prepare("SELECT slug,query,section,language,title,summary,status,hero_image_url,hero_image_alt,hero_image_credit,hero_image_source,hero_image_license,hero_image_status,source_url,created_at,updated_at FROM knowledge_articles WHERE section=? ORDER BY updated_at DESC LIMIT ?").bind(section,limit).all();
+        else result = await env.DB.prepare("SELECT slug,query,section,language,title,summary,status,hero_image_url,hero_image_alt,hero_image_credit,hero_image_source,hero_image_license,hero_image_status,source_url,created_at,updated_at FROM knowledge_articles ORDER BY updated_at DESC LIMIT ?").bind(limit).all();
+        return json({ status: "ok", articles: result.results || [] });
+      } catch (error) { return json({ status: "database_error", articles: [], error: safeErrorMessage(error) }, 503); }
+    }
+
+    if (path === "/api/ai/manager/article/image" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      if (!env.DB || !await ensureKnowledgeTables(env)) return json({ status: "database_unavailable" }, 503);
+      try {
+        const body = await request.json() as any;
+        const slug = cleanText(body?.slug, 240);
+        const imageUrl = cleanText(body?.imageUrl, 2000);
+        if (!slug) return json({ status: "slug_required" }, 400);
+        if (imageUrl && !/^https?:\/\//i.test(imageUrl)) return json({ status: "invalid_image_url" }, 400);
+        const article = await env.DB.prepare("SELECT slug,title,source_url FROM knowledge_articles WHERE slug=?").bind(slug).first<any>();
+        if (!article) return json({ status: "article_not_found" }, 404);
+        const now = new Date().toISOString();
+        const clear = !imageUrl;
+        await env.DB.prepare("UPDATE knowledge_articles SET hero_image_url=?,hero_image_alt=?,hero_image_credit=?,hero_image_source=?,hero_image_license=?,hero_image_status=?,updated_at=? WHERE slug=?")
+          .bind(clear ? null : imageUrl, clear ? null : cleanText(body?.alt || article.title,240), clear ? null : cleanText(body?.credit || "Manager selected",160), clear ? null : cleanText(body?.sourceUrl || article.source_url || "",2000) || null, clear ? null : cleanText(body?.license || "",160) || null, clear ? "NONE" : cleanText(body?.rightsStatus || "manager_verified",40), now, slug).run();
+        await sendBayanOwnerNotification(env, clear ? "تمت إزالة صورة مقال" : "تم تحديث صورة مقال في بيان", "المقال: " + slug + (clear ? "\nتمت إزالة الصورة الرئيسية." : "\nتم تعيين صورة رئيسية جديدة."));
+        return json({ status: "ok", slug, image: clear ? null : imageUrl });
+      } catch (error) { return json({ status: "invalid_request", error: safeErrorMessage(error) }, 400); }
+    }
+
+    if (path === "/api/ai/manager/article/status" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      if (!env.DB || !await ensureKnowledgeTables(env)) return json({ status: "database_unavailable" }, 503);
+      try {
+        const body = await request.json() as any;
+        const slug = cleanText(body?.slug, 240);
+        const status = ["PUBLISHED","DRAFT","ARCHIVED"].includes(String(body?.status)) ? String(body.status) : "";
+        if (!slug || !status) return json({ status: "invalid_article_status" }, 400);
+        const result = await env.DB.prepare("UPDATE knowledge_articles SET status=?,updated_at=? WHERE slug=?").bind(status,new Date().toISOString(),slug).run();
+        return json({ status: result.meta?.changes ? "ok" : "not_found", slug, articleStatus: status });
+      } catch (error) { return json({ status: "database_error", error: safeErrorMessage(error) }, 503); }
+    }
+
+    if (path === "/api/ai/manager/news-diagnostics" && request.method === "GET") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      try {
+        const lang = url.searchParams.get("lang") === "en" ? "en" : "ar";
+        const started = Date.now();
+        const items = await rssNewsSearch("", lang);
+        const withImages = items.filter((x: any) => !!x?.image).length;
+        const sources = [...new Set(items.map((x: any) => cleanText(x?.source || "",120)).filter(Boolean))];
+        const newest = items.map((x:any)=>x?.date ? Date.parse(x.date) : NaN).filter(Number.isFinite).sort((a,b)=>b-a)[0] || null;
+        return json({ status:"ok", language:lang, checkedAt:new Date().toISOString(), durationMs:Date.now()-started, articleCount:items.length, imageCount:withImages, imageCoverage:items.length ? Number((withImages/items.length).toFixed(2)) : 0, sources, newestAt:newest ? new Date(newest).toISOString() : null });
+      } catch (error) { return json({ status:"provider_error", error:safeErrorMessage(error) },502); }
+    }
+
+    if (path === "/api/ai/manager/audit-history" && request.method === "GET") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      if (!env.DB || !await ensureRuntimeAuditTable(env)) return json({ status:"database_unavailable", audits:[] },503);
+      try {
+        const result = await env.DB.prepare("SELECT id,checked_at,healthy,details_json FROM runtime_audits ORDER BY checked_at DESC LIMIT 30").all();
+        return json({ status:"ok", audits:result.results || [] });
+      } catch (error) { return json({ status:"database_error",audits:[],error:safeErrorMessage(error) },503); }
+    }
+
     if (path === "/api/knowledge") {
       if (!allowRequest(request, 30)) return json({ status: "rate_limited" }, 429);
       const section = cleanText(url.searchParams.get("section"), 80) || undefined;
