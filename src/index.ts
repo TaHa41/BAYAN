@@ -893,6 +893,15 @@ const managerAuthorized = (request: Request, env: Env) => {
 
 const managerAuthError = (env: Env) => env.BAYAN_AI_MANAGER_TOKEN ? "manager_token_invalid" : "manager_token_not_configured";
 
+const ensureNewsCacheTable = async (env: Env) => {
+  if (!env.DB) return false;
+  try {
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS news_cache (cache_key TEXT PRIMARY KEY, language TEXT NOT NULL, provider TEXT NOT NULL, articles_json TEXT NOT NULL, updated_at TEXT NOT NULL)").run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_news_cache_language_updated ON news_cache(language, updated_at DESC)").run();
+    return true;
+  } catch { return false; }
+};
+
 const ensureKnowledgeTables = async (env: Env) => {
   if (!env.DB) return false;
   try {
@@ -972,7 +981,12 @@ const ensureUserFeatureTables = async (env: Env) => {
   if (!env.DB) return false;
   try {
     await env.DB.prepare(`CREATE TABLE IF NOT EXISTS saved_articles (visitor_id TEXT NOT NULL, article_slug TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(visitor_id, article_slug))`).run();
-    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS article_revisions (id INTEGER PRIMARY KEY AUTOINCREMENT, article_slug TEXT NOT NULL, title TEXT NOT NULL, summary TEXT NOT NULL, body TEXT NOT NULL, sources_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL)`).run();
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS article_revisions (id INTEGER PRIMARY KEY AUTOINCREMENT, article_slug TEXT NOT NULL, title TEXT NOT NULL, summary TEXT NOT NULL, body TEXT NOT NULL, sources_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL)`).run();    for (const sql of [
+      "ALTER TABLE article_revisions ADD COLUMN action TEXT NOT NULL DEFAULT 'EDIT'",
+      "ALTER TABLE article_revisions ADD COLUMN editor TEXT NOT NULL DEFAULT 'BAYAN_MANAGER'",
+      "ALTER TABLE article_revisions ADD COLUMN before_json TEXT",
+      "ALTER TABLE article_revisions ADD COLUMN after_json TEXT"
+    ]) { try { await env.DB.prepare(sql).run(); } catch {} }
     await env.DB.prepare(`CREATE TABLE IF NOT EXISTS user_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, visitor_id TEXT NOT NULL, request_type TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL, source TEXT, status TEXT NOT NULL DEFAULT 'PENDING_REVIEW', created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`).run();
     await env.DB.prepare(`CREATE TABLE IF NOT EXISTS notification_preferences (visitor_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0, language TEXT NOT NULL DEFAULT 'ar', topics_json TEXT NOT NULL DEFAULT '[]', updated_at TEXT NOT NULL)`).run();
     await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_saved_articles_visitor ON saved_articles(visitor_id,created_at DESC)").run();
@@ -2745,6 +2759,44 @@ export default {
       } catch (error) { return json({ status: "database_error", articles: [], error: safeErrorMessage(error) }, 503); }
     }
 
+    if (path === "/api/ai/manager/article" && request.method === "GET") {
+      if (!managerAuthorized(request, env)) return json({ status:"forbidden", error:managerAuthError(env) },403);
+      if (!env.DB || !await ensureKnowledgeTables(env)) return json({status:"database_unavailable"},503);
+      const slug=cleanText(url.searchParams.get("slug"),240);
+      if(!slug) return json({status:"slug_required"},400);
+      const article=await env.DB.prepare("SELECT * FROM knowledge_articles WHERE slug=?").bind(slug).first<any>();
+      if(!article) return json({status:"article_not_found"},404);
+      return json({status:"ok",article});
+    }
+
+    if (path === "/api/ai/manager/article/revisions" && request.method === "GET") {
+      if (!managerAuthorized(request, env)) return json({status:"forbidden",error:managerAuthError(env)},403);
+      if (!env.DB || !await ensureUserFeatureTables(env)) return json({status:"database_unavailable"},503);
+      const slug=cleanText(url.searchParams.get("slug"),240);
+      if(!slug) return json({status:"slug_required"},400);
+      const rows=await env.DB.prepare("SELECT id,article_slug,title,summary,body,sources_json,created_at FROM article_revisions WHERE article_slug=? ORDER BY created_at DESC LIMIT 20").bind(slug).all();
+      return json({status:"ok",revisions:rows.results||[]});
+    }
+
+    if (path === "/api/ai/manager/article/restore" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({status:"forbidden",error:managerAuthError(env)},403);
+      if (!env.DB || !await ensureUserFeatureTables(env) || !await ensureKnowledgeTables(env)) return json({status:"database_unavailable"},503);
+      try {
+        const body=await request.json() as any;
+        const slug=cleanText(body?.slug,240);
+        const revisionId=Number(body?.revisionId||0);
+        const revision=await env.DB.prepare("SELECT * FROM article_revisions WHERE id=? AND article_slug=?").bind(revisionId,slug).first<any>();
+        if(!revision) return json({status:"revision_not_found"},404);
+        const current=await env.DB.prepare("SELECT * FROM knowledge_articles WHERE slug=?").bind(slug).first<any>();
+        if(!current) return json({status:"article_not_found"},404);
+        const now=new Date().toISOString();
+        await env.DB.prepare("INSERT INTO article_revisions(article_slug,title,summary,body,sources_json,created_at) VALUES(?,?,?,?,?,?)").bind(slug,current.title,current.summary,current.body,current.sources_json||"[]",now).run();
+        await env.DB.prepare("UPDATE knowledge_articles SET title=?,summary=?,body=?,sources_json=?,updated_at=? WHERE slug=?").bind(revision.title,revision.summary,revision.body,revision.sources_json||"[]",now,slug).run();
+        await sendBayanOwnerNotification(env,"تم استرجاع نسخة قديمة من مقال","المقال: "+slug+"\nالنسخة: "+revisionId);
+        return json({status:"ok",slug,revisionId,updatedAt:now});
+      } catch(error) { return json({status:"restore_failed",error:safeErrorMessage(error)},400); }
+    }
+
     if (path === "/api/ai/manager/article/edit" && request.method === "POST") {
       if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
       if (!env.DB || !await ensureKnowledgeTables(env)) return json({ status: "database_unavailable" }, 503);
@@ -2765,8 +2817,11 @@ export default {
         const imageUrl = cleanText(body?.imageUrl, 2000) || article.hero_image_url || null;
         if (imageUrl && !/^https?:\/\//i.test(imageUrl)) return json({ status:"invalid_image_url" },400);
         const now = new Date().toISOString();
-        await env.DB.prepare("UPDATE knowledge_articles SET title=?,summary=?,body=?,title_en=?,summary_en=?,body_en=?,section=?,source_url=?,hero_image_url=?,hero_image_alt=?,hero_image_credit=?,hero_image_source=?,hero_image_license=?,hero_image_status=?,updated_at=? WHERE slug=?")
-          .bind(title,summary,bodyText,titleEn,summaryEn,bodyEn,section,sourceUrl,imageUrl,cleanText(body?.imageAlt || article.hero_image_alt || title,240),cleanText(body?.imageCredit || article.hero_image_credit || "",160)||null,cleanText(body?.imageSource || article.hero_image_source || "",2000)||null,cleanText(body?.imageLicense || article.hero_image_license || "",160)||null,imageUrl?(cleanText(body?.imageRightsStatus || article.hero_image_status || "manager_verified",40)):"NONE",now,slug).run();
+        await ensureUserFeatureTables(env);
+        await env.DB.prepare("INSERT INTO article_revisions(article_slug,title,summary,body,sources_json,created_at) VALUES(?,?,?,?,?,?)").bind(slug,article.title,article.summary,article.body,article.sources_json||"[]",now).run();
+        const sourcesJson = Array.isArray(body?.sources) ? JSON.stringify(body.sources.slice(0,20).map((x:any)=>({title:cleanText(x?.title||"",240),source:cleanText(x?.source||"",160),url:cleanText(x?.url||"",2000),date:x?.date||null}))) : article.sources_json || "[]";
+        await env.DB.prepare("UPDATE knowledge_articles SET title=?,summary=?,body=?,title_en=?,summary_en=?,body_en=?,section=?,source_url=?,sources_json=?,hero_image_url=?,hero_image_alt=?,hero_image_credit=?,hero_image_source=?,hero_image_license=?,hero_image_status=?,updated_at=? WHERE slug=?")
+          .bind(title,summary,bodyText,titleEn,summaryEn,bodyEn,section,sourceUrl,sourcesJson,imageUrl,cleanText(body?.imageAlt || article.hero_image_alt || title,240),cleanText(body?.imageCredit || article.hero_image_credit || "",160)||null,cleanText(body?.imageSource || article.hero_image_source || "",2000)||null,cleanText(body?.imageLicense || article.hero_image_license || "",160)||null,imageUrl?(cleanText(body?.imageRightsStatus || article.hero_image_status || "manager_verified",40)):"NONE",now,slug).run();
         await sendBayanOwnerNotification(env,"تم تعديل مقال من إدارة بيان","المقال: "+slug+"\nتم تحديث المحتوى/البيانات من لوحة الإدارة.");
         return json({ status:"ok", slug, updatedAt:now });
       } catch(error) { return json({status:"invalid_request",error:safeErrorMessage(error)},400); }
@@ -2826,6 +2881,62 @@ export default {
         if (a.status==="PUBLISHED" && !a.hero_image_url && a.section==="news") issues.push("news_missing_hero_image");
         return json({status:"ok",slug,valid:issues.length===0,issues});
       } catch(error) { return json({status:"validation_failed",error:safeErrorMessage(error)},400); }
+    }
+
+    if (path === "/api/ai/manager/article" && request.method === "GET") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      if (!env.DB || !await ensureKnowledgeTables(env)) return json({ status: "database_unavailable" }, 503);
+      const slug = cleanText(url.searchParams.get("slug"), 240);
+      if (!slug) return json({ status: "slug_required" }, 400);
+      try {
+        const row = await env.DB.prepare("SELECT slug,query,section,language,title,summary,body,title_en,summary_en,body_en,sources_json,status,hero_image_url,hero_image_alt,hero_image_credit,hero_image_source,hero_image_license,hero_image_status,source_url,created_at,updated_at FROM knowledge_articles WHERE slug=?").bind(slug).first<any>();
+        if (!row) return json({ status: "article_not_found" }, 404);
+        const revisions = await env.DB.prepare("SELECT id,article_slug,title,summary,body,sources_json,action,editor,before_json,after_json,created_at FROM article_revisions WHERE article_slug=? ORDER BY created_at DESC LIMIT 20").bind(slug).all().catch(() => ({results:[]}));
+        return json({ status:"ok", article:{...row, sources: (()=>{try{return JSON.parse(row.sources_json||"[]")}catch{return[]}})()}, revisions:revisions.results||[] });
+      } catch (error) { return json({ status:"database_error",error:safeErrorMessage(error) },503); }
+    }
+
+    if (path === "/api/ai/manager/article" && request.method === "PUT") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      if (!env.DB || !await ensureKnowledgeTables(env)) return json({ status: "database_unavailable" }, 503);
+      try {
+        const body = await request.json() as any;
+        const slug = cleanText(body?.slug,240);
+        if (!slug) return json({ status:"slug_required" },400);
+        const current = await env.DB.prepare("SELECT * FROM knowledge_articles WHERE slug=?").bind(slug).first<any>();
+        if (!current) return json({ status:"article_not_found" },404);
+        const textField = (v:any,max:number, fallback:string) => {
+          const x=cleanText(v,max); return x || fallback;
+        };
+        const title=textField(body?.title,240,current.title);
+        const summary=textField(body?.summary,1200,current.summary);
+        const bodyText=textField(body?.body,30000,current.body);
+        const titleEn=textField(body?.title_en,240,current.title_en||"");
+        const summaryEn=textField(body?.summary_en,1200,current.summary_en||"");
+        const bodyEn=textField(body?.body_en,30000,current.body_en||"");
+        const section=textField(body?.section,80,current.section);
+        const sourceUrl=cleanText(body?.source_url,2000)||current.source_url||null;
+        const sources=Array.isArray(body?.sources)?body.sources.slice(0,20).map((x:any)=>({
+          source:cleanText(x?.source,160), title:cleanText(x?.title,240), date:cleanText(x?.date,80), url:cleanText(x?.url,2000), snippet:cleanText(x?.snippet,1000)
+        })).filter((x:any)=>x.source||x.title||x.url):JSON.parse(current.sources_json||"[]");
+        const now=new Date().toISOString();
+        const before={title:current.title,summary:current.summary,body:current.body,title_en:current.title_en||"",summary_en:current.summary_en||"",body_en:current.body_en||"",section:current.section,sources:JSON.parse(current.sources_json||"[]"),source_url:current.source_url||null,hero_image_url:current.hero_image_url||null,hero_image_alt:current.hero_image_alt||null,hero_image_credit:current.hero_image_credit||null,hero_image_source:current.hero_image_source||null,hero_image_license:current.hero_image_license||null,hero_image_status:current.hero_image_status||"NONE"};
+        const heroImageUrl=cleanText(body?.hero_image_url,2000)||current.hero_image_url||null;
+        const heroImageAlt=cleanText(body?.hero_image_alt,240)||current.hero_image_alt||title;
+        const heroImageCredit=cleanText(body?.hero_image_credit,160)||current.hero_image_credit||null;
+        const heroImageSource=cleanText(body?.hero_image_source,2000)||current.hero_image_source||sourceUrl;
+        const heroImageLicense=cleanText(body?.hero_image_license,160)||current.hero_image_license||null;
+        const heroImageStatus=heroImageUrl ? cleanText(body?.hero_image_status,40)||current.hero_image_status||"manager_verified" : "NONE";
+        const after={title,summary,body:bodyText,title_en:titleEn,summary_en:summaryEn,body_en:bodyEn,section,sources,source_url:sourceUrl,hero_image_url:heroImageUrl,hero_image_alt:heroImageAlt,hero_image_credit:heroImageCredit,hero_image_source:heroImageSource,hero_image_license:heroImageLicense,hero_image_status:heroImageStatus};
+        await env.DB.prepare("UPDATE knowledge_articles SET title=?,summary=?,body=?,title_en=?,summary_en=?,body_en=?,section=?,sources_json=?,source_url=?,hero_image_url=?,hero_image_alt=?,hero_image_credit=?,hero_image_source=?,hero_image_license=?,hero_image_status=?,updated_at=? WHERE slug=?").bind(title,summary,bodyText,titleEn||null,summaryEn||null,bodyEn||null,section,JSON.stringify(sources),sourceUrl,heroImageUrl,heroImageAlt,heroImageCredit,heroImageSource,heroImageLicense,heroImageStatus,now,slug).run();
+        try {
+          await env.DB.prepare("INSERT INTO article_revisions(article_slug,title,summary,body,sources_json,action,editor,before_json,after_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(slug,title,summary,bodyText,JSON.stringify(sources),"EDIT","BAYAN_MANAGER",JSON.stringify(before),JSON.stringify(after),now).run();
+        } catch {
+          await env.DB.prepare("INSERT INTO article_revisions(article_slug,title,summary,body,sources_json,created_at) VALUES(?,?,?,?,?,?)").bind(slug,title,summary,bodyText,JSON.stringify(sources),now).run();
+        }
+        await sendBayanOwnerNotification(env,"تم تعديل مقال في إدارة بيان","المقال: "+slug+"\nتم حفظ نسخة مراجعة جديدة.");
+        return json({status:"ok",slug,updatedAt:now,article:after});
+      } catch(error) { return json({status:"editor_save_failed",error:safeErrorMessage(error)},400); }
     }
 
     if (path === "/api/ai/manager/article/status" && request.method === "POST") {
@@ -3341,7 +3452,11 @@ export default {
                 image: typeof article.image === "string" ? article.image : null,
                 url: typeof article.url === "string" ? article.url : null
               }));
-              if (articles.length) return json({ status: "ok", provider: "GNews", articles, totalArticles: data.totalArticles || articles.length });
+              if (articles.length) {
+                await ensureNewsCacheTable(env);
+                try { await env.DB?.prepare("INSERT OR REPLACE INTO news_cache(cache_key,language,provider,articles_json,updated_at) VALUES(?,?,?,?,?)").bind("top:"+lang,lang,"GNews",JSON.stringify(articles),new Date().toISOString()).run(); } catch {}
+                return json({ status: "ok", provider: "GNews", articles, totalArticles: data.totalArticles || articles.length });
+              }
             }
           } catch {}
         }
@@ -3349,23 +3464,19 @@ export default {
         const searchQuery = q || (lang === "ar" ? "أحدث الأخبار اليوم" : "latest verified news today");
         const rss = await rssNewsSearch(q, lang);
         if (rss.length) {
-          const enrichedRss = await enrichNewsImages(rss.slice(0, 10));
-          return json({
-            status: "ok",
-            provider: "Google News RSS",
-            articles: enrichedRss.map((item: any) => ({
-              title: item.title,
-              description: item.snippet,
-              content: item.snippet,
-              publishedAt: item.date || null,
-              source: { name: item.source },
-              image: item.image || null,
-              imageMeta: item.imageMeta || null,
-              url: item.url || null,
-              articleReady: true
-            })),
-            totalArticles: enrichedRss.length
-          });
+          const articles = rss.slice(0, 10).map((item: any) => ({
+            title: item.title,
+            description: item.snippet,
+            content: item.snippet,
+            publishedAt: item.date || null,
+            source: { name: item.source },
+            image: item.image || null,
+            url: item.url || null,
+            articleReady: true
+          }));
+          await ensureNewsCacheTable(env);
+          try { await env.DB?.prepare("INSERT OR REPLACE INTO news_cache(cache_key,language,provider,articles_json,updated_at) VALUES(?,?,?,?,?)").bind("top:"+lang,lang,"Google News RSS",JSON.stringify(articles),new Date().toISOString()).run(); } catch {}
+          return json({ status: "ok", provider: "Google News RSS", articles, totalArticles: articles.length });
         }
         const search = await internalSearch(searchQuery, env);
         if (search.ok && search.results.length) {
@@ -3389,22 +3500,19 @@ export default {
           : "Egypt OR world OR economy OR sports OR technology";
         const fallbackRss = await rssNewsSearch(fallbackQuery, lang);
         if (fallbackRss.length) {
-          return json({
-            status: "ok",
-            provider: "Google News RSS fallback",
-            articles: fallbackRss.slice(0,10).map((item: any) => ({
-              title: item.title,
-              description: item.snippet,
-              content: item.snippet,
-              publishedAt: item.date || null,
-              source: { name: item.source },
-              image: item.image || null,
-              url: item.url || null,
-              articleReady: true
-            })),
-            totalArticles: fallbackRss.length
-          });
+          const articles = fallbackRss.slice(0,10).map((item:any)=>({title:item.title,description:item.snippet,content:item.snippet,publishedAt:item.date||null,source:{name:item.source},image:item.image||null,url:item.url||null,articleReady:true}));
+          await ensureNewsCacheTable(env);
+          try { await env.DB?.prepare("INSERT OR REPLACE INTO news_cache(cache_key,language,provider,articles_json,updated_at) VALUES(?,?,?,?,?)").bind("top:"+lang,lang,"Google News RSS fallback",JSON.stringify(articles),new Date().toISOString()).run(); } catch {}
+          return json({ status: "ok", provider: "Google News RSS fallback", articles, totalArticles: articles.length });
         }
+        await ensureNewsCacheTable(env);
+        try {
+          const cached = await env.DB?.prepare("SELECT provider,articles_json,updated_at FROM news_cache WHERE cache_key=? AND language=?").bind("top:"+lang,lang).first<any>();
+          if (cached?.articles_json) {
+            const articles = JSON.parse(cached.articles_json);
+            return json({ status: "stale_cache", provider: cached.provider, cacheUpdatedAt: cached.updated_at, articles, totalArticles: Array.isArray(articles) ? articles.length : 0, warning: "LIVE_PROVIDER_UNAVAILABLE_USING_LAST_KNOWN_GOOD_NEWS" });
+          }
+        } catch {}
         return json({ status: "provider_unavailable", provider: "GNews/RSS/Search", articles: [], totalArticles: 0 }, 503);
       } catch (error) {
         await reportBayanError(env, "api/news", error, { repair: "تمت محاولة GNews ثم RSS ثم البحث الداخلي قبل إعلان فشل مزود الأخبار." });
