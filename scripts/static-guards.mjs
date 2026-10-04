@@ -22,7 +22,7 @@ if (!deploy.includes("workflow_run.conclusion == 'success'")) failures.push("pro
 if (!deploy.includes("Deployment preconditions satisfied.") || !deploy.includes("deployment is intentionally skipped")) failures.push("deployment precondition decision is not explicit");
 if (!deploy.includes("Verify deployment source is current main") || !deploy.includes("git ls-remote origin refs/heads/main")) failures.push("production deploy source verification missing");
 if ((deploy.match(/steps\.source\.outputs\.current == 'true'/g) || []).length < 3) failures.push("production deploy stale-source guard is not applied to all privileged steps");
-if ((deploy.match(/wranglerVersion: "4.146.0"/g) || []).length < 2) failures.push("deployment Wrangler version is not pinned");
+if ((deploy.match(/wranglerVersion: "4.147.0"/g) || []).length < 2) failures.push("deployment Wrangler version is not pinned");
 if (!deploy.includes("actions/checkout@v7")) failures.push("deployment checkout action is outdated");
 const ci = read(".github/workflows/ci.yml");
 if (!ci.includes("actions/checkout@v7") || !ci.includes("actions/setup-node@v7") || !ci.includes("node-version: 24")) failures.push("CI toolchain is outdated");
