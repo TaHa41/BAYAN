@@ -94,6 +94,13 @@ if (!read("scripts/production-smoke.mjs").includes("publicApiContracts")) failur
 if (!read("public/app.js").includes("function savedPage()") || !read("public/app.js").includes("function toolsPage()")) failures.push("frontend saved/tools routes missing");
 if (!source.includes("await setCooldown")) failures.push("provider cooldown persistence missing");
 if (!source.includes("predictBayanIssues") || !source.includes("predictive runtime degradation")) failures.push("predictive runtime degradation detection missing");
+if (!read("docs/BAYAN_SYSTEM_SPEC.md").includes("Self-healing AI engineer contract")) failures.push("complete BAYAN AI repair specification missing");
+if (!read("migrations/0011_repair_engine_state.sql").includes("phase TEXT")) failures.push("repair-engine state migration missing");
+if (!source.includes('path === "/api/ai/manager/repair-signal"')) failures.push("protected self-healing repair signal endpoint missing");
+if (!guardian.includes("Self-healing repair signal") || !guardian.includes("BAYAN_AI_MANAGER_TOKEN")) failures.push("Guardian is not connected to the self-healing repair signal");
+const autorepair = read("scripts/ai-autorepair.mjs");
+if (!autorepair.includes("docs/BAYAN_SYSTEM_SPEC.md") || !autorepair.includes("maximum 4 changed files") || !autorepair.includes("CI_VERIFY")) failures.push("autonomous repair engine lacks bounded architecture-aware verification");
+
 if (/const (aiProviderCooldown|diagnosticMemory|repairMemory) = new Map/.test(source)) failures.push("request/provider cooldown uses mutable module state");
 if (!guardian.includes("AI repair diagnosis")) failures.push("Guardian AI diagnosis step missing");
 if (guardian.includes("steps.ai_classification")) failures.push("Guardian references a nonexistent AI classification step");
