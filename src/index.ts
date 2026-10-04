@@ -171,8 +171,8 @@ const renderHtml = async (response: Response, requestUrl: URL, env?: Env) => {
   const direction = language === "en" ? "ltr" : "rtl";
   const cleanPath = requestUrl.pathname || "/";
   const canonical = requestUrl.origin + cleanPath + (language === "en" ? "?lang=en" : "");
-  const alternateAr = requestUrl.origin + cleanPath;
-  const alternateEn = requestUrl.origin + cleanPath + "?lang=en";
+  let alternateAr = requestUrl.origin + cleanPath;
+  let alternateEn = requestUrl.origin + cleanPath + "?lang=en";
   const seoPages: Record<string, { ar: [string, string], en: [string, string] }> = {
     "/": { ar: ["BAYAN | بيان — المعرفة والبحث الموثق", "بيان منصة عربية للمعرفة والبحث الموثق، تجمع المعلومات والأخبار والأبحاث مع فصل الأدلة عن التفسير."], en: ["BAYAN — Verified Knowledge & Research", "BAYAN is a bilingual knowledge and research platform that separates evidence from interpretation."] },
     "/egypt": { ar: ["مصر — بيان", "أخبار ومعلومات وموضوعات عن مصر من مصادر متعددة مع سياق واضح وأدلة."], en: ["Egypt — BAYAN", "News, information and topics about Egypt with source-aware context."] },
@@ -199,8 +199,19 @@ const renderHtml = async (response: Response, requestUrl: URL, env?: Env) => {
   if (cleanPath.startsWith("/article/") && env?.DB) {
     try {
       const slug = decodeURIComponent(cleanPath.slice("/article/".length));
-      const row = await env.DB.prepare("SELECT slug,language,title,summary,title_en,summary_en,created_at,updated_at FROM knowledge_articles WHERE slug=? AND status='PUBLISHED' LIMIT 1").bind(slug).first<any>();
+      const row = await env.DB.prepare("SELECT slug,query,language,title,summary,title_en,summary_en,created_at,updated_at FROM knowledge_articles WHERE slug=? AND status='PUBLISHED' LIMIT 1").bind(slug).first<any>();
       if (row) articleSeo = row;
+      if (articleSeo?.query) {
+        try {
+          const siblings = await env.DB.prepare("SELECT slug,language FROM knowledge_articles WHERE query=? AND status='PUBLISHED' AND language IN ('ar','en')").bind(articleSeo.query).all<any>();
+          for (const sibling of siblings.results || []) {
+            const siblingSlug = cleanText(sibling.slug, 240);
+            if (!siblingSlug) continue;
+            if (sibling.language === "ar") alternateAr = requestUrl.origin + "/article/" + encodeURIComponent(siblingSlug);
+            if (sibling.language === "en") alternateEn = requestUrl.origin + "/article/" + encodeURIComponent(siblingSlug) + "?lang=en";
+          }
+        } catch {}
+      }
     } catch {}
   }
   const seoTitle = language === "en" ? (articleSeo?.title_en || (articleSeo?.language === "en" ? articleSeo?.title : null)) : (articleSeo?.title || null);
