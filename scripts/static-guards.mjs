@@ -80,6 +80,7 @@ if (!guardian.includes("ai-diagnosis.json")) failures.push("Guardian diagnosis a
 if (!aiSmoke.includes("EXTERNAL_DEPENDENCY=AI_PROVIDER_QUOTA")) failures.push("AI capability smoke lacks external quota classification");
 if (!guardian.includes("Route AI benchmark incident") || !guardian.includes("EXTERNAL_DEPENDENCY=AI_PROVIDER_QUOTA") || !guardian.includes("gh issue create")) failures.push("Guardian does not separate provider quota from AI regressions");
 
+if (!source.includes('const browserRoutes = ["/", "/news", "/science", "/search?lang=en", "/ai?lang=en", "/trending?lang=en"')) failures.push("browser audit does not cover core English SPA routes");
 const numbers = migrations.map((x) => Number(x.split("_")[0]));
 for (let i = 0; i < numbers.length; i++) {
   if (numbers[i] !== i + 1) failures.push("migration numbering gap at " + (i + 1));
