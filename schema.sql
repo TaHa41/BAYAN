@@ -123,3 +123,11 @@ CREATE INDEX IF NOT EXISTS idx_article_revisions_slug_time ON article_revisions(
 CREATE TABLE IF NOT EXISTS user_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, visitor_id TEXT NOT NULL, request_type TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL, source TEXT, status TEXT NOT NULL DEFAULT 'PENDING_REVIEW', created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_user_requests_status_time ON user_requests(status, created_at DESC);
 CREATE TABLE IF NOT EXISTS notification_preferences (visitor_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0, language TEXT NOT NULL DEFAULT 'ar', topics_json TEXT NOT NULL DEFAULT '[]', updated_at TEXT NOT NULL);
+
+CREATE TABLE IF NOT EXISTS bayan_manager_settings (
+  setting_key TEXT PRIMARY KEY,
+  setting_value TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_bayan_manager_settings_updated
+  ON bayan_manager_settings(updated_at DESC);
