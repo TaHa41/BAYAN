@@ -34,3 +34,6 @@ Migrations in `migrations/` are append-only. The canonical schema is kept in `sc
 
 ## Reliability
 See `docs/AI_REPAIR_PLAYBOOK.md` and `docs/BAYAN_SYSTEM_SPEC.md` for the evidence-first autonomous repair process. Application-code fixes may be generated on isolated repair branches and merged only after guards, CI, deployment and production Guardian verification. Secrets, permissions, security-boundary changes and destructive data operations remain human-gated.
+
+
+<!-- Manager editor/sidebar controls validated in CI. -->
