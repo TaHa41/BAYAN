@@ -85,3 +85,23 @@ main{width:min(1280px,92%)}.hero{min-height:590px;grid-template-columns:minmax(0
 .manager-edge-menu nav a:hover,.manager-edge-menu nav a.active{background:color-mix(in srgb,var(--accent) 10%,var(--surface2));color:var(--accent)}
 .manager-edge-menu nav a span{width:30px;height:30px;display:grid;place-items:center;border-radius:8px;background:var(--surface2);font-weight:900}
 @media(max-width:560px){.manager-edge-control{top:38%}.manager-edge-menu{top:calc(38% - 145px);width:min(280px,86vw)}.manager-edge-control>button{width:36px;height:50px}}
+
+
+/* BAYAN palette refresh — visible final theme */
+:root{--bg:#090812;--surface:#12101d;--surface2:#1b1729;--text:#f8f7ff;--muted:#aaa4bb;--line:rgba(255,255,255,.10);--accent:#b86cff;--accent2:#5ee7d0;--glow:rgba(184,108,255,.16);--shadow:0 20px 60px rgba(0,0,0,.32)}
+body.light{--bg:#faf8ff;--surface:#ffffff;--surface2:#f1edfa;--text:#181323;--muted:#6d667c;--line:rgba(35,25,55,.11);--accent:#7b3ff2;--accent2:#0fae99;--glow:rgba(123,63,242,.12);--shadow:0 18px 50px rgba(52,31,82,.10)}
+body{background:radial-gradient(circle at 12% 18%,color-mix(in srgb,var(--accent) 12%,transparent),transparent 30%),radial-gradient(circle at 88% 78%,color-mix(in srgb,var(--accent2) 9%,transparent),transparent 32%),var(--bg)}
+body:before{background:radial-gradient(circle,color-mix(in srgb,var(--accent) 25%,transparent),transparent 66%)}body:after{background:radial-gradient(circle,color-mix(in srgb,var(--accent2) 20%,transparent),transparent 67%)}
+.site-header{background:color-mix(in srgb,var(--bg) 82%,transparent);border-bottom-color:color-mix(in srgb,var(--accent) 18%,var(--line))}
+.brand strong{background:linear-gradient(110deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.searchbar:focus-within{border-color:color-mix(in srgb,var(--accent) 72%,var(--line));box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 12%,transparent)}
+.nav a.active,.side-menu-links a:hover,.manager-edge-menu nav a:hover,.manager-edge-menu nav a.active{background:color-mix(in srgb,var(--accent) 13%,var(--surface));color:var(--accent)}
+.menu-icon,.manager-edge-menu nav a span{background:color-mix(in srgb,var(--accent) 12%,var(--surface2));color:var(--accent)}
+.primary{background:linear-gradient(110deg,var(--accent),var(--accent2));color:#100b18}
+.hero h1 span{background:linear-gradient(110deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.card,.topic-card{border-color:color-mix(in srgb,var(--accent) 8%,var(--line))}
+.topic-card:hover{border-color:color-mix(in srgb,var(--accent) 55%,var(--line));box-shadow:0 22px 50px color-mix(in srgb,var(--accent) 13%,transparent)}
+.summary{border-inline-start-color:var(--accent)}
+.page-title{background:linear-gradient(110deg,var(--text) 45%,var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent}
+.manager-edge-control>button{border-color:color-mix(in srgb,var(--accent) 25%,var(--line));color:var(--accent)}
+.manager-edge-menu{border-color:color-mix(in srgb,var(--accent) 18%,var(--line))}
