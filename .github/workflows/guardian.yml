@@ -50,7 +50,12 @@ jobs:
         env:
           BAYAN_BASE_URL: https://bayan.tahaomar411.workers.dev
         shell: bash
-        run: node scripts/ai-capability-smoke.mjs | tee ai-report.txt
+        run: |
+          set -o pipefail
+          node scripts/ai-capability-smoke.mjs | tee ai-report.txt
+          echo "report<<EOF" >> "$GITHUB_OUTPUT"
+          cat ai-report.txt >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: AI repair diagnosis
         id: diagnosis
@@ -82,8 +87,27 @@ jobs:
           DIAGNOSIS="$(cat ai-diagnosis.json 2>/dev/null || true)"
           gh issue create --repo "${{ github.repository }}" --title "BAYAN Guardian: production regression" --body "$(printf 'Production smoke failed on %s.\n\n%s' "${{ github.sha }}" "$DIAGNOSIS")" || true
 
+      - name: Create AI provider dependency incident
+        if: steps.smoke.outcome == 'success' && steps.ai.outcome == 'failure' && contains(steps.ai.outputs.report, 'EXTERNAL_DEPENDENCY=AI_PROVIDER_QUOTA')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh issue list --repo "${{ github.repository }}" --state open --search "BAYAN Guardian: AI provider quota in:title" --json number --jq 'length' | grep -q '^0        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DIAGNOSIS="$(cat ai-diagnosis.json 2>/dev/null || true)"
+          gh issue create --repo "${{ github.repository }}" --title "BAYAN Guardian: AI capability regression" --body "$(printf 'AI capability benchmark failed on %s. The site smoke test remained healthy.\n\n%s' "${{ github.sha }}" "$DIAGNOSIS")" || true
+
+      - name: Guardian result
+        if: steps.smoke.outcome == 'failure'
+        run: exit 1
+; then
+            gh issue create --repo "${{ github.repository }}" --title "BAYAN Guardian: AI provider quota" --body "$(printf 'The production site remained healthy, but AI providers are currently unavailable because of external quota/credit limits on %s.\n\n%s' "${{ github.sha }}" "$(cat ai-report.txt 2>/dev/null || true)")" || true
+          fi
+
       - name: Create AI quality incident
-        if: steps.smoke.outcome == 'success' && steps.ai.outcome == 'failure'
+        if: steps.smoke.outcome == 'success' && steps.ai.outcome == 'failure' && !contains(steps.ai.outputs.report, 'EXTERNAL_DEPENDENCY=AI_PROVIDER_QUOTA')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
