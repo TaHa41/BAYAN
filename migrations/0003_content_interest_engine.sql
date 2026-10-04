@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS visitor_contributions (
   body TEXT NOT NULL,
   source TEXT,
   status TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
+  reviewer_note TEXT,
   created_at TEXT NOT NULL,
   reviewed_at TEXT
 );
