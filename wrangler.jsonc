@@ -11,7 +11,8 @@
     "mode": "smart"
   },
   "ai": {
-    "binding": "AI"
+    "binding": "AI",
+    "remote": true
   },
   "browser": {
     "binding": "BROWSER",
