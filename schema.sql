@@ -79,7 +79,16 @@ CREATE TABLE IF NOT EXISTS repair_jobs (
   next_attempt_at TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  resolved_at TEXT
+  resolved_at TEXT,
+  phase TEXT NOT NULL DEFAULT 'DETECTED',
+  root_cause TEXT,
+  risk_level TEXT NOT NULL DEFAULT 'AI_FIX_VERIFY',
+  base_sha TEXT,
+  branch TEXT,
+  pr_number INTEGER,
+  verification_json TEXT,
+  rollback_count INTEGER NOT NULL DEFAULT 0,
+  last_verified_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_repair_jobs_status_next ON repair_jobs(status,next_attempt_at);
 
@@ -131,3 +140,6 @@ CREATE TABLE IF NOT EXISTS bayan_manager_settings (
 );
 CREATE INDEX IF NOT EXISTS idx_bayan_manager_settings_updated
   ON bayan_manager_settings(updated_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_repair_jobs_phase ON repair_jobs(phase, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_repair_jobs_root_cause ON repair_jobs(root_cause, status, updated_at DESC);
