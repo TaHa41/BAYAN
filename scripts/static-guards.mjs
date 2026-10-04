@@ -79,6 +79,7 @@ if (!source.includes("language: lang, title: generated.title")) failures.push("t
 if (!read("scripts/production-smoke.mjs").includes("publicApiContracts")) failures.push("production API contract coverage missing");
 if (!read("public/app.js").includes("function savedPage()") || !read("public/app.js").includes("function toolsPage()")) failures.push("frontend saved/tools routes missing");
 if (!source.includes("await setCooldown")) failures.push("provider cooldown persistence missing");
+if (!source.includes("predictBayanIssues") || !source.includes("predictive runtime degradation")) failures.push("predictive runtime degradation detection missing");
 if (/const (aiProviderCooldown|diagnosticMemory|repairMemory) = new Map/.test(source)) failures.push("request/provider cooldown uses mutable module state");
 if (!guardian.includes("AI repair diagnosis")) failures.push("Guardian AI diagnosis step missing");
 if (guardian.includes("steps.ai_classification")) failures.push("Guardian references a nonexistent AI classification step");
