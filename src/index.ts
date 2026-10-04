@@ -2795,6 +2795,39 @@ export default {
       } catch (error) { return json({ status: "invalid_request", error: safeErrorMessage(error) }, 400); }
     }
 
+    if (path === "/api/ai/manager/article/duplicate" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      if (!env.DB || !await ensureKnowledgeTables(env)) return json({ status: "database_unavailable" }, 503);
+      try {
+        const body = await request.json() as any;
+        const slug = cleanText(body?.slug,240);
+        const source = await env.DB.prepare("SELECT * FROM knowledge_articles WHERE slug=?").bind(slug).first<any>();
+        if (!source) return json({status:"article_not_found"},404);
+        const newSlug = (slug+"-draft-"+Date.now()).slice(0,240);
+        await env.DB.prepare("INSERT INTO knowledge_articles (slug,query,section,language,title,summary,body,title_en,summary_en,body_en,sources_json,status,hero_image_url,hero_image_alt,hero_image_credit,hero_image_source,hero_image_license,hero_image_status,source_url,created_at,updated_at) SELECT ?,query,section,language,title,summary,body,title_en,summary_en,body_en,sources_json,'DRAFT',hero_image_url,hero_image_alt,hero_image_credit,hero_image_source,hero_image_license,hero_image_status,source_url,?,? FROM knowledge_articles WHERE slug=?").bind(newSlug,new Date().toISOString(),new Date().toISOString(),slug).run();
+        return json({status:"ok",slug:newSlug});
+      } catch(error) { return json({status:"duplicate_failed",error:safeErrorMessage(error)},400); }
+    }
+
+    if (path === "/api/ai/manager/article/validate" && request.method === "POST") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      if (!env.DB || !await ensureKnowledgeTables(env)) return json({ status: "database_unavailable" }, 503);
+      try {
+        const body = await request.json() as any;
+        const slug = cleanText(body?.slug,240);
+        const a = await env.DB.prepare("SELECT * FROM knowledge_articles WHERE slug=?").bind(slug).first<any>();
+        if (!a) return json({status:"article_not_found"},404);
+        const issues:string[]=[];
+        if (!cleanText(a.title,500)) issues.push("missing_title");
+        if (!cleanText(a.body,30000)) issues.push("missing_body");
+        if (!cleanText(a.summary,4000)) issues.push("missing_summary");
+        if (!cleanText(a.sources_json,30000)) issues.push("missing_sources");
+        try { const sources=JSON.parse(a.sources_json||"[]"); if(!Array.isArray(sources)||sources.length<2) issues.push("insufficient_sources"); } catch { issues.push("invalid_sources_json"); }
+        if (a.status==="PUBLISHED" && !a.hero_image_url && a.section==="news") issues.push("news_missing_hero_image");
+        return json({status:"ok",slug,valid:issues.length===0,issues});
+      } catch(error) { return json({status:"validation_failed",error:safeErrorMessage(error)},400); }
+    }
+
     if (path === "/api/ai/manager/article/status" && request.method === "POST") {
       if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
       if (!env.DB || !await ensureKnowledgeTables(env)) return json({ status: "database_unavailable" }, 503);
