@@ -1654,11 +1654,12 @@ const internalSearch = async (query: string, env: Env) => {
     .split(",")
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
-  const providerOrder = [...configuredSearchProviders, ...SEARCH_PROVIDER_CHAIN, "serpapi", "cloudflare_web_search", "google_news_rss", "wikipedia"];
+  const providerOrder = [...configuredSearchProviders, ...SEARCH_PROVIDER_CHAIN, "gnews", "serpapi", "cloudflare_web_search", "google_news_rss", "wikipedia"];
   const providers = Array.from(new Set(providerOrder.map((provider) => {
     if (provider === "ceramic") return env.AI_SEARCH ? "cloudflare_ai_search" : null;
     if (provider === "exa" || provider === "linkup") return env.AI?.websearch ? "cloudflare_web_search:" + provider : null;
     if (provider === "serpapi") return env.SEARCH_API_KEY ? "serpapi" : null;
+    if (provider === "gnews") return env.GNEWS_API_KEY ? "gnews" : null;
     if (provider === "cloudflare_web_search") return env.AI?.websearch ? "cloudflare_web_search:exa" : null;
     if (provider === "google_news_rss") return "google_news_rss";
     if (provider === "wikipedia") return "wikipedia";
@@ -1679,6 +1680,19 @@ const internalSearch = async (query: string, env: Env) => {
           snippet: cleanText(item?.text, 900),
           url: typeof item?.item?.key === "string" && /^https?:\/\//i.test(item.item.key) ? item.item.key : null,
           score: typeof item?.score === "number" ? item.score : null
+        })).filter((x: any) => x.title && x.snippet);
+      }
+      if (provider === "gnews") {
+        const endpoint = "https://gnews.io/api/v4/search?lang=" + language + "&max=10&q=" + encodeURIComponent(researchQuery) + "&apikey=" + encodeURIComponent(env.GNEWS_API_KEY || "");
+        const response = await fetch(endpoint, { signal: AbortSignal.timeout(6000) });
+        if (!response.ok) throw new Error("http_" + response.status);
+        const data = await response.json() as any;
+        return (data.articles || []).slice(0, 10).map((item: any, index: number) => ({
+          rank: index + 1, provider: "gnews", title: cleanText(item?.title, 220),
+          source: cleanText(item?.source?.name || "GNews", 160),
+          date: item?.publishedAt || null, snippet: cleanText(item?.description || item?.content, 900),
+          url: typeof item?.url === "string" ? item.url : null,
+          image: typeof item?.image === "string" ? item.image : null
         })).filter((x: any) => x.title && x.snippet);
       }
       if (provider === "serpapi") {
