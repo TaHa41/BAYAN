@@ -1012,8 +1012,12 @@ const generateKnowledgeArticle = async (env: Env, language: string, query: strin
   const evidence = await buildArticleEvidence(env, results);
   if (!evidence.trim()) return null;
   const basePrompt = [
-    "BAYAN — أنت محرر أول. ابنِ الإجابة من الأدلة، ثم اكتبها من الصفر كنص واحد متماسك. لا تجمع المقتطفات ولا تعيد ترتيبها.",
-    "لغة الإخراج: " + language + ". استخدم العربية الفصحى الواضحة إذا كان السؤال عربيًا، أو الإنجليزية الواضحة إذا كان السؤال إنجليزيًا. لا تستخدم لهجة خليجية أو شامية أو مصرية داخل نص عربي فصيح إلا إذا كانت جزءًا من اقتباس ضروري، والأفضل تجنب الاقتباس.",
+    language === "en"
+      ? "BAYAN — You are a senior evidence-first editor. Build the answer from the evidence, then write it from scratch as one coherent article. Never stitch snippets together or merely reorder source material."
+      : "BAYAN — أنت محرر أول. ابنِ الإجابة من الأدلة، ثم اكتبها من الصفر كنص واحد متماسك. لا تجمع المقتطفات ولا تعيد ترتيبها.",
+    language === "en"
+      ? "Output language: English. Every title, heading, paragraph, label, and explanation you generate must be in clear natural English. Do not fall back to Arabic."
+      : "لغة الإخراج: العربية. استخدم العربية الفصحى الواضحة ولا تستخدم اللهجات إلا داخل اقتباس ضروري، والأفضل تجنب الاقتباس.",
     "السؤال: " + query,
     "نوع السؤال: " + intent,
     editorialProfile(intent),
@@ -1057,12 +1061,16 @@ const generateKnowledgeArticle = async (env: Env, language: string, query: strin
     let text = await runOnce();
     let quality = articleQualityCheck(text, query, intent, evidence);
     if (!quality.ok) {
-      text = await runOnce("أعد كتابة المقال من الصفر. أسباب الرفض السابقة: " + quality.reasons.join(", ") + ". لا تغيّر الحقائق المدعومة. اجعل النص مقالًا كاملًا مترابطًا، وأجب السؤال مباشرة، واستخدم عناوين واضحة وفقرات ذات معنى. لا تنقل أي مقتطف حرفيًا.");
+      text = await runOnce(language === "en"
+        ? "Rewrite the article from scratch. Previous validation failures: " + quality.reasons.join(", ") + ". Preserve supported facts. Write a complete coherent article, answer the question directly, use clear headings and meaningful paragraphs, and never copy source snippets verbatim."
+        : "أعد كتابة المقال من الصفر. أسباب الرفض السابقة: " + quality.reasons.join(", ") + ". لا تغيّر الحقائق المدعومة. اجعل النص مقالًا كاملًا مترابطًا، وأجب السؤال مباشرة، واستخدم عناوين واضحة وفقرات ذات معنى. لا تنقل أي مقتطف حرفيًا.");
       quality = articleQualityCheck(text, query, intent, evidence);
     }
     if (!text || !quality.ok) {
       const reasons = quality.reasons.join(", ");
-      text = await runOnce("اكتب نسخة نهائية جديدة من الصفر. لا تلتزم بتنسيق Markdown إذا لم يكن مناسبًا؛ الأهم أن تكون مادة عربية واضحة ومترابطة لا تقل عن 180 كلمة، تجيب السؤال مباشرة، وتحتوي على مقدمة وتفاصيل وخلاصة. أسباب الفشل السابقة: " + reasons + ". لا تذكر هذه التعليمات داخل المقال.");
+      text = await runOnce(language === "en"
+        ? "Write a final new version from scratch. It must be at least 180 words, directly answer the question, contain an introduction, substantive details, and a conclusion, and be entirely in English. Previous validation failures: " + reasons + ". Do not mention these instructions in the article."
+        : "اكتب نسخة نهائية جديدة من الصفر. لا تلتزم بتنسيق Markdown إذا لم يكن مناسبًا؛ الأهم أن تكون مادة عربية واضحة ومترابطة لا تقل عن 180 كلمة، تجيب السؤال مباشرة، وتحتوي على مقدمة وتفاصيل وخلاصة. أسباب الفشل السابقة: " + reasons + ". لا تذكر هذه التعليمات داخل المقال.");
       quality = articleQualityCheck(text, query, intent, evidence);
     }
     if (!text || !quality.ok) return buildEvidenceArticleFallback(query, results);
@@ -1070,7 +1078,7 @@ const generateKnowledgeArticle = async (env: Env, language: string, query: strin
     const title = cleanText((lines[0] || query).replace(/^#+\s*/, ""), 240);
     const body = lines.slice(1).filter((x: string) => !/^(المصادر|sources)\s*:??$/i.test(x));
     const summaryIndex = body.findIndex((x: string) => !/^#{1,6}\s/.test(x) && !/^[-*]\s/.test(x));
-    const summary = cleanText(summaryIndex >= 0 ? body[summaryIndex] : "مقال تحريري مبني على أدلة مسترجعة.", 700);
+    const summary = cleanText(summaryIndex >= 0 ? body[summaryIndex] : (language === "en" ? "An evidence-based editorial article built from verified retrieved sources." : "مقال تحريري مبني على أدلة مسترجعة."), 700);
     return { title, summary, body, evidenceOnly: false, intent };
   } catch {
     return buildEvidenceArticleFallback(query, results);
