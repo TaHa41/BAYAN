@@ -1270,7 +1270,7 @@ const browserRenderedCheck = async (env: Env, route: string) => {
   const recovery = /وضع الاسترداد|تعذر تحميل الصفحة|Unable to load page|Internal Server Error|Unhandled exception/i.test(html);
   if (!html.trim() || !hasApp || hasEmptyApp || recovery) throw new Error("browser_render_degraded_" + route);
   if (route.includes("lang=en")) {
-    const forbiddenEnglishUi = ["بحث", "القائمة", "المظهر", "عن بيان", "المنهجية", "ساهم بمعلومة", "المحفوظات", "أدوات بيان", "إدارة بيان", "المعلومة أولًا. الدليل قبل الادعاء."];
+    const forbiddenEnglishUi = ["بحث", "القائمة", "المظهر", "عن بيان", "المنهجية", "ساهم بمعلومة", "المحفوظات", "أدوات بيان", "إدارة بيان", "المعلومة أولًا. الدليل قبل الادعاء.", "لماذا السماء زرقاء؟", "علوم وفهم — المنهج العلمي وموضوعات علمية", "مصر — جغرافيا وتاريخ ومجتمع", "أخبار موثقة — الخبر والتحليل", "أسعار وبيانات مباشرة — قراءة الأسعار وتغيراتها"];
     const leaked = forbiddenEnglishUi.filter((term) => html.includes(term));
     if (leaked.length) throw new Error("english_ui_arabic_leak_" + leaked.slice(0, 4).join("|"));
   }
@@ -1321,7 +1321,7 @@ const runRuntimeAudit = async (env: Env) => {
   });
   // Browser Run is expensive; rotate one representative SPA route per audit cycle.
   // This still gives continuous coverage without multiplying browser calls every 5 minutes.
-  const browserRoutes = ["/", "/news", "/science", "/?lang=en", "/science?lang=en"];
+  const browserRoutes = ["/", "/news", "/science", "/?lang=en", "/science?lang=en", "/tools?lang=en", "/about?lang=en"];
   const browserRoute = browserRoutes[Math.floor(Date.now() / 300000) % browserRoutes.length];
   await check("browser:" + browserRoute, async () => browserRenderedCheck(env, browserRoute));
   await check("/search", async () => {
