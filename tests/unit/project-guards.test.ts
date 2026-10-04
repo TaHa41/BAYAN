@@ -31,7 +31,7 @@ describe("BAYAN repository contracts", () => {
 
   it("keeps database migrations contiguous and includes multilingual hardening", () => {
     const files = readdirSync("migrations").filter((x) => /^\d+_.*\.sql$/.test(x)).sort();
-    expect(files.at(-1)).toBe("0011_manager_control.sql");
+    expect(files.at(-1)).toBe("0012_repair_engine_state.sql");
     expect(files.map((x: string) => Number(x.split("_")[0]))).toEqual(files.map((_x: string, i: number) => i + 1));
   });
 
