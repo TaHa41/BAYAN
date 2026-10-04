@@ -1069,9 +1069,7 @@ const sourceIdentity = (item: any) => {
     const host = new URL(rawUrl).hostname.toLowerCase().replace(/^www\./, "");
     if (host) return host;
   } catch {}
-  const domain = String(item?.domain || "").toLowerCase().replace(/^www\./, "").trim();
-  if (domain) return domain;
-  return String(item?.provider || item?.source || "").toLowerCase().replace(/^www\./, "").trim();
+  return String(item?.domain || "").toLowerCase().replace(/^www\./, "").trim();
 };
 
 const generateKnowledgeArticle = async (env: Env, language: string, query: string, results: any[]) => {
@@ -2420,8 +2418,9 @@ export default {
           .map((match) => match[0].replace(/[).]+$/, ""))
           .filter(Boolean);
         const uniqueSources = [...new Set(sourceUrls)];
-        if (uniqueSources.length < 2) {
-          return json({ status: "source_required_for_verification", id, moderation: "PENDING_REVIEW", reason: "At least two independent HTTP(S) source URLs are required before a contribution can enter verified publication review." }, 400);
+        const sourceHosts = [...new Set(uniqueSources.map((value) => { try { return new URL(value).hostname.toLowerCase().replace(/^www\./, ""); } catch { return ""; } }).filter(Boolean))];
+        if (sourceHosts.length < 2) {
+          return json({ status: "source_required_for_verification", id, moderation: "PENDING_REVIEW", reason: "At least two independent source domains are required before a contribution can enter verified publication review." }, 400);
         }
         const section = sectionForIntent(queryIntent(String(current.title) + " " + String(current.body)), String(current.title));
         const queueAccepted = await queueContentTopic(env, String(current.title) + "\n" + String(current.body), section, "ar", 95);
@@ -2429,7 +2428,7 @@ export default {
         await env.DB!.prepare("UPDATE visitor_contributions SET status=?, reviewer_note=?, reviewed_at=? WHERE id=?")
           .bind("VERIFIED", cleanText(body.note, 1000) || "Verified by manager; queued for independent evidence-based editorial generation. Sources: " + uniqueSources.join(" | "), now, id).run();
         await sendBayanOwnerNotification(env, "تم التحقق من مساهمة في بيان", "تمت مراجعة المساهمة رقم " + id + " ووضعها في طابور التحرير للتحقق من مصدرين مستقلين على الأقل.\n\nالعنوان: " + String(current.title));
-        return json({ status: "updated", id, moderation: "VERIFIED", publication: "QUEUED_FOR_INDEPENDENT_EVIDENCE", sourceCount: uniqueSources.length });
+        return json({ status: "updated", id, moderation: "VERIFIED", publication: "QUEUED_FOR_INDEPENDENT_EVIDENCE", sourceCount: sourceHosts.length });
       }
       await env.DB!.prepare("UPDATE visitor_contributions SET status=?, reviewer_note=?, reviewed_at=? WHERE id=?")
         .bind(status, cleanText(body.note, 1000) || null, now, id).run();
