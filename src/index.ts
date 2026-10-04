@@ -148,6 +148,8 @@ const securityHeaders = (headers: Headers) => {
   headers.set("referrer-policy", "strict-origin-when-cross-origin");
   headers.set("x-frame-options", "SAMEORIGIN");
   headers.set("permissions-policy", "camera=(), microphone=(), geolocation=()");
+  headers.set("content-security-policy", "base-uri 'self'; form-action 'self'; frame-ancestors 'self'");
+  headers.set("strict-transport-security", "max-age=31536000");
   return headers;
 };
 
