@@ -60,6 +60,7 @@ jobs:
 
       - name: Autonomous repair
         id: repair
+        if: steps.classify.outputs.rollback_candidate != 'true'
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || 'gpt-6-luna' }}
@@ -93,7 +94,7 @@ jobs:
           gh pr create --repo "${{ github.repository }}" --base main --head "$branch"             --title "fix(ai): autonomous verified repair for $base_sha"             --body "BAYAN AI produced a bounded patch for production commit $base_sha. Guards, typecheck, tests and build passed locally before this PR was opened. Normal CI/deploy/Guardian remains the production verification gate."
 
       - name: Run CI explicitly on repair branch
-        if: steps.repair.outcome == 'success'
+        if: steps.repair.outcome == 'success' && steps.classify.outputs.rollback_candidate != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
