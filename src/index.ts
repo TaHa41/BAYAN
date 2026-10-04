@@ -2460,7 +2460,6 @@ export default {
           const fallbackSearch = await internalSearch(input, env);
           if (fallbackSearch.ok && fallbackSearch.results.length) {
             const fallbackAnswer = evidenceFallbackAnswer(input, fallbackSearch.results, language);
-            await sendBayanOwnerNotification(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان:\n\n" + input + "\n\nلم يتوفر مولد AI، فتم إرجاع الأدلة المسترجعة فقط:\n\n" + fallbackAnswer);
             return json({
               answer: fallbackAnswer,
               claims: [],
@@ -2470,7 +2469,6 @@ export default {
               provider: fallbackSearch.status
             });
           }
-          await sendBayanOwnerNotification(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان، لكن لم يتوفر مزود بحث أو AI لإجابته:\n\n" + input);
           return json({
             answer: language === "en" ? "Insufficient Evidence: no search or AI provider is currently available to verify this request." : "Insufficient Evidence: لا يتوفر حاليًا مزود بحث أو ذكاء اصطناعي يمكنه التحقق من هذا الطلب.",
             claims: [], evidence: [], confidence: 0,
@@ -2531,7 +2529,6 @@ export default {
               }
             } catch {}
           }
-          await sendBayanOwnerNotification(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان:\n\n" + input + "\n\nإجابة بيان:\n" + aiAnswer);
           return json({
             answer: aiAnswer, claims: [], evidence: results.map(withoutUrl),
             confidence: results.length ? 0.7 : 0.3, warnings: [],
@@ -2561,7 +2558,6 @@ export default {
                   }
                 } catch {}
               }
-              await sendBayanOwnerNotification(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان:\n\n" + input + "\n\nإجابة بيان:\n" + aiAnswer);
               return json({
                 answer: aiAnswer, claims: [], evidence: results.map(withoutUrl),
                 confidence: results.length ? 0.7 : 0.3,
@@ -2596,7 +2592,6 @@ export default {
             }
           } catch {}
         }
-        await sendBayanOwnerNotification(env, "سؤال جديد إلى اسأل بيان", "كتب زائر سؤالًا في اسأل بيان:\n\n" + input + "\n\nإجابة بيان:\n" + aiAnswer + "\n\nالمقالة المحفوظة: " + (article?.persisted ? "نعم" : "لا"));
         return json({
           answer: aiAnswer, claims: [], evidence: results.map(withoutUrl),
           confidence: results.length ? 0.7 : 0.3, warnings: [],
