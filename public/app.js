@@ -85,10 +85,17 @@ function summaryBlock(items){return '<section class="summary"><h2>'+(isEn?"Quick
   const formatDate=(v)=>{if(!v)return"";const d=new Date(v);if(Number.isNaN(d.getTime()))return String(v);return new Intl.DateTimeFormat(isEn?"en-GB":"ar-EG",{dateStyle:"medium",timeZone:"Africa/Cairo"}).format(d)};
   try{
     const [trendRes,newsRes]=await Promise.all([
-      fetch("/api/trending?lang="+lang),
-      fetch("/api/news?lang="+lang)
+      fetch("/api/trending?lang="+lang).catch(()=>null),
+      fetch("/api/news?lang="+lang).catch(()=>null)
     ]);
-    const [trend,news]=await Promise.all([trendRes.json(),newsRes.json()]);
+    const readJson=async(res,fallback)=>{
+      if(!res)return fallback;
+      try{return await res.json();}catch{return fallback;}
+    };
+    const [trend,news]=await Promise.all([
+      readJson(trendRes,{status:"provider_unavailable",signals:[]}),
+      readJson(newsRes,{status:"provider_unavailable",articles:[]})
+    ]);
     if(trendBox){
       const signals=Array.isArray(trend.signals)?trend.signals.slice(0,3):[];
       trendBox.innerHTML=signals.length?signals.map(x=>'<a class="signal-item" href="'+esc(safeHref(x.url,"/search?q="+encodeURIComponent(x.title||"")) )+'" target="'+(safeHref(x.url,"").startsWith("http")?"_blank":"_self")+'" rel="'+(x.url?"noopener noreferrer":"")+'"><strong>'+esc(x.title)+'</strong><small>'+esc(x.source||(isEn?"Direct source":"مصدر مباشر"))+(x.date?" · "+esc(x.date):"")+'</small></a>').join(""):'<p class="muted">'+(isEn?"No recent signals are available right now.":"لم تصل إشارات حديثة قابلة للعرض الآن.")+'</p>';
@@ -147,9 +154,9 @@ document.querySelector("#telegramSetup").onclick=async()=>{
   try{
     const r=await fetch("/api/ai/manager/telegram/setup",{headers:{authorization:"Bearer "+t}});
     const d=await r.json();
-    if(!r.ok){state.textContent="تعذر الوصول لإعداد Telegram.";return;}
+    if(!r.ok){state.textContent="تعذر إعداد Telegram: "+String(d?.error||d?.status||("HTTP "+r.status));return;}
     if(d.chatId) state.textContent="تم العثور على CHAT_ID: "+d.chatId+" — احفظه الآن في Cloudflare Secret باسم TELEGRAM_CHAT_ID.";
-    else state.textContent="لم أجد رسالة Telegram بعد. افتح البوت واضغط Start وأرسل /start ثم جرّب الزر مرة أخرى.";
+    else state.textContent="لم أجد رسالة Telegram بعد: "+String(d?.next||d?.error||"افتح البوت واضغط Start وأرسل /start ثم جرّب الزر مرة أخرى.");
   }catch{state.textContent="تعذر الاتصال بإعداد Telegram."}
 };
 document.querySelector("#telegramTest").onclick=async()=>{
@@ -159,7 +166,7 @@ document.querySelector("#telegramTest").onclick=async()=>{
   try{
     const r=await fetch("/api/ai/manager/telegram/test",{method:"POST",headers:{authorization:"Bearer "+t}});
     const d=await r.json();
-    state.textContent=d.delivered?"تم إرسال رسالة اختبار Telegram بنجاح.":"فشل إرسال Telegram: "+(d.error||"تأكد من TELEGRAM_CHAT_ID.");
+    state.textContent=d.delivered?"تم إرسال رسالة اختبار Telegram بنجاح.":"فشل إرسال Telegram: "+(d.error||d.status||("HTTP "+r.status)+" — تأكد من TELEGRAM_BOT_TOKEN وTELEGRAM_CHAT_ID.");
   }catch{state.textContent="تعذر الاتصال باختبار Telegram."}
 };
 document.querySelector("#reviewTest").onclick=async()=>{
@@ -169,8 +176,8 @@ document.querySelector("#reviewTest").onclick=async()=>{
   try{
     const r=await fetch("/api/ai/manager/test-report",{method:"POST",headers:{authorization:"Bearer "+t}});
     const d=await r.json();
-    if(r.ok) state.textContent=d.delivered?"تم إرسال رسالة الاختبار والتشخيص إلى حساب الإشعارات.":"اكتمل الاختبار التشخيصي لكن لم تصل رسالة Telegram.";
-    else state.textContent=d.status==="forbidden"?"المفتاح غير صحيح.":"تعذر تشغيل الاختبار.";
+    if(r.ok) state.textContent=d.delivered?"تم إرسال رسالة الاختبار والتشخيص إلى حساب الإشعارات.":"اكتمل الاختبار التشخيصي لكن لم تصل رسالة Telegram: "+String(d.error||"سبب غير محدد");
+    else state.textContent=d.status==="forbidden"?"المفتاح غير صحيح.":"تعذر تشغيل الاختبار: "+String(d.error||d.status||("HTTP "+r.status));
   }catch{state.textContent="تعذر الاتصال بخدمة الاختبار."}
 };
 list.addEventListener("click",async e=>{const b=e.target.closest(".review-action");if(!b)return;const id=Number(b.dataset.id),status=b.dataset.status;const note=status==="NEEDS_MORE_INFO"?"يرجى إضافة مصدر أو تفاصيل يمكن التحقق منها.":"";try{const r=await fetch("/api/contributions/review",{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+token.value.trim()},body:JSON.stringify({id,status,note})});if(r.ok){load();}else{let d={};try{d=await r.json()}catch{}state.textContent=isEn?(d?.status||"Unable to update contribution status."):(d?.status==="source_required_for_verification"?"لا يمكن اعتماد المساهمة قبل إضافة رابطَي مصدر HTTP(S) مستقلين على الأقل.":"تعذر تحديث حالة المساهمة.");}}catch{state.textContent="تعذر الاتصال بخدمة المراجعة."}});
