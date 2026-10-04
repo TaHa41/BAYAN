@@ -155,5 +155,5 @@ jobs:
           retention-days: 7
 
       - name: Guardian result
-        if: steps.smoke.outcome == 'failure'
+        if: steps.smoke.outcome == 'failure' || steps.repair_signal.outcome == 'failure'
         run: exit 1
