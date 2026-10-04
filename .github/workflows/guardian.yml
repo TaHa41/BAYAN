@@ -51,11 +51,13 @@ jobs:
           BAYAN_BASE_URL: https://bayan.tahaomar411.workers.dev
         shell: bash
         run: |
-          set -o pipefail
+          set +e
           node scripts/ai-capability-smoke.mjs | tee ai-report.txt
+          exit_code=${PIPESTATUS[0]}
           echo "report<<EOF" >> "$GITHUB_OUTPUT"
           cat ai-report.txt >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
+          exit "$exit_code"
 
       - name: AI repair diagnosis
         id: diagnosis
