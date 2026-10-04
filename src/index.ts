@@ -2878,6 +2878,33 @@ export default {
       } catch(error) { return json({status:"manager_control_error",error:safeErrorMessage(error)},503); }
     }
 
+    if (path === "/api/ai/manager/repair-signal" && request.method === "GET") {
+      if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
+      if (!env.DB) return json({ status: "database_unavailable", healthy: false }, 503);
+      try {
+        await ensureRepairQueue(env);
+        await ensureRuntimeAuditTable(env);
+        const audit = await env.DB.prepare("SELECT checked_at,healthy,details_json FROM runtime_audits ORDER BY checked_at DESC LIMIT 1").first<any>();
+        const recentCutoff = new Date(Date.now() - 20 * 60_000).toISOString();
+        const jobs = await env.DB.prepare("SELECT id,context,error_text,status,phase,risk_level,attempts,updated_at FROM repair_jobs WHERE status IN ('QUEUED','DIAGNOSING','WAITING_VERIFY') AND updated_at>=? ORDER BY updated_at DESC LIMIT 10").bind(recentCutoff).all<any>();
+        const runtimeDegraded = !!audit && Number(audit.healthy) !== 1 && String(audit.checked_at || "") >= recentCutoff;
+        const repairable = runtimeDegraded || (jobs.results || []).length > 0;
+        return json({
+          status: repairable ? "degraded" : "healthy",
+          healthy: !repairable,
+          checkedAt: new Date().toISOString(),
+          runtimeAudit: audit ? {
+            checkedAt: audit.checked_at,
+            healthy: Number(audit.healthy) === 1,
+            details: (() => { try { return JSON.parse(audit.details_json || "[]"); } catch { return []; } })()
+          } : null,
+          repairableJobs: jobs.results || []
+        });
+      } catch (error) {
+        return json({ status: "signal_error", healthy: false, error: safeErrorMessage(error) }, 503);
+      }
+    }
+
     if (path === "/api/ai/manager/repairs/retry-all" && request.method === "POST") {
       if (!managerAuthorized(request, env)) return json({ status: "forbidden", error: managerAuthError(env) }, 403);
       if (!env.DB) return json({ status: "database_unavailable" }, 503);
