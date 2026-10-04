@@ -981,7 +981,12 @@ const ensureUserFeatureTables = async (env: Env) => {
   if (!env.DB) return false;
   try {
     await env.DB.prepare(`CREATE TABLE IF NOT EXISTS saved_articles (visitor_id TEXT NOT NULL, article_slug TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(visitor_id, article_slug))`).run();
-    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS article_revisions (id INTEGER PRIMARY KEY AUTOINCREMENT, article_slug TEXT NOT NULL, title TEXT NOT NULL, summary TEXT NOT NULL, body TEXT NOT NULL, sources_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL)`).run();
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS article_revisions (id INTEGER PRIMARY KEY AUTOINCREMENT, article_slug TEXT NOT NULL, title TEXT NOT NULL, summary TEXT NOT NULL, body TEXT NOT NULL, sources_json TEXT NOT NULL DEFAULT '[]', created_at TEXT NOT NULL)`).run();    for (const sql of [
+      "ALTER TABLE article_revisions ADD COLUMN action TEXT NOT NULL DEFAULT 'EDIT'",
+      "ALTER TABLE article_revisions ADD COLUMN editor TEXT NOT NULL DEFAULT 'BAYAN_MANAGER'",
+      "ALTER TABLE article_revisions ADD COLUMN before_json TEXT",
+      "ALTER TABLE article_revisions ADD COLUMN after_json TEXT"
+    ]) { try { await env.DB.prepare(sql).run(); } catch {} }
     await env.DB.prepare(`CREATE TABLE IF NOT EXISTS user_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, visitor_id TEXT NOT NULL, request_type TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL, source TEXT, status TEXT NOT NULL DEFAULT 'PENDING_REVIEW', created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`).run();
     await env.DB.prepare(`CREATE TABLE IF NOT EXISTS notification_preferences (visitor_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL DEFAULT 0, language TEXT NOT NULL DEFAULT 'ar', topics_json TEXT NOT NULL DEFAULT '[]', updated_at TEXT NOT NULL)`).run();
     await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_saved_articles_visitor ON saved_articles(visitor_id,created_at DESC)").run();
@@ -3495,21 +3500,10 @@ export default {
           : "Egypt OR world OR economy OR sports OR technology";
         const fallbackRss = await rssNewsSearch(fallbackQuery, lang);
         if (fallbackRss.length) {
-          return json({
-            status: "ok",
-            provider: "Google News RSS fallback",
-            articles: fallbackRss.slice(0,10).map((item: any) => ({
-              title: item.title,
-              description: item.snippet,
-              content: item.snippet,
-              publishedAt: item.date || null,
-              source: { name: item.source },
-              image: item.image || null,
-              url: item.url || null,
-              articleReady: true
-            })),
-            totalArticles: fallbackRss.length
-          });
+          const articles = fallbackRss.slice(0,10).map((item:any)=>({title:item.title,description:item.snippet,content:item.snippet,publishedAt:item.date||null,source:{name:item.source},image:item.image||null,url:item.url||null,articleReady:true}));
+          await ensureNewsCacheTable(env);
+          try { await env.DB?.prepare("INSERT OR REPLACE INTO news_cache(cache_key,language,provider,articles_json,updated_at) VALUES(?,?,?,?,?)").bind("top:"+lang,lang,"Google News RSS fallback",JSON.stringify(articles),new Date().toISOString()).run(); } catch {}
+          return json({ status: "ok", provider: "Google News RSS fallback", articles, totalArticles: articles.length });
         }
         await ensureNewsCacheTable(env);
         try {
