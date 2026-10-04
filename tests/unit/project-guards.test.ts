@@ -47,6 +47,9 @@ describe("BAYAN repository contracts", () => {
     expect(source).toContain('path === "/api/requests" && request.method === "POST")');
     expect(source).toContain('path === "/api/search/article"');
     expect(source).toContain('path === "/api/trending/article"');
+    expect(source).toContain('/article/egypt-basics');
+    expect(source).toContain('/article/trending-data');
+
   });
 
   it("keeps English UI contract in the frontend source", () => {
