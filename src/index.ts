@@ -195,12 +195,14 @@ const renderHtml = async (response: Response, requestUrl: URL, env?: Env) => {
   if (cleanPath.startsWith("/article/") && env?.DB) {
     try {
       const slug = decodeURIComponent(cleanPath.slice("/article/".length));
-      const row = await env.DB.prepare("SELECT slug,title,summary,created_at,updated_at FROM knowledge_articles WHERE slug=? AND status='PUBLISHED' LIMIT 1").bind(slug).first<any>();
+      const row = await env.DB.prepare("SELECT slug,title,summary,title_en,summary_en,created_at,updated_at FROM knowledge_articles WHERE slug=? AND status='PUBLISHED' LIMIT 1").bind(slug).first<any>();
       if (row) articleSeo = row;
     } catch {}
   }
-  const finalTitle = articleSeo?.title ? cleanText(articleSeo.title, 180) + " — BAYAN | بيان" : seo[language][0];
-  const finalDescription = articleSeo?.summary ? cleanText(articleSeo.summary, 300) : seo[language][1];
+  const seoTitle = language === "en" ? (articleSeo?.title_en || null) : (articleSeo?.title || null);
+  const seoSummary = language === "en" ? (articleSeo?.summary_en || null) : (articleSeo?.summary || null);
+  const finalTitle = seoTitle ? cleanText(seoTitle, 180) + " — BAYAN" : seo[language][0];
+  const finalDescription = seoSummary ? cleanText(seoSummary, 300) : seo[language][1];
   const [resolvedTitle, resolvedDescription] = [finalTitle, finalDescription];
 
   html = html.replace('<html lang="ar" dir="rtl">', '<html lang="' + language + '" dir="' + direction + '">');
@@ -209,13 +211,13 @@ const renderHtml = async (response: Response, requestUrl: URL, env?: Env) => {
   const jsonLd = JSON.stringify(articleSeo ? {
     "@context": "https://schema.org",
     "@type": "Article",
-    headline: articleSeo.title,
-    description: articleSeo.summary,
+    headline: language === "en" ? (articleSeo.title_en || articleSeo.title) : articleSeo.title,
+    description: language === "en" ? (articleSeo.summary_en || articleSeo.summary) : articleSeo.summary,
     datePublished: articleSeo.created_at,
     dateModified: articleSeo.updated_at,
     mainEntityOfPage: { "@type": "WebPage", "@id": canonical },
-    author: { "@type": "Organization", name: "BAYAN | بيان" },
-    publisher: { "@type": "Organization", name: "BAYAN | بيان" },
+    author: { "@type": "Organization", name: "BAYAN" },
+    publisher: { "@type": "Organization", name: "BAYAN" },
     inLanguage: language
   } : {
     "@context": "https://schema.org",
