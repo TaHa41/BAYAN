@@ -104,7 +104,7 @@ try{
     const titleOk=titleText.length>0 && /[A-Za-z]/.test(titleText) && !/[\u0600-\u06FF]/.test(titleText);
     const forbiddenShell=["بيان","بحث","المظهر","القائمة","التنقل الرئيسي","ماذا تريد أن تعرف؟","عن بيان","المنهجية","ساهم بمعلومة","الخصوصية","الشروط","تواصل","المحفوظات","أدوات بيان","إدارة بيان","المعلومة أولًا. الدليل قبل الادعاء."];
     const shellLeaks=forbiddenShell.filter((value)=>html.includes(value));
-    const visibleHtml=html.replace(/<script[\\s\\S]*?<\\/script>/gi,"").replace(/<style[\\s\\S]*?<\\/style>/gi,"");
+    const visibleHtml=html.replace(/<script[\s\S]*?<\/script>/gi,"").replace(/<style[\s\S]*?<\/style>/gi,"");
     const visibleArabic=/[\\u0600-\\u06FF]/.test(visibleHtml);
     const jsonLdArabic=[...html.matchAll(/<script[^>]+type=["']application\\/ld\\+json["'][^>]*>([\\s\\S]*?)<\\/script>/gi)].some((m)=>/[\\u0600-\\u06FF]/.test(m[1]||""));
     const shellLeak=shellLeaks.length>0 || visibleArabic || jsonLdArabic;
