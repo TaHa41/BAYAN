@@ -1280,6 +1280,43 @@ const rerankResults = (query: string, results: any[]) => {
     .map(({ _score, ...item }, index) => ({ ...item, rank: index + 1 }));
 };
 
+const resolveLicensedEditorialImage = async (query: string) => {
+  const cleanQuery = cleanText(query, 180);
+  if (!cleanQuery) return null;
+  try {
+    const response = await fetch("https://api.openverse.org/v1/images/?q=" + encodeURIComponent(cleanQuery) + "&page_size=8", {
+      headers: { "accept": "application/json" },
+      signal: AbortSignal.timeout(5000)
+    });
+    if (!response.ok) return null;
+    const data = await response.json() as any;
+    const candidates = (data.results || []).map((x: any) => ({
+      url: x.thumbnail || x.url,
+      alt: x.alt || x.title || cleanQuery,
+      credit: x.creator || x.source_name || "Openverse",
+      license: x.license || null,
+      sourceUrl: x.foreign_landing_url || x.url || null,
+      relevanceScore: x.rank_feature || 0
+    }));
+    const gated = imageGate(candidates, cleanQuery);
+    const best = gated[0];
+    return best ? { ...best, rightsStatus: "license_identified", imageSource: "Openverse" } : null;
+  } catch {
+    return null;
+  }
+};
+
+const chooseNewsImage = async (title: string, sourceUrl: string | null, suppliedImage: string | null, sourceName = "News source") => {
+  if (suppliedImage && /^https?:\/\//i.test(suppliedImage)) {
+    return { url: suppliedImage, alt: cleanText(title, 220), credit: cleanText(sourceName, 160), sourceUrl: sourceUrl || suppliedImage, license: null, rightsStatus: "publisher_source", imageSource: "publisher" };
+  }
+  const sourceImage = await rssArticleImage(sourceUrl);
+  if (sourceImage) {
+    return { url: sourceImage, alt: cleanText(title, 220), credit: cleanText(sourceName, 160), sourceUrl: sourceUrl || sourceImage, license: null, rightsStatus: "publisher_source", imageSource: "publisher" };
+  }
+  return resolveLicensedEditorialImage(title);
+};
+
 const imageGate = (images: any[], query: string) => {
   const q = query.toLowerCase().split(/\s+/).filter((x) => x.length > 2);
   return images.filter((image) => {
