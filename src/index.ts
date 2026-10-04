@@ -528,10 +528,32 @@ const ensureRepairQueue = async (env: Env) => {
       next_attempt_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
-      resolved_at TEXT
+      resolved_at TEXT,
+      phase TEXT NOT NULL DEFAULT 'DETECTED',
+      root_cause TEXT,
+      risk_level TEXT NOT NULL DEFAULT 'AI_FIX_VERIFY',
+      base_sha TEXT,
+      branch TEXT,
+      pr_number INTEGER,
+      verification_json TEXT,
+      rollback_count INTEGER NOT NULL DEFAULT 0,
+      last_verified_at TEXT
     )
   `).run();
+  for (const sql of [
+    "ALTER TABLE repair_jobs ADD COLUMN phase TEXT NOT NULL DEFAULT 'DETECTED'",
+    "ALTER TABLE repair_jobs ADD COLUMN root_cause TEXT",
+    "ALTER TABLE repair_jobs ADD COLUMN risk_level TEXT NOT NULL DEFAULT 'AI_FIX_VERIFY'",
+    "ALTER TABLE repair_jobs ADD COLUMN base_sha TEXT",
+    "ALTER TABLE repair_jobs ADD COLUMN branch TEXT",
+    "ALTER TABLE repair_jobs ADD COLUMN pr_number INTEGER",
+    "ALTER TABLE repair_jobs ADD COLUMN verification_json TEXT",
+    "ALTER TABLE repair_jobs ADD COLUMN rollback_count INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE repair_jobs ADD COLUMN last_verified_at TEXT"
+  ]) { try { await env.DB.prepare(sql).run(); } catch {} }
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_repair_jobs_status_next ON repair_jobs(status,next_attempt_at)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_repair_jobs_phase ON repair_jobs(phase,updated_at DESC)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_repair_jobs_root_cause ON repair_jobs(root_cause,status,updated_at DESC)").run();
 };
 
 const queueBayanRepair = async (env: Env, context: string, error: unknown) => {
@@ -542,8 +564,8 @@ const queueBayanRepair = async (env: Env, context: string, error: unknown) => {
     const signature = context + "|" + safe;
     const now = new Date().toISOString();
     await env.DB.prepare(
-      "INSERT INTO repair_jobs (signature,context,error_text,status,created_at,updated_at) VALUES (?,?,?,?,?,?) ON CONFLICT(signature) DO UPDATE SET updated_at=excluded.updated_at"
-    ).bind(signature, cleanText(context, 240), safe, "QUEUED", now, now).run();
+      "INSERT INTO repair_jobs (signature,context,error_text,status,phase,created_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(signature) DO UPDATE SET updated_at=excluded.updated_at"
+    ).bind(signature, cleanText(context, 240), safe, "QUEUED", "DETECTED", now, now).run();
   } catch {}
 };
 
@@ -577,15 +599,15 @@ const processBayanRepairQueue = async (env: Env, currentAudit?: any) => {
       if (job.status === "WAITING_VERIFY") {
         const verification = await verifyBayanRepair(env, job);
         if (verification.ok) {
-          await env.DB.prepare("UPDATE repair_jobs SET status='RESOLVED', last_action=?, diagnosis=?, updated_at=?, resolved_at=? WHERE id=?")
-            .bind("verification_passed", verification.details, new Date().toISOString(), new Date().toISOString(), job.id).run();
+          await env.DB.prepare("UPDATE repair_jobs SET status='RESOLVED', phase='RESOLVED', last_action=?, diagnosis=?, verification_json=?, last_verified_at=?, updated_at=?, resolved_at=? WHERE id=?")
+            .bind("verification_passed", verification.details, JSON.stringify(verification), new Date().toISOString(), new Date().toISOString(), new Date().toISOString(), job.id).run();
           continue;
         }
-        await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI', last_action=?, diagnosis=?, next_attempt_at=?, updated_at=? WHERE id=?")
+        await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI', phase='WAITING_HUMAN', last_action=?, diagnosis=?, next_attempt_at=?, updated_at=? WHERE id=?")
           .bind("verification_failed", verification.details, new Date(Date.now() + 10 * 60_000).toISOString(), new Date().toISOString(), job.id).run();
         continue;
       }
-      await env.DB.prepare("UPDATE repair_jobs SET status='DIAGNOSING', attempts=attempts+1, updated_at=? WHERE id=?")
+      await env.DB.prepare("UPDATE repair_jobs SET status='DIAGNOSING', phase='DIAGNOSING', attempts=attempts+1, updated_at=? WHERE id=?")
         .bind(started, job.id).run();
 
       if (job.context.includes("runtime audit")) {
@@ -596,14 +618,14 @@ const processBayanRepairQueue = async (env: Env, currentAudit?: any) => {
             .bind("runtime_audit_retry", "نجح فحص runtime الحالي؛ أغلقت المهمة دون تشغيل audit ثانٍ.", new Date().toISOString(), new Date().toISOString(), job.id).run();
           continue;
         }
-        await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI',last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
+        await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI',phase='WAITING_HUMAN',last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
           .bind("runtime_audit_degraded", "فحص runtime الحالي ما زال متدهورًا؛ تم تأجيل إعادة المحاولة لمنع تكرار استهلاك subrequests.", new Date(Date.now() + 15 * 60_000).toISOString(), new Date().toISOString(), job.id).run();
         continue;
       }
 
       const repair = await attemptBayanSelfRepair(env, job.context, new Error(job.error_text));
       if (repair.action === "cooldown") {
-        await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI',last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
+        await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI',phase='EXTERNAL_DEPENDENCY',last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
           .bind(repair.action, cleanText(repair.result, 4000), new Date(Date.now() + 15 * 60_000).toISOString(), new Date().toISOString(), job.id).run();
         continue;
       }
@@ -614,7 +636,7 @@ const processBayanRepairQueue = async (env: Env, currentAudit?: any) => {
       }
       const isQuota = /4006|daily free allocation|429|quota|allocation/i.test(JSON.stringify(repair));
       const next = isQuota ? new Date(Date.now() + 60 * 60_000).toISOString() : new Date(Date.now() + 5 * 60_000).toISOString();
-      await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_VERIFY',last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
+      await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_VERIFY',phase='PRODUCTION_VERIFY',last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
         .bind(repair.action, cleanText(repair.diagnosis || repair.result, 4000), next, new Date().toISOString(), job.id).run();
     } catch (error) {
       await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI',last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
@@ -2132,10 +2154,13 @@ export default {
           details: (() => { try { return JSON.parse(lastAudit.details_json || "[]"); } catch { return []; } })()
         } : null,
         repairPolicy: {
-          runtimeOnly: true,
-          sourceCodeMutationAllowed: false,
+          runtimeOnly: false,
+          sourceCodeMutationAllowed: true,
           destructiveActionsAllowed: false,
-          humanReviewRequiredForCodeChanges: true
+          securityBoundaryChangesAllowed: false,
+          humanReviewRequiredForHighRiskChanges: true,
+          resolutionRequiresProductionVerification: true,
+          rollbackSupported: true
         }
       });
     }
@@ -2811,7 +2836,7 @@ export default {
           if (ai.ok) diagnosis = textOf(await ai.json());
         } catch {}
       }
-      return json({ status: failed.length ? "degraded" : "healthy", checkedAt: new Date().toISOString(), results, diagnosis, automaticRepairPolicy: "Only allowlisted runtime retries/circuit recovery are automatic; source-code changes require CI validation before deployment." });
+      return json({ status: failed.length ? "degraded" : "healthy", checkedAt: new Date().toISOString(), results, diagnosis, automaticRepairPolicy: "BAYAN AI is an autonomous repair engineer: DETECTED→DIAGNOSING→PATCHING→TESTING→CI_VERIFY→DEPLOYING→PRODUCTION_VERIFY→RESOLVED. Source changes are isolated, tested and production-verified; destructive/security/secret changes require human review." });
     }
 
     if (path === "/api/ai/manager/repairs" && request.method === "GET") {
@@ -2821,7 +2846,7 @@ export default {
       const status = cleanText(url.searchParams.get("status"), 40);
       const limit = Math.max(1, Math.min(100, Number(url.searchParams.get("limit") || 50)));
       const result = status
-        ? await env.DB.prepare("SELECT id,signature,context,error_text,status,attempts,last_action,diagnosis,next_attempt_at,created_at,updated_at,resolved_at FROM repair_jobs WHERE status=? ORDER BY updated_at DESC LIMIT ?").bind(status, limit).all()
+        ? await env.DB.prepare("SELECT id,signature,context,error_text,status,phase,root_cause,risk_level,attempts,last_action,diagnosis,next_attempt_at,base_sha,branch,pr_number,verification_json,rollback_count,last_verified_at,created_at,updated_at,resolved_at FROM repair_jobs WHERE status=? ORDER BY updated_at DESC LIMIT ?").bind(status, limit).all()
         : await env.DB.prepare("SELECT id,signature,context,error_text,status,attempts,last_action,diagnosis,next_attempt_at,created_at,updated_at,resolved_at FROM repair_jobs ORDER BY updated_at DESC LIMIT ?").bind(limit).all();
       return json({ status: "ok", jobs: result.results || [] });
     }
@@ -2832,11 +2857,13 @@ export default {
       try {
         await ensureRepairQueue(env);
         await ensureRuntimeAuditTable(env);
-        const [queued, running, failed, resolved, audits, pendingContributions, pendingRequests] = await Promise.all([
+        const [queued, running, failed, resolved, patching, verifying, audits, pendingContributions, pendingRequests] = await Promise.all([
           env.DB.prepare("SELECT COUNT(*) AS count FROM repair_jobs WHERE status='QUEUED'").first() as Promise<any>,
           env.DB.prepare("SELECT COUNT(*) AS count FROM repair_jobs WHERE status='RUNNING'").first() as Promise<any>,
           env.DB.prepare("SELECT COUNT(*) AS count FROM repair_jobs WHERE status='FAILED'").first() as Promise<any>,
           env.DB.prepare("SELECT COUNT(*) AS count FROM repair_jobs WHERE status='RESOLVED'").first() as Promise<any>,
+          env.DB.prepare("SELECT COUNT(*) AS count FROM repair_jobs WHERE phase IN ('PATCHING','TESTING','CI_VERIFY','DEPLOYING')").first() as Promise<any>,
+          env.DB.prepare("SELECT COUNT(*) AS count FROM repair_jobs WHERE phase='PRODUCTION_VERIFY'").first() as Promise<any>,
           env.DB.prepare("SELECT checked_at,healthy,details_json FROM runtime_audits ORDER BY checked_at DESC LIMIT 1").first() as Promise<any>,
           env.DB.prepare("SELECT COUNT(*) AS count FROM visitor_contributions WHERE status='PENDING_REVIEW'").first() as Promise<any>,
           env.DB.prepare("SELECT COUNT(*) AS count FROM user_requests WHERE status='PENDING_REVIEW'").first() as Promise<any>
@@ -2844,7 +2871,7 @@ export default {
         return json({
           status:"ok",
           runtime: audits || null,
-          repairs:{queued:Number(queued?.count||0),running:Number(running?.count||0),failed:Number(failed?.count||0),resolved:Number(resolved?.count||0)},
+          repairs:{queued:Number(queued?.count||0),running:Number(running?.count||0),failed:Number(failed?.count||0),resolved:Number(resolved?.count||0),patching:Number(patching?.count||0),verifying:Number(verifying?.count||0)},
           moderation:{contributions:Number(pendingContributions?.count||0),requests:Number(pendingRequests?.count||0)},
           checkedAt:new Date().toISOString()
         });
