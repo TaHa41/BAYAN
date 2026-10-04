@@ -12,10 +12,12 @@ const guardian = read(".github/workflows/guardian.yml");
 const aiSmoke = read("scripts/ai-capability-smoke.mjs");
 const schema = read("schema.sql");
 const sw = read("public/sw.js");
+const app = read("public/app.js");
 const migrations = readdirSync("migrations").filter((x) => /^\d+_.*\.sql$/.test(x)).sort();
 
 if (pkg.version !== "0.9.0") failures.push("package version is not 0.9.0");
 if (Object.values(pkg.devDependencies || {}).some((v) => typeof v === "string" && /[~^*]/.test(v))) failures.push("direct devDependencies must be exact-pinned until package-lock.json is committed");
+if (!read(".github/workflows/bootstrap-lockfile.yml").includes("npm install --package-lock-only")) failures.push("lockfile bootstrap workflow is missing");
 if (!env.includes("BAYAN_VERSION=0.9.0")) failures.push(".env.example version drift");
 if (!env.includes("SEARCH_PROVIDER=ceramic") || !env.includes("WIKIMEDIA_ENTERPRISE_TOKEN") || !env.includes("AI_SEARCH_INSTANCE")) failures.push(".env.example integration coverage drift");
 if (!deploy.includes("--var BAYAN_VERSION:0.9.0")) failures.push("deploy workflow version drift");
