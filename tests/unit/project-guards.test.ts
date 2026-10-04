@@ -31,7 +31,7 @@ describe("BAYAN repository contracts", () => {
 
   it("keeps database migrations contiguous and includes multilingual hardening", () => {
     const files = readdirSync("migrations").filter((x) => /^\d+_.*\.sql$/.test(x)).sort();
-    expect(files.at(-1)).toBe("0012_repair_engine_state.sql");
+    expect(files.at(-1)).toBe("0013_content_operations_and_news_images.sql");
     expect(files.map((x: string) => Number(x.split("_")[0]))).toEqual(files.map((_x: string, i: number) => i + 1));
   });
 
@@ -50,6 +50,12 @@ describe("BAYAN repository contracts", () => {
     expect(source).toContain('path === "/api/requests" && request.method === "POST")');
     expect(source).toContain('path === "/api/search/article"');
     expect(source).toContain('path === "/api/trending/article"');
+    expect(source).toContain('path === "/api/ai/manager/articles"');
+    expect(source).toContain('path === "/api/ai/manager/article/image"');
+    expect(source).toContain('path === "/api/ai/manager/article/status"');
+    expect(source).toContain('path === "/api/ai/manager/news-diagnostics"');
+    expect(source).toContain('hero_image_url');
+    expect(source).toContain('resolveLicensedEditorialImage');
     expect(source).not.toContain("سؤال جديد إلى اسأل بيان");
 
     expect(source).toContain('/article/egypt-basics');
@@ -64,6 +70,9 @@ describe("BAYAN repository contracts", () => {
     expect(app).toContain("Information first. Evidence before claims.");
     expect(app).not.toContain('isEn?(a.enTitle||a.title):a.title');
     expect(app).toContain("!isEn||a.enTitle");
+    expect(app).toContain("managerArticlesLoad");
+    expect(app).toContain("article-auto-image");
+    expect(app).toContain("newsDiagnostics");
 
   });
 });
