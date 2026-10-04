@@ -55,5 +55,7 @@ describe("BAYAN repository contracts", () => {
     expect(app).toContain("enTitle");
     expect(app).toContain("Information first. Evidence before claims.");
     expect(app).not.toContain('isEn?(a.enTitle||a.title):a.title');
+    expect(app).toContain("!isEn||a.enTitle");
+
   });
 });
