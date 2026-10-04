@@ -3050,7 +3050,29 @@ export default {
             totalArticles: search.results.length
           });
         }
-        return json({ status: "provider_unavailable", provider: "GNews/Search", articles: [], totalArticles: 0 }, 503);
+        // Last safe news fallback: retry direct RSS with broad, language-specific topics.
+        const fallbackQuery = lang === "ar"
+          ? "مصر OR العالم OR اقتصاد OR رياضة OR تكنولوجيا"
+          : "Egypt OR world OR economy OR sports OR technology";
+        const fallbackRss = await rssNewsSearch(fallbackQuery, lang);
+        if (fallbackRss.length) {
+          return json({
+            status: "ok",
+            provider: "Google News RSS fallback",
+            articles: fallbackRss.slice(0,10).map((item: any) => ({
+              title: item.title,
+              description: item.snippet,
+              content: item.snippet,
+              publishedAt: item.date || null,
+              source: { name: item.source },
+              image: item.image || null,
+              url: item.url || null,
+              articleReady: true
+            })),
+            totalArticles: fallbackRss.length
+          });
+        }
+        return json({ status: "provider_unavailable", provider: "GNews/RSS/Search", articles: [], totalArticles: 0 }, 503);
       } catch (error) {
         await reportBayanError(env, "api/news", error, { repair: "تمت محاولة GNews ثم RSS ثم البحث الداخلي قبل إعلان فشل مزود الأخبار." });
         return json({ status: "provider_error", provider: "GNews/Search", articles: [], totalArticles: 0, error: safeErrorMessage(error) }, 502);
