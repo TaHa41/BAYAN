@@ -2906,9 +2906,15 @@ export default {
           source:cleanText(x?.source,160), title:cleanText(x?.title,240), date:cleanText(x?.date,80), url:cleanText(x?.url,2000), snippet:cleanText(x?.snippet,1000)
         })).filter((x:any)=>x.source||x.title||x.url):JSON.parse(current.sources_json||"[]");
         const now=new Date().toISOString();
-        const before={title:current.title,summary:current.summary,body:current.body,title_en:current.title_en||"",summary_en:current.summary_en||"",body_en:current.body_en||"",section:current.section,sources:JSON.parse(current.sources_json||"[]"),source_url:current.source_url||null};
-        const after={title,summary,body:bodyText,title_en:titleEn,summary_en:summaryEn,body_en:bodyEn,section,sources,source_url:sourceUrl};
-        await env.DB.prepare("UPDATE knowledge_articles SET title=?,summary=?,body=?,title_en=?,summary_en=?,body_en=?,section=?,sources_json=?,source_url=?,updated_at=? WHERE slug=?").bind(title,summary,bodyText,titleEn||null,summaryEn||null,bodyEn||null,section,JSON.stringify(sources),sourceUrl,now,slug).run();
+        const before={title:current.title,summary:current.summary,body:current.body,title_en:current.title_en||"",summary_en:current.summary_en||"",body_en:current.body_en||"",section:current.section,sources:JSON.parse(current.sources_json||"[]"),source_url:current.source_url||null,hero_image_url:current.hero_image_url||null,hero_image_alt:current.hero_image_alt||null,hero_image_credit:current.hero_image_credit||null,hero_image_source:current.hero_image_source||null,hero_image_license:current.hero_image_license||null,hero_image_status:current.hero_image_status||"NONE"};
+        const heroImageUrl=cleanText(body?.hero_image_url,2000)||current.hero_image_url||null;
+        const heroImageAlt=cleanText(body?.hero_image_alt,240)||current.hero_image_alt||title;
+        const heroImageCredit=cleanText(body?.hero_image_credit,160)||current.hero_image_credit||null;
+        const heroImageSource=cleanText(body?.hero_image_source,2000)||current.hero_image_source||sourceUrl;
+        const heroImageLicense=cleanText(body?.hero_image_license,160)||current.hero_image_license||null;
+        const heroImageStatus=heroImageUrl ? cleanText(body?.hero_image_status,40)||current.hero_image_status||"manager_verified" : "NONE";
+        const after={title,summary,body:bodyText,title_en:titleEn,summary_en:summaryEn,body_en:bodyEn,section,sources,source_url:sourceUrl,hero_image_url:heroImageUrl,hero_image_alt:heroImageAlt,hero_image_credit:heroImageCredit,hero_image_source:heroImageSource,hero_image_license:heroImageLicense,hero_image_status:heroImageStatus};
+        await env.DB.prepare("UPDATE knowledge_articles SET title=?,summary=?,body=?,title_en=?,summary_en=?,body_en=?,section=?,sources_json=?,source_url=?,hero_image_url=?,hero_image_alt=?,hero_image_credit=?,hero_image_source=?,hero_image_license=?,hero_image_status=?,updated_at=? WHERE slug=?").bind(title,summary,bodyText,titleEn||null,summaryEn||null,bodyEn||null,section,JSON.stringify(sources),sourceUrl,heroImageUrl,heroImageAlt,heroImageCredit,heroImageSource,heroImageLicense,heroImageStatus,now,slug).run();
         try {
           await env.DB.prepare("INSERT INTO article_revisions(article_slug,title,summary,body,sources_json,action,editor,before_json,after_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(slug,title,summary,bodyText,JSON.stringify(sources),"EDIT","BAYAN_MANAGER",JSON.stringify(before),JSON.stringify(after),now).run();
         } catch {
