@@ -31,7 +31,11 @@ if (!source.includes("repair-skills")) failures.push("repair skills capability m
 if (!source.includes("title_en") || !source.includes("body_en")) failures.push("multilingual article storage missing");
 if (!schema.includes("title_en") || !schema.includes("body_en")) failures.push("canonical schema missing multilingual fields");
 if (!migrations.includes("0009_multilingual_article_integrity.sql")) failures.push("multilingual integrity migration missing");
-if (!sw.includes("bayan-shell-v2")) failures.push("service worker cache version not upgraded");\nif (!sw.includes("/manifest.en.json")) failures.push("service worker does not cache English manifest");\nif (!read("public/manifest.en.json").includes('"lang": "en"')) failures.push("English PWA manifest missing");\nif (!source.includes("slugForQuery(q, lang)") || !source.includes("slugForQuery(input, language)")) failures.push("language-aware article slug persistence missing");\nif (!source.includes("language === \"en\" ? \"Insufficient Evidence:")) failures.push("English AI fallback missing");
+if (!sw.includes("bayan-shell-v2")) failures.push("service worker cache version not upgraded");
+if (!sw.includes("/manifest.en.json")) failures.push("service worker does not cache English manifest");
+if (!read("public/manifest.en.json").includes('"lang": "en"')) failures.push("English PWA manifest missing");
+if (!source.includes("slugForQuery(q, lang)") || !source.includes("slugForQuery(input, language)")) failures.push("language-aware article slug persistence missing");
+if (!source.includes("language === \"en\" ? \"Insufficient Evidence:")) failures.push("English AI fallback missing");
 if (!source.includes("await setCooldown")) failures.push("provider cooldown persistence missing");
 if (/const (aiProviderCooldown|diagnosticMemory|repairMemory) = new Map/.test(source)) failures.push("request/provider cooldown uses mutable module state");
 if (!guardian.includes("AI repair diagnosis")) failures.push("Guardian AI diagnosis step missing");
