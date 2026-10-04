@@ -2382,8 +2382,11 @@ export default {
       const now = new Date().toISOString();
       let publishedArticle: any = null;
       if (status === "VERIFIED") {
-        const articleSlug = await slugForQuery(String(current.title) + "\n" + String(current.body), "ar");
         const rawSource = cleanText(current.source, 500);
+        if (!/^https?:\/\//i.test(rawSource)) {
+          return json({ status: "source_required_for_verification", id, moderation: "PENDING_REVIEW", reason: "A public HTTP(S) source URL is required before a visitor contribution can be published." }, 400);
+        }
+        const articleSlug = await slugForQuery(String(current.title) + "\n" + String(current.body), "ar");
         const source = rawSource ? {
           source: rawSource,
           domain: (() => { try { return new URL(rawSource).hostname; } catch { return rawSource; } })(),
