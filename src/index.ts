@@ -2054,7 +2054,7 @@ export default {
         const generated = await generateKnowledgeArticle(env, lang, title, search.results);
         if (!generated) return json({ error: "full_article_generation_unavailable" }, 503);
         const slug = await slugForQuery("trending:" + title, lang);
-        const article = { slug, query: title, section: "news", title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
+        const article = { slug, query: title, section: "news", language: lang, title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
         const persistence = await saveKnowledgeArticle(env, article);
         if (persistence.persisted) await refreshKnowledgeGraph(env, article);
         return json({ status: "ok", article: { id: slug, title: article.title, summary: article.summary, body: article.body, sources: article.sources, sourceUrl, image } });
