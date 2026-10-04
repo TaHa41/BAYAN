@@ -2403,38 +2403,20 @@ export default {
       const now = new Date().toISOString();
       let publishedArticle: any = null;
       if (status === "VERIFIED") {
-        const rawSource = cleanText(current.source, 500);
-        if (!/^https?:\/\//i.test(rawSource)) {
-          return json({ status: "source_required_for_verification", id, moderation: "PENDING_REVIEW", reason: "A public HTTP(S) source URL is required before a visitor contribution can be published." }, 400);
+        const sourceUrls = [...cleanText(current.source, 1200).matchAll(/https?:\/\/[^\s,]+/gi)]
+          .map((match) => match[0].replace(/[).]+$/, ""))
+          .filter(Boolean);
+        const uniqueSources = [...new Set(sourceUrls)];
+        if (uniqueSources.length < 2) {
+          return json({ status: "source_required_for_verification", id, moderation: "PENDING_REVIEW", reason: "At least two independent HTTP(S) source URLs are required before a contribution can enter verified publication review." }, 400);
         }
-        const articleSlug = await slugForQuery(String(current.title) + "\n" + String(current.body), "ar");
-        const source = rawSource ? {
-          source: rawSource,
-          domain: (() => { try { return new URL(rawSource).hostname; } catch { return rawSource; } })(),
-          url: /^https?:\/\//i.test(rawSource) ? rawSource : null,
-          date: null,
-          snippet: "مصدر قدمه أحد الزوار وتمت مراجعته داخل بيان."
-        } : {
-          source: "مساهمة زائر تمت مراجعتها داخل بيان",
-          domain: "BAYAN",
-          url: null,
-          date: null,
-          snippet: "معلومة مقدمة من المجتمع وتمت مراجعتها."
-        };
-        const article = {
-          slug: articleSlug,
-          query: String(current.title),
-          section: sectionForIntent(queryIntent(String(current.title) + " " + String(current.body)), String(current.title)),
-          title: cleanText(current.title, 240),
-          summary: cleanText(current.body, 500),
-          body: [cleanText(current.body, 6000)],
-          sources: [source],
-          createdAt: now
-        };
-        const persistence = await saveKnowledgeArticle(env, article);
-        if (!persistence.persisted) return json({ status: "database_unavailable", id, moderation: "PENDING_REVIEW" }, 503);
-        await refreshKnowledgeGraph(env, article);
-        publishedArticle = { id: articleSlug, section: article.section, title: article.title };
+        const section = sectionForIntent(queryIntent(String(current.title) + " " + String(current.body)), String(current.title));
+        const queueAccepted = await queueContentTopic(env, String(current.title) + "\n" + String(current.body), section, "ar", 95);
+        if (!queueAccepted) return json({ status: "queue_unavailable", id, moderation: "PENDING_REVIEW" }, 503);
+        await env.DB!.prepare("UPDATE visitor_contributions SET status=?, reviewer_note=?, reviewed_at=? WHERE id=?")
+          .bind("VERIFIED", cleanText(body.note, 1000) || "Verified by manager; queued for independent evidence-based editorial generation. Sources: " + uniqueSources.join(" | "), now, id).run();
+        await sendBayanOwnerNotification(env, "تم التحقق من مساهمة في بيان", "تمت مراجعة المساهمة رقم " + id + " ووضعها في طابور التحرير للتحقق من مصدرين مستقلين على الأقل.\n\nالعنوان: " + String(current.title));
+        return json({ status: "updated", id, moderation: "VERIFIED", publication: "QUEUED_FOR_INDEPENDENT_EVIDENCE", sourceCount: uniqueSources.length });
       }
       await env.DB!.prepare("UPDATE visitor_contributions SET status=?, reviewer_note=?, reviewed_at=? WHERE id=?")
         .bind(status, cleanText(body.note, 1000) || null, now, id).run();
