@@ -85,6 +85,22 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
           exit "$exit_code"
 
+      - name: AI repair gate
+        id: ai_repair_gate
+        if: always() && steps.ai.outcome == 'failure'
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$(cat ai-report.txt 2>/dev/null || true)"
+          if grep -q 'EXTERNAL_DEPENDENCY=AI_PROVIDER_QUOTA' <<< "$report"; then
+            echo "AI failure is an external provider quota/dependency; Guardian remains healthy."
+            echo "repairable=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "AI capability failure is application-repairable; failing Guardian to activate AI Auto Repair."
+          echo "repairable=true" >> "$GITHUB_OUTPUT"
+          exit 1
+
       - name: AI repair diagnosis
         id: diagnosis
         if: steps.smoke.outcome == 'failure' || steps.ai.outcome == 'failure' || steps.repair_signal.outcome == 'failure'
@@ -155,5 +171,5 @@ jobs:
           retention-days: 7
 
       - name: Guardian result
-        if: steps.smoke.outcome == 'failure' || steps.repair_signal.outcome == 'failure'
+        if: steps.smoke.outcome == 'failure' || steps.repair_signal.outcome == 'failure' || steps.ai_repair_gate.outcome == 'failure'
         run: exit 1
