@@ -41,6 +41,7 @@ if (!source.includes('AI_SEARCH_INSTANCE')) failures.push("AI Search instance co
 if (!source.includes('path === "/api/health" || path === "/health"')) failures.push("health compatibility route missing");
 if (!read("scripts/production-smoke.mjs").includes('["/health","application/json"]')) failures.push("production smoke does not verify /health");
 if (!read("scripts/production-smoke.mjs").includes("fetchWithTimeout") || !read("scripts/production-smoke.mjs").includes("AbortController")) failures.push("production smoke requests are not timeout-bounded");
+if (!source.includes("geocoding-api.open-meteo.com") || !source.includes("AbortSignal.timeout(5000)")) failures.push("live weather search dependencies are not timeout-bounded");
 if (!source.includes('path === "/api/diagnostics"')) failures.push("protected diagnostics route missing");
 if (!source.includes("repair-skills")) failures.push("repair skills capability missing");
 if (!source.includes("title_en") || !source.includes("body_en")) failures.push("multilingual article storage missing");
