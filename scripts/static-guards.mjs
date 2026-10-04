@@ -40,6 +40,13 @@ if (!sw.includes("bayan-shell-v2")) failures.push("service worker cache version 
 if (!sw.includes("/manifest.en.json")) failures.push("service worker does not cache English manifest");
 if (!read("public/manifest.en.json").includes('"lang": "en"')) failures.push("English PWA manifest missing");
 if (!source.includes("slugForQuery(q, lang)") || !source.includes("slugForQuery(input, language)")) failures.push("language-aware article slug persistence missing");
+if (!source.includes("languageContamination") || !source.includes("wrong_output_language")) failures.push("article output-language validation missing");
+if (!source.includes("independentSources.size < 2")) failures.push("article publication evidence gate missing");
+if (/slugForQuery\\(input\\)\\)/.test(source)) failures.push("article slug persistence still has a language-less input slug");
+if (!source.includes('WHERE status=\'PUBLISHED\' AND language=? AND section IN')) failures.push("recommendations are not language-isolated");
+if (!source.includes('WHERE section = ? AND language = ?')) failures.push("knowledge article listing is not language-isolated");
+if (!source.includes('a.language=?')) failures.push("saved articles are not language-isolated");
+if (!schema.includes("FOREIGN KEY(visitor_id) REFERENCES visitor_profiles(visitor_id) ON DELETE CASCADE")) failures.push("canonical schema is missing the interest-event visitor foreign key");
 if (!source.includes("language === \"en\" ? \"Insufficient Evidence:")) failures.push("English AI fallback missing");
 if (!source.includes("await setCooldown")) failures.push("provider cooldown persistence missing");
 if (/const (aiProviderCooldown|diagnosticMemory|repairMemory) = new Map/.test(source)) failures.push("request/provider cooldown uses mutable module state");
