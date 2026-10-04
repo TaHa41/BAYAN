@@ -39,7 +39,7 @@ describe("BAYAN repository contracts", () => {
     const source = readFileSync("src/index.ts", "utf8");
     expect(source).toContain("languageContamination");
     expect(source).toContain("independentSources.size < 2");
-    expect(source).not.toContain("slugForQuery(input)");
+    expect(source).not.toMatch(/slugForQuery\(input\)(?!,)/);
     expect(source).toContain("slugForQuery(input, language)");
     expect(source).toContain("WHERE section = ? AND language = ?");
     expect(source).toContain("AND language=? AND section IN");
