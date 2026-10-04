@@ -3202,20 +3202,22 @@ export default {
         const searchQuery = q || (lang === "ar" ? "أحدث الأخبار اليوم" : "latest verified news today");
         const rss = await rssNewsSearch(q, lang);
         if (rss.length) {
+          const enrichedRss = await enrichNewsImages(rss.slice(0, 10));
           return json({
             status: "ok",
             provider: "Google News RSS",
-            articles: rss.slice(0, 10).map((item: any) => ({
+            articles: enrichedRss.map((item: any) => ({
               title: item.title,
               description: item.snippet,
               content: item.snippet,
               publishedAt: item.date || null,
               source: { name: item.source },
               image: item.image || null,
+              imageMeta: item.imageMeta || null,
               url: item.url || null,
               articleReady: true
             })),
-            totalArticles: rss.length
+            totalArticles: enrichedRss.length
           });
         }
         const search = await internalSearch(searchQuery, env);
@@ -3268,19 +3270,22 @@ export default {
       try {
         const title = cleanText(url.searchParams.get("title"), 500);
         const sourceUrl = cleanText(url.searchParams.get("url"), 2000) || null;
-        const image = cleanText(url.searchParams.get("image"), 2000) || null;
+        let image = cleanText(url.searchParams.get("image"), 2000) || null;
         const lang = (url.searchParams.get("lang") || "ar").toLowerCase() === "en" ? "en" : "ar";
         if (!title) return json({ error: "title_required" }, 400);
         const search = await internalSearch(title, env);
         if (!search.ok || !search.results.length) return json({ error: "article_source_unavailable", status: search.status || "no_results" }, 503);
-        const evidence = search.results.slice(0, 12).map((item: any, index: number) => index === 0 && image ? { ...item, image } : item);
+        const sourceName = cleanText(search.results[0]?.source || search.results[0]?.domain || "News source", 160);
+        const imageMeta = await chooseNewsImage(title, sourceUrl, image, sourceName);
+        image = imageMeta?.url || image;
+        const evidence = search.results.slice(0, 12).map((item: any, index: number) => index === 0 && image ? { ...item, image, imageMeta } : item);
         const generated = await generateKnowledgeArticle(env, lang, title, evidence);
         if (!generated) return json({ error: "full_article_generation_unavailable" }, 503);
         const slug = await slugForQuery("news:" + title, lang);
-        const article = { slug, query: title, section: "news", language: lang, title: generated.title, summary: generated.summary, body: generated.body, sources: evidence.map(withoutUrl), createdAt: new Date().toISOString() };
+        const article = { slug, query: title, section: "news", language: lang, title: generated.title, summary: generated.summary, body: generated.body, sources: evidence.map(withoutUrl), createdAt: new Date().toISOString(), heroImage: imageMeta || null, sourceUrl };
         const persistence = await saveKnowledgeArticle(env, article);
         if (persistence.persisted) await refreshKnowledgeGraph(env, article);
-        return json({ status: "ok", persisted: persistence.persisted, article: { id: slug, section: "news", title: article.title, summary: article.summary, body: article.body, sources: article.sources, sourceUrl, image: image || article.sources.find((x: any) => x?.image)?.image || null } });
+        return json({ status: "ok", persisted: persistence.persisted, article: { id: slug, section: "news", title: article.title, summary: article.summary, body: article.body, sources: article.sources, sourceUrl, image: image || article.sources.find((x: any) => x?.image)?.image || null, imageMeta: imageMeta || null } });
       } catch (error) {
         await reportBayanError(env, "api/news/article", error);
         return json({ error: "news_article_failed" }, 502);
