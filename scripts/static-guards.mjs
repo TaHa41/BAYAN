@@ -17,6 +17,8 @@ if (pkg.version !== "0.9.0") failures.push("package version is not 0.9.0");
 if (!env.includes("BAYAN_VERSION=0.9.0")) failures.push(".env.example version drift");
 if (!env.includes("SEARCH_PROVIDER=ceramic") || !env.includes("WIKIMEDIA_ENTERPRISE_TOKEN") || !env.includes("AI_SEARCH_INSTANCE")) failures.push(".env.example integration coverage drift");
 if (!deploy.includes("--var BAYAN_VERSION:0.9.0")) failures.push("deploy workflow version drift");
+if (!deploy.includes("head_branch == 'main'")) failures.push("production deploy is not restricted to main CI");
+if ((deploy.match(/wranglerVersion: "4.146.0"/g) || []).length < 2) failures.push("deployment Wrangler version is not pinned");
 if (!deploy.includes("actions/checkout@v7")) failures.push("deployment checkout action is outdated");
 const ci = read(".github/workflows/ci.yml");
 if (!ci.includes("actions/checkout@v7") || !ci.includes("actions/setup-node@v7") || !ci.includes("node-version: 24")) failures.push("CI toolchain is outdated");
