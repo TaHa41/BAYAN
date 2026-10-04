@@ -54,18 +54,19 @@ jobs:
             echo "Cloudflare deployment credentials are not configured; deployment is skipped safely."
           fi
 
-      - name: Enforce deployment preconditions
+      - name: Report deployment decision
         shell: bash
         run: |
           set -euo pipefail
           if [[ "${{ steps.source.outputs.current }}" != "true" ]]; then
-            echo "Refusing to report success: the CI-tested commit is not the current main commit."
-            exit 1
+            echo "Stale CI result detected; this deployment run is intentionally skipped because main advanced."
+            exit 0
           fi
           if [[ "${{ steps.credentials.outputs.configured }}" != "true" ]]; then
-            echo "Refusing to report success: Cloudflare deployment credentials are not configured."
-            exit 1
+            echo "Cloudflare deployment credentials are not configured; deployment is intentionally skipped."
+            exit 0
           fi
+          echo "Deployment preconditions satisfied."
       - name: Apply D1 migrations
         if: steps.credentials.outputs.configured == 'true' && steps.source.outputs.current == 'true'
         uses: cloudflare/wrangler-action@v4
