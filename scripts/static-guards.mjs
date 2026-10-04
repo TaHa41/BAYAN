@@ -34,7 +34,7 @@ if (!guardian.includes("ref: ${{ github.event.workflow_run.head_sha || github.sh
 
 if (!guardian.includes("shell: bash") || !guardian.includes("production-smoke.mjs | tee smoke-report.txt") || !guardian.includes("ai-capability-smoke.mjs | tee ai-report.txt")) failures.push("Guardian does not propagate piped script failures");
 if (!wrangler.includes('"observability"') || !wrangler.includes('"issues"')) failures.push("observability configuration missing");
-if (!wrangler.includes('"redact_query_string": true')) failures.push("observability query-string redaction missing");
+if (!wrangler.includes('"redactQueryString": true')) failures.push("observability query-string redaction missing");
 if (!wrangler.includes('"head_sampling_rate": 0.25')) failures.push("trace sampling budget is not bounded");
 if (!wrangler.includes('"binding": "AI"') || !wrangler.includes('"remote": true')) failures.push("Workers AI remote binding configuration missing");
 if (!source.includes("gpt-6-luna") || !source.includes("gpt-6.1-sol")) failures.push("OpenAI fallback chain missing");
