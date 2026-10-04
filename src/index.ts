@@ -365,11 +365,27 @@ const ensureContributionTable = async (env: Env) => {
       created_at TEXT NOT NULL,
       reviewed_at TEXT
     )`).run();
-    try { await env.DB.prepare("ALTER TABLE visitor_contributions ADD COLUMN reviewer_note TEXT").run(); } catch {}
-    try { await env.DB.prepare("ALTER TABLE visitor_contributions ADD COLUMN reviewed_at TEXT").run(); } catch {}
+
+    // Legacy databases may have been created before reviewer_note/reviewed_at existed.
+    // D1/SQLite has no ADD COLUMN IF NOT EXISTS, so inspect first and alter only when absent.
+    const columns = await env.DB.prepare("PRAGMA table_info('visitor_contributions')").all<any>();
+    const names = new Set((columns.results || []).map((row: any) => String(row?.name || "")));
+    if (!names.has("reviewer_note")) {
+      await env.DB.prepare("ALTER TABLE visitor_contributions ADD COLUMN reviewer_note TEXT").run();
+    }
+    if (!names.has("reviewed_at")) {
+      await env.DB.prepare("ALTER TABLE visitor_contributions ADD COLUMN reviewed_at TEXT").run();
+    }
+
     await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_contributions_status_created ON visitor_contributions(status, created_at DESC)").run();
-    return true;
-  } catch { return false; }
+
+    // Final read verifies that the exact columns required by moderation queries exist.
+    const verified = await env.DB.prepare("PRAGMA table_info('visitor_contributions')").all<any>();
+    const verifiedNames = new Set((verified.results || []).map((row: any) => String(row?.name || "")));
+    return verifiedNames.has("reviewer_note") && verifiedNames.has("reviewed_at");
+  } catch {
+    return false;
+  }
 };
 const ensureAnalyticsTable = async (env: Env) => {
   if (!env.DB) return false;
@@ -549,7 +565,7 @@ const verifyBayanRepair = async (env: Env, job: any) => {
   return { ok: audit.healthy, details: JSON.stringify(audit.results).slice(0, 2500) };
 };
 
-const processBayanRepairQueue = async (env: Env) => {
+const processBayanRepairQueue = async (env: Env, currentAudit?: any) => {
   if (!env.DB) return;
   await ensureRepairQueue(env);
   const jobs = await env.DB.prepare(
@@ -573,13 +589,16 @@ const processBayanRepairQueue = async (env: Env) => {
         .bind(started, job.id).run();
 
       if (job.context.includes("runtime audit")) {
-        const audit = await runRuntimeAudit(env);
-        if (audit.healthy) {
+        // Reuse the audit already executed by this cron invocation. Running it again here
+        // doubled subrequests and could recursively trigger the same limit error.
+        if (currentAudit?.healthy) {
           await env.DB.prepare("UPDATE repair_jobs SET status='RESOLVED',last_action=?,diagnosis=?,updated_at=?,resolved_at=? WHERE id=?")
-            .bind("runtime_audit_retry", "تمت إعادة فحص المكونات الداخلية ونجحت.", new Date().toISOString(), new Date().toISOString(), job.id).run();
-          await sendBayanOwnerNotification(env, "تم إصلاح مشكلة تلقائيًا", "تمت إعادة فحص بيان بعد عطل runtime audit وأصبحت المكونات الأساسية سليمة.");
+            .bind("runtime_audit_retry", "نجح فحص runtime الحالي؛ أغلقت المهمة دون تشغيل audit ثانٍ.", new Date().toISOString(), new Date().toISOString(), job.id).run();
           continue;
         }
+        await env.DB.prepare("UPDATE repair_jobs SET status='WAITING_AI',last_action=?,diagnosis=?,next_attempt_at=?,updated_at=? WHERE id=?")
+          .bind("runtime_audit_degraded", "فحص runtime الحالي ما زال متدهورًا؛ تم تأجيل إعادة المحاولة لمنع تكرار استهلاك subrequests.", new Date(Date.now() + 15 * 60_000).toISOString(), new Date().toISOString(), job.id).run();
+        continue;
       }
 
       const repair = await attemptBayanSelfRepair(env, job.context, new Error(job.error_text));
@@ -1373,29 +1392,32 @@ const browserRenderedCheck = async (env: Env, route: string) => {
 const runRuntimeAudit = async (env: Env) => {
   const results: any[] = [];
   const started = Date.now();
+
+  // Cron runs every 5 minutes. Keep this audit intentionally small: on the Free plan
+  // a Worker invocation has a 50 external-subrequest ceiling. The old audit checked
+  // ~30 routes, retried each three times, then added Browser + Search + maintenance.
   const check = async (name: string, fn: () => Promise<any>) => {
     const t = Date.now();
-    let lastError: unknown = null;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        const details = await fn();
-        results.push({ route: name, ok: true, status: 200, latencyMs: Date.now() - t, attempt, details });
-        return;
-      } catch (error) {
-        lastError = error;
-        if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
-      }
+    try {
+      const details = await fn();
+      results.push({ route: name, ok: true, status: 200, latencyMs: Date.now() - t, attempt: 1, details });
+    } catch (error) {
+      results.push({ route: name, ok: false, status: 0, latencyMs: Date.now() - t, attempt: 1, error: safeErrorMessage(error) });
     }
-    results.push({ route: name, ok: false, status: 0, latencyMs: Date.now() - t, attempt: 3, error: safeErrorMessage(lastError) });
   };
-  await check("/api/health", async () => ({ service: "BAYAN", version: env.BAYAN_VERSION || "0.9.0" }));
+
+  await check("/api/health", async () => ({ service: "BAYAN", version: env.BAYAN_VERSION || "0.9.1" }));
+
   await check("/assets", async () => {
     if (!env.ASSETS) throw new Error("assets_binding_missing");
     const response = await env.ASSETS.fetch(new Request("https://bayan.internal/"));
     if (!response.ok) throw new Error("assets_http_" + response.status);
     return { status: response.status };
   });
-  const publicRoutes = ["/", "/egypt", "/arab", "/world", "/science", "/economy", "/politics", "/technology", "/health", "/history-culture", "/people", "/sports", "/travel", "/arts", "/news", "/trending", "/prices", "/tools", "/about", "/methodology", "/privacy", "/terms", "/contact", "/contribute", "/review", "/ai", "/saved"];
+
+  // Representative routes only. Browser rotation below provides deeper UI coverage
+  // without multiplying ordinary asset requests on every cron invocation.
+  const publicRoutes = ["/", "/news", "/science", "/search", "/prices", "/tools", "/about", "/methodology"];
   for (const route of publicRoutes) {
     await check("page:" + route, async () => {
       if (!env.ASSETS) throw new Error("assets_binding_missing");
@@ -1407,28 +1429,27 @@ const runRuntimeAudit = async (env: Env) => {
       return { contentType: response.headers.get("content-type") || "", spaFallback: route !== "/" };
     });
   }
+
   await check("/database/contribution-schema", async () => {
     if (!await ensureContributionTable(env)) throw new Error("contribution_schema_unavailable");
-    return { reviewerNote: true };
+    return { reviewerNote: true, reviewedAt: true };
   });
+
   await check("/database", async () => {
     if (!env.DB) throw new Error("database_binding_missing");
     await env.DB.prepare("SELECT 1 AS ok").first();
     return { configured: true };
   });
-  // Browser Run is expensive; rotate one representative SPA route per audit cycle.
-  // This still gives continuous coverage without multiplying browser calls every 5 minutes.
+
+  // Browser is one expensive external operation; rotate it instead of running every route.
   const browserRoutes = ["/", "/news", "/science", "/search?lang=en", "/ai?lang=en", "/trending?lang=en", "/prices?lang=en", "/saved?lang=en", "/contribute?lang=en", "/review?lang=en", "/tools?lang=en", "/about?lang=en", "/methodology?lang=en"];
   const browserRoute = browserRoutes[Math.floor(Date.now() / 300000) % browserRoutes.length];
   await check("browser:" + browserRoute, async () => browserRenderedCheck(env, browserRoute));
-  await check("/search", async () => {
-    const search = await internalSearch("BAYAN", env);
-    if (!search.ok) throw new Error("search_unavailable");
-    return { providers: search.providerCount, sources: search.sourceCount, results: search.results.length };
-  });
+
+  // Do not run internalSearch from the 5-minute audit. It can fan out to multiple
+  // external providers and was a major contributor to the subrequest-limit failures.
   return { checkedAt: new Date().toISOString(), healthy: results.every((x) => x.ok), results, durationMs: Date.now() - started };
 };
-
 const predictBayanIssues = async (env: Env) => {
   if (!env.DB) return { healthy: true, issues: [] as any[] };
   try {
@@ -1452,6 +1473,7 @@ const predictBayanIssues = async (env: Env) => {
     }
     const issues = Array.from(failures.entries())
       .filter(([, item]) => item.count >= 2)
+      .filter(([, item]) => !item.errors.some((error) => /Too many subrequests by single Worker invocation/i.test(error)))
       .map(([route, item]) => ({
         route,
         consecutiveOrRepeatedFailures: item.count,
@@ -1925,10 +1947,20 @@ export default {
           );
         }
       }
-      await runKnowledgeMaintenance(env);
-      await enqueueProactiveTopics(env);
-      await processContentQueue(env, 2);
-      await processBayanRepairQueue(env);
+      const cronMinute = new Date().getUTCMinutes();
+      // Keep the 5-minute cron lightweight. Expensive research/content maintenance is
+      // intentionally staggered so one invocation cannot exhaust the Free-plan subrequest budget.
+      if (cronMinute % 15 === 0) {
+        await runKnowledgeMaintenance(env);
+        await processContentQueue(env, 1);
+        await processBayanRepairQueue(env, audit);
+      }
+      if (cronMinute % 30 === 0) {
+        await enqueueProactiveTopics(env);
+      }
+      if (cronMinute % 15 !== 0) {
+        await processBayanRepairQueue(env, audit);
+      }
     } catch (error) {
       await reportBayanError(env, "scheduled runtime audit / maintenance", error);
     }
