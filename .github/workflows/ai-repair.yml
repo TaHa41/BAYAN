@@ -1,0 +1,73 @@
+name: BAYAN AI Auto Repair
+
+on:
+  workflow_run:
+    workflows: ["BAYAN Guardian"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: bayan-ai-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout failed production commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install
+        run: npm install
+
+      - name: Autonomous repair
+        id: repair
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL || 'gpt-6-luna' }}
+          BASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          REPAIR_REPORT: |
+            BAYAN Guardian failed for commit ${{ github.event.workflow_run.head_sha || github.sha }}.
+            Workflow: ${{ github.event.workflow_run.html_url || 'manual run' }}
+            Inspect the repository and repair the confirmed production failure.
+        run: node scripts/ai-autorepair.mjs | tee ai-repair-result.json
+
+      - name: Create repair pull request
+        if: steps.repair.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          status="$(node -e "const x=require('./ai-repair-result.json'); console.log(x.status)")"
+          if [[ "$status" != "patched_and_verified" ]]; then
+            echo "No verified patch was produced: $status"
+            exit 0
+          fi
+          branch="$(node -e "const x=require('./ai-repair-result.json'); console.log(x.branch)")"
+          base_sha="$(node -e "const x=require('./ai-repair-result.json'); console.log(x.baseSha)")"
+          gh pr create --repo "${{ github.repository }}" --base main --head "$branch"             --title "fix(ai): autonomous verified repair for $base_sha"             --body "BAYAN AI produced a bounded patch for production commit $base_sha. Guards, typecheck, tests and build passed locally before this PR was opened. Normal CI/deploy/Guardian remains the production verification gate."
+
+      - name: Enable auto-merge
+        if: steps.repair.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch="$(node -e "const x=require('./ai-repair-result.json'); console.log(x.branch)")"
+          pr="$(gh pr list --repo "${{ github.repository }}" --head "$branch" --json number --jq '.[0].number')"
+          if [[ -n "$pr" ]]; then
+            gh pr merge "$pr" --repo "${{ github.repository }}" --auto --squash --delete-branch || echo "Auto-merge could not be enabled; PR remains for review."
+          fi
