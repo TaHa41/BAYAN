@@ -59,9 +59,21 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
           exit "$exit_code"
 
+      - name: Classify AI benchmark dependency state
+        id: ai_classification
+        if: always() && steps.smoke.outcome == 'success'
+        shell: bash
+        run: |
+          report="$(cat ai-report.txt 2>/dev/null || true)"
+          if grep -q 'EXTERNAL_DEPENDENCY=AI_PROVIDER_QUOTA' <<< "$report"; then
+            echo "quota=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "quota=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: AI repair diagnosis
         id: diagnosis
-        if: steps.smoke.outcome == 'failure' || steps.ai.outcome == 'failure'
+        if: steps.smoke.outcome == 'failure' || (steps.ai.outcome == 'failure' && steps.ai_classification.outputs.quota != 'true')
         continue-on-error: true
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -90,7 +102,7 @@ jobs:
           gh issue create --repo "${{ github.repository }}" --title "BAYAN Guardian: production regression" --body "$(printf 'Production smoke failed on %s.\n\n%s' "${{ github.sha }}" "$DIAGNOSIS")" || true
 
       - name: Create AI provider dependency incident
-        if: steps.smoke.outcome == 'success' && steps.ai.outcome == 'failure' && contains(steps.ai.outputs.report, 'EXTERNAL_DEPENDENCY=AI_PROVIDER_QUOTA')
+        if: steps.smoke.outcome == 'success' && steps.ai.outcome == 'failure' && steps.ai_classification.outputs.quota == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -100,7 +112,7 @@ jobs:
           fi
 
       - name: Create AI quality incident
-        if: steps.smoke.outcome == 'success' && steps.ai.outcome == 'failure' && !contains(steps.ai.outputs.report, 'EXTERNAL_DEPENDENCY=AI_PROVIDER_QUOTA')
+        if: steps.smoke.outcome == 'success' && steps.ai.outcome == 'failure' && steps.ai_classification.outputs.quota != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
