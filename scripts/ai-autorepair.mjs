@@ -54,14 +54,18 @@ function extractPatch(value) {
   return match ? match[1] : value;
 }
 function trackedFiles() {
-  return exec("git", ["ls-files"]).split("\n").filter(Boolean)
+  const all = exec("git", ["ls-files"]).split("\n").filter(Boolean)
     .filter(p => /^(src|public|scripts|tests|docs|migrations)\//.test(p))
-    .filter(p => !/(^|\/)(node_modules|dist|\.env)/.test(p))
-    .slice(0, 260);
+    .filter(p => !/(^|\/)(node_modules|dist|\.env)/.test(p));
+  const tokens = new Set((report.toLowerCase().match(/[a-z0-9_/-]{4,}/g) || []).slice(0, 80));
+  const score = path => tokens.size ? [...tokens].reduce((n, token) => n + (path.toLowerCase().includes(token) ? 3 : 0), 0) : 0;
+  const ranked = all.sort((a, b) => score(b) - score(a));
+  const must = ["src/index.ts", "scripts/production-smoke.mjs", "scripts/ai-capability-smoke.mjs"];
+  return [...new Set([...must, ...ranked])].filter(p => all.includes(p)).slice(0, 18);
 }
 function snapshot(paths) {
   return paths.map(path => {
-    try { return `===== ${path} =====\n${readFileSync(path, "utf8").slice(0, 18000)}`; }
+    try { return `===== ${path} =====\n${readFileSync(path, "utf8").slice(0, 7000)}`; }
     catch { return ""; }
   }).join("\n");
 }
