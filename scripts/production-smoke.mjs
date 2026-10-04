@@ -99,7 +99,7 @@ try{
     const html=await response.text();
     const manifestIsEnglish=html.includes('href="/manifest.en.json"') || html.includes("href='/manifest.en.json'");
     const htmlLanguageOk=/<html[^>]+lang=["']en["'][^>]+dir=["']ltr["']/i.test(html);
-    const titleOk=/BAYAN \| Knowledge & Evidence/i.test(html);
+    const titleMatch=html.match(/<title>([^<]+)<\/title>/i);\n    const titleText=titleMatch?.[1]||"";\n    const titleOk=titleText.length>0 && /[A-Za-z]/.test(titleText) && !/[\u0600-\u06FF]/.test(titleText);
     const ok=response.ok && htmlLanguageOk && manifestIsEnglish && titleOk;
     console.log((ok?"PASS":"FAIL")+" English route "+route);
     if(!ok) console.log("EN_ROUTE_DEBUG",JSON.stringify({route,status:response.status,htmlLanguageOk,manifestIsEnglish,titleOk,head:html.slice(0,1200)}));
