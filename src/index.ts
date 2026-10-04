@@ -2239,6 +2239,7 @@ export default {
     }
 
     if (path === "/api/interest" && request.method === "POST") {
+      if (!allowRequest(request, 60)) return json({ status: "rate_limited" }, 429);
       try {
         const body = await request.json() as { visitorId?: string; section?: string; eventType?: string; language?: string };
         const visitorId = cleanText(body.visitorId, 100);
@@ -2272,6 +2273,7 @@ export default {
       catch { return json({ status:"database_error",articles:[] },503); }
     }
     if (path === "/api/saved" && request.method === "POST") {
+      if (!allowRequest(request, 60)) return json({ status: "rate_limited" }, 429);
       try {
         const body=await request.json() as {visitorId?:string;articleSlug?:string;action?:string};
         const visitorId=cleanText(body.visitorId,100), articleSlug=cleanText(body.articleSlug,240), action=body.action==="remove"?"remove":"save";
@@ -2288,6 +2290,7 @@ export default {
       catch { return json({status:"database_error",revisions:[]},503); }
     }
     if (path === "/api/requests" && request.method === "POST") {
+      if (!allowRequest(request, 10)) return json({ status: "rate_limited" }, 429);
       try {
         const body=await request.json() as {visitorId?:string;type?:string;title?:string;body?:string;source?:string};
         const visitorId=cleanText(body.visitorId,100), type=["article","correction"].includes(String(body.type))?String(body.type):"", title=cleanText(body.title,240), content=cleanText(body.body,6000), source=cleanText(body.source,1000);
@@ -2305,6 +2308,7 @@ export default {
       catch { return json({status:"database_error",enabled:false,topics:[]},503); }
     }
     if (path === "/api/notifications" && request.method === "POST") {
+      if (!allowRequest(request, 30)) return json({ status: "rate_limited" }, 429);
       try {
         const body=await request.json() as {visitorId?:string;enabled?:boolean;language?:string;topics?:string[]};
         const visitorId=cleanText(body.visitorId,100);
@@ -2317,6 +2321,7 @@ export default {
     }
 
     if (path === "/api/contributions" && request.method === "POST") {
+      if (!allowRequest(request, 10)) return json({ status: "rate_limited" }, 429);
       try {
         const body = await request.json() as { visitorId?: string; title?: string; body?: string; source?: string };
         const visitorId = cleanText(body.visitorId, 100);
