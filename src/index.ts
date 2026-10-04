@@ -1641,13 +1641,20 @@ const internalSearch = async (query: string, env: Env) => {
   // This prevents routine searches from waiting for five research angles and every provider.
   const primaryQueries = allResearch.slice(0, 1);
   const expandedQueries = allResearch.slice(1, 2);
-  const providers = [
-    env.AI_SEARCH ? "cloudflare_ai_search" : null,
-    env.SEARCH_API_KEY ? "serpapi" : null,
-    env.AI?.websearch ? "cloudflare_web_search" : null,
-    "google_news_rss",
-    "wikipedia"
-  ].filter(Boolean) as string[];
+  const configuredSearchProviders = String(env.SEARCH_PROVIDER || DEFAULT_SEARCH_PROVIDER)
+    .split(",")
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  const providerOrder = [...configuredSearchProviders, ...SEARCH_PROVIDER_CHAIN, "serpapi", "cloudflare_web_search", "google_news_rss", "wikipedia"];
+  const providers = Array.from(new Set(providerOrder.map((provider) => {
+    if (provider === "ceramic") return env.AI_SEARCH ? "cloudflare_ai_search" : null;
+    if (provider === "exa" || provider === "linkup") return env.AI?.websearch ? "cloudflare_web_search:" + provider : null;
+    if (provider === "serpapi") return env.SEARCH_API_KEY ? "serpapi" : null;
+    if (provider === "cloudflare_web_search") return env.AI?.websearch ? "cloudflare_web_search:exa" : null;
+    if (provider === "google_news_rss") return "google_news_rss";
+    if (provider === "wikipedia") return "wikipedia";
+    return null;
+  }).filter(Boolean))) as string[];
   const attempts: any[] = [];
 
   const searchOne = async (researchQuery: string, provider: string) => {
@@ -1677,8 +1684,9 @@ const internalSearch = async (query: string, env: Env) => {
           url: typeof item.link === "string" ? item.link : null
         }));
       }
-      if (provider === "cloudflare_web_search") {
-        const raw = await cloudflareWebSearch(env, researchQuery, "exa");
+      if (provider.startsWith("cloudflare_web_search")) {
+        const searchProvider = provider.split(":")[1] || "exa";
+        const raw = await cloudflareWebSearch(env, researchQuery, searchProvider);
         const candidates = Array.isArray(raw?.results) ? raw.results : Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : [];
         return candidates.slice(0, 8).map((item: any, index: number) => ({
           rank: index + 1, provider: "cloudflare_web_search",
