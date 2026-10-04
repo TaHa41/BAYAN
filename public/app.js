@@ -119,4 +119,193 @@ function pricesPage(){app.innerHTML='<section class="page"><div class="eyebrow">
 async function recommendations(){const box=document.querySelector("#personalizedGrid");if(!box)return;try{const local=JSON.parse(localStorage.getItem("bayan:interests")||"{}");const localSections=Object.entries(local).sort((a,b)=>Number(b[1])-Number(a[1])).map(x=>x[0]);const rr=await fetch("/api/recommendations?visitorId="+encodeURIComponent(visitorId)+"&lang="+(isEn?"en":"ar"));const dd=await rr.json();const serverItems=Array.isArray(dd.articles)?dd.articles:[];const isBad=a=>{const s=(String(a?.title||"")+" "+String(a?.summary||"")).toLowerCase();return a?.evidenceOnly===true||/لا تحسمها الأدلة|لا يمكن إثبات|تعذر|لم يتم التحقق|ملخص الأدلة المتاحة|evidence[- ]only|available evidence summary/.test(s)};const cleanServer=serverItems.filter(a=>!isBad(a));const sectionEn={egypt:"Egypt",arab:"Arab World",world:"World",science:"Science & Understanding",economy:"Economy & Money",politics:"Politics & Public Affairs",technology:"Technology & AI",health:"Health & Medicine","history-culture":"History & Culture",people:"People & Profiles",sports:"Sports & Data",travel:"Travel & Places",arts:"Arts & Entertainment",news:"Verified News",trending:"Trends & Interest",prices:"Live Prices & Data"};const staticItems=Array.isArray(window.BAYAN_CONTENT?.articles)?window.BAYAN_CONTENT.articles.filter(a=>localSections.includes(a.section)&&!isBad(a)&&(!isEn||Boolean(a.enTitle))).sort((a,b)=>localSections.indexOf(a.section)-localSections.indexOf(b.section)):[];const localizedServer=cleanServer.filter(a=>!isEn||Boolean(a.enTitle)||(a.lang==="en"&&Boolean(a.title)));const seen=new Set(),items=[...localizedServer,...staticItems].filter(a=>{const id=a.id||a.slug;if(!id||seen.has(id))return false;seen.add(id);return true;});if(!items.length){box.innerHTML='<article class="card"><h3>'+(isEn?"No recommendations yet":"لم نعرف اهتماماتك بعد")+'</h3><p class="muted">'+(isEn?"Browse the sections you care about and BAYAN will build recommendations gradually.":"تصفح الأقسام التي تهمك، وسيبني بيان اقتراحاتك تدريجيًا.")+'</p></article>';return;}box.innerHTML=items.slice(0,6).map(a=>{const t=isEn?(a.enTitle||(a.lang==="en"?a.title:"")):a.title;const summary=isEn?(a.enSummary||(a.lang==="en"?a.summary:"")):a.summary;return '<a class="card article-card" href="'+withLang("/article/"+(a.id||a.slug))+'"><span class="article-section">'+sectionIcon(a.section)+(isEn?(sectionEn[a.section]||a.section):(isEn?({egypt:"Egypt",arab:"Arab World",world:"World",science:"Science & Understanding",economy:"Economy & Money",politics:"Politics & Public Affairs",technology:"Technology & AI",health:"Health & Medicine","history-culture":"History & Culture",people:"People & Profiles",sports:"Sports & Data",travel:"Travel & Places",arts:"Arts & Entertainment",news:"Verified News",trending:"Trends & Interest",prices:"Live Prices & Data"}[a.section]||a.section):(window.BAYAN_CONTENT?.sectionMeta?.[a.section]||a.section)))+'</span><h3>'+escapeHtml(t)+'</h3><p>'+escapeHtml(summary)+'</p></a>'}).join("")}catch{box.innerHTML='<article class="card"><p class="muted">'+(isEn?"Recommendations will appear after more interaction with the site.":"ستظهر اقتراحاتك بعد تفاعل إضافي مع الموقع.")+'</p></article>';}};
 const observeEnglishUi=()=>{if(!isEn)return;const root=document.querySelector("#app");if(!root||root.__bayanEnglishObserver)return;const observer=new MutationObserver(()=>{localizeUi();});observer.observe(root,{subtree:true,childList:true,characterData:true});root.__bayanEnglishObserver=observer;};
 localizeUi();observeEnglishUi();
+function reviewPage(){
+app.innerHTML='<section class="page"><div class="eyebrow">BAYAN REVIEW</div><h1 class="page-title">مراجعة مساهمات الزوار</h1><p class="page-lead">هذه الصفحة خاصة بإدارة بيان. أدخل مفتاح المراجعة لمشاهدة المساهمات التي أرسلها الزوار ولم تُنشر تلقائيًا.</p><div class="card"><label>مفتاح المراجعة<input id="reviewToken" class="select" type="password" placeholder="BAYAN manager token"></label><div class="actions"><button id="reviewLoad" class="primary" type="button">عرض المساهمات</button><button id="reviewTest" class="secondary" type="button">اختبار النظام وإرسال تقرير</button><button id="reviewStatus" class="secondary" type="button">فحص إعدادات النظام</button><button id="telegramSetup" class="secondary" type="button">ربط Telegram واستخراج CHAT_ID</button><button id="telegramTest" class="secondary" type="button">اختبار Telegram</button></div><p id="reviewState" class="muted"></p></div><div id="reviewList" class="grid"></div></section>';
+const token=document.querySelector("#reviewToken"),state=document.querySelector("#reviewState"),list=document.querySelector("#reviewList");
+try{const saved=sessionStorage.getItem("bayan:review-token");if(saved)token.value=saved;}catch{}
+async function load(){const t=token.value.trim();if(!t){state.textContent="أدخل مفتاح المراجعة.";return;}try{sessionStorage.setItem("bayan:review-token",t);}catch{}state.textContent="جارٍ تحميل المساهمات…";try{const r=await fetch("/api/contributions/review",{headers:{authorization:"Bearer "+t}}),d=await r.json();if(!r.ok){state.textContent="مفتاح المراجعة غير صحيح أو خدمة الإدارة غير متاحة. استخدم BAYAN_AI_MANAGER_TOKEN وليس RESEND_API_KEY.";list.innerHTML="";return;}state.textContent="عدد المساهمات قيد المراجعة: "+(d.count||0);list.innerHTML=(d.items||[]).map(x=>'<article class="card"><span class="number">#'+escapeHtml(x.id)+' · '+escapeHtml(x.status)+'</span><h3>'+escapeHtml(x.title)+'</h3><p>'+escapeHtml(x.body)+'</p>'+(x.source?'<p class="muted">المصدر: '+escapeHtml(x.source)+'</p>':"")+'<small>'+escapeHtml(x.created_at||"")+'</small><div class="actions"><button class="secondary review-action" data-id="'+escapeHtml(x.id)+'" data-status="VERIFIED">تم التحقق</button><button class="secondary review-action" data-id="'+escapeHtml(x.id)+'" data-status="NEEDS_MORE_INFO">تحتاج معلومات</button><button class="secondary review-action" data-id="'+escapeHtml(x.id)+'" data-status="REJECTED">رفض</button></div></article>').join("")||'<article class="card"><h3>لا توجد مساهمات جديدة</h3><p class="muted">عندما يرسل شخص معلومة ستظهر هنا بحالة PENDING_REVIEW.</p></article>';}catch{state.textContent="تعذر الاتصال بخدمة المراجعة."}}
+document.querySelector("#reviewLoad").onclick=load;
+document.querySelector("#telegramSetup").onclick=async()=>{
+  const t=token.value.trim();
+  if(!t){state.textContent="أدخل BAYAN_AI_MANAGER_TOKEN أولًا.";return;}
+  state.textContent="جارٍ البحث عن محادثة Telegram…";
+  try{
+    const r=await fetch("/api/ai/manager/telegram/setup",{headers:{authorization:"Bearer "+t}});
+    const d=await r.json();
+    if(!r.ok){state.textContent="تعذر الوصول لإعداد Telegram.";return;}
+    if(d.chatId) state.textContent="تم العثور على CHAT_ID: "+d.chatId+" — احفظه الآن في Cloudflare Secret باسم TELEGRAM_CHAT_ID.";
+    else state.textContent="لم أجد رسالة Telegram بعد. افتح البوت واضغط Start وأرسل /start ثم جرّب الزر مرة أخرى.";
+  }catch{state.textContent="تعذر الاتصال بإعداد Telegram."}
+};
+document.querySelector("#telegramTest").onclick=async()=>{
+  const t=token.value.trim();
+  if(!t){state.textContent="أدخل BAYAN_AI_MANAGER_TOKEN أولًا.";return;}
+  state.textContent="جارٍ إرسال اختبار Telegram…";
+  try{
+    const r=await fetch("/api/ai/manager/telegram/test",{method:"POST",headers:{authorization:"Bearer "+t}});
+    const d=await r.json();
+    state.textContent=d.delivered?"تم إرسال رسالة اختبار Telegram بنجاح.":"فشل إرسال Telegram: "+(d.error||"تأكد من TELEGRAM_CHAT_ID.");
+  }catch{state.textContent="تعذر الاتصال باختبار Telegram."}
+};
+document.querySelector("#reviewTest").onclick=async()=>{
+  const t=token.value.trim();
+  if(!t){state.textContent="أدخل BAYAN_AI_MANAGER_TOKEN أولًا. لا تستخدم RESEND_API_KEY هنا.";return;}
+  state.textContent="جارٍ اختبار الموقع وتجهيز التقرير…";
+  try{
+    const r=await fetch("/api/ai/manager/test-email",{method:"POST",headers:{authorization:"Bearer "+t}});
+    const d=await r.json();
+    if(r.ok) state.textContent=d.delivered?"تم إرسال رسالة الاختبار والتشخيص إلى حساب الإشعارات.":"اكتمل الاختبار لكن لم يتم إرسال البريد؛ راجع إعدادات Resend.";
+    else state.textContent=d.status==="forbidden"?"المفتاح غير صحيح.":"تعذر تشغيل الاختبار.";
+  }catch{state.textContent="تعذر الاتصال بخدمة الاختبار."}
+};
+list.addEventListener("click",async e=>{const b=e.target.closest(".review-action");if(!b)return;const id=Number(b.dataset.id),status=b.dataset.status;const note=status==="NEEDS_MORE_INFO"?"يرجى إضافة مصدر أو تفاصيل يمكن التحقق منها.":"";try{const r=await fetch("/api/contributions/review",{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+token.value.trim()},body:JSON.stringify({id,status,note})});if(r.ok)load();else state.textContent="تعذر تحديث حالة المساهمة.";}catch{state.textContent="تعذر الاتصال بخدمة المراجعة."}});
+}
+function contributionPage(){app.innerHTML='<section class="page"><div class="eyebrow">COMMUNITY KNOWLEDGE</div><h1 class="page-title">ساهم بمعلومة</h1><p class="page-lead">يمكنك إرسال معلومة أو تصحيح أو مصدر. لا تُنشر مساهمتك تلقائيًا؛ تمر أولًا بالمراجعة والتحقق.</p><div class="card"><label>العنوان<input id="contribTitle" class="select" maxlength="240" placeholder="ما المعلومة؟"></label><label>المحتوى<textarea id="contribBody" class="prompt" maxlength="6000" placeholder="اكتب المعلومة بالتفصيل..."></textarea></label><label>المصدر (اختياري)<input id="contribSource" class="select" maxlength="500" placeholder="اسم المصدر أو المرجع"></label><button id="contribSend" class="primary" type="button">إرسال للمراجعة</button><p id="contribState" class="muted"></p></div></section>';document.querySelector("#contribSend").onclick=async()=>{const state=document.querySelector("#contribState"),title=document.querySelector("#contribTitle").value.trim(),body=document.querySelector("#contribBody").value.trim(),source=document.querySelector("#contribSource").value.trim();if(!title||body.length<20){state.textContent="اكتب عنوانًا ومعلومة لا تقل عن 20 حرفًا.";return;}state.textContent="جارٍ إرسال المساهمة للمراجعة…";try{const rr=await fetch("/api/contributions",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({visitorId,title,body,source})});const dd=await rr.json();if(rr.ok){state.textContent="تم استلام المساهمة وستدخل دورة المراجعة.";document.querySelector("#contribTitle").value="";document.querySelector("#contribBody").value="";document.querySelector("#contribSource").value="";}else{state.textContent=dd.status||"تعذر إرسال المساهمة.";}}catch{state.textContent="تعذر الاتصال بالخدمة."};}};
+function home(){app.innerHTML='<section class="hero"><div><div class="eyebrow">BAYAN | بيان</div><h1>ماذا تريد أن <span>تعرف؟</span></h1><p>اسأل، ابحث، افهم، أو حل مشكلة. يجمع بيان المعرفة والأخبار والبيانات والمصادر في تجربة واحدة، ويصرّح عندما لا تكفي الأدلة.</p><div class="actions"><a class="primary" href="'+withLang("/search")+'">ابدأ البحث</a><a class="secondary" href="'+withLang("/ai")+'">اسأل بيان</a></div></div><div class="hero-visual"><div class="hero-visual-label">معلومة · دليل · سياق · تحقق</div></div></section>'+adSlot("home-top")+'<section><div class="section-head"><div><h2>مهم الآن</h2><p>بيانات مباشرة تتحدث عندما تصل من مصادرها.</p></div><a class="secondary" href="'+withLang("/prices")+'">كل الأسعار والطقس</a></div><div class="card live-home"><div class="live-home-head"><div><span class="number">LIVE DATA</span><h3>الطقس والعملات والذهب</h3></div><div class="weather-city-inline"><input id="weatherCity" class="select" value="Cairo" aria-label="مدينة الطقس"><button id="refreshLiveHome" class="secondary" type="button">تحديث</button></div></div><div id="liveDataGrid" class="live-grid"><div class="live-loading">جارٍ تحميل البيانات…</div></div></div></section><section><div class="section-head"><div><h2>ما الذي يهم الناس الآن؟</h2><p>اكتشاف الاهتمام يحتاج إلى إشارات ثم تحقق قبل النشر.</p></div></div><div class="signal-grid"><article class="card signal"><span class="number">DISCOVERY</span><h3>استكشاف الاهتمام</h3><p class="muted">موضوعات وأسئلة يمكن أن تصبح محتوى مفيدًا بعد التحقق.</p><a class="secondary" href="'+withLang("/trending")+'">استكشف الاهتمام</a></article><article class="card signal"><span class="number">NEWS</span><h3>الأخبار</h3><p class="muted">أخبار من مزود مباشر، مع فصل الخبر عن التفسير والمعلومة غير المؤكدة.</p><a class="secondary" href="'+withLang("/news")+'">استكشف الأخبار</a></article></div></section><section><div class="section-head"><div><h2>استكشف المعرفة</h2><p>موضوعات مرتبطة بالمحتوى الفعلي داخل بيان، وكل قسم له وظيفة مختلفة.</p></div></div><div class="grid">'+sections.slice(0,12).map((x,i)=>'<a class="card topic-card" href="'+withLang("/"+x[0])+'"><span class="number">'+String(i+1).padStart(2,"0")+"</span><h3>"+title(x)+"</h3><p>"+(descriptions[x[0]]||"محتوى منظم مع مصادر وسياق.")+"</p></a>").join("")+'</div></section>'+editorialArticles()+'<section class="feature card"><div><div class="eyebrow">BAYAN INTELLIGENCE</div><h2>ثلاث طرق لاستخدام بيان</h2><p class="muted">ابحث عن معلومة، اسأل الذكاء الاصطناعي، أو اقرأ شرحًا جاهزًا من قاعدة المعرفة.</p><div class="actions"><a class="primary" href="'+withLang("/search")+'">ابحث في المعرفة</a><a class="secondary" href="'+withLang("/ai")+'">اسأل بيان</a><a class="secondary" href="'+withLang("/article/ai-evidence")+'">كيف نتحقق؟</a></div></div></section><section><div class="section-head"><div><h2>محتوى مخصص لك</h2><p>اقتراحات مبنية على الأقسام التي تتفاعل معها، دون جمع اسمك أو بريدك.</p></div></div><div id="personalizedGrid" class="grid"></div></section>'+adSlot("home-bottom")+'<section class="wisdom"><b>WISDOM · حكمة</b><p id="wisdom"></p></section>'}function sectionPage(key){const sec=sections.find(x=>x[0]===key),lead=descriptions[key]||"قسم معرفي مستقل.";const pair=content[key]||sectionGuides[key];const list=(window.BAYAN_CONTENT?.articles||[]).filter(a=>a.section===key);const featured=pair?'<article class="card topic-card"><span class="number">FEATURED</span><h3>'+pair[0]+'</h3><p>'+pair[1]+'</p><a class="secondary" href="'+withLang("/article/"+(list[0]?.id||key))+'">افهم الموضوع</a></article>':'';const articles=list.map(a=>'<a class="card article-card" href="'+withLang("/article/"+a.id)+'"><span class="article-section">'+sectionIcon(a.section)+(window.BAYAN_CONTENT?.sectionMeta?.[a.section]||a.section)+'</span><h3>'+a.title+'</h3><p>'+a.summary+'</p><small>'+a.readTime+'</small></a>').join("");const fallback='<a class="card topic-card" href="'+withLang("/search?q="+encodeURIComponent(title(sec)))+'"><span class="number">DISCOVERY</span><h3>اكتشف المزيد</h3><p>ابحث داخل بيان عن أسئلة وموضوعات مرتبطة بهذا القسم.</p></a>';app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+title(sec)+'</div><h1 class="page-title">'+title(sec)+'</h1><p class="page-lead">'+lead+'</p>'+summaryBlock(["المحتوى في هذا القسم مرتبط بالسياق وليس مجرد عنوان.","كل معلومة قابلة للتحقق ترتبط بمصادر وأوقات تحديث واضحة.","عند نقص الأدلة، يعرض بيان ذلك بدل ملء الفراغ بتخمين."])+evidence()+adSlot("section-top")+(featured?'<div class="grid">'+featured+fallback+'</div>':'')+(articles?'<div class="section-head"><div><h2>محتوى القسم</h2><p>افتح أي مادة لقراءة التفاصيل داخل بيان.</p></div></div><div class="grid article-grid dynamic-knowledge-grid">'+articles+'</div>':'<div class="grid">'+fallback+'</div>')+'</section>';loadPersistedSection(key)}async function loadPersistedSection(key){
+  try{
+    const rr=await fetch("/api/knowledge?section="+encodeURIComponent(key)+"&limit=30");
+    const dd=await rr.json();
+    const items=Array.isArray(dd.articles)?dd.articles:[];
+    const grid=document.querySelector(".dynamic-knowledge-grid");
+    if(!items.length||!grid)return;
+    grid.innerHTML=items.map(a=>'<a class="card article-card" href="'+withLang("/article/"+a.id)+'"><span class="article-section">'+sectionIcon(a.section)+(window.BAYAN_CONTENT?.sectionMeta?.[a.section]||a.section)+'</span><h3>'+escapeHtml(a.title)+'</h3><p>'+escapeHtml(a.summary)+'</p><small>مقال معرفة محفوظ في بيان</small></a>').join("")+grid.innerHTML;
+  }catch{}
+}
+async function articlePage(slug){
+const a=(window.BAYAN_CONTENT?.articles||[]).find(x=>x.id===slug);
+const renderArticle=(k,isPersisted)=>{
+  const section=k.section||"news";
+  const body=Array.isArray(k.body)?k.body:(String(k.body||"").split(/\n+/).filter(Boolean));
+  const saved=(()=>{try{return JSON.parse(localStorage.getItem("bayan:saved-articles")||"[]").includes(k.id||slug)}catch{return false}})();
+  const related=(window.BAYAN_CONTENT?.articles||[]).filter(x=>x.section===section&&x.id!==(k.id||slug)).slice(0,3);const sources=Array.isArray(k.sources)?k.sources:[];const sourceHtml=sources.length?"<div class=\"card article-sources\"><h3>المصادر المستخدمة</h3><ul>"+sources.slice(0,8).map(s=>"<li>"+escHtml(s.source||s.title||"مصدر")+(s.date?" · "+escHtml(s.date):"")+"</li>").join("")+"</ul></div>":"";
+  const sourceLabel=isPersisted?"مقال معرفة محفوظ داخل بيان":"مقال معرفي في بيان";
+  const actions='<div class="actions article-actions"><button class="secondary" type="button" data-bayan-save="'+escHtml(k.id||slug)+'">'+(saved?"★ محفوظ":"☆ حفظ المقال")+'</button><button class="secondary" type="button" data-bayan-share="'+escHtml(k.title||"مقال بيان")+'">↗ مشاركة</button></div>';
+  const relatedHtml=related.length?'<div class="section-head"><div><h2>اقرأ أيضًا</h2><p>مواد مرتبطة من نفس المجال.</p></div></div><div class="grid">'+related.map(x=>'<a class="card article-card" href="'+withLang("/article/"+x.id)+'"><span class="article-section">'+sectionIcon(x.section)+(window.BAYAN_CONTENT?.sectionMeta?.[x.section]||x.section)+'</span><h3>'+escHtml(x.title)+'</h3><p>'+escHtml(x.summary)+'</p></a>').join("")+'</div>':"";
+  app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isPersisted?"مقال معرفة":(isEn?"Article":"مقال"))+'</div><div class="article-kicker">'+sectionIcon(section)+(window.BAYAN_CONTENT?.sectionMeta?.[section]||section)+'</div><h1 class="page-title">'+escHtml(k.title||"مقال بيان")+'</h1><p class="page-lead">'+escHtml(k.summary||"")+'</p>'+summaryBlock([sourceLabel,"المحتوى مبني على الأدلة المتاحة، مع تجنب اختلاق معلومات غير مؤكدة."])+actions+evidence()+adSlot("article")+'<article class="article-body card">'+body.map(p=>"<p>"+escHtml(p)+"</p>").join("")+'</article>'+sourceHtml+relatedHtml+'</section>';
+};
+if(a){renderArticle(a,false);return;}
+try{
+  const rr=await fetch("/api/knowledge?id="+encodeURIComponent(slug));
+  const dd=await rr.json();
+  if(dd.article){renderArticle(dd.article,true);return;}
+}catch{}
+const sectionArticle=(window.BAYAN_CONTENT?.articles||[]).find(x=>x.section===slug);
+if(sectionArticle){renderArticle(sectionArticle,false);return;}
+try{
+  const query=decodeURIComponent(slug).replace(/[-_]+/g," ").trim();
+  if(query){
+    const generated=await fetch("/api/search/article?q="+encodeURIComponent(query)+"&lang="+(isEn?"en":"ar"));
+    const gd=await generated.json();
+    if(generated.ok&&gd.article&&gd.article.body){renderArticle({...gd.article,id:gd.article.id||slug},true);return;}
+  }
+}catch{}
+const pair=content[slug]||[decodeURIComponent(slug).replace(/[-_]+/g," ")||"مقال بيان","لم يتم العثور على مادة منشورة لهذا المسار بعد."];
+app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isEn?"Article":"مقال")+'</div><h1 class="page-title">'+escHtml(pair[0])+'</h1><p class="page-lead">'+escHtml(pair[1])+'</p>'+summaryBlock(["سيُعرض المحتوى الكامل بعد اجتياز دورة الاسترجاع والتحليل والكتابة والتحقق."])+'</section>';
+}
+async function dynamicKnowledgePage(kind,slug){
+const labels={person:isEn?"Person":"شخص",event:isEn?"Event":"حدث",topic:isEn?"Topic":"موضوع"};
+const label=labels[kind]||labels.topic;
+app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+label+'</div><div class="eyebrow">'+kind.toUpperCase()+'</div><h1 class="page-title">'+escHtml(slug.replace(/[-_]+/g," "))+'</h1><div id="dynamicState" class="card"><h3>'+ (isEn?"Researching and verifying…":"جارٍ البحث والتحقق…") +'</h3><p class="muted">'+(isEn?"BAYAN is retrieving evidence before writing the page.":"يجمع بيان الأدلة قبل كتابة الصفحة.")+'</p></div><div id="dynamicAnswer" class="card answer" style="display:none"></div>'+evidence()+'</section>';
+const state=document.querySelector("#dynamicState"),out=document.querySelector("#dynamicAnswer");
+const request=(kind==="person"?(isEn?"Build a verified factual profile for the person named "+slug:"أنشئ ملفًا معرفيًا موثقًا ومحايدًا للشخص المذكور: "+slug):(kind==="event"?(isEn?"Explain the event named "+slug+" with confirmed facts, when, where, who, context and updates.":"اشرح الحدث المذكور: "+slug+" مع الحقائق المؤكدة، متى وأين ومن والسياق والتحديثات."):(isEn?"Explain the topic "+slug+" with definition, history, how it works, examples and related concepts.":"اشرح الموضوع "+slug+" مع التعريف والتاريخ وكيف يعمل والأمثلة والمفاهيم المرتبطة.")));
+try{
+const r=await fetch("/api/ai",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({input:request,mode:kind})});
+const d=await r.json();
+if(!r.ok){state.innerHTML='<h3>'+ (isEn?"Verification unavailable":"تعذر التحقق الآن")+'</h3><p class="muted">'+escHtml(d.warnings?.join(" · ")||"Insufficient Evidence")+'</p>';return;}
+state.innerHTML='<h3>'+ (isEn?"Verified evidence retrieved":"تم استرجاع الأدلة")+'</h3><p class="muted">'+(isEn?"The answer below is evidence-first.":"الإجابة التالية مبنية على الأدلة أولًا.")+'</p>';
+out.style.display="block";out.innerHTML='<h2>'+label+'</h2><div class="answer-copy">'+escHtml(d.answer||"Insufficient Evidence").replace(/\n/g,"<br>")+'</div>';
+}catch{state.innerHTML='<h3>'+ (isEn?"Could not complete verification":"تعذر إكمال التحقق")+'</h3><p class="muted">Insufficient Evidence</p>';}
+}
+function escHtml(v){return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+
+function topicPage(slug){const sec=sections.find(x=>x[0]===slug);app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isEn?"Topic":"موضوع")+'</div><h1 class="page-title">'+(sec?title(sec):slug)+'</h1>'+summaryBlock(["تعريف الموضوع وسياقه أولًا.","شرح ما نعرفه وما يحتاج إلى دليل إضافي.","مصادر وموضوعات مرتبطة لتوسيع الفهم."])+evidence()+'<div class="grid"><article class="card topic-card"><span class="number">EXPLAIN</span><h3>ما هو الموضوع؟</h3><p>سيُبنى التعريف من مصادر موثوقة ويُراجع قبل النشر.</p></article><article class="card topic-card"><span class="number">RELATED</span><h3>موضوعات مرتبطة</h3><p>روابط داخلية مفيدة بدون تكرار أو حشو SEO.</p></article></div></section>'}function searchPage(){
+const q=params.get("q")||"";
+app.innerHTML='<section class="page search-page"><div class="search-hero"><div><div class="eyebrow">SEARCH / KNOWLEDGE</div><h1 class="page-title">البحث</h1><p class="page-lead">ابحث عن سؤال أو شخص أو موضوع أو خبر. يجمع بيان الأدلة أولًا ثم يرتبها في إجابة واضحة، مع فصل المصادر عن الخلاصة.</p></div></div><form id="siteSearch" class="searchbar search-page-form"><input id="searchInput" name="q" value="'+q.replace(/"/g,"&quot;")+'" placeholder="مثال: من هو محمد صلاح؟" autocomplete="off"><button type="submit">بحث</button></form><div id="searchState" class="search-status"><span class="status-dot"></span><div><strong>'+ (q?"جارٍ البحث والتحقق…":"ابدأ البحث") +'</strong><p>'+(q?"يجمع بيان الأدلة قبل كتابة الإجابة.":"اكتب سؤالك لتحصل على نتيجة منظمة داخل بيان.")+'</p></div></div><div id="searchAnswer" class="search-answer" style="display:none"></div><section id="searchSources" class="search-sources" style="display:none"><div class="section-head"><div><h2>الأدلة والمصادر</h2><p>المصادر التي استُخدمت في بناء الإجابة.</p></div><span id="sourceCount" class="source-count"></span></div><div id="searchEvidence" class="search-results-grid"></div></section></section>';
+const form=document.querySelector("#siteSearch"),state=document.querySelector("#searchState"),answer=document.querySelector("#searchAnswer"),sources=document.querySelector("#searchSources"),evidence=document.querySelector("#searchEvidence"),sourceCount=document.querySelector("#sourceCount");
+const esc=(v)=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const run=async(query)=>{
+if(!query)return;
+state.innerHTML='<span class="status-dot loading"></span><div><strong>جارٍ البحث والتحقق…</strong><p>يتم جمع الأدلة ومقارنتها قبل عرض النتيجة.</p></div>';
+try{
+const r=await fetch("/api/search?q="+encodeURIComponent(query)+"&lang="+(isEn?"en":"ar"));
+const d=await r.json();
+if(!r.ok||d.status==="search_provider_not_configured"){state.innerHTML='<span class="status-dot error"></span><div><strong>البحث غير متاح مؤقتًا</strong><p>لم تتوفر مصادر قابلة للتحقق الآن.</p></div>';return;}
+if(d.answer){
+answer.style.display="block";
+answer.innerHTML='<div class="answer-header"><div><span class="eyebrow">BAYAN ANSWER</span><h2>الخلاصة</h2></div><span class="verified-pill">مبنية على الأدلة</span></div><div class="answer-copy">'+esc(d.answer).replace(/\n/g,"<br>")+'</div>'+(d.article&&d.article.id?'<div class="actions"><a class="primary" href="'+withLang("/article/"+encodeURIComponent(d.article.id))+'">قراءة المقال الكامل</a></div>':"")+'<p class="answer-note">تمت الصياغة من الأدلة المتاحة. التفاصيل الزمنية أو الإحصائية تُراجع بحسب تاريخ المصدر.</p>';
+}
+const items=d.items||[];
+if(items.length){
+sources.style.display="block";
+sourceCount.textContent=items.length+" مصادر";
+evidence.innerHTML=items.map((x,index)=>{
+const title=escapeHtml(x.title||"نتيجة بدون عنوان");
+const source=escapeHtml(x.source||"مصدر غير محدد");
+const date=x.date?escapeHtml(x.date):"";
+const snippet=escapeHtml(x.snippet||"لم يتوفر ملخص كافٍ.");
+return '<article class="search-result-card"><div class="result-number">'+String(index+1).padStart(2,"0")+'</div><div class="result-main"><div class="result-meta"><span class="source-name">'+source+'</span>'+(date?'<span>·</span><span>'+date+'</span>':"")+'</div><h3>'+title+'</h3><p>'+snippet+'</p><button class="secondary read-search-article" data-rank="'+esc(x.rank)+'" type="button">قراءة داخل بيان <span>←</span></button><div class="search-article-body" hidden></div></div></article>';
+}).join("");
+evidence.querySelectorAll(".read-search-article").forEach(button=>{
+button.addEventListener("click",async()=>{
+const card=button.closest(".search-result-card"),body=card?.querySelector(".search-article-body"),rank=button.dataset.rank;
+if(!card||!body||!rank)return;
+button.disabled=true;button.textContent="جارٍ إعداد المقال…";body.hidden=false;body.innerHTML='<p class="muted">بيان يتحقق من المادة ويجهز المقال…</p>';
+try{
+const rr=await fetch("/api/search/article?q="+encodeURIComponent(query)+"&rank="+encodeURIComponent(rank)+"&lang="+(isEn?"en":"ar"));
+const dd=await rr.json();
+if(!rr.ok||!dd.article)throw new Error("article_unavailable");
+location.href=withLang("/article/"+encodeURIComponent(dd.article.id));
+}catch{body.innerHTML='<p class="search-error">تعذر تجهيز المقال الآن؛ لم يتم عرض محتوى غير متحقق منه.</p>';button.disabled=false;button.textContent="حاول مرة أخرى";}
+});
+});
+}
+state.innerHTML='<span class="status-dot success"></span><div><strong>اكتمل البحث</strong><p>تم جمع '+items.length+' مصادر/نتائج وعرضها في أقسام منفصلة.</p></div>';
+}catch{state.innerHTML='<span class="status-dot error"></span><div><strong>تعذر إكمال البحث</strong><p>لم يتم عرض معلومة غير متحقق منها.</p></div>';}}
+form.onsubmit=(e)=>{e.preventDefault();const query=document.querySelector("#searchInput").value.trim();if(query){const u=new URL(location.href);u.searchParams.set("q",query);history.pushState({q:query},"",u.pathname+u.search);run(query);}};
+if(q)run(q);
+}function newsPage(){app.innerHTML='<section class="page"><div class="eyebrow">LIVE NEWS</div><h1 class="page-title">الأخبار</h1><p class="page-lead">أخبار حديثة من مزود مباشر، تُعرض داخل بيان مع المصدر ووقت النشر، دون روابط خارجية للزائر.</p><div class="card" id="newsState"><h3>جارٍ تحديث الأخبار…</h3></div><div id="newsGrid" class="grid article-grid"></div></section>';const state=document.querySelector("#newsState"),grid=document.querySelector("#newsGrid");fetch("/api/news?lang="+(isEn?"en":"ar")).then(r=>r.json()).then(d=>{if(!d.articles?.length){state.innerHTML='<h3>الأخبار غير متاحة الآن</h3><p class="muted">لم يتم عرض أخبار غير متحققة أو قديمة.</p>';return;}state.innerHTML='<h3>تم التحديث</h3><p class="muted">'+esc(d.totalArticles||d.articles.length)+' مادة من '+esc(d.provider||"المصدر المباشر")+'.</p>';grid.innerHTML=d.articles.slice(0,10).map(x=>'<article class="card article-card">'+(x.image?"<img loading=\"lazy\" src=\""+escapeHtml(x.image)+"\" alt=\"\" class=\"news-image\">":"")+'<span class="article-section">'+escapeHtml(x.source?.name||"News")+'</span><h3>'+escapeHtml(x.title||"")+'</h3><p>'+escapeHtml(x.description||x.content||"")+'</p><small>'+escapeHtml(x.publishedAt||"—")+'</small></article>').join("");}).catch(()=>{state.innerHTML='<h3>تعذر تحديث الأخبار</h3><p class="muted">لم يتم عرض معلومات غير متحققة.</p>';});}
+function trendingPage(){app.innerHTML='<section class="page"><div class="eyebrow">DISCOVERY</div><h1 class="page-title">إشارات الاهتمام</h1><p class="page-lead">موضوعات تظهر في الأخبار الحالية داخل بيان. هذه إشارات من العناوين المتاحة وليست ترتيبًا لشعبية الجمهور.</p><div class="card" id="trendingState"><h3>جارٍ جمع الإشارات…</h3><p class="muted">يتم جلب أحدث العناوين من مصدر أخبار مباشر.</p></div><div id="trendingGrid" class="grid article-grid"></div></section>';const state=document.querySelector("#trendingState"),grid=document.querySelector("#trendingGrid");fetch("/api/trending?lang="+(isEn?"en":"ar")).then(r=>r.json()).then(d=>{if(!d.signals?.length){state.innerHTML='<h3>الإشارات غير متاحة الآن</h3><p class="muted">لم تتوفر بيانات حديثة قابلة للعرض.</p>';return;}state.innerHTML='<h3>تم التحديث</h3><p class="muted">هذه إشارات من الأخبار الحالية وليست مقياسًا لعدد المتابعين أو عمليات البحث.</p>';grid.innerHTML=d.signals.map(x=>'<article class="card article-card"><span class="article-section">#'+escapeHtml(x.rank)+' · '+escapeHtml(x.source||"News")+'</span><h3>'+escapeHtml(x.title||"")+'</h3><small>'+escapeHtml(x.date||"وقت النشر غير متاح")+'</small></article>').join("");}).catch(()=>{state.innerHTML='<h3>تعذر تحديث الإشارات</h3><p class="muted">لم يتم عرض ترتيب غير متحقق منه.</p>';});}function ai(){app.innerHTML='<section class="page"><div class="eyebrow">BAYAN AI</div><h1 class="page-title">اسأل بيان</h1><p class="page-lead">اسأل عن أي شيء. عند الحاجة إلى دليل، يبدأ بيان بالاسترجاع والتحقق قبل الصياغة.</p><div class="card ai-box"><div><textarea id="prompt" class="prompt" placeholder="مثال: اشرح لي الموضوع ببساطة…"></textarea><div class="actions"><select id="mode" class="select"><option value="knowledge">معرفة</option><option value="research">بحث</option><option value="summary">تلخيص</option><option value="analyze">تحليل</option><option value="write">كتابة</option><option value="code">برمجة</option></select><button id="ask" class="primary" type="button">إرسال</button></div></div><div class="card"><b>كيف يجيب بيان؟</b><p class="muted">يستفيد من معرفة المنصة، ويجمع معلومات حديثة عند الحاجة، ثم يصوغ الإجابة مع توضيح ما هو مؤكد وما يحتاج إلى دليل إضافي.</p></div></div><div id="answer" class="card answer" aria-live="polite" style="display:none"></div></section>';document.querySelector("#ask").onclick=async()=>{const input=document.querySelector("#prompt").value.trim(),out=document.querySelector("#answer");if(!input)return;out.style.display="block";out.textContent="جارٍ العمل…";try{const r=await fetch("/api/ai",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({input,mode:document.querySelector("#mode").value})});const d=await r.json();out.textContent=d.answer||d.error||"Insufficient Evidence"}catch{out.textContent="تعذر الاتصال بالخدمة."}}}const validInterestSectionForClient=(key)=>["egypt","arab","world","science","economy","politics","technology","health","history-culture","people","sports","travel","arts","news","trending","prices"].includes(key);
+function renderRoute(routePath){
+document.body.dataset.section=routePath||"home";
+if(validInterestSectionForClient(routePath)) recordInterest(routePath,"view");
+nav.querySelectorAll("a").forEach(a=>a.classList.toggle("active",a.getAttribute("href")?.split("?")[0]==="/"+routePath));
+if(!routePath)home();else if(routePath==="ai")ai();else if(routePath==="search")searchPage();else if(routePath==="prices")pricesPage();else if(routePath.startsWith("article/"))articlePage(routePath.split("/")[1]);else if(routePath.startsWith("person/"))dynamicKnowledgePage("person",routePath.split("/")[1]);else if(routePath.startsWith("event/"))dynamicKnowledgePage("event",routePath.split("/")[1]);else if(routePath.startsWith("topic/"))dynamicKnowledgePage("topic",routePath.split("/")[1]);else if(routePath==="contribute"){contributionPage();}else if((routePath==="review"||routePath==="admin")){reviewPage();}else if(info[routePath]){const x=info[routePath];app.innerHTML='<section class="page"><div class="breadcrumb">BAYAN / '+(isEn?x[1]:x[0])+'</div><h1 class="page-title">'+(isEn?x[1]:x[0])+'</h1><p class="page-lead">'+x[2]+'</p>'+summaryBlock(["الوضوح قبل السرعة.","المصادر والتحقق جزء من طريقة عمل المنصة.","أي معلومة غير مؤكدة تُعامل على أنها غير مؤكدة."])+'</section>'}else if(routePath==="news")newsPage();else if(routePath==="trending")trendingPage();else if(sections.some(x=>x[0]===routePath))sectionPage(routePath);else app.innerHTML='<section class="page"><h1 class="page-title">404</h1><p class="page-lead">هذه الصفحة غير متاحة.</p></section>';if(!routePath){liveDataHome();recommendations();}const wisdom=window.BAYAN_CONTENT?.wisdom||[];const wisdomAt=Math.floor(Date.now()/30000);const wisdomIndex=wisdom.length?wisdomAt%wisdom.length:0;const w=document.querySelector("#wisdom");if(w){w.textContent=wisdom.length?(isEn?(wisdom[wisdomIndex].en||wisdom[wisdomIndex].ar):wisdom[wisdomIndex].ar):"السؤال الجيد بداية معرفة أفضل.";}
+}
+const safeRenderRoute=(routePath)=>{try{renderRoute(routePath);}catch(error){const app=document.querySelector("#app");if(app)app.innerHTML='<section class="page"><h1 class="page-title">تعذر عرض هذه الصفحة</h1><p class="page-lead">تم احتواء الخطأ حتى لا تظهر الصفحة فارغة.</p><button class="primary" type="button" onclick="location.reload()">إعادة المحاولة</button>';console.error("BAYAN route error",error);}};
+const updateWisdom=()=>{const wisdom=window.BAYAN_CONTENT?.wisdom||[];const w=document.querySelector("#wisdom");if(!w)return;const i=wisdom.length?Math.floor(Date.now()/30000)%wisdom.length:0;w.textContent=wisdom.length?(isEn?(wisdom[i].en||wisdom[i].ar):wisdom[i].ar):"السؤال الجيد بداية معرفة أفضل.";};
+safeRenderRoute(path);
+window.setInterval(updateWisdom,30000);
+document.addEventListener("click",(event)=>{
+  const save=event.target.closest("[data-bayan-save]");
+  if(save){
+    event.preventDefault();
+    event.stopPropagation();
+    const id=save.getAttribute("data-bayan-save");
+    let list=[];try{list=JSON.parse(localStorage.getItem("bayan:saved-articles")||"[]")}catch{}
+    if(list.includes(id)){list=list.filter(x=>x!==id);save.textContent="☆ حفظ المقال";}else{list.unshift(id);save.textContent="★ محفوظ";}
+    localStorage.setItem("bayan:saved-articles",JSON.stringify(list.slice(0,100)));const article=(window.BAYAN_CONTENT?.articles||[]).find(x=>x.id===id);if(article)recordInterest(article.section,"save");
+    return;
+  }
+  const share=event.target.closest("[data-bayan-share]");
+  if(share){
+    event.preventDefault();
+    event.stopPropagation();
+    const title=share.getAttribute("data-bayan-share")||"مقال بيان";
+    const data={title,text:title+" — BAYAN | بيان",url:location.href};
+    if(navigator.share)navigator.share(data).catch(()=>{});
+    else if(navigator.clipboard)navigator.clipboard.writeText(location.href).then(()=>{share.textContent="✓ تم نسخ الرابط";setTimeout(()=>share.textContent="↗ مشاركة",1800)}).catch(()=>{});
+    return;
+  }
+  const link=event.target.closest("a");
+  if(!link)return;
+  const href=link.getAttribute("href");
+  if(!href||!href.startsWith("/")||href.startsWith("//")||link.hasAttribute("download")||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+  event.preventDefault();
+  const u=new URL(href,location.origin);
+  history.pushState({}, "", u.pathname+u.search);
+  safeRenderRoute(u.pathname.replace(/^\//,"").replace(/\/$/,""));
+  window.scrollTo({top:0,behavior:"smooth"});
+});
+window.addEventListener("popstate",()=>safeRenderRoute(location.pathname.replace(/^\//,"").replace(/\/$/,"")));
+if(localStorage.getItem("bayan-theme")==="light")document.body.classList.add("light");document.querySelector("#theme")?.addEventListener("click",()=>{document.body.classList.toggle("light");localStorage.setItem("bayan-theme",document.body.classList.contains("light")?"light":"dark")});document.querySelector("#language")?.addEventListener("click",()=>{const u=new URL(location.href);u.searchParams.set("lang",isEn?"ar":"en");location.href=u});document.querySelector("#year").textContent=new Date().getFullYear()
 })();
