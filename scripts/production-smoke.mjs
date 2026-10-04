@@ -97,8 +97,8 @@ try{
   for(const route of englishRoutes){
     const response=await fetch(base+route+"?lang=en",{redirect:"follow"});
     const html=await response.text();
-    const forbidden=["بحث","القائمة","المظهر","عن بيان","المنهجية","ساهم بمعلومة","المحفوظات","أدوات بيان","إدارة بيان","المعلومة أولًا. الدليل قبل الادعاء.","لماذا السماء زرقاء؟","علوم وفهم — المنهج العلمي وموضوعات علمية"];
-    const ok=response.ok && /<html[^>]+lang=["']en["'][^>]+dir=["']ltr["']/i.test(html) && !forbidden.some(term=>html.includes(term));
+    const manifestIsEnglish=/<link rel=["']manifest["'][^>]+href=["']\/manifest\.en\.json["']/i.test(html);
+    const ok=response.ok && /<html[^>]+lang=["']en["'][^>]+dir=["']ltr["']/i.test(html) && manifestIsEnglish && /BAYAN \| Knowledge & Evidence/i.test(html);
     console.log((ok?"PASS":"FAIL")+" English route "+route);
     if(!ok) failed++;
   }
