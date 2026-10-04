@@ -1,16 +1,45 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync, readdirSync } from "node:fs";
 import worker from "../../src/index";
 
-describe("BAYAN Worker contract", () => {
-  it("keeps Telegram-only owner notifications", async () => {    const source = await (await import("../../src/index")).default.fetch(new Request("https://bayan.test/api/features"), {});    const text = await source.text();    expect(text).not.toContain("RESEND");  });  it("keeps AI repair automation operationally safe", async () => {
-    const source = (await import("../../src/index")).default;
-    const response = await source.fetch(new Request("https://bayan.test/api/tools"), {});
+describe("BAYAN repository contracts", () => {
+  it("keeps Telegram-only owner notifications", async () => {
+    const response = await worker.fetch(new Request("https://bayan.test/api/features"), {});
+    expect(await response.text()).not.toContain("RESEND");
+  });
+
+  it("keeps AI repair automation operationally safe", async () => {
+    const response = await worker.fetch(new Request("https://bayan.test/api/tools"), {});
     const body = await response.text();
     expect(body).toContain("repair-skills");
     expect(body).toContain("web-search-fallback");
   });
+
   it("exposes fetch and scheduled handlers", () => {
     expect(worker.fetch).toBeTypeOf("function");
     expect(worker.scheduled).toBeTypeOf("function");
+  });
+
+  it("keeps English content fields and service-worker cache in sync", () => {
+    const content = readFileSync("public/content-data.js", "utf8");
+    const sw = readFileSync("public/sw.js", "utf8");
+    expect(content).toContain("enTitle");
+    expect(content).toContain("enSummary");
+    expect(content).toContain("enBody");
+    expect(sw).toContain("bayan-shell-v2");
+  });
+
+  it("keeps database migrations contiguous and includes multilingual hardening", () => {
+    const files = readdirSync("migrations").filter((x) => /^\d+_.*\.sql$/.test(x)).sort();
+    expect(files.at(-1)).toBe("0009_multilingual_article_integrity.sql");
+    expect(files.map(x => Number(x.split("_")[0]))).toEqual(files.map((_, i) => i + 1));
+  });
+
+  it("keeps English UI contract in the frontend source", () => {
+    const app = readFileSync("public/app.js", "utf8");
+    expect(app).toContain("isEn");
+    expect(app).toContain("enTitle");
+    expect(app).toContain("Information first. Evidence before claims.");
+    expect(app).not.toContain('isEn?(a.enTitle||a.title):a.title');
   });
 });
