@@ -104,12 +104,11 @@ try{
     const titleOk=titleText.length>0 && /[A-Za-z]/.test(titleText) && !/[\u0600-\u06FF]/.test(titleText);
     const forbiddenShell=["بيان","بحث","المظهر","القائمة","التنقل الرئيسي","ماذا تريد أن تعرف؟","عن بيان","المنهجية","ساهم بمعلومة","الخصوصية","الشروط","تواصل","المحفوظات","أدوات بيان","إدارة بيان","المعلومة أولًا. الدليل قبل الادعاء."];
     const shellLeaks=forbiddenShell.filter((value)=>html.includes(value));
+    const visibleHtml=html.replace(/<script[\s\S]*?<\/script>/gi,"").replace(/<style[\s\S]*?<\/style>/gi,"");
     const visibleArabic=/[\u0600-\u06FF]/.test(visibleHtml);
     const jsonLdArabic=[...html.matchAll(/<script[^>]+type=["\']application\/ld\+json["\'][^>]*>([\s\S]*?)<\/script>/gi)].some((m)=>/[\u0600-\u06FF]/.test(m[1]||""));
-    const jsonLdArabic=[...html.matchAll(/<script[^>]+type=["']application\\/ld\\+json["'][^>]*>([\\s\\S]*?)<\\/script>/gi)].some((m)=>/[\\u0600-\\u06FF]/.test(m[1]||""));
     const englishFooterLinks=[...html.matchAll(/<a[^>]+href="([^"]+\?lang=en)"[^>]*>/gi)].map((m)=>m[1]);
-    const englishFooterLinks=[...html.matchAll(/<a[^>]+href="([^"]+\\?lang=en)"[^>]*>/gi)].map((m)=>m[1]);
-    const footerLinksOk=["/about?lang=en","/methodology?lang=en","/contribute?lang=en","/privacy?lang=en","/terms?lang=en","/contact?lang=en","/saved?lang=en","/tools?lang=en","/review?lang=en"].every((x)=>englishFooterLinks.includes(x));
+    const shellLeak=shellLeaks.length>0 || visibleArabic || jsonLdArabic;
     const ok=response.ok && htmlLanguageOk && manifestIsEnglish && titleOk && !shellLeak && footerLinksOk;
     console.log((ok?"PASS":"FAIL")+" English route "+route);
     if(!ok) console.log("EN_ROUTE_DEBUG",JSON.stringify({route,status:response.status,htmlLanguageOk,manifestIsEnglish,titleOk,shellLeaks,visibleArabic,jsonLdArabic,footerLinksOk,head:html.slice(0,1200)}));
