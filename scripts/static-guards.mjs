@@ -31,7 +31,6 @@ if (/const (aiProviderCooldown|diagnosticMemory|repairMemory) = new Map/.test(so
 if (!guardian.includes("AI repair diagnosis")) failures.push("Guardian AI diagnosis step missing");
 if (!guardian.includes("ai-diagnosis.json")) failures.push("Guardian diagnosis artifact missing");
 
-const migrations = readdirSync("migrations").filter((x) => /^\\d+_.*\\.sql$/.test(x)).sort();
 const numbers = migrations.map((x) => Number(x.split("_")[0]));
 for (let i = 0; i < numbers.length; i++) {
   if (numbers[i] !== i + 1) failures.push("migration numbering gap at " + (i + 1));
