@@ -1784,7 +1784,7 @@ const internalSearch = async (query: string, env: Env) => {
   rawResults = [...enterprise, ...rawResults];
 
   // Only spend another provider round-trip when the first pass is genuinely weak.
-  if (rawResults.length < 6 && expandedQueries.length) {
+  if (rawResults.length < 3 && expandedQueries.length) {
     rawResults = rawResults.concat(await runQueries(expandedQueries));
   }
 
