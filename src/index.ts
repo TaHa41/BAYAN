@@ -195,12 +195,12 @@ const renderHtml = async (response: Response, requestUrl: URL, env?: Env) => {
   if (cleanPath.startsWith("/article/") && env?.DB) {
     try {
       const slug = decodeURIComponent(cleanPath.slice("/article/".length));
-      const row = await env.DB.prepare("SELECT slug,title,summary,title_en,summary_en,created_at,updated_at FROM knowledge_articles WHERE slug=? AND status='PUBLISHED' LIMIT 1").bind(slug).first<any>();
+      const row = await env.DB.prepare("SELECT slug,language,title,summary,title_en,summary_en,created_at,updated_at FROM knowledge_articles WHERE slug=? AND status='PUBLISHED' LIMIT 1").bind(slug).first<any>();
       if (row) articleSeo = row;
     } catch {}
   }
-  const seoTitle = language === "en" ? (articleSeo?.title_en || null) : (articleSeo?.title || null);
-  const seoSummary = language === "en" ? (articleSeo?.summary_en || null) : (articleSeo?.summary || null);
+  const seoTitle = language === "en" ? (articleSeo?.title_en || (articleSeo?.language === "en" ? articleSeo?.title : null)) : (articleSeo?.title || null);
+  const seoSummary = language === "en" ? (articleSeo?.summary_en || (articleSeo?.language === "en" ? articleSeo?.summary : null)) : (articleSeo?.summary || null);
   const finalTitle = seoTitle ? cleanText(seoTitle, 180) + " — BAYAN" : seo[language][0];
   const finalDescription = seoSummary ? cleanText(seoSummary, 300) : seo[language][1];
   const [resolvedTitle, resolvedDescription] = [finalTitle, finalDescription];
@@ -212,8 +212,8 @@ const renderHtml = async (response: Response, requestUrl: URL, env?: Env) => {
   const jsonLd = JSON.stringify(articleSeo ? {
     "@context": "https://schema.org",
     "@type": "Article",
-    headline: language === "en" ? (articleSeo.title_en || articleSeo.title) : articleSeo.title,
-    description: language === "en" ? (articleSeo.summary_en || articleSeo.summary) : articleSeo.summary,
+    headline: language === "en" ? (articleSeo.title_en || (articleSeo.language === "en" ? articleSeo.title : null)) : articleSeo.title,
+    description: language === "en" ? (articleSeo.summary_en || (articleSeo.language === "en" ? articleSeo.summary : null)) : articleSeo.summary,
     datePublished: articleSeo.created_at,
     dateModified: articleSeo.updated_at,
     mainEntityOfPage: { "@type": "WebPage", "@id": canonical },
@@ -887,12 +887,15 @@ const saveKnowledgeArticle = async (env: Env, article: any) => {
   } catch { return { persisted: false, reason: "database_write_failed" }; }
 };
 
-const loadKnowledgeArticles = async (env: Env, section?: string, limit = 30) => {
+const loadKnowledgeArticles = async (env: Env, section?: string, limit = 30, language = "ar") => {
   if (!env.DB) return [];
   try {
     if (!await ensureKnowledgeTables(env)) return [];
     const safeLimit = Math.max(1, Math.min(100, limit));
-    const result = section ? await env.DB.prepare("SELECT slug, query, section, language, title, summary, body, title_en, summary_en, body_en, sources_json, status, created_at, updated_at FROM knowledge_articles WHERE section = ? ORDER BY created_at DESC LIMIT ?").bind(section, safeLimit).all() : await env.DB.prepare("SELECT slug, query, section, language, title, summary, body, title_en, summary_en, body_en, sources_json, status, created_at, updated_at FROM knowledge_articles ORDER BY created_at DESC LIMIT ?").bind(safeLimit).all();
+    const lang = language === "en" ? "en" : "ar";
+    const result = section
+      ? await env.DB.prepare("SELECT slug, query, section, language, title, summary, body, title_en, summary_en, body_en, sources_json, status, created_at, updated_at FROM knowledge_articles WHERE section = ? AND language = ? ORDER BY created_at DESC LIMIT ?").bind(section, lang, safeLimit).all()
+      : await env.DB.prepare("SELECT slug, query, section, language, title, summary, body, title_en, summary_en, body_en, sources_json, status, created_at, updated_at FROM knowledge_articles WHERE language = ? ORDER BY created_at DESC LIMIT ?").bind(lang, safeLimit).all();
     return (result.results || []).map((row: any) => ({ id: row.slug, query: row.query, section: row.section, language: row.language || "ar", title: row.title, summary: row.summary, enTitle: row.title_en || undefined, enSummary: row.summary_en || undefined, enBody: row.body_en ? String(row.body_en).split(/\n+/).filter(Boolean) : undefined, body: String(row.body || "").split(/\n+/).filter(Boolean), sources: (() => { try { return JSON.parse(row.sources_json || "[]"); } catch { return []; } })(), status: row.status, createdAt: row.created_at, updatedAt: row.updated_at }));
   } catch { return []; }
 };
@@ -980,12 +983,12 @@ const buildEvidenceArticleFallback = (query: string, results: any[]) => {
   return null;
 };
 
-const articleQualityCheck = (text: string, query: string, intent: string, evidence: string) => {
+const articleQualityCheck = (text: string, query: string, intent: string, evidence: string, language = "ar") => {
   const normalized = normalizeGeneratedText(text);
   const paragraphs = normalized.split(/\n+/).map((x: string) => x.trim()).filter(Boolean);
   const headings = paragraphs.filter((x: string) =>
     /^#{1,3}\s+/.test(x) ||
-    /^(?:المقدمة|الخلاصة|النتيجة|الأسباب|الخطوات|طريقة|كيفية|لماذا|كيف|ما هو|ما هي|التفاصيل|الخلفية|التاريخ|الآثار|الأهمية|الحل|التشخيص|التحقق|الحدود|الأسئلة الشائعة)\b/i.test(x)
+    /^(?:المقدمة|الخلاصة|النتيجة|الأسباب|الخطوات|طريقة|كيفية|لماذا|كيف|ما هو|ما هي|التفاصيل|الخلفية|التاريخ|الآثار|الأهمية|الحل|التشخيص|التحقق|الحدود|الأسئلة الشائعة|introduction|summary|conclusion|causes|steps|how|why|what|details|background|history|impact|solution|diagnosis|verification|limitations|frequently asked questions|faq)\b/i.test(x)
   );
   const words = normalized.split(/\s+/).filter(Boolean);
   const queryTerms = query.toLowerCase().split(/\s+/).map((x: string) => x.replace(/[^\p{L}\p{N}]+/gu, "")).filter((x: string) => x.length > 2).slice(0, 10);
@@ -1006,6 +1009,12 @@ const articleQualityCheck = (text: string, query: string, intent: string, eviden
     : true;
   const bad = badPatterns.some((re: RegExp) => re.test(normalized));
   const enoughTopic = !queryTerms.length || topicHits >= Math.min(2, queryTerms.length);
+  const arabicChars = (normalized.match(/[\u0600-\u06FF]/g) || []).length;
+  const latinChars = (normalized.match(/[A-Za-z]/g) || []).length;
+  const title = paragraphs[0] || "";
+  const languageContamination = language === "en"
+    ? /[\u0600-\u06FF]/.test(title) || arabicChars > Math.max(18, Math.floor(latinChars * 0.06))
+    : latinChars > Math.max(28, Math.floor(arabicChars * 0.18));
   return {
     ok: words.length >= minimumWords &&
       headings.length >= requiredHeadings &&
@@ -1016,6 +1025,7 @@ const articleQualityCheck = (text: string, query: string, intent: string, eviden
       headings.length < requiredHeadings ? "too_few_sections" : null,
       !enoughTopic ? "weak_topic_match" : null,
       repeated ? "repeated_paragraphs" : null,
+      languageContamination ? "wrong_output_language" : null,
       rawEvidenceOverlap ? "source_text_overlap" : null,
       bad ? "language_or_source_contamination" : null,
       !hasSteps ? "missing_steps" : null
@@ -1075,19 +1085,19 @@ const generateKnowledgeArticle = async (env: Env, language: string, query: strin
 
   try {
     let text = await runOnce();
-    let quality = articleQualityCheck(text, query, intent, evidence);
+    let quality = articleQualityCheck(text, query, intent, evidence, language);
     if (!quality.ok) {
       text = await runOnce(language === "en"
         ? "Rewrite the article from scratch. Previous validation failures: " + quality.reasons.join(", ") + ". Preserve supported facts. Write a complete coherent article, answer the question directly, use clear headings and meaningful paragraphs, and never copy source snippets verbatim."
         : "أعد كتابة المقال من الصفر. أسباب الرفض السابقة: " + quality.reasons.join(", ") + ". لا تغيّر الحقائق المدعومة. اجعل النص مقالًا كاملًا مترابطًا، وأجب السؤال مباشرة، واستخدم عناوين واضحة وفقرات ذات معنى. لا تنقل أي مقتطف حرفيًا.");
-      quality = articleQualityCheck(text, query, intent, evidence);
+      quality = articleQualityCheck(text, query, intent, evidence, language);
     }
     if (!text || !quality.ok) {
       const reasons = quality.reasons.join(", ");
       text = await runOnce(language === "en"
         ? "Write a final new version from scratch. It must be at least 180 words, directly answer the question, contain an introduction, substantive details, and a conclusion, and be entirely in English. Previous validation failures: " + reasons + ". Do not mention these instructions in the article."
         : "اكتب نسخة نهائية جديدة من الصفر. لا تلتزم بتنسيق Markdown إذا لم يكن مناسبًا؛ الأهم أن تكون مادة عربية واضحة ومترابطة لا تقل عن 180 كلمة، تجيب السؤال مباشرة، وتحتوي على مقدمة وتفاصيل وخلاصة. أسباب الفشل السابقة: " + reasons + ". لا تذكر هذه التعليمات داخل المقال.");
-      quality = articleQualityCheck(text, query, intent, evidence);
+      quality = articleQualityCheck(text, query, intent, evidence, language);
     }
     if (!text || !quality.ok) return buildEvidenceArticleFallback(query, results);
     const lines = text.split(/\r?\n/).map((x: string) => normalizeGeneratedText(x)).filter(Boolean);
@@ -1967,7 +1977,7 @@ export default {
       }
       const section = sectionForIntent(queryIntent(q), q);
       const slug = await slugForQuery(q, lang);
-      const article = { slug, query: q, section, title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
+      const article = { slug, query: q, section, language: lang, title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
       const persistence = await saveKnowledgeArticle(env, article);
       if (persistence.persisted) await refreshKnowledgeGraph(env, article);
       return json({ status: "ok", query: q, section, persisted: persistence.persisted, article: { id: slug, title: article.title, summary: article.summary, body: article.body, source: article.sources[0]?.source || "BAYAN evidence", date: article.sources[0]?.date || null, rank } });
@@ -2212,22 +2222,24 @@ export default {
 
     if (path === "/api/recommendations") {
       const visitorId = cleanText(url.searchParams.get("visitorId"), 100);
+      const language = url.searchParams.get("lang") === "en" ? "en" : "ar";
       if (!env.DB || !visitorId) return json({ status: "ok", articles: [] });
       try {
         const rows = await env.DB.prepare("SELECT section, SUM(weight) AS score FROM visitor_interest_events WHERE visitor_id=? GROUP BY section ORDER BY score DESC LIMIT 5").bind(visitorId).all();
         const sections = (rows.results || []).map((x:any)=>String(x.section));
         if (!sections.length) return json({ status: "ok", articles: [] });
         const placeholders = sections.map(()=>"?").join(",");
-        const sql = "SELECT slug,section,title,summary,updated_at FROM knowledge_articles WHERE status='PUBLISHED' AND section IN ("+placeholders+") ORDER BY updated_at DESC LIMIT 12";
-        const result = await env.DB.prepare(sql).bind(...sections).all();
+        const sql = "SELECT slug,section,language,title,summary,title_en,summary_en,updated_at FROM knowledge_articles WHERE status='PUBLISHED' AND language=? AND section IN ("+placeholders+") ORDER BY updated_at DESC LIMIT 12";
+        const result = await env.DB.prepare(sql).bind(language, ...sections).all();
         return json({ status: "ok", interests: rows.results || [], articles: result.results || [] });
       } catch { return json({ status: "database_error", articles: [] }, 503); }
     }
 
     if (path === "/api/saved" && request.method === "GET") {
       const visitorId = cleanText(url.searchParams.get("visitorId"), 100);
+      const language = url.searchParams.get("lang") === "en" ? "en" : "ar";
       if (!visitorId || !env.DB || !await ensureUserFeatureTables(env)) return json({ status: "ok", articles: [] });
-      try { const result = await env.DB.prepare("SELECT a.slug,a.section,a.title,a.summary,a.updated_at FROM saved_articles s JOIN knowledge_articles a ON a.slug=s.article_slug WHERE s.visitor_id=? AND a.status='PUBLISHED' ORDER BY s.created_at DESC LIMIT 100").bind(visitorId).all(); return json({ status:"ok", articles:result.results||[] }); }
+      try { const result = await env.DB.prepare("SELECT a.slug,a.section,a.language,a.title,a.summary,a.title_en,a.summary_en,a.updated_at FROM saved_articles s JOIN knowledge_articles a ON a.slug=s.article_slug WHERE s.visitor_id=? AND a.status='PUBLISHED' AND a.language=? ORDER BY s.created_at DESC LIMIT 100").bind(visitorId, language).all(); return json({ status:"ok", articles:result.results||[] }); }
       catch { return json({ status:"database_error",articles:[] },503); }
     }
     if (path === "/api/saved" && request.method === "POST") {
@@ -2332,7 +2344,7 @@ export default {
       const now = new Date().toISOString();
       let publishedArticle: any = null;
       if (status === "VERIFIED") {
-        const articleSlug = await slugForQuery(String(current.title) + "\n" + String(current.body));
+        const articleSlug = await slugForQuery(String(current.title) + "\n" + String(current.body), "ar");
         const rawSource = cleanText(current.source, 500);
         const source = rawSource ? {
           source: rawSource,
@@ -2374,7 +2386,8 @@ export default {
       const section = cleanText(url.searchParams.get("section"), 80) || undefined;
       const id = cleanText(url.searchParams.get("id"), 120) || undefined;
       const limit = Number(url.searchParams.get("limit") || 30);
-      const articles = await loadKnowledgeArticles(env, section, limit);
+      const language = url.searchParams.get("lang") === "en" ? "en" : "ar";
+      const articles = await loadKnowledgeArticles(env, section, limit, language);
       return json({ status: "ok", section: section || null, article: id ? articles.find((x: any) => x.id === id) || null : null, articles });
     }
     if (path === "/api/ai" && request.method === "POST") {
