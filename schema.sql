@@ -16,12 +16,23 @@ CREATE TABLE IF NOT EXISTS knowledge_articles (
   language TEXT NOT NULL DEFAULT 'ar',
   title_en TEXT,
   summary_en TEXT,
-  body_en TEXT
+  body_en TEXT,
+  hero_image_url TEXT,
+  hero_image_alt TEXT,
+  hero_image_credit TEXT,
+  hero_image_source TEXT,
+  hero_image_license TEXT,
+  hero_image_status TEXT NOT NULL DEFAULT 'NONE',
+  source_url TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_knowledge_articles_section_created
   ON knowledge_articles(section, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_knowledge_articles_query
   ON knowledge_articles(query);
+CREATE INDEX IF NOT EXISTS idx_knowledge_articles_image_status
+  ON knowledge_articles(hero_image_status, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_knowledge_articles_section_status_updated
+  ON knowledge_articles(section, status, updated_at DESC);
 CREATE TABLE IF NOT EXISTS knowledge_entities (
   entity_key TEXT PRIMARY KEY, entity_type TEXT NOT NULL, label TEXT NOT NULL, updated_at TEXT NOT NULL
 );
