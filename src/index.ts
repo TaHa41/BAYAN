@@ -932,6 +932,16 @@ const ensureKnowledgeTables = async (env: Env) => {
     try { await env.DB.prepare("ALTER TABLE knowledge_articles ADD COLUMN summary_en TEXT").run(); } catch {}
     try { await env.DB.prepare("ALTER TABLE knowledge_articles ADD COLUMN body_en TEXT").run(); } catch {}
     await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_knowledge_articles_language_status ON knowledge_articles(language,status,updated_at DESC)").run();
+    for (const sql of [
+      "ALTER TABLE knowledge_articles ADD COLUMN hero_image_url TEXT",
+      "ALTER TABLE knowledge_articles ADD COLUMN hero_image_alt TEXT",
+      "ALTER TABLE knowledge_articles ADD COLUMN hero_image_credit TEXT",
+      "ALTER TABLE knowledge_articles ADD COLUMN hero_image_source TEXT",
+      "ALTER TABLE knowledge_articles ADD COLUMN hero_image_license TEXT",
+      "ALTER TABLE knowledge_articles ADD COLUMN hero_image_status TEXT NOT NULL DEFAULT 'NONE'",
+      "ALTER TABLE knowledge_articles ADD COLUMN source_url TEXT"
+    ]) { try { await env.DB.prepare(sql).run(); } catch {} }
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_knowledge_articles_image_status ON knowledge_articles(hero_image_status, updated_at DESC)").run();
     await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_knowledge_articles_status_updated ON knowledge_articles(status, updated_at DESC)").run();
     return true;
   } catch { return false; }
@@ -988,13 +998,20 @@ const saveKnowledgeArticle = async (env: Env, article: any) => {
     if (!await ensureKnowledgeTables(env)) return { persisted: false, reason: "knowledge_schema_unavailable" };
     const bodyText = article.body.join("\n");
     const sourcesJson = JSON.stringify(article.sources || []);
+    const hero = article.heroImage || null;
+    const heroUrl = hero?.url || null;
+    const heroAlt = cleanText(hero?.alt || article.title || "", 240) || null;
+    const heroCredit = cleanText(hero?.credit || "", 160) || null;
+    const heroSource = cleanText(hero?.sourceUrl || article.sourceUrl || "", 2000) || null;
+    const heroLicense = cleanText(hero?.license || "", 160) || null;
+    const heroStatus = heroUrl ? cleanText(hero?.rightsStatus || "publisher_source", 40) : "NONE";
     const existing = await env.DB.prepare("SELECT title,summary,body,title_en,summary_en,body_en FROM knowledge_articles WHERE slug=?").bind(article.slug).first() as any;
     const language = article.language === "en" ? "en" : "ar";
     const titleEn = language === "en" ? article.title : null;
     const summaryEn = language === "en" ? article.summary : null;
     const bodyEn = language === "en" ? bodyText : null;
-    const sql = "INSERT INTO knowledge_articles (slug, query, section, language, title, summary, body, title_en, summary_en, body_en, sources_json, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?) ON CONFLICT(slug) DO UPDATE SET section=excluded.section, language=excluded.language, title=excluded.title, summary=excluded.summary, body=excluded.body, title_en=excluded.title_en, summary_en=excluded.summary_en, body_en=excluded.body_en, sources_json=excluded.sources_json, status='PUBLISHED', updated_at=excluded.updated_at";
-    await env.DB.prepare(sql).bind(article.slug, article.query, article.section, language, article.title, article.summary, bodyText, titleEn, summaryEn, bodyEn, sourcesJson, article.createdAt, article.createdAt).run();
+    const sql = "INSERT INTO knowledge_articles (slug, query, section, language, title, summary, body, title_en, summary_en, body_en, sources_json, status, hero_image_url, hero_image_alt, hero_image_credit, hero_image_source, hero_image_license, hero_image_status, source_url, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PUBLISHED', ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(slug) DO UPDATE SET section=excluded.section, language=excluded.language, title=excluded.title, summary=excluded.summary, body=excluded.body, title_en=excluded.title_en, summary_en=excluded.summary_en, body_en=excluded.body_en, sources_json=excluded.sources_json, hero_image_url=excluded.hero_image_url, hero_image_alt=excluded.hero_image_alt, hero_image_credit=excluded.hero_image_credit, hero_image_source=excluded.hero_image_source, hero_image_license=excluded.hero_image_license, hero_image_status=excluded.hero_image_status, source_url=excluded.source_url, status='PUBLISHED', updated_at=excluded.updated_at";
+    await env.DB.prepare(sql).bind(article.slug, article.query, article.section, language, article.title, article.summary, bodyText, titleEn, summaryEn, bodyEn, sourcesJson, heroUrl, heroAlt, heroCredit, heroSource, heroLicense, heroStatus, cleanText(article.sourceUrl || "", 2000) || null, article.createdAt, article.createdAt).run();
     if (await ensureUserFeatureTables(env) && (!existing || existing.title !== article.title || existing.body !== bodyText || existing.summary !== article.summary)) {
       await env.DB.prepare("INSERT INTO article_revisions(article_slug,title,summary,body,sources_json,created_at) VALUES(?,?,?,?,?,?)").bind(article.slug,article.title,article.summary,bodyText,sourcesJson,article.createdAt).run();
     }
@@ -1009,9 +1026,9 @@ const loadKnowledgeArticles = async (env: Env, section?: string, limit = 30, lan
     const safeLimit = Math.max(1, Math.min(100, limit));
     const lang = language === "en" ? "en" : "ar";
     const result = section
-      ? await env.DB.prepare("SELECT slug, query, section, language, title, summary, body, title_en, summary_en, body_en, sources_json, status, created_at, updated_at FROM knowledge_articles WHERE section = ? AND language = ? ORDER BY created_at DESC LIMIT ?").bind(section, lang, safeLimit).all()
-      : await env.DB.prepare("SELECT slug, query, section, language, title, summary, body, title_en, summary_en, body_en, sources_json, status, created_at, updated_at FROM knowledge_articles WHERE language = ? ORDER BY created_at DESC LIMIT ?").bind(lang, safeLimit).all();
-    return (result.results || []).map((row: any) => ({ id: row.slug, query: row.query, section: row.section, language: row.language || "ar", title: row.title, summary: row.summary, enTitle: row.title_en || undefined, enSummary: row.summary_en || undefined, enBody: row.body_en ? String(row.body_en).split(/\n+/).filter(Boolean) : undefined, body: String(row.body || "").split(/\n+/).filter(Boolean), sources: (() => { try { return JSON.parse(row.sources_json || "[]"); } catch { return []; } })(), status: row.status, createdAt: row.created_at, updatedAt: row.updated_at }));
+      ? await env.DB.prepare("SELECT slug, query, section, language, title, summary, body, title_en, summary_en, body_en, sources_json, status, hero_image_url, hero_image_alt, hero_image_credit, hero_image_source, hero_image_license, hero_image_status, source_url, created_at, updated_at FROM knowledge_articles WHERE section = ? AND language = ? ORDER BY created_at DESC LIMIT ?").bind(section, lang, safeLimit).all()
+      : await env.DB.prepare("SELECT slug, query, section, language, title, summary, body, title_en, summary_en, body_en, sources_json, status, hero_image_url, hero_image_alt, hero_image_credit, hero_image_source, hero_image_license, hero_image_status, source_url, created_at, updated_at FROM knowledge_articles WHERE language = ? ORDER BY created_at DESC LIMIT ?").bind(lang, safeLimit).all();
+    return (result.results || []).map((row: any) => ({ id: row.slug, query: row.query, section: row.section, language: row.language || "ar", title: row.title, summary: row.summary, enTitle: row.title_en || undefined, enSummary: row.summary_en || undefined, enBody: row.body_en ? String(row.body_en).split(/\n+/).filter(Boolean) : undefined, body: String(row.body || "").split(/\n+/).filter(Boolean), sources: (() => { try { return JSON.parse(row.sources_json || "[]"); } catch { return []; } })(), status: row.status, createdAt: row.created_at, updatedAt: row.updated_at, image: row.hero_image_url || undefined, imageAlt: row.hero_image_alt || undefined, imageCredit: row.hero_image_credit || undefined, imageSource: row.hero_image_source || undefined, imageLicense: row.hero_image_license || undefined, imageStatus: row.hero_image_status || "NONE", sourceUrl: row.source_url || undefined }));
   } catch { return []; }
 };
 
