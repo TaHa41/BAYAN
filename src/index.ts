@@ -1490,7 +1490,7 @@ const rssNewsSearch = async (query = "", language = "ar") => {
     const key = (item.url || item.title).toLowerCase();
     if (!unique.has(key)) unique.set(key, item);
   }
-  return rerankResults(query, Array.from(unique.values()).slice(0, 30)).slice(0, 12);
+  const ranked = rerankResults(query, Array.from(unique.values()).slice(0, 30)).slice(0, 12);\n  const enriched = await Promise.all(ranked.map(async (item: any, index: number) => {\n    if (item.image || !item.url || index >= 10) return item;\n    const image = await rssArticleImage(item.url);\n    return image ? { ...item, image } : item;\n  }));\n  return enriched;
 };
 
 const wikimediaEnterpriseLookup = async (env: Env, query: string, language = "ar") => {
@@ -2802,7 +2802,8 @@ export default {
               publishedAt: item.date || null,
               source: { name: item.source },
               image: item.image || null,
-              url: item.url || null
+              url: item.url || null,
+              articleReady: true
             })),
             totalArticles: rss.length
           });
@@ -2827,6 +2828,30 @@ export default {
       } catch (error) {
         await reportBayanError(env, "api/news", error, { repair: "تمت محاولة GNews ثم RSS ثم البحث الداخلي قبل إعلان فشل مزود الأخبار." });
         return json({ status: "provider_error", provider: "GNews/Search", articles: [], totalArticles: 0, error: safeErrorMessage(error) }, 502);
+      }
+    }
+
+    if (path === "/api/news/article") {
+      if (!allowRequest(request, 10)) return json({ status: "rate_limited" }, 429);
+      try {
+        const title = cleanText(url.searchParams.get("title"), 500);
+        const sourceUrl = cleanText(url.searchParams.get("url"), 2000) || null;
+        const image = cleanText(url.searchParams.get("image"), 2000) || null;
+        const lang = (url.searchParams.get("lang") || "ar").toLowerCase() === "en" ? "en" : "ar";
+        if (!title) return json({ error: "title_required" }, 400);
+        const search = await internalSearch(title, env);
+        if (!search.ok || !search.results.length) return json({ error: "article_source_unavailable", status: search.status || "no_results" }, 503);
+        const evidence = search.results.slice(0, 12).map((item: any, index: number) => index === 0 && image ? { ...item, image } : item);
+        const generated = await generateKnowledgeArticle(env, lang, title, evidence);
+        if (!generated) return json({ error: "full_article_generation_unavailable" }, 503);
+        const slug = await slugForQuery("news:" + title, lang);
+        const article = { slug, query: title, section: "news", language: lang, title: generated.title, summary: generated.summary, body: generated.body, sources: evidence.map(withoutUrl), createdAt: new Date().toISOString() };
+        const persistence = await saveKnowledgeArticle(env, article);
+        if (persistence.persisted) await refreshKnowledgeGraph(env, article);
+        return json({ status: "ok", persisted: persistence.persisted, article: { id: slug, section: "news", title: article.title, summary: article.summary, body: article.body, sources: article.sources, sourceUrl, image: image || article.sources.find((x: any) => x?.image)?.image || null } });
+      } catch (error) {
+        await reportBayanError(env, "api/news/article", error);
+        return json({ error: "news_article_failed" }, 502);
       }
     }
 
