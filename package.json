@@ -5,8 +5,8 @@
   "description": "BAYAN | بيان — Arabic/English information and knowledge platform",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev",
-    "build": "wrangler deploy --dry-run",
+    "dev": "^4.146.0 dev",
+    "build": "^4.146.0 deploy --dry-run",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "guards": "node scripts/static-guards.mjs",
@@ -16,7 +16,7 @@
     "@cloudflare/workers-types": "^5.20261003.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3",
-    "wrangler": "^4.146.0",
+    "^4.146.0": "^4.146.0",
     "@types/node": "^26.4.0"
   }
 }
