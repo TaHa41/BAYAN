@@ -179,6 +179,27 @@ app.innerHTML='<section class="page"><div class="eyebrow">BAYAN CONTROL CENTER</
 '<div id="content" class="card"><h3>'+(isEn?"Content & article control":"التحكم في المحتوى والمقالات")+'</h3><p class="muted">'+(isEn?"Inspect published/draft articles, repair missing hero images, and control publication status.":"عرض المقالات المنشورة والمسودات، إصلاح الصور الرئيسية الناقصة، والتحكم في حالة النشر.")+'</p><div class="actions"><select id="managerArticleStatus" class="select"><option value="">'+(isEn?"All statuses":"كل الحالات")+'</option><option value="PUBLISHED">PUBLISHED</option><option value="DRAFT">DRAFT</option><option value="ARCHIVED">ARCHIVED</option></select><button id="managerArticlesLoad" class="primary" type="button">'+(isEn?"Load articles":"عرض المقالات")+'</button></div><div id="managerArticles"></div></div>'+
 '<div class="card"><h3>'+(isEn?"News & image health":"صحة الأخبار والصور")+'</h3><div class="actions"><button id="newsDiagnostics" class="secondary" type="button">'+(isEn?"Check news":"فحص الأخبار")+'</button><button id="auditHistory" class="secondary" type="button">'+(isEn?"Audit history":"سجل الفحوصات")+'</button></div><div id="newsHealthPanel" class="grid"></div></div>'+
 '<div id="analytics" class="manager-anchor"></div><div id="analyticsPanel"></div></section>';
+const managerMenuItems=[
+["manager","⚙","لوحة التحكم","Dashboard"],
+["ai-repair","✦","BAYAN AI","BAYAN AI"],
+["content","▤","المحتوى والمقالات","Content & Articles"],
+["contributions","＋","المساهمات","Contributions"],
+["repairs","⌁","الإصلاحات","Repairs"],
+["manager-news","◉","الأخبار والصور","News & Images"],
+["analytics","▥","الإحصاءات","Analytics"],
+["telegram","➤","Telegram","Telegram"]
+];
+const managerNav=document.createElement("div");
+managerNav.className="manager-nav-wrap";
+managerNav.innerHTML='<button id="managerMenuBtn" class="manager-menu-btn" type="button" aria-expanded="false" aria-controls="managerSideNav">☰ <span>'+(isEn?"Management menu":"قائمة الإدارة")+'</span></button><div id="managerSideNav" class="manager-side-nav" aria-hidden="true"><div class="manager-side-head"><strong>'+(isEn?"BAYAN Manager":"إدارة بيان")+'</strong><button id="managerSideClose" class="text-btn" type="button" aria-label="'+(isEn?"Close":"إغلاق")+'">×</button></div><nav>'+managerMenuItems.map(x=>'<a href="#'+x[0]+'" data-manager-target="'+x[0]+'"><span class="manager-nav-icon">'+x[1]+'</span><span>'+(isEn?x[3]:x[2])+'</span></a>').join("")+'</nav></div><div id="managerNavOverlay" class="manager-nav-overlay" hidden></div>';
+document.querySelector("#app .page")?.prepend(managerNav);
+const managerMenu=document.querySelector("#managerSideNav"),managerBtn=document.querySelector("#managerMenuBtn"),managerOverlay=document.querySelector("#managerNavOverlay");
+const closeManagerMenu=()=>{managerMenu?.classList.remove("open");managerMenu?.setAttribute("aria-hidden","true");if(managerBtn)managerBtn.setAttribute("aria-expanded","false");if(managerOverlay)managerOverlay.hidden=true};
+const openManagerMenu=()=>{managerMenu?.classList.add("open");managerMenu?.setAttribute("aria-hidden","false");if(managerBtn)managerBtn.setAttribute("aria-expanded","true");if(managerOverlay)managerOverlay.hidden=false};
+managerBtn?.addEventListener("click",()=>managerMenu?.classList.contains("open")?closeManagerMenu():openManagerMenu());
+document.querySelector("#managerSideClose")?.addEventListener("click",closeManagerMenu);
+managerOverlay?.addEventListener("click",closeManagerMenu);
+managerMenu?.querySelectorAll("a").forEach(a=>a.addEventListener("click",()=>{closeManagerMenu();}));
 const token=document.querySelector("#reviewToken"),state=document.querySelector("#reviewState");
 try{const saved=sessionStorage.getItem("bayan:review-token");if(saved)token.value=saved;}catch{}
 const auth=()=>token.value.trim();
