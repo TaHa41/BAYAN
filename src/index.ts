@@ -893,6 +893,15 @@ const managerAuthorized = (request: Request, env: Env) => {
 
 const managerAuthError = (env: Env) => env.BAYAN_AI_MANAGER_TOKEN ? "manager_token_invalid" : "manager_token_not_configured";
 
+const ensureNewsCacheTable = async (env: Env) => {
+  if (!env.DB) return false;
+  try {
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS news_cache (cache_key TEXT PRIMARY KEY, language TEXT NOT NULL, provider TEXT NOT NULL, articles_json TEXT NOT NULL, updated_at TEXT NOT NULL)").run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_news_cache_language_updated ON news_cache(language, updated_at DESC)").run();
+    return true;
+  } catch { return false; }
+};
+
 const ensureKnowledgeTables = async (env: Env) => {
   if (!env.DB) return false;
   try {
@@ -3438,7 +3447,11 @@ export default {
                 image: typeof article.image === "string" ? article.image : null,
                 url: typeof article.url === "string" ? article.url : null
               }));
-              if (articles.length) return json({ status: "ok", provider: "GNews", articles, totalArticles: data.totalArticles || articles.length });
+              if (articles.length) {
+                await ensureNewsCacheTable(env);
+                try { await env.DB?.prepare("INSERT OR REPLACE INTO news_cache(cache_key,language,provider,articles_json,updated_at) VALUES(?,?,?,?,?)").bind("top:"+lang,lang,"GNews",JSON.stringify(articles),new Date().toISOString()).run(); } catch {}
+                return json({ status: "ok", provider: "GNews", articles, totalArticles: data.totalArticles || articles.length });
+              }
             }
           } catch {}
         }
@@ -3446,23 +3459,19 @@ export default {
         const searchQuery = q || (lang === "ar" ? "أحدث الأخبار اليوم" : "latest verified news today");
         const rss = await rssNewsSearch(q, lang);
         if (rss.length) {
-          const enrichedRss = await enrichNewsImages(rss.slice(0, 10));
-          return json({
-            status: "ok",
-            provider: "Google News RSS",
-            articles: enrichedRss.map((item: any) => ({
-              title: item.title,
-              description: item.snippet,
-              content: item.snippet,
-              publishedAt: item.date || null,
-              source: { name: item.source },
-              image: item.image || null,
-              imageMeta: item.imageMeta || null,
-              url: item.url || null,
-              articleReady: true
-            })),
-            totalArticles: enrichedRss.length
-          });
+          const articles = rss.slice(0, 10).map((item: any) => ({
+            title: item.title,
+            description: item.snippet,
+            content: item.snippet,
+            publishedAt: item.date || null,
+            source: { name: item.source },
+            image: item.image || null,
+            url: item.url || null,
+            articleReady: true
+          }));
+          await ensureNewsCacheTable(env);
+          try { await env.DB?.prepare("INSERT OR REPLACE INTO news_cache(cache_key,language,provider,articles_json,updated_at) VALUES(?,?,?,?,?)").bind("top:"+lang,lang,"Google News RSS",JSON.stringify(articles),new Date().toISOString()).run(); } catch {}
+          return json({ status: "ok", provider: "Google News RSS", articles, totalArticles: articles.length });
         }
         const search = await internalSearch(searchQuery, env);
         if (search.ok && search.results.length) {
@@ -3502,6 +3511,14 @@ export default {
             totalArticles: fallbackRss.length
           });
         }
+        await ensureNewsCacheTable(env);
+        try {
+          const cached = await env.DB?.prepare("SELECT provider,articles_json,updated_at FROM news_cache WHERE cache_key=? AND language=?").bind("top:"+lang,lang).first<any>();
+          if (cached?.articles_json) {
+            const articles = JSON.parse(cached.articles_json);
+            return json({ status: "stale_cache", provider: cached.provider, cacheUpdatedAt: cached.updated_at, articles, totalArticles: Array.isArray(articles) ? articles.length : 0, warning: "LIVE_PROVIDER_UNAVAILABLE_USING_LAST_KNOWN_GOOD_NEWS" });
+          }
+        } catch {}
         return json({ status: "provider_unavailable", provider: "GNews/RSS/Search", articles: [], totalArticles: 0 }, 503);
       } catch (error) {
         await reportBayanError(env, "api/news", error, { repair: "تمت محاولة GNews ثم RSS ثم البحث الداخلي قبل إعلان فشل مزود الأخبار." });
