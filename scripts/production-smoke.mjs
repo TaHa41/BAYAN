@@ -108,6 +108,7 @@ try{
     const visibleArabic=/[\u0600-\u06FF]/.test(visibleHtml);
     const jsonLdArabic=[...html.matchAll(/<script[^>]+type=["\']application\/ld\+json["\'][^>]*>([\s\S]*?)<\/script>/gi)].some((m)=>/[\u0600-\u06FF]/.test(m[1]||""));
     const englishFooterLinks=[...html.matchAll(/<a[^>]+href="([^"]+\?lang=en)"[^>]*>/gi)].map((m)=>m[1]);
+    const footerLinksOk=["/about?lang=en","/methodology?lang=en","/contribute?lang=en","/privacy?lang=en","/terms?lang=en","/contact?lang=en","/saved?lang=en","/tools?lang=en","/review?lang=en"].every((x)=>englishFooterLinks.includes(x));
     const shellLeak=shellLeaks.length>0 || visibleArabic || jsonLdArabic;
     const ok=response.ok && htmlLanguageOk && manifestIsEnglish && titleOk && !shellLeak && footerLinksOk;
     console.log((ok?"PASS":"FAIL")+" English route "+route);
