@@ -1654,7 +1654,7 @@ const internalSearch = async (query: string, env: Env) => {
     .split(",")
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
-  const providerOrder = [...configuredSearchProviders, ...SEARCH_PROVIDER_CHAIN, "gnews", "serpapi", "cloudflare_web_search", "google_news_rss", "wikipedia"];
+  const providerOrder = [...configuredSearchProviders, ...SEARCH_PROVIDER_CHAIN, "gnews", "serpapi", "cloudflare_web_search", "google_news_rss", "wikipedia", "wikidata"];
   const providers = Array.from(new Set(providerOrder.map((provider) => {
     if (provider === "ceramic") return env.AI_SEARCH ? "cloudflare_ai_search" : null;
     if (provider === "exa" || provider === "linkup") return env.AI?.websearch ? "cloudflare_web_search:" + provider : null;
@@ -1663,6 +1663,7 @@ const internalSearch = async (query: string, env: Env) => {
     if (provider === "cloudflare_web_search") return env.AI?.websearch ? "cloudflare_web_search:exa" : null;
     if (provider === "google_news_rss") return "google_news_rss";
     if (provider === "wikipedia") return "wikipedia";
+    if (provider === "wikidata") return "wikidata";
     return null;
   }).filter(Boolean))) as string[];
   const attempts: any[] = [];
@@ -1721,6 +1722,17 @@ const internalSearch = async (query: string, env: Env) => {
         })).filter((x: any) => x.title && x.snippet);
       }
       if (provider === "google_news_rss") return (await rssNewsSearch(researchQuery, language)).map((x: any) => ({ ...x, provider: "google_news_rss" }));
+      if (provider === "wikidata") {
+        const api = "https://www.wikidata.org/w/api.php?action=wbsearchentities&search=" + encodeURIComponent(researchQuery) + "&language=" + language + "&uselang=" + language + "&format=json&limit=8";
+        const response = await fetch(api, { headers: { "user-agent": "BAYAN/1.0 (knowledge search)" }, signal: AbortSignal.timeout(5000) });
+        if (!response.ok) throw new Error("http_" + response.status);
+        const data = await response.json() as any;
+        return (Array.isArray(data?.search) ? data.search : []).map((item: any, index: number) => ({
+          rank: index + 1, provider: "wikidata", title: cleanText(item?.label || item?.match?.text, 220),
+          source: "Wikidata", date: null, snippet: cleanText(item?.description || item?.match?.text, 700),
+          url: typeof item?.concepturi === "string" ? item.concepturi : null
+        })).filter((x: any) => x.title && x.snippet);
+      }
       if (provider === "wikipedia") return (await wikipediaSearch(researchQuery, language)).map((x: any) => ({ ...x, provider: "wikipedia" }));
       return [];
     } catch (error) {
