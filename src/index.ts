@@ -3038,7 +3038,7 @@ export default {
     }
 
     if (path === "/sitemap.xml") {
-      const routes = ["/", "/egypt", "/arab", "/world", "/science", "/economy", "/politics", "/technology", "/health", "/history-culture", "/people", "/sports", "/travel", "/arts", "/news", "/trending", "/prices", "/about", "/methodology", "/privacy", "/terms", "/contact", "/article/sky-blue", "/article/password-security", "/article/inflation-explained", "/article/health-information", "/article/sports-statistics", "/article/travel-checklist", "/article/ai-evidence", "/article/history-context"];
+      const routes = ["/", "/egypt", "/arab", "/world", "/science", "/economy", "/politics", "/technology", "/health", "/history-culture", "/people", "/sports", "/travel", "/arts", "/news", "/trending", "/prices", "/about", "/methodology", "/privacy", "/terms", "/contact", "/article/sky-blue", "/article/password-security", "/article/inflation-explained", "/article/health-information", "/article/sports-statistics", "/article/travel-checklist", "/article/ai-evidence", "/article/history-context", "/article/egypt-basics", "/article/arab-world-overview", "/article/world-events-guide", "/article/political-news-reading", "/article/people-profiles", "/article/arts-context", "/article/trending-data"];
       const xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
       let dynamicRows: any[] = [];
       if (env.DB) {
