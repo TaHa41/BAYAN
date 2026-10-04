@@ -61,7 +61,7 @@ jobs:
 
       - name: AI repair diagnosis
         id: diagnosis
-        if: steps.smoke.outcome == 'failure' || (steps.ai.outcome == 'failure' && steps.ai_classification.outputs.quota != 'true')
+        if: steps.smoke.outcome == 'failure' || steps.ai.outcome == 'failure'
         continue-on-error: true
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
