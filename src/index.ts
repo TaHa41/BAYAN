@@ -2757,10 +2757,7 @@ export default {
         await env.DB.prepare("INSERT INTO repair_jobs(signature,context,error_text,status,phase,risk_level,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(signature) DO UPDATE SET context=excluded.context,error_text=excluded.error_text,status='QUEUED',phase='DETECTED',next_attempt_at=NULL,updated_at=excluded.updated_at")
           .bind(signature,context,requestText,"QUEUED","DETECTED","AI_FIX_VERIFY",now,now).run();
         const job=await env.DB.prepare("SELECT id,status,phase,context,created_at,updated_at FROM repair_jobs WHERE signature=?").bind(signature).first<any>();
-        await sendBayanOwnerNotification(env,"طلب جديد من مهندس بيان", "طلب الإدارة:
-"+requestText+"
-
-تم وضعه في Repair Queue ليمر بالتشخيص والإصلاح والتحقق قبل الدمج.");
+        await sendBayanOwnerNotification(env,"طلب جديد من مهندس بيان", "طلب الإدارة:\n"+requestText+"\n\nتم وضعه في Repair Queue ليمر بالتشخيص والإصلاح والتحقق قبل الدمج.");
         return json({status:"queued",job});
       } catch(error) { return json({status:"request_failed",error:safeErrorMessage(error)},400); }
     }
