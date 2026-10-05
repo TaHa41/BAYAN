@@ -2,7 +2,10 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const key = process.env.OPENAI_API_KEY;
-const model = process.env.OPENAI_MODEL || "gpt-6-luna";
+const modelChain = Array.from(new Set([
+  process.env.OPENAI_MODEL || "gpt-6-luna",
+  ...(process.env.OPENAI_FALLBACK_MODELS || "gpt-6.1-sol").split(",").map(x => x.trim()).filter(Boolean)
+]));
 const report = String(process.env.REPAIR_REPORT || "").slice(0, 18000);
 const baseSha = String(process.env.BASE_SHA || exec("git", ["rev-parse", "HEAD"])).trim();
 const branch = "ai-repair/" + baseSha.slice(0, 12);
@@ -36,24 +39,37 @@ function runTests() {
 }
 async function ask(input) {
   if (!key) throw new Error("OPENAI_API_KEY_missing");
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: "Bearer " + key },
-    body: JSON.stringify({
-      model,
-      instructions:
-        "You are BAYAN's autonomous senior software repair engineer. " +
-        "You know BAYAN is a Cloudflare Workers TypeScript application with D1, Workers AI/AI Gateway, AI Search, Cloudflare Assets, GitHub Actions CI/deploy/Guardian, Telegram notifications, multilingual Arabic/English UI, evidence-first search/news/live data, and bounded self-healing. " +
-        "Evidence first. Find the root cause from the supplied incident and repository evidence. " +
-        "Make the smallest reversible patch. Never expose/request/use secrets in the patch. Never weaken authentication, CSP, permissions, security headers, rate limits, evidence verification, or moderation gates. Never delete data or perform destructive migrations. Never invent APIs, bindings, database columns, providers, or dependencies. Prefer deterministic fixes over extra AI calls. " +
-        "Return ONLY a unified git diff in a fenced diff block, or NO_PATCH.",
-      input,
-      store: false
-    })
-  });
-  if (!response.ok) throw new Error("openai_http_" + response.status + ":" + safe(await response.text()));
-  const data = await response.json();
-  return String(data.output_text || "").trim();
+  let lastError = "openai_failed";
+  for (const candidate of modelChain) {
+    try {
+      const response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: "Bearer " + key },
+        signal: AbortSignal.timeout(20000),
+        body: JSON.stringify({
+          model: candidate,
+          instructions:
+            "You are BAYAN's autonomous senior software repair engineer. " +
+            "You know BAYAN is a Cloudflare Workers TypeScript application with D1, Workers AI/AI Gateway, AI Search, Cloudflare Assets, GitHub Actions CI/deploy/Guardian, Telegram notifications, multilingual Arabic/English UI, evidence-first search/news/live data, and bounded self-healing. " +
+            "Evidence first. Find the root cause from the supplied incident and repository evidence. " +
+            "Make the smallest reversible patch. Never expose/request/use secrets in the patch. Never weaken authentication, CSP, permissions, security headers, rate limits, evidence verification, or moderation gates. Never delete data or perform destructive migrations. Never invent APIs, bindings, database columns, providers, or dependencies. Prefer deterministic fixes over extra AI calls. " +
+            "Return ONLY a unified git diff in a fenced diff block, or NO_PATCH.",
+          input,
+          store: false
+        })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        return String(data.output_text || "").trim();
+      }
+      const body = await response.text().catch(() => "");
+      lastError = "openai_http_" + response.status + (body ? ":" + safe(body, 600) : "");
+      if (![408, 409, 429, 500, 502, 503, 504].includes(response.status)) break;
+    } catch (error) {
+      lastError = safe(error?.message || error);
+    }
+  }
+  throw new Error(lastError);
 }
 function extractPatch(value) {
   const match = String(value || "").match(/\`\`\`(?:diff)?\n([\s\S]*?)\`\`\`/);
