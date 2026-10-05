@@ -116,6 +116,10 @@ if (!guardian.includes("steps.ai.outcome == 'failure'")) failures.push("Guardian
 if (!guardian.includes("PIPESTATUS[0]") || !guardian.includes('cat ai-report.txt >> "$GITHUB_OUTPUT"')) failures.push("Guardian does not preserve AI benchmark output when the benchmark exits non-zero");
 if (!guardian.includes("ai-diagnosis.json")) failures.push("Guardian diagnosis artifact missing");
 if (!aiSmoke.includes("EXTERNAL_DEPENDENCY=AI_PROVIDER_QUOTA")) failures.push("AI capability smoke lacks external quota classification");
+const aiAutorepair = read("scripts/ai-autorepair.mjs");
+const aiGuardian = read("scripts/ai-guardian.mjs");
+if (!aiAutorepair.includes("modelChain") || !aiAutorepair.includes("AbortSignal.timeout(20000)")) failures.push("AI autorepair provider failover/timeout missing");
+if (!aiGuardian.includes("modelChain") || !aiGuardian.includes("AbortSignal.timeout(20000)") || !aiGuardian.includes('status: "external_dependency"')) failures.push("AI Guardian provider failover/timeout classification missing");
 if (!guardian.includes("Route AI benchmark incident") || !guardian.includes("EXTERNAL_DEPENDENCY=AI_PROVIDER_QUOTA") || !guardian.includes("gh issue create")) failures.push("Guardian does not separate provider quota from AI regressions");
 
 if (!source.includes('const browserRoutes = ["/", "/news", "/science", "/search?lang=en", "/ai?lang=en", "/trending?lang=en"')) failures.push("browser audit does not cover core English SPA routes");
