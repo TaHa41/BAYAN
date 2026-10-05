@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: bayan-deploy-production
+  group: bayan-deploy-production-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
