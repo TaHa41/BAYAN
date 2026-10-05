@@ -18,11 +18,11 @@ for (const lang of ["ar", "en"]) {
     const res = await fetchWithTimeout(base + "/api/news?lang=" + lang, {redirect:"follow"}, 20000);
     const body = await res.text();
     let data = null; try { data = JSON.parse(body); } catch {}
-    const allowedUnavailable = res.status === 502 || res.status === 503;
     const articles = Array.isArray(data?.articles) ? data.articles : [];
     const shapeOk = articles.every((a) => a && typeof a.title === "string" && typeof a.source?.name === "string");
     const numericLeak = /(?:^|[\\s>])(?:NaN|undefined|null)(?:[\\s<]|$)/i.test(body);
-    const ok = (res.ok && data?.status === "ok" && articles.length > 0 && shapeOk && !numericLeak) || (allowedUnavailable && Array.isArray(data?.articles));
+    const cacheOk = data?.status === "stale_cache" && articles.length > 0 && typeof data?.cacheUpdatedAt === "string";
+    const ok = res.ok && articles.length > 0 && shapeOk && !numericLeak && (data?.status === "ok" || cacheOk);
     console.log((ok?"PASS":"FAIL") + " " + res.status + " /api/news?lang=" + lang + " articles=" + articles.length + " provider=" + (data?.provider || "—"));
     if (!ok) failed++;
   } catch (e) { console.log("FAIL /api/news?lang=" + lang + " " + e.message); failed++; }
