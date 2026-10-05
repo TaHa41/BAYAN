@@ -1,4 +1,4 @@
-export interface Env{DB?:D1Database;ASSETS?:Fetcher;AI?:any;OPENAI_API_KEY?:string;OPENAI_MODEL?:string;GNEWS_API_KEY?:string;BAYAN_AI_MANAGER_TOKEN?:string;TELEGRAM_BOT_TOKEN?:string;TELEGRAM_CHAT_ID?:string;BAYAN_VERSION?:string;BAYAN_COMMIT_SHA?:string}
+export interface Env{DB?:any;ASSETS?:any;AI?:any;OPENAI_API_KEY?:string;OPENAI_MODEL?:string;GNEWS_API_KEY?:string;BAYAN_AI_MANAGER_TOKEN?:string;TELEGRAM_BOT_TOKEN?:string;TELEGRAM_CHAT_ID?:string;BAYAN_VERSION?:string;BAYAN_COMMIT_SHA?:string}
 export const now=()=>new Date().toISOString();
 export const clean=(v:unknown,max=4000)=>String(v??"").replace(/[\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]/g," ").trim().slice(0,max);
 export const hash=async(v:string)=>{const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,"0")).join("")};
