@@ -1,1 +1,0 @@
-CREATE INDEX IF NOT EXISTS idx_searches_created ON searches(created_at DESC);CREATE INDEX IF NOT EXISTS idx_runtime_created ON runtime_events(created_at DESC);CREATE INDEX IF NOT EXISTS idx_saved_visitor ON saved_articles(visitor_id,created_at DESC);CREATE INDEX IF NOT EXISTS idx_repairs_status ON repair_jobs(status,updated_at DESC);
