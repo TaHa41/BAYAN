@@ -1739,17 +1739,17 @@ const rssNewsSearch = async (query = "", language = "ar") => {
   const googleEndpoint = query
     ? "https://news.google.com/rss/search?q=" + encodeURIComponent(query) + "&hl=" + encodeURIComponent(hl) + "&gl=" + gl + "&ceid=" + encodeURIComponent(ceid)
     : "https://news.google.com/rss?hl=" + encodeURIComponent(hl) + "&gl=" + gl + "&ceid=" + encodeURIComponent(ceid);
+  const editorialFeeds = [
+    language === "ar"
+      ? "https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdff8b8cab9"
+      : "https://www.aljazeera.com/xml/rss/all.xml",
+    language === "ar" ? "https://feeds.bbci.co.uk/arabic/rss.xml" : "https://feeds.bbci.co.uk/news/rss.xml",
+    language === "ar" ? "https://rss.dw.com/rdf/rss-ar-all" : "https://rss.dw.com/rdf/rss-en-all",
+    language === "ar" ? "https://www.france24.com/ar/rss" : "https://www.france24.com/en/rss"
+  ];
   const feeds = query
-    ? [googleEndpoint]
-    : [
-        googleEndpoint,
-        language === "ar"
-          ? "https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdff8b8cab9"
-          : "https://www.aljazeera.com/xml/rss/all.xml",
-        language === "ar" ? "https://feeds.bbci.co.uk/arabic/rss.xml" : "https://feeds.bbci.co.uk/news/rss.xml",
-        language === "ar" ? "https://rss.dw.com/rdf/rss-ar-all" : "https://rss.dw.com/rdf/rss-en-all",
-        language === "ar" ? "https://www.france24.com/ar/rss" : "https://www.france24.com/en/rss"
-      ];
+    ? [googleEndpoint, ...editorialFeeds]
+    : [googleEndpoint, ...editorialFeeds];
   const settled = await Promise.allSettled(feeds.map((endpoint) => fetchTextWithTimeout(endpoint)));
   const collected: any[] = [];
   for (const item of settled) {
@@ -1974,8 +1974,8 @@ const internalSearch = async (query: string, env: Env) => {
   const allResearch = researchQueries(query);
   // Fast path: start with the user's exact query. Expand only when evidence is thin.
   // This prevents routine searches from waiting for five research angles and every provider.
-  const primaryQueries = allResearch.slice(0, 1);
-  const expandedQueries = allResearch.slice(1, 2);
+  const primaryQueries = allResearch.slice(0, 2);
+  const expandedQueries = allResearch.slice(2, 3);
   const configuredSearchProviders = String(env.SEARCH_PROVIDER || DEFAULT_SEARCH_PROVIDER)
     .split(",")
     .map((value) => value.trim().toLowerCase())
