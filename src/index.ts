@@ -334,6 +334,7 @@ const renderHtml = async (response: Response, requestUrl: URL, env?: Env) => {
   html = html.replace(/<meta name="description" content="[^"]*">/i, '<meta name="description" content="' + resolvedDescription.replace(/"/g, "&quot;") + '">');
   html = html.replace("</head>",
     '<link rel="canonical" href="' + canonical + '">' +
+    '<link rel="alternate" type="application/rss+xml" title="BAYAN News" href="' + requestUrl.origin + '/feed.xml">' +
     '<link rel="alternate" hreflang="ar" href="' + alternateAr + '">' +
     '<link rel="alternate" hreflang="en" href="' + alternateEn + '">' +
     '<link rel="alternate" hreflang="x-default" href="' + alternateAr + '">' +
