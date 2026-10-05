@@ -76,7 +76,7 @@ if (!source.includes("repair-skills")) failures.push("repair skills capability m
 if (!source.includes("title_en") || !source.includes("body_en")) failures.push("multilingual article storage missing");
 if (!schema.includes("title_en") || !schema.includes("body_en")) failures.push("canonical schema missing multilingual fields");
 if (!migrations.includes("0009_multilingual_article_integrity.sql")) failures.push("multilingual integrity migration missing");
-if (!sw.includes("bayan-shell-v3-20261005")) failures.push("service worker cache version not upgraded");
+if (!sw.includes("bayan-shell-v4-20261005")) failures.push("service worker cache version not upgraded");
 if (!sw.includes("/manifest.en.json")) failures.push("service worker does not cache English manifest");
 if (!sw.includes("/?lang=en")) failures.push("service worker does not cache the English offline shell");
 if (!sw.includes('u.searchParams.get("lang")==="en"?"/?lang=en":"/"')) failures.push("service worker English offline fallback is not language-safe");
