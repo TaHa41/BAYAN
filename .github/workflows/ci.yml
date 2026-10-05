@@ -35,7 +35,9 @@ jobs:
         run: |
           set +e
           node --check public/app.js 2>&1 | tee frontend-syntax.txt
-          exit ${PIPESTATUS[0]}
+          status=${PIPESTATUS[0]}
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/comments" -f body="BAYAN v2 frontend syntax diagnostics:\n$(cat frontend-syntax.txt)" || true; fi
+          exit "$status"
       - name: Unit tests with diagnostics
         env:
           GH_TOKEN: ${{ github.token }}
