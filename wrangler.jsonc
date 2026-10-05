@@ -20,14 +20,6 @@
     }
   ],
   "keep_vars": true,
-  "secrets": {
-    "required": [
-      "OPENAI_API_KEY",
-      "SEARCH_API_KEY",
-      "GNEWS_API_KEY",
-      "GOLD_API_KEY"
-    ]
-  },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1,
