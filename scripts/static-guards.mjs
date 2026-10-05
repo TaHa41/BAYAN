@@ -55,6 +55,7 @@ if (!source.includes(`path === "/api/news"`) || !source.includes("Google News RS
 if (!source.includes("provider_unavailable") || !source.includes("articles: []")) failures.push("news failure contract is incomplete");
 if (!app.includes("newsPage") || !app.includes("open-news-article")) failures.push("news article UI contract is incomplete");
 if (!app.includes("function toolsPage()") || !app.includes("/api/maps/search") || !app.includes("/api/images")) failures.push("tools UI does not activate maps/image discovery");
+if (!app.includes("async function sectionPage(slug)") || !app.includes('fetch("/api/search?q="+encodeURIComponent(query)')) failures.push("knowledge category pages are not wired to verified search");
 if (!source.includes("AbortSignal.timeout(5000)") || !source.includes("AbortSignal.timeout(7000)")) failures.push("live utility provider requests are not timeout-bounded");
 if (!source.includes("/api/ai/manager/telegram/status") || !source.includes("/api/ai/manager/telegram/configure")) failures.push("Telegram manager control endpoints are missing");
 if (!source.includes("/api/ai/manager/repairs/retry-all")) failures.push("manager bulk repair control is missing");
