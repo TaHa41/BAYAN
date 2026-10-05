@@ -2099,7 +2099,14 @@ const internalSearch = async (query: string, env: Env) => {
   }
   const intent = editorialIntent(query);
   const rawRanked = rerankResults(query, Array.from(unique.values()));
-  const temporalRanked = rawRanked.map((item: any) => {
+  const freshnessWindowDays = intent === "news" || intent === "markets" || intent === "weather" ? 7 : intent === "person" ? 180 : null;
+  const freshOnly = freshnessWindowDays
+    ? rawRanked.filter((item: any) => {
+        const t = item?.date ? Date.parse(String(item.date)) : NaN;
+        return Number.isFinite(t) && Date.now() - t <= freshnessWindowDays * 86400000 && Date.now() - t >= -86400000;
+      })
+    : rawRanked;
+  const temporalRanked = (freshOnly.length >= (intent === "news" ? 3 : 1) ? freshOnly : rawRanked).map((item: any) => {
     const t = item?.date ? Date.parse(String(item.date)) : NaN;
     const ageDays = Number.isFinite(t) ? Math.max(0, (Date.now() - t) / 86400000) : null;
     return { ...item, ageDays };
@@ -2177,10 +2184,12 @@ const evidencePrompt = (language: string, query: string, results: any[]) => {
     .join("\n\n");
 
   return "BAYAN evidence synthesis.\n" +
+    "Current date: " + new Date().toISOString().slice(0, 10) + ".\n" +
     "Language: " + language + "\n" +
     (language === "en" ? "Write every visitor-facing sentence in clear natural English. Do not switch to Arabic.\n" : "اكتب كل جملة موجهة للزائر بالعربية الواضحة ولا تنتقل إلى الإنجليزية.\n") +
     "User request: " + query + "\n\n" +
     "Use ONLY the supplied search evidence. Do not invent facts, dates, numbers, quotations, people, events, URLs, or sources.\n" +
+    "For current/news questions, do not present an older report as current. For person profiles, use recent evidence for current status and clearly label older evidence as historical background.\n" +
     "If the evidence conflicts, say that it conflicts and distinguish the claims.\n" +
     "Prefer evidence supported by at least two independent sources/providers. Never treat multiple copies of the same story as independent confirmation.\n" +
     "If fewer than two independent sources are available, clearly label the answer as single-source/limited evidence and avoid presenting uncertain claims as established facts.\n" +
