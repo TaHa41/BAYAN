@@ -7,6 +7,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  pull-requests: write
 jobs:
   quality:
     runs-on: ubuntu-latest
@@ -15,15 +16,20 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - name: Install
-        run: npm install
-      - name: Static architecture guards
-        run: npm run guards
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Frontend syntax
-        run: node --check public/app.js
-      - name: Unit tests
-        run: npm test
-      - name: Wrangler dry build
-        run: npm run build
+      - run: npm install
+      - run: npm run guards
+      - name: Typecheck with diagnostics
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck -- --pretty false --noErrorTruncation 2>&1 | tee typecheck.txt
+          status=${PIPESTATUS[0]}
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            gh pr comment "${{ github.event.pull_request.number }}" --body "$(printf '### BAYAN v2 TypeScript diagnostics\\n\\n\\`\\`\\`text\\n%s\\n\\`\\`\\`' "$(cat typecheck.txt)")" || true
+          fi
+          exit "$status"
+      - run: node --check public/app.js
+      - run: npm test
+      - run: npm run build
