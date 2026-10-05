@@ -3775,6 +3775,7 @@ export default {
       if (!q) return json({ status: "query_required" }, 400);
       try {
         const response = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&q=" + encodeURIComponent(q), {
+          signal: AbortSignal.timeout(7000),
           headers: { "user-agent": "BAYAN/0.6 (location search; contact via bayan.tahaomar411.workers.dev)" }
         });
         if (!response.ok) throw new Error("nominatim_http_" + response.status);
@@ -3799,7 +3800,7 @@ export default {
       const q = (url.searchParams.get("q") || "").trim().slice(0, 120);
       if (!q) return json({ status: "query_required" }, 400);
       try {
-        const response = await fetch("https://api.openverse.org/v1/images/?q=" + encodeURIComponent(q) + "&page_size=12");
+        const response = await fetch("https://api.openverse.org/v1/images/?q=" + encodeURIComponent(q) + "&page_size=12", { signal: AbortSignal.timeout(7000) });
         if (!response.ok) return json({ status: "source_error", source: "Openverse" }, 502);
         const data = await response.json() as any;
         const images = (data.results || []).map((x: any) => ({
@@ -3819,12 +3820,12 @@ export default {
       const city = (url.searchParams.get("city") || "").trim().slice(0, 80);
       if (!city) return json({ status: "city_required" }, 400);
       try {
-        const geo = await fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(city) + "&count=1&language=en&format=json");
+        const geo = await fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(city) + "&count=1&language=en&format=json", { signal: AbortSignal.timeout(5000) });
         if (!geo.ok) return json({ status: "source_error", source: "Open-Meteo" }, 502);
         const gd = await geo.json() as any;
         const place = gd.results?.[0];
         if (!place) return json({ status: "not_found", city, source: "Open-Meteo" }, 404);
-        const weather = await fetch("https://api.open-meteo.com/v1/forecast?latitude=" + place.latitude + "&longitude=" + place.longitude + "&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto");
+        const weather = await fetch("https://api.open-meteo.com/v1/forecast?latitude=" + place.latitude + "&longitude=" + place.longitude + "&current=temperature_2m,relative_humidity_2m,weather_code&timezone=auto", { signal: AbortSignal.timeout(5000) });
         if (!weather.ok) return json({ status: "source_error", source: "Open-Meteo" }, 502);
         const wd = await weather.json() as any;
         const current = wd.current;
@@ -3846,7 +3847,7 @@ export default {
       const supportedCurrencies = new Set(["USD", "EGP", "EUR", "GBP", "SAR", "AED"]);
       if (!supportedCurrencies.has(base) || !supportedCurrencies.has(quote)) return json({ status: "invalid_currency" }, 400);
       try {
-        const response = await fetch("https://api.frankfurter.dev/v2/rate/" + base + "/" + quote);
+        const response = await fetch("https://api.frankfurter.dev/v2/rate/" + base + "/" + quote, { signal: AbortSignal.timeout(5000) });
         if (!response.ok) return json({ status: "source_error", source: "Frankfurter" }, 502);
         const data = await response.json() as any;
         const rate = typeof data.rate === "number" ? data.rate : null;
