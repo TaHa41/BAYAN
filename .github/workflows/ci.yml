@@ -31,5 +31,16 @@ jobs:
           fi
           exit "$status"
       - run: node --check public/app.js
-      - run: npm test
+      - name: Unit tests with diagnostics
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set +e
+          npm test -- --reporter=verbose 2>&1 | tee test.txt
+          status=${PIPESTATUS[0]}
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/comments" -f body="BAYAN v2 unit-test diagnostics:\n$(cat test.txt)" || true
+          fi
+          exit "$status"
       - run: npm run build
