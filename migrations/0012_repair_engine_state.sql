@@ -1,6 +1,0 @@
--- BAYAN repair-engine Compatibility marker.
--- Legacy/partially repaired D1 databases may already contain the repair-engine
--- columns because ensureRepairQueue performs additive runtime schema healing.
--- The deployment pre-migration step verifies/adds these columns before this
--- migration is recorded. Fresh databases receive the same columns from that
--- pre-migration step and from schema.sql.
