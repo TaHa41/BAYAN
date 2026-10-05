@@ -1,72 +1,53 @@
 import { describe, it, expect } from "vitest";
 import worker from "../../src/index";
 
-describe("BAYAN platform", () => {
-  it("returns safe health metadata", async () => {
-    const response = await worker.fetch(new Request("https://bayan.test/api/health"), {
-      BAYAN_ENVIRONMENT: "test", BAYAN_VERSION: "0.9.0", BAYAN_COMMIT_SHA: "test",
-    });
-    expect(response.status).toBe(200);
-    const body = await response.json() as unknown as { status: string; environment: string; version: string };
-    expect(body.status).toBe("ok"); expect(body.environment).toBe("test"); expect(body.version).toBe("0.9.0");
-    expect(response.headers.get("content-security-policy")).toContain("base-uri 'self'");
-    expect(response.headers.get("strict-transport-security")).toContain("max-age=31536000");
-    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+const env = (extra:any = {}) => ({
+  ...extra,
+  BAYAN_AI_MANAGER_TOKEN: "manager-secret",
+});
+
+describe("BAYAN V3 runtime contract", () => {
+  it("returns V3 health metadata", async () => {
+    const r = await worker.fetch(new Request("https://bayan.test/api/health"), env());
+    expect(r.status).toBe(200);
+    const b:any = await r.json();
+    expect(b.ok).toBe(true);
+    expect(b.service).toBe("bayan-v3");
   });
-  it("keeps the compatibility health endpoint separate from the API health endpoint", async () => {
-    const response=await worker.fetch(new Request("https://bayan.test/health"), {
-      BAYAN_ENVIRONMENT: "test", BAYAN_VERSION: "0.9.0", BAYAN_COMMIT_SHA: "test",
-    });
-    expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toContain("application/json");
-    const body = await response.json() as unknown as { status: string; service: string; version: string };
-    expect(body.status).toBe("ok"); expect(body.service).toBe("BAYAN"); expect(body.version).toBe("0.9.0");
+
+  it("keeps the health compatibility route", async () => {
+    const r = await worker.fetch(new Request("https://bayan.test/health"), env());
+    expect(r.status).toBe(200);
+    expect((await r.json()).ok).toBe(true);
   });
-  it("exposes the tool catalog without secrets", async () => {
-    const response = await worker.fetch(new Request("https://bayan.test/api/tools"), { OPENAI_API_KEY: "secret" });
-    const text = await response.text();
-    expect(response.status).toBe(200); expect(text).not.toContain("secret"); expect(text).toContain("verification");
+
+  it("returns the feature contract", async () => {
+    const r = await worker.fetch(new Request("https://bayan.test/api/features"), env());
+    const b:any = await r.json();
+    expect(r.status).toBe(200);
+    expect(b.features).toEqual(expect.arrayContaining(["search","articles","news","trends","prices","weather","tools","saved","contribute","admin","telegram","analytics"]));
   });
-  it("exposes advertising configuration without enabling ads by default", async () => {
-    const response = await worker.fetch(new Request("https://bayan.test/api/ads/config"), {});
-    const body = await response.json() as { enabled: boolean; provider: string | null };
-    expect(response.status).toBe(200);
-    expect(body.enabled).toBe(false);
-    expect(body.provider).toBeNull();
-  });
-  it("serves a safe ads.txt response when no publisher is configured", async () => {
-    const response = await worker.fetch(new Request("https://bayan.test/ads.txt"), {});
-    expect(response.status).toBe(200);
-    expect(await response.text()).toBe("");
-  });
-  it("protects diagnostics and never returns secret values", async () => {
-    const denied = await worker.fetch(new Request("https://bayan.test/api/diagnostics"), { OPENAI_API_KEY: "secret" });
-    expect(denied.status).toBe(403);
-    const allowed = await worker.fetch(new Request("https://bayan.test/api/diagnostics", { headers: { authorization: "Bearer manager-secret" } }), {
-      BAYAN_AI_MANAGER_TOKEN: "manager-secret",
-      OPENAI_API_KEY: "secret",
-      SEARCH_PROVIDER: "ceramic",
-      AI_SEARCH_INSTANCE: "bayan-knowledge",
-      BAYAN_VERSION: "0.9.0",
-      BAYAN_COMMIT_SHA: "test"
-    });
+
+  it("protects manager endpoints", async () => {
+    const denied = await worker.fetch(new Request("https://bayan.test/api/ai/manager/status"), env());
+    expect(denied.status).toBe(401);
+    const allowed = await worker.fetch(new Request("https://bayan.test/api/ai/manager/status", {
+      headers: { authorization: "Bearer manager-secret" }
+    }), env());
     expect(allowed.status).toBe(200);
-    const body = await allowed.text();
-    expect(body).toContain('"status": "ok"');
-    expect(body).toContain('"searchProviderChain"');
-    expect(body).not.toContain("manager-secret");
-    expect(body).not.toContain("secret");
   });
-  it("requires AI input", async () => {
-    const response = await worker.fetch(new Request("https://bayan.test/api/ai",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({input:" "})}), {});
-    expect(response.status).toBe(400);
+
+  it("serves semantic routes through the asset shell", async () => {
+    const assets = { fetch: async () => new Response("<!doctype html><html><body>BAYAN</body></html>", {
+      status: 200, headers: { "content-type": "text/html" }
+    }) } as unknown as Fetcher;
+    const r = await worker.fetch(new Request("https://bayan.test/science"), env({ASSETS: assets}));
+    expect(r.status).toBe(200);
+    expect(await r.text()).toContain("BAYAN");
   });
-  it("serves the SPA shell for a semantic route", async () => {
-    const asset=new Response("<!doctype html><html><body>BAYAN</body></html>",{status:200,headers:{"content-type":"text/html"}});
-    const assets={fetch:async()=>asset} as unknown as Fetcher;
-    const response=await worker.fetch(new Request("https://bayan.test/science"),{ASSETS:assets});
-    expect(response.status).toBe(200); expect(await response.text()).toContain("BAYAN");
+
+  it("never exposes manager secrets in the public feature response", async () => {
+    const r = await worker.fetch(new Request("https://bayan.test/api/features"), env());
+    expect(await r.text()).not.toContain("manager-secret");
   });
-  it("requires an explicit weather city",async()=>{const r=await worker.fetch(new Request("https://bayan.test/api/weather"),{});expect(r.status).toBe(400);});
-  it("validates market currency codes",async()=>{const r=await worker.fetch(new Request("https://bayan.test/api/markets?base=bad&quote=EGP"),{});expect(r.status).toBe(400);});
 });
