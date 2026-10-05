@@ -428,7 +428,7 @@ function managerSubPage(kind){
  if(titleEl) titleEl.textContent=isEn?map[kind]?.[2]||"Dashboard":map[kind]?.[1]||"لوحة التحكم";
  const tab=document.createElement("div");
  tab.className="manager-edge-control";
- tab.innerHTML='<button id="managerEdgeBtn" type="button" aria-label="'+(isEn?"Open management menu":"فتح قائمة الإدارة")+'" aria-expanded="false">☰</button><div id="managerEdgeMenu" class="manager-edge-menu" hidden><div class="manager-edge-head"><strong>'+(isEn?"BAYAN Manager":"إدارة بيان")+'</strong><button id="managerEdgeClose" type="button">×</button></div><nav>'+Object.entries(map).map(([key,v])=>'<a href="/review/'+key+(isEn?"?lang=en":"")+'" class="'+(key===kind?"active":"")+'"><span>'+({dashboard:"⚙","ai-repair:"✦",content:"▤",contributions:"＋",repairs:"⌁",news:"◉",analytics:"▥",telegram:"➤"}[key])+'</span><b>'+(isEn?v[2]:v[1])+'</b></a>').join("")+'</nav></div>';
+ tab.innerHTML='<button id="managerEdgeBtn" type="button" aria-label="'+(isEn?"Open management menu":"فتح قائمة الإدارة")+'" aria-expanded="false">☰</button><div id="managerEdgeMenu" class="manager-edge-menu" hidden><div class="manager-edge-head"><strong>'+(isEn?"BAYAN Manager":"إدارة بيان")+'</strong><button id="managerEdgeClose" type="button">×</button></div><nav>'+Object.entries(map).map(([key,v])=>'<a href="/review/'+key+(isEn?"?lang=en":"")+'" class="'+(key===kind?"active":"")+'"><span>'+({dashboard:"⚙","ai-repair":"✦",content:"▤",contributions:"＋",repairs:"⌁",news:"◉",analytics:"▥",telegram:"➤"}[key])+'</span><b>'+(isEn?v[2]:v[1])+'</b></a>').join("")+'</nav></div>';
  document.body.appendChild(tab);
  const btn=tab.querySelector("#managerEdgeBtn"),menu=tab.querySelector("#managerEdgeMenu");
  btn.onclick=()=>{menu.hidden=!menu.hidden;btn.setAttribute("aria-expanded",String(!menu.hidden));};
@@ -480,4 +480,3 @@ window.addEventListener("popstate",()=>safeRenderRoute(location.pathname.replace
 if(localStorage.getItem("bayan-theme")==="light")document.body.classList.add("light");document.querySelector("#theme")?.addEventListener("click",()=>{document.body.classList.toggle("light");localStorage.setItem("bayan-theme",document.body.classList.contains("light")?"light":"dark")});document.querySelector("#language")?.addEventListener("click",()=>{const u=new URL(location.href);u.searchParams.set("lang",isEn?"ar":"en");location.href=u});document.querySelector("#year").textContent=new Date().getFullYear()
 })();
 \n// BAYAN frontend syntax-audit checkpoint\n
-// BAYAN frontend syntax-audit checkpoint
