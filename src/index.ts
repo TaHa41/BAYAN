@@ -2099,14 +2099,15 @@ const internalSearch = async (query: string, env: Env) => {
   }
   const intent = editorialIntent(query);
   const rawRanked = rerankResults(query, Array.from(unique.values()));
-  const freshnessWindowDays = intent === "news" || intent === "markets" || intent === "weather" ? 7 : intent === "person" ? 180 : null;
+  const freshnessWindowDays = intent === "news" ? 3 : intent === "person" ? 60 : intent === "markets" || intent === "weather" ? 7 : null;
   const freshOnly = freshnessWindowDays
     ? rawRanked.filter((item: any) => {
         const t = item?.date ? Date.parse(String(item.date)) : NaN;
         return Number.isFinite(t) && Date.now() - t <= freshnessWindowDays * 86400000 && Date.now() - t >= -86400000;
       })
     : rawRanked;
-  const temporalRanked = (freshOnly.length >= (intent === "news" ? 3 : 1) ? freshOnly : rawRanked).map((item: any) => {
+  const temporalBase = intent === "news" || intent === "person" ? freshOnly : (freshOnly.length ? freshOnly : rawRanked);
+  const temporalRanked = temporalBase.map((item: any) => {
     const t = item?.date ? Date.parse(String(item.date)) : NaN;
     const ageDays = Number.isFinite(t) ? Math.max(0, (Date.now() - t) / 86400000) : null;
     return { ...item, ageDays };
