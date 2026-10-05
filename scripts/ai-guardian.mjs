@@ -15,7 +15,10 @@ if (!key) {
   process.exit(0);
 }
 
-const model = process.env.OPENAI_MODEL || "gpt-6-luna";
+const modelChain = Array.from(new Set([
+  process.env.OPENAI_MODEL || "gpt-6-luna",
+  ...(process.env.OPENAI_FALLBACK_MODELS || "gpt-6.1-sol").split(",").map(x => x.trim()).filter(Boolean)
+]));
 const prompt = [
   "BAYAN Site Guardian.",
   "Diagnose the supplied production/CI report using the repair skills below.",
@@ -30,25 +33,37 @@ const prompt = [
   report
 ].join("\n");
 
-const response = await fetch("https://api.openai.com/v1/responses", {
-  method: "POST",
-  headers: { "content-type": "application/json", authorization: "Bearer " + key },
-  body: JSON.stringify({
-    model,
-    instructions: "You are a conservative reliability engineer for BAYAN. Evidence first. Separate facts from hypotheses.",
-    input: prompt,
-    store: false
-  })
-});
-
-if (!response.ok) {
-  console.error("OpenAI guardian failed with status", response.status);
-  process.exit(1);
+let diagnosis = "";
+let selectedModel = null;
+let lastError = "";
+for (const model of modelChain) {
+  try {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer " + key },
+      signal: AbortSignal.timeout(20000),
+      body: JSON.stringify({
+        model,
+        instructions: "You are a conservative reliability engineer for BAYAN. Evidence first. Separate facts from hypotheses.",
+        input: prompt,
+        store: false
+      })
+    });
+    if (response.ok) {
+      const data = await response.json();
+      diagnosis = String(data.output_text || "").trim();
+      if (diagnosis) { selectedModel = model; break; }
+      lastError = "empty_diagnosis";
+    } else {
+      lastError = "openai_http_" + response.status;
+      if (![408, 409, 429, 500, 502, 503, 504].includes(response.status)) break;
+    }
+  } catch (error) {
+    lastError = String(error?.message || error);
+  }
 }
-const data = await response.json();
-const diagnosis = String(data.output_text || "").trim();
 if (!diagnosis) {
-  console.error("OpenAI guardian returned no diagnosis.");
-  process.exit(1);
+  console.log(JSON.stringify({ status: "external_dependency", reason: "AI diagnostic provider unavailable", error: redact(lastError, 600) }));
+  process.exit(0);
 }
-console.log(JSON.stringify({ status: "ok", model, diagnosis: redact(diagnosis, 9000) }, null, 2));
+console.log(JSON.stringify({ status: "ok", model: selectedModel, diagnosis: redact(diagnosis, 9000) }, null, 2));
