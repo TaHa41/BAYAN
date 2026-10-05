@@ -33,4 +33,4 @@ Pushes to `main` run CI. A successful CI run triggers the production deployment 
 Migrations in `migrations/` are append-only. The canonical schema is kept in `schema.sql`. Multilingual article fields are introduced by migration 0009; contribution schema repair is tracked through migration 0010; persistent self-healing repair state is tracked through migration 0012.
 
 ## Reliability
-See `docs/AI_REPAIR_PLAYBOOK.md` and `docs/BAYAN_SYSTEM_SPEC.md` for the evidence-first autonomous repair process. Application-code fixes may be generated on isolated repair branches and merged only after guards, CI, deployment and production Guardian verification. Secrets, permissions, security-boundary changes and destructive data operations remain human-gated.
+See `docs/BAYAN_PRODUCT_CONTRACT.md`, `docs/AI_REPAIR_PLAYBOOK.md` and `docs/BAYAN_SYSTEM_SPEC.md` for the evidence-first autonomous repair process. Application-code fixes may be generated on isolated repair branches and merged only after guards, CI, deployment and production Guardian verification. Secrets, permissions, security-boundary changes and destructive data operations remain human-gated.
