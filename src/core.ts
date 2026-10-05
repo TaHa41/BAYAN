@@ -1,6 +1,6 @@
 export interface Env{DB?:any;ASSETS?:any;AI?:any;OPENAI_API_KEY?:string;OPENAI_MODEL?:string;GNEWS_API_KEY?:string;BAYAN_AI_MANAGER_TOKEN?:string;TELEGRAM_BOT_TOKEN?:string;TELEGRAM_CHAT_ID?:string;BAYAN_VERSION?:string;BAYAN_COMMIT_SHA?:string}
 export const now=()=>new Date().toISOString();
-export const clean=(v:unknown,max=4000)=>String(v??"").replace(/[\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f]/g," ").trim().slice(0,max);
+export const clean=(v:unknown,max=4000)=>String(v??"").replace(new RegExp("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]","g")," ").trim().slice(0,max);
 export const hash=async(v:string)=>{const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(v));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,"0")).join("")};
 export const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin"}});
 export const unauthorized=()=>json({ok:false,error:"unauthorized"},401);
