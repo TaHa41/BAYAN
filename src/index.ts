@@ -1891,8 +1891,7 @@ const enrichNewsImages = async (items: any[]) => {
     if (image) return { index, image, imageMeta: { url: image, alt: cleanText(item.title || "", 220), sourceUrl: item.url || image, credit: cleanText(item.source || "Publisher", 160), rightsStatus: "publisher_source", imageSource: "publisher" } };
     const licensed = await resolveLicensedEditorialImage(String(item.title || ""));
     if (licensed?.url) return { index, image: licensed.url, imageMeta: licensed };
-    const wikimedia = await resolveWikimediaEditorialImage(String(item.title || ""));
-    return { index, image: wikimedia?.url || null, imageMeta: wikimedia || null };
+    // Optional image providers are isolated from article publication.\n    return { index, image: null, imageMeta: null };
   }));
   for (const item of resolved) {
     if (item.image) output[item.index] = { ...output[item.index], image: item.image, imageMeta: item.imageMeta };
