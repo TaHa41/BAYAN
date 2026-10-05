@@ -55,6 +55,16 @@ if (!source.includes(`path === "/api/news"`) || !source.includes("Google News RS
 if (!source.includes("provider_unavailable") || !source.includes("articles: []")) failures.push("news failure contract is incomplete");
 if (!app.includes("newsPage") || !app.includes("open-news-article")) failures.push("news article UI contract is incomplete");
 if (!app.includes("function toolsPage()") || !app.includes("/api/maps/search") || !app.includes("/api/images")) failures.push("tools UI does not activate maps/image discovery");
+const contract = readText("docs/BAYAN_PRODUCT_CONTRACT.md");
+for (const required of ["Visitor experience","Management","Reliability","Preservation rule","BAYAN_AI_MANAGER_TOKEN","Telegram","Resend is not a required runtime dependency","No core route may call an undefined renderer"]) {
+  if (!contract.includes(required)) failures.push("product contract missing: " + required);
+}
+if (!app.includes("const uiTranslations=") || !app.includes('"إدارة بيان والذكاء الاصطناعي":"BAYAN Management & AI"')) failures.push("English management navigation translation contract missing");
+if (!app.includes('history.pushState({q:query},"",u.pathname+u.search)')) failures.push("homepage search query handoff contract missing");
+if (!app.includes('routePath==="news"') || !app.includes('routePath==="trending"')) failures.push("news/trends route separation contract missing");
+if (!source.includes('BAYAN_AI_MANAGER_TOKEN')) failures.push("manager token protection contract missing");
+if (!source.includes('TELEGRAM_BOT_TOKEN')) failures.push("Telegram integration contract missing");
+if (source.match(/resend/i)) failures.push("Resend runtime dependency detected");
 if (!app.includes("async function sectionPage(slug)") || !app.includes('fetch("/api/search?q="+encodeURIComponent(query)')) failures.push("knowledge category pages are not wired to verified search");
 if (!source.includes("AbortSignal.timeout(5000)") || !source.includes("AbortSignal.timeout(7000)")) failures.push("live utility provider requests are not timeout-bounded");
 if (!source.includes("/api/ai/manager/telegram/status") || !source.includes("/api/ai/manager/telegram/configure")) failures.push("Telegram manager control endpoints are missing");
