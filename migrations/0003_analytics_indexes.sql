@@ -1,1 +1,0 @@
-CREATE INDEX IF NOT EXISTS idx_analytics_created ON analytics(created_at DESC);CREATE INDEX IF NOT EXISTS idx_analytics_event ON analytics(event,path,language);
