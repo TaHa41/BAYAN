@@ -9,7 +9,7 @@ describe("BAYAN V3 contracts", () => {
   });
 
   it("keeps migrations contiguous through the V3 contract", () => {
-    const files = readdirSync("migrations").filter((x) => /^\\d+_.*\\.sql$/.test(x)).sort();
+    const files = readdirSync("migrations").filter((x) => /^\d+_.*\.sql$/.test(x)).sort();
     expect(files.at(-1)).toBe("0016_v3_content_contract.sql");
     expect(files.map(x => Number(x.split("_")[0]))).toEqual(files.map((_x, i) => i + 1));
   });
