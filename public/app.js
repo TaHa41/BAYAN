@@ -421,6 +421,33 @@ function toolsPage(){
     }catch{imageResults.innerHTML='<p class="muted">'+(isEn?"Image search is temporarily unavailable.":"البحث عن الصور غير متاح مؤقتًا.")+'</p>';}
   });
 }
+async function sectionPage(slug){
+  const sec=sections.find(x=>x[0]===slug);
+  const name=sec?(isEn?sec[1]:sec[0]):slug;
+  const description=sec?(isEn?(sec[3]||sec[2]):sec[2]):"";
+  app.innerHTML='<section class="page section-page"><div class="breadcrumb">BAYAN / '+escapeHtml(name)+'</div><div class="eyebrow">KNOWLEDGE / '+escapeHtml(slug)+'</div><h1 class="page-title">'+escapeHtml(name)+'</h1><p class="page-lead">'+escapeHtml(description)+'</p><div class="card" id="sectionState"><h3>'+(isEn?"Loading verified knowledge…":"جارٍ تحميل المعرفة الموثقة…")+'</h3><p class="muted">'+(isEn?"BAYAN is retrieving evidence before showing articles.":"بيان يسترجع الأدلة قبل عرض المقالات.")+'</p></div><div id="sectionGrid" class="grid article-grid"></div></section>';
+  const state=document.querySelector("#sectionState"),grid=document.querySelector("#sectionGrid");
+  const query=isEn?name+" latest verified knowledge":name+" أحدث معلومات موثقة";
+  try{
+    const r=await fetch("/api/search?q="+encodeURIComponent(query)+"&lang="+(isEn?"en":"ar"),{signal:AbortSignal.timeout(12000)});
+    const d=await r.json().catch(()=>({}));
+    const items=Array.isArray(d.items)?d.items:[];
+    if(!r.ok||!items.length){
+      state.innerHTML='<h3>'+(isEn?"No verified articles are available yet.":"لا توجد مقالات موثقة متاحة حاليًا.")+'</h3><p class="muted">'+(isEn?"The category stays visible rather than showing unverified content.":"ستظل الفئة متاحة دون عرض محتوى غير متحقق منه.")+'</p>';
+      return;
+    }
+    grid.innerHTML=items.slice(0,12).map((x,index)=>{
+      const title=escapeHtml(x.title||name);
+      const source=escapeHtml(x.source||"BAYAN");
+      const date=x.date?escapeHtml(x.date):"";
+      const snippet=escapeHtml(x.snippet||"");
+      return '<article class="card article-card"><span class="number">'+String(index+1).padStart(2,"0")+'</span><div class="result-meta"><span class="source-name">'+source+'</span>'+(date?'<span>·</span><span>'+date+'</span>':"")+'</div><h3>'+title+'</h3><p>'+snippet+'</p><a class="btn btn-secondary" href="'+withLang("/search?q="+encodeURIComponent(x.title||name))+'">'+(isEn?"Read with evidence":"اقرأ مع الأدلة")+' <span>←</span></a></article>';
+    }).join("");
+    state.innerHTML='<h3>'+(isEn?"Verified knowledge loaded":"تم تحميل المعرفة الموثقة")+'</h3><p class="muted">'+(isEn?"Retrieved "+items.length+" evidence-backed results.":"تم استرجاع "+items.length+" نتيجة مبنية على الأدلة.")+'</p>';
+  }catch{
+    state.innerHTML='<h3>'+(isEn?"Category data is temporarily unavailable.":"بيانات الفئة غير متاحة مؤقتًا.")+'</h3><p class="muted">'+(isEn?"No unverified content was displayed.":"لم يتم عرض محتوى غير متحقق منه.")+'</p>';
+  }
+}
 function renderRoute(routePath){
 document.body.dataset.section=routePath||"home";
 if(validInterestSectionForClient(routePath)){recordInterest(routePath,"view");recordAnalytics("page_view","/"+routePath);}else{recordAnalytics("page_view",routePath?"/"+routePath:"/");}
