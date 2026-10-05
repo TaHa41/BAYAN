@@ -38,6 +38,7 @@
       "head_sampling_rate": 0.25
     }
   },
+  "previews": {},
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
