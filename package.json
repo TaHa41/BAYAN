@@ -9,7 +9,8 @@
     "build": "wrangler deploy --dry-run",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run typecheck && node --check public/app.js && npm test && npm run build"
+    "check": "npm run guards && npm run typecheck && node --check public/app.js && npm test && npm run build",
+    "guards": "node scripts/static-guards.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261003.1",
