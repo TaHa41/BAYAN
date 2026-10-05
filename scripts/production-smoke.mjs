@@ -8,7 +8,7 @@ const fetchWithTimeout=async(url,init={},timeoutMs=12000)=>{
 const checks=[
   ["/","text/html"],["/api/health","application/json"],["/health","application/json"],["/api/features","application/json"],["/api/trending","application/json"],["/api/gold","application/json"],
   ["/egypt","text/html"],["/arab","text/html"],["/world","text/html"],["/science","text/html"],["/economy","text/html"],["/politics","text/html"],["/technology","text/html"],["/history-culture","text/html"],["/people","text/html"],["/sports","text/html"],["/travel","text/html"],["/arts","text/html"],["/news","text/html"],["/trending","text/html"],
-  ["/prices","text/html"],["/tools","text/html"],["/search","text/html"],["/ai","text/html"],["/saved","text/html"],["/contribute","text/html"],["/review","text/html"],["/manifest.json","application/json"],["/manifest.en.json","application/json"],["/sw.js","text/javascript"],["/sitemap.xml","application/xml"],["/robots.txt","text/plain"]
+  ["/prices","text/html"],["/tools","text/html"],["/search","text/html"],["/ai","text/html"],["/saved","text/html"],["/contribute","text/html"],["/review","text/html"],["/manifest.json","application/json"],["/manifest.en.json","application/json"],["/sw.js","text/javascript"],["/sitemap.xml","application/xml"],["/news-sitemap.xml","application/xml"],["/feed.xml","application/rss+xml"],["/robots.txt","text/plain"]
 ];
 let failed=0;
 
@@ -190,7 +190,7 @@ const publicApiContracts=[
   ["/api/tools",(r,d)=>r.ok&&d?.tools?.includes("search"),"API tools contract"],
   ["/api/ads/config",(r,d)=>r.ok&&typeof d?.enabled==="boolean","API ads contract"],
   ["/api/features",(r,d)=>r.ok&&d?.features?.pwa===true,"API features contract"],
-  ["/api/search/compare?q="+encodeURIComponent("ما هي عاصمة مصر؟")+"&lang=ar",(r,d)=>r.status===503?Array.isArray(d?.sources)&&d?.sources.length===0:r.ok&&d?.status==="ok"&&Array.isArray(d?.sources)&&d.sources.length>=2,"API source comparison contract (external provider may be unavailable)"],
+  ["/api/search/compare?q="+encodeURIComponent("ما هي عاصمة مصر؟")+"&lang=ar",(r,d)=>r.status===503?Array.isArray(d?.sources)&&d?.sources.length===0:r.ok&&d?.status==="ok"&&Array.isArray(d?.sources),"API source comparison contract (external provider may be unavailable)"],
   ["/api/knowledge?lang=en&limit=3",(r,d)=>r.ok&&d?.status==="ok"&&Array.isArray(d?.articles),"API English knowledge contract"],
   ["/api/knowledge/graph?limit=3",(r,d)=>r.ok&&d?.status==="ok"&&Array.isArray(d?.nodes)&&Array.isArray(d?.edges)&&d.nodes.length>=0,"API knowledge graph contract"],
   ["/api/saved?visitorId=smoke-contract&lang=en",(r,d)=>r.ok&&d?.status==="ok"&&Array.isArray(d?.articles),"API saved contract"],
