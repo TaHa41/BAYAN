@@ -30,7 +30,12 @@ jobs:
             gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/comments" -f body="BAYAN v2 TypeScript diagnostics:\n$(cat typecheck.txt)" || true
           fi
           exit "$status"
-      - run: node --check public/app.js
+      - name: Frontend syntax with diagnostics
+        shell: bash
+        run: |
+          set +e
+          node --check public/app.js 2>&1 | tee frontend-syntax.txt
+          exit ${PIPESTATUS[0]}
       - name: Unit tests with diagnostics
         env:
           GH_TOKEN: ${{ github.token }}
