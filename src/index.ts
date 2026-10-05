@@ -2494,7 +2494,13 @@ export default {
       if (!q) return json({ error: "query_required" }, 400);
       const search = await internalSearch(q, env);
       if (!search.ok || !search.results[rank - 1]) return json({ error: "article_source_unavailable", status: search.status }, 503);
-      const articleImage = await chooseNewsImage(q, null, null, search.results[0]?.source || "BAYAN");
+      const selectedEvidence = search.results[rank - 1] || search.results[0];
+      const articleImage = await chooseNewsImage(
+        q,
+        selectedEvidence?.url || null,
+        selectedEvidence?.image || null,
+        selectedEvidence?.source || "BAYAN"
+      );
       const generated = await generateKnowledgeArticle(env, lang, q, search.results);
       if (!generated) {
         await queueContentTopic(env, q, sectionForIntent(queryIntent(q), q), lang, 100);
