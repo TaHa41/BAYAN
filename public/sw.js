@@ -1,4 +1,4 @@
-const CACHE="bayan-shell-v2";
+const CACHE="bayan-shell-v3-20261005";
 const SHELL=["/","/?lang=en","/manifest.json","/manifest.en.json","/logo.svg","/styles.css","/app.js","/content-data.js","/ad-manager.js"];
 const CACHEABLE=new Set(SHELL);
 self.addEventListener("install",event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()))});
