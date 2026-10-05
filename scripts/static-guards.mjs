@@ -40,6 +40,8 @@ if (!wrangler.includes('"redactQueryString": true')) failures.push("observabilit
 if (!wrangler.includes('"head_sampling_rate": 0.25')) failures.push("trace sampling budget is not bounded");
 if (!wrangler.includes('"binding": "AI"') || !wrangler.includes('"remote": true')) failures.push("Workers AI remote binding configuration missing");
 if (!source.includes("gpt-6-luna") || !source.includes("gpt-6.1-sol")) failures.push("OpenAI fallback chain missing");
+if (!source.includes("@cf/deepseek-ai/deepseek-v4-flash-0731") || !source.includes("@cf/openai/gpt-oss-20b")) failures.push("expanded Cloudflare AI fallback chain missing");
+if (!source.includes('isCooldownActive("ai-model", "openai:" + model)') || !source.includes('setCooldown("ai-model", "openai:" + model')) failures.push("OpenAI model quota cooldown missing");
 if (!source.includes('SEARCH_PROVIDER') || !source.includes('SEARCH_PROVIDER_CHAIN')) failures.push("search provider fallback chain missing");
 if (!source.includes("configuredSearchProviders") || !source.includes("providerOrder")) failures.push("configured search provider priority is not applied");
 if (!source.includes('AI_SEARCH_INSTANCE')) failures.push("AI Search instance configuration missing");
