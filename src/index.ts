@@ -298,6 +298,10 @@ const renderHtml = async (response: Response, requestUrl: URL, env?: Env) => {
       "بيان": "BAYAN"
     };
     for (const [ar, en] of Object.entries(replacements)) html = html.split(ar).join(en);
+    // Some shorter Arabic labels (e.g. "بحث") can match inside longer labels
+    // before/after translation. In English mode, remove any leftover Arabic
+    // definite-article prefix only when it is directly attached to Latin text.
+    html = html.replace(/ال(?=[A-Za-z])/g, "");
     for (const route of ["/about","/methodology","/contribute","/privacy","/terms","/contact","/saved","/tools","/review"]) {
       html = html.replace(new RegExp('href="' + route.replace("/", "\\/") + '"', "g"), 'href="' + route + '?lang=en"');
     }
