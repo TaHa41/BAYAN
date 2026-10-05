@@ -481,3 +481,5 @@ if(localStorage.getItem("bayan-theme")==="light")document.body.classList.add("li
 })();
 \n// BAYAN frontend syntax-audit checkpoint\n
 // BAYAN frontend syntax-audit checkpoint
+
+// CI syntax diagnosis
