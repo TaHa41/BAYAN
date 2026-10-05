@@ -3730,21 +3730,20 @@ export default {
         let image = cleanText(url.searchParams.get("image"), 2000) || null;
         const lang = (url.searchParams.get("lang") || "ar").toLowerCase() === "en" ? "en" : "ar";
         if (!title) return json({ error: "title_required" }, 400);
-        let search = await internalSearch(title, env);
-        if (!search.ok || search.results.length < 2) {
+        const search = await internalSearch(title, env);
+        let articleResults: any[] = search.ok ? search.results : [];
+        if (articleResults.length < 2) {
           const live = await liveNewsSearch(env, title, lang);
-          if (live.length) {
-            search = { ok: true, status: "ok", results: live.map((item: any) => ({
-              title: item.title, url: item.url, source: item.source, date: item.date,
-              snippet: item.snippet || item.description || item.title, image: item.image || null, domain: item.domain || ""
-            })) };
-          }
+          if (live.length) articleResults = live.map((item: any) => ({
+            title: item.title, url: item.url, source: item.source, date: item.date,
+            snippet: item.snippet || item.description || item.title, image: item.image || null, domain: item.domain || ""
+          }));
         }
-        if (!search.ok || !search.results.length) return json({ error: "article_source_unavailable", status: search.status || "no_results" }, 503);
-        const sourceName = cleanText(search.results[0]?.source || search.results[0]?.domain || "News source", 160);
+        if (!articleResults.length) return json({ error: "article_source_unavailable", status: search.status || "no_results" }, 503);
+        const sourceName = cleanText(articleResults[0]?.source || articleResults[0]?.domain || "News source", 160);
         const imageMeta = await chooseNewsImage(title, sourceUrl, image, sourceName);
         image = imageMeta?.url || image;
-        const evidence = search.results.slice(0, 12).map((item: any, index: number) => index === 0 && image ? { ...item, image, imageMeta } : item);
+        const evidence = articleResults.slice(0, 12).map((item: any, index: number) => index === 0 && image ? { ...item, image, imageMeta } : item);
         const generated = await generateKnowledgeArticle(env, lang, title, evidence);
         if (!generated) return json({ error: "full_article_generation_unavailable" }, 503);
         const slug = await slugForQuery("news:" + title, lang);
