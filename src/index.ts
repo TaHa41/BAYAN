@@ -1747,6 +1747,57 @@ const rssNewsSearch = async (query = "", language = "ar") => {
   return enriched;
 };
 
+const liveNewsSearch = async (env: Env, query = "", language = "ar") => {
+  const tasks: Promise<any[]>[] = [];
+  if (env.GNEWS_API_KEY) {
+    tasks.push((async () => {
+      const endpoint = query
+        ? "https://gnews.io/api/v4/search?lang=" + language + "&max=10&q=" + encodeURIComponent(query) + "&apikey=" + encodeURIComponent(env.GNEWS_API_KEY || "")
+        : "https://gnews.io/api/v4/top-headlines?lang=" + language + "&max=10&category=general&apikey=" + encodeURIComponent(env.GNEWS_API_KEY || "");
+      try {
+        const response = await fetch(endpoint, { signal: AbortSignal.timeout(6000) });
+        if (!response.ok) return [];
+        const data = await response.json() as any;
+        return (data.articles || []).slice(0, 10).map((item: any, index: number) => ({
+          rank: index + 1, provider: "gnews",
+          title: cleanText(item?.title, 240),
+          source: cleanText(item?.source?.name || "GNews", 160),
+          date: item?.publishedAt || null,
+          snippet: cleanText(item?.description || item?.content || item?.title, 900),
+          url: typeof item?.url === "string" ? item.url : null,
+          image: typeof item?.image === "string" ? item.image : null
+        })).filter((x: any) => x.title && x.snippet);
+      } catch { return []; }
+    })());
+  }
+  tasks.push(rssNewsSearch(query, language).catch(() => []));
+  if (env.AI?.websearch) {
+    tasks.push((async () => {
+      try {
+        const q = query || (language === "ar" ? "أحدث الأخبار اليوم مصر والعالم اقتصاد رياضة تكنولوجيا" : "latest news today Egypt world economy sports technology");
+        const raw = await cloudflareWebSearch(env, q, "exa");
+        const candidates = Array.isArray(raw?.results) ? raw.results : Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : [];
+        return candidates.slice(0, 10).map((item: any, index: number) => ({
+          rank: index + 1, provider: "cloudflare_web_search",
+          title: cleanText(item?.title || item?.name || item?.headline, 240),
+          source: cleanText(item?.source || item?.domain || item?.url || "Web Search", 160),
+          date: cleanText(item?.date || item?.published_at || item?.publishedAt, 100) || null,
+          snippet: cleanText(item?.snippet || item?.text || item?.description || item?.content, 900),
+          url: typeof (item?.url || item?.link) === "string" ? (item?.url || item?.link) : null,
+          image: typeof item?.image === "string" ? item.image : null
+        })).filter((x: any) => x.title && x.snippet);
+      } catch { return []; }
+    })());
+  }
+  const settled = await Promise.all(tasks);
+  const unique = new Map<string, any>();
+  for (const list of settled) for (const item of list) {
+    const key = String(item.url || item.title || "").toLowerCase().trim();
+    if (key && !unique.has(key)) unique.set(key, item);
+  }
+  return Array.from(unique.values()).slice(0, 15);
+};
+
 const enrichNewsImages = async (items: any[]) => {
   const output = items.slice();
   const missing = output.map((item, index) => ({ item, index })).filter((x) => !x.item?.image).slice(0, 4);
@@ -3570,9 +3621,9 @@ export default {
         }
 
         const searchQuery = q || (lang === "ar" ? "أحدث الأخبار اليوم" : "latest verified news today");
-        const rss = await rssNewsSearch(q, lang);
-        if (rss.length) {
-          const articles = rss.slice(0, 10).map((item: any) => ({
+        const live = await liveNewsSearch(env, q, lang);
+        if (live.length) {
+          const articles = live.slice(0, 10).map((item: any) => ({
             title: item.title,
             description: item.snippet,
             content: item.snippet,
@@ -3583,8 +3634,9 @@ export default {
             articleReady: true
           }));
           await ensureNewsCacheTable(env);
-          try { await env.DB?.prepare("INSERT OR REPLACE INTO news_cache(cache_key,language,provider,articles_json,updated_at) VALUES(?,?,?,?,?)").bind("top:"+lang,lang,"Google News RSS",JSON.stringify(articles),new Date().toISOString()).run(); } catch {}
-          return json({ status: "ok", provider: "Google News RSS", articles, totalArticles: articles.length });
+          const providers = [...new Set(live.map((x: any) => x.provider).filter(Boolean))].join(" + ");
+          try { await env.DB?.prepare("INSERT OR REPLACE INTO news_cache(cache_key,language,provider,articles_json,updated_at) VALUES(?,?,?,?,?)").bind("top:"+lang,lang,providers || "live-news",JSON.stringify(articles),new Date().toISOString()).run(); } catch {}
+          return json({ status: "ok", provider: providers || "live-news", articles, totalArticles: articles.length });
         }
         // Prefer the last known-good cache before slower search fallbacks.
         // This prevents a slow provider from making the public news page look empty.
@@ -3671,9 +3723,9 @@ export default {
       if (!allowRequest(request, 30)) return json({ status: "rate_limited" }, 429);
       try {
         const lang = (url.searchParams.get("lang") || "ar").toLowerCase() === "en" ? "en" : "ar";
-        let items = await rssNewsSearch("", lang);
+        let items = await liveNewsSearch(env, "", lang);
         if (!items.length) {
-          items = await rssNewsSearch(lang === "ar" ? "مصر OR العالم OR رياضة OR اقتصاد" : "Egypt OR world OR sports OR economy", lang);
+          items = await liveNewsSearch(env, lang === "ar" ? "مصر OR العالم OR رياضة OR اقتصاد" : "Egypt OR world OR sports OR economy", lang);
         }
         if (!items.length) return json({ status: "provider_unavailable", signals: [], providersTried: ["Google News RSS", "BBC RSS"] }, 503);
         const signals = items.slice(0, 10).map((item: any, index: number) => ({
