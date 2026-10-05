@@ -2,7 +2,7 @@
 
 BAYAN is an evidence-first Arabic/English knowledge, research, search, AI and live-data platform running on Cloudflare Workers.
 
-**Current release:** 0.11.0
+**Current release:** 0.11.1
 
 ## Core principles
 - Evidence before claims.
