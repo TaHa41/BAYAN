@@ -1,0 +1,19 @@
+name: BAYAN v1 CI
+on:
+  push:
+    branches: ["v1"]
+  pull_request:
+    branches: ["v1","main"]
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm test
+      - run: node --check public/app.js
+      - run: npm run build
