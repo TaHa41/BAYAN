@@ -2097,7 +2097,21 @@ const internalSearch = async (query: string, env: Env) => {
     if (!current) unique.set(key, item);
     else current.provider = Array.from(new Set((String(current.provider) + "+" + String(item.provider)).split("+"))).join("+");
   }
-  let results = rerankResults(query, Array.from(unique.values())).slice(0, 24);
+  const intent = editorialIntent(query);
+  const rawRanked = rerankResults(query, Array.from(unique.values()));
+  const temporalRanked = rawRanked.map((item: any) => {
+    const t = item?.date ? Date.parse(String(item.date)) : NaN;
+    const ageDays = Number.isFinite(t) ? Math.max(0, (Date.now() - t) / 86400000) : null;
+    return { ...item, ageDays };
+  }).sort((a: any, b: any) => {
+    const aRecent = Number.isFinite(a.ageDays) ? a.ageDays : 99999;
+    const bRecent = Number.isFinite(b.ageDays) ? b.ageDays : 99999;
+    if (intent === "news" || intent === "markets" || intent === "weather" || intent === "person") {
+      if (aRecent !== bRecent) return aRecent - bRecent;
+    }
+    return (Number(b.score) || 0) - (Number(a.score) || 0);
+  });
+  let results = temporalRanked.slice(0, 24);
   const strong = results.filter((x: any) => !/facebook|instagram|youtube|tiktok|reddit/i.test(String(x.source || "") + " " + String(x.url || "")));
   if (strong.length >= 8) results = strong.slice(0, 16);
   const providerCount = new Set(results.flatMap((x: any) => String(x.provider || "").split("+").filter(Boolean))).size;
@@ -2109,6 +2123,8 @@ const internalSearch = async (query: string, env: Env) => {
     }).filter(Boolean)
   ).size;
   const coverage = {
+    currentAsOf: new Date().toISOString(),
+    intent,
     researchAngles: allResearch.length,
     sourceCount,
     providerCount,
@@ -2469,6 +2485,7 @@ export default {
       if (!q) return json({ error: "query_required" }, 400);
       const search = await internalSearch(q, env);
       if (!search.ok || !search.results[rank - 1]) return json({ error: "article_source_unavailable", status: search.status }, 503);
+      const articleImage = await chooseNewsImage(q, null, null, search.results[0]?.source || "BAYAN");
       const generated = await generateKnowledgeArticle(env, lang, q, search.results);
       if (!generated) {
         await queueContentTopic(env, q, sectionForIntent(queryIntent(q), q), lang, 100);
@@ -2476,10 +2493,10 @@ export default {
       }
       const section = sectionForIntent(queryIntent(q), q);
       const slug = await slugForQuery(q, lang);
-      const article = { slug, query: q, section, language: lang, title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 12).map(withoutUrl), createdAt: new Date().toISOString() };
+      const article = { slug, query: q, section, language: lang, title: generated.title, summary: generated.summary, body: generated.body, sources: search.results.slice(0, 12).map((item:any, index:number)=> index===0 && articleImage?.url ? {...withoutUrl(item), image: articleImage.url} : withoutUrl(item)), heroImage: articleImage || null, createdAt: new Date().toISOString() };
       const persistence = await saveKnowledgeArticle(env, article);
       if (persistence.persisted) await refreshKnowledgeGraph(env, article);
-      return json({ status: "ok", query: q, section, persisted: persistence.persisted, article: { id: slug, title: article.title, summary: article.summary, body: article.body, source: article.sources[0]?.source || "BAYAN evidence", date: article.sources[0]?.date || null, rank } });
+      return json({ status: "ok", query: q, section, persisted: persistence.persisted, article: { id: slug, title: article.title, summary: article.summary, body: article.body, sources: article.sources, image: articleImage?.url || null, imageMeta: articleImage || null, source: article.sources[0]?.source || "BAYAN evidence", date: article.sources[0]?.date || null, rank } });
     }
     if (path === "/api/trending/article") {
       if (!allowRequest(request, 10)) return json({ status: "rate_limited" }, 429);
