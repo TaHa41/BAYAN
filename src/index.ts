@@ -270,6 +270,7 @@ const renderHtml = async (response: Response, requestUrl: URL, env?: Env) => {
       "التنقل الرئيسي": "Main navigation",
       "قائمة بيان الجانبية": "BAYAN side menu",
       "إغلاق القائمة": "Close menu",
+      "إغلاق": "Close",
       "التصفح": "Browse",
       "الرئيسية": "Home",
       "البحث": "Search",
