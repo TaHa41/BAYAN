@@ -386,7 +386,40 @@ async function savedPage(){
   render((window.BAYAN_CONTENT?.articles||[]).filter(a=>ids.includes(a.id)));
 }
 function toolsPage(){
-  app.innerHTML='<section class="page"><div class="eyebrow">BAYAN TOOLS</div><h1 class="page-title">'+(isEn?"BAYAN Tools":"أدوات بيان")+'</h1><p class="page-lead">'+(isEn?"Live utilities for weather, markets, maps and image discovery.":"أدوات مباشرة للطقس والأسواق والخرائط واكتشاف الصور.")+'</p><div class="grid"><a class="card topic-card" href="'+withLang("/prices")+'"><span class="number">LIVE</span><h3>'+(isEn?"Prices & weather":"الأسعار والطقس")+'</h3><p>'+(isEn?"Live currency, gold and weather data.":"بيانات مباشرة للعملات والذهب والطقس.")+'</p></a><a class="card topic-card" href="'+withLang("/ai")+'"><span class="number">AI</span><h3>'+(isEn?"Ask BAYAN":"اسأل بيان")+'</h3><p>'+(isEn?"Evidence-first AI answers.":"إجابات ذكاء اصطناعي تبدأ بالأدلة.")+'</p></a></div></section>';
+  const title=isEn?"BAYAN Tools":"أدوات بيان";
+  const lead=isEn?"Live utilities for weather, markets, maps and image discovery.":"أدوات مباشرة للطقس والأسواق والخرائط واكتشاف الصور.";
+  app.innerHTML='<section class="page tools-page">'+
+    '<div class="eyebrow">BAYAN TOOLS</div><h1 class="page-title">'+title+'</h1><p class="page-lead">'+lead+'</p>'+
+    '<div class="grid tools-grid">'+
+      '<article class="card tool-panel"><span class="number">MAPS</span><h3>'+(isEn?"Find a place":"ابحث عن مكان")+'</h3><p class="muted">'+(isEn?"Search OpenStreetMap without requiring a paid key.":"ابحث في الخرائط عبر OpenStreetMap دون الحاجة إلى مفتاح مدفوع.")+'</p>'+
+      '<form id="toolMapForm" class="tool-form"><input id="toolMapQuery" required maxlength="180" placeholder="'+(isEn?"Cairo Museum":"متحف القاهرة")+'"><button class="btn btn-primary" type="submit">'+(isEn?"Search":"بحث")+'</button></form><div id="toolMapResults" class="tool-results"></div></article>'+
+      '<article class="card tool-panel"><span class="number">IMAGES</span><h3>'+(isEn?"Discover reusable images":"اكتشف صورًا قابلة لإعادة الاستخدام")+'</h3><p class="muted">'+(isEn?"Search Openverse and show licensing/source context.":"ابحث في Openverse مع عرض سياق المصدر والترخيص.")+'</p>'+
+      '<form id="toolImageForm" class="tool-form"><input id="toolImageQuery" required maxlength="120" placeholder="'+(isEn?"Egyptian desert":"الصحراء المصرية")+'"><button class="btn btn-primary" type="submit">'+(isEn?"Search":"بحث")+'</button></form><div id="toolImageResults" class="tool-results image-results"></div></article>'+
+      '<article class="card tool-panel"><span class="number">AI</span><h3>'+(isEn?"Ask BAYAN":"اسأل بيان")+'</h3><p>'+(isEn?"Evidence-first AI answers with retrieval and verification.":"إجابات ذكاء اصطناعي تبدأ بالاسترجاع والتحقق من الأدلة.")+'</p><a class="btn btn-secondary" href="'+withLang("/ai")+'">'+(isEn?"Open Ask BAYAN":"فتح اسأل بيان")+'</a></article>'+
+      '<article class="card tool-panel"><span class="number">LIVE</span><h3>'+(isEn?"Prices & weather":"الأسعار والطقس")+'</h3><p>'+(isEn?"Live currency, gold and weather data.":"بيانات مباشرة للعملات والذهب والطقس.")+'</p><a class="btn btn-secondary" href="'+withLang("/prices")+'">'+(isEn?"Open live data":"فتح البيانات المباشرة")+'</a></article>'+
+    '</div></section>';
+  const esc=(v)=>escapeHtml(String(v??""));
+  const mapForm=document.querySelector("#toolMapForm"), mapResults=document.querySelector("#toolMapResults");
+  mapForm?.addEventListener("submit",async e=>{
+    e.preventDefault(); const q=document.querySelector("#toolMapQuery")?.value.trim(); if(!q)return;
+    mapResults.innerHTML='<p class="muted">'+(isEn?"Searching…":"جارٍ البحث…")+'</p>';
+    try{
+      const res=await fetch("/api/maps/search?q="+encodeURIComponent(q)); const d=await res.json();
+      if(!res.ok||!Array.isArray(d.places)||!d.places.length){mapResults.innerHTML='<p class="muted">'+(isEn?"No places found.":"لم يتم العثور على أماكن.")+'</p>';return;}
+      mapResults.innerHTML=d.places.map(p=>'<a class="tool-result" href="'+safeHref(p.mapUrl)+'" target="_blank" rel="noopener noreferrer"><strong>'+esc(p.name)+'</strong><small>'+esc(p.category||p.type||"OpenStreetMap")+' · '+esc(p.lat)+', '+esc(p.lon)+'</small></a>').join("");
+    }catch{mapResults.innerHTML='<p class="muted">'+(isEn?"Map search is temporarily unavailable.":"البحث في الخرائط غير متاح مؤقتًا.")+'</p>';}
+  });
+  const imageForm=document.querySelector("#toolImageForm"), imageResults=document.querySelector("#toolImageResults");
+  imageForm?.addEventListener("submit",async e=>{
+    e.preventDefault(); const q=document.querySelector("#toolImageQuery")?.value.trim(); if(!q)return;
+    imageResults.innerHTML='<p class="muted">'+(isEn?"Searching…":"جارٍ البحث…")+'</p>';
+    try{
+      const res=await fetch("/api/images?q="+encodeURIComponent(q)); const d=await res.json();
+      const items=Array.isArray(d.images)?d.images:[];
+      if(!res.ok||!items.length){imageResults.innerHTML='<p class="muted">'+(isEn?"No images found.":"لم يتم العثور على صور.")+'</p>';return;}
+      imageResults.innerHTML=items.slice(0,12).map(x=>'<article class="tool-image"><img loading="lazy" src="'+safeHref(x.thumbnail||x.url||"")+'" alt="'+esc(x.title||q)+'"><div><strong>'+esc(x.title||q)+'</strong><small>'+esc(x.creator||"")+' · '+esc(x.license||"")+'</small><a href="'+safeHref(x.sourceUrl||x.url||"")+'" target="_blank" rel="noopener noreferrer">'+(isEn?"Source":"المصدر")+'</a></div></article>').join("");
+    }catch{imageResults.innerHTML='<p class="muted">'+(isEn?"Image search is temporarily unavailable.":"البحث عن الصور غير متاح مؤقتًا.")+'</p>';}
+  });
 }
 function renderRoute(routePath){
 document.body.dataset.section=routePath||"home";
