@@ -16,3 +16,6 @@ Release gates:
 11. Production smoke covers every public section and critical API.
 12. Cloudflare build and deployment pass on the exact commit being verified.
 13. No merge to main until all gates pass.
+
+
+CI contract verification: static guards, typecheck, unit tests, syntax checks, and Wrangler build must all pass before merge.
