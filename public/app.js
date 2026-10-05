@@ -417,7 +417,7 @@ function toolsPage(){
       const res=await fetch("/api/images?q="+encodeURIComponent(q)); const d=await res.json();
       const items=Array.isArray(d.images)?d.images:[];
       if(!res.ok||!items.length){imageResults.innerHTML='<p class="muted">'+(isEn?"No images found.":"لم يتم العثور على صور.")+'</p>';return;}
-      imageResults.innerHTML=items.slice(0,12).map(x=>'<article class="tool-image"><img loading="lazy" src="'+safeHref(x.thumbnail||x.url||"")+'" alt="'+esc(x.title||q)+'"><div><strong>'+esc(x.title||q)+'</strong><small>'+esc(x.creator||"")+' · '+esc(x.license||"")+'</small><a href="'+safeHref(x.sourceUrl||x.url||"")+'" target="_blank" rel="noopener noreferrer">'+(isEn?"Source":"المصدر")+'</a></div></article>').join("");
+      imageResults.innerHTML=items.slice(0,12).map(x=>'<article class="tool-image"><img loading="lazy" src="'+safeHref(x.url||"")+'" alt="'+esc(x.title||q)+'"><div><strong>'+esc(x.title||q)+'</strong><small>'+esc(x.credit||"")+' · '+esc(x.license||"")+'</small><a href="'+safeHref(x.sourceUrl||x.url||"")+'" target="_blank" rel="noopener noreferrer">'+(isEn?"Source":"المصدر")+'</a></div></article>').join("");
     }catch{imageResults.innerHTML='<p class="muted">'+(isEn?"Image search is temporarily unavailable.":"البحث عن الصور غير متاح مؤقتًا.")+'</p>';}
   });
 }
