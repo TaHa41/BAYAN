@@ -1,9 +1,7 @@
 name: BAYAN Deploy
 
 on:
-  workflow_run:
-    workflows: ["BAYAN CI"]
-    types: [completed]
+  push:
     branches: [main]
   workflow_dispatch:
 
@@ -16,21 +14,21 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || true
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.sha }}
 
       - name: Verify deployment source is current main
         id: source
         shell: bash
         run: |
           set -euo pipefail
-          target="${{ github.event.workflow_run.head_sha || github.sha }}"
+          target="${{ github.sha }}"
           current="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
           if [[ "$target" == "$current" ]]; then
             echo "current=true" >> "$GITHUB_OUTPUT"
@@ -109,7 +107,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4.147.0"
-          command: deploy --strict --var BAYAN_COMMIT_SHA:${{ github.event.workflow_run.head_sha || github.sha }} --var BAYAN_VERSION:0.11.1 --var BAYAN_ENVIRONMENT:production
+          command: deploy --strict --var BAYAN_COMMIT_SHA:${{ github.sha }} --var BAYAN_VERSION:0.11.2 --var BAYAN_ENVIRONMENT:production
 
       - name: Production smoke test
         if: steps.credentials.outputs.configured == 'true' && steps.source.outputs.current == 'true'
