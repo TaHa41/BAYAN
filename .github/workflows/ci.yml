@@ -1,45 +1,29 @@
-name: BAYAN CI
-
+name: BAYAN v2 CI
 on:
   push:
-    branches: ["main"]
+    branches: ["main","rebuild/v2-from-scratch"]
   pull_request:
     branches: ["main"]
-
+  workflow_dispatch:
 permissions:
   contents: read
-
 jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      - name: Setup Node
-        uses: actions/setup-node@v7
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       - name: Install
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -f package-lock.json ]]; then
-            npm ci
-          else
-            npm install
-          fi
-      - name: Static release guards
+        run: npm install
+      - name: Static architecture guards
         run: npm run guards
-
       - name: Typecheck
         run: npm run typecheck
+      - name: Frontend syntax
+        run: node --check public/app.js
       - name: Unit tests
         run: npm test
-      - name: Frontend JavaScript syntax check
-        run: node --check public/app.js
-
-      - name: Runtime script syntax check
-        run: node --check scripts/production-smoke.mjs && node --check scripts/ai-capability-smoke.mjs && node --check scripts/ai-guardian.mjs && node --check scripts/ai-autorepair.mjs && node --check scripts/static-guards.mjs
-
-      - name: Build validation
+      - name: Wrangler dry build
         run: npm run build
