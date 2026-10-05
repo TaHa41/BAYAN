@@ -52,6 +52,7 @@ if (!read("scripts/production-smoke.mjs").includes("fetchWithTimeout") || !read(
 if (!source.includes("geocoding-api.open-meteo.com") || !source.includes("AbortSignal.timeout(5000)")) failures.push("live weather search dependencies are not timeout-bounded");
 if (!source.includes("bayan_manager_settings") || !source.includes("telegram.chat_id")) failures.push("manager Telegram settings persistence is missing");
 if (!source.includes(`path === "/api/news"`) || !source.includes("Google News RSS") || !source.includes("GNews")) failures.push("news provider chain is incomplete");
+if (!source.includes("last known-good cache") || !source.includes('status: "stale_cache"') || !source.includes("const fetchTextWithTimeout = async (endpoint: string, timeoutMs = 5000)") || !app.includes("AbortSignal.timeout(25000)")) failures.push("news resilience/cache/timeout guard missing");
 if (!source.includes("provider_unavailable") || !source.includes("articles: []")) failures.push("news failure contract is incomplete");
 if (!app.includes("newsPage") || !app.includes("open-news-article")) failures.push("news article UI contract is incomplete");
 if (!app.includes("function toolsPage()") || !app.includes("/api/maps/search") || !app.includes("/api/images")) failures.push("tools UI does not activate maps/image discovery");
