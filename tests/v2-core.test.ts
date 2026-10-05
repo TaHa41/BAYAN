@@ -1,0 +1,2 @@
+import{describe,it,expect}from'vitest';import{clean}from'../src/core';
+describe('BAYAN v2 core',()=>{it('sanitizes control characters',()=>expect(clean('a\u0000b')).toBe('a b'));it('limits text',()=>expect(clean('x'.repeat(20),10)).toHaveLength(10))});
