@@ -26,7 +26,7 @@ describe("BAYAN repository contracts", () => {
     expect(content).toContain("enTitle");
     expect(content).toContain("enSummary");
     expect(content).toContain("enBody");
-    expect(sw).toContain("bayan-shell-v3-20261005");
+    expect(sw).toContain("bayan-shell-v4-20261005");
   });
 
   it("keeps database migrations contiguous and includes multilingual hardening", () => {
