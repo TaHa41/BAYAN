@@ -1,0 +1,1 @@
+import {describe,it,expect} from "vitest";describe("BAYAN v1",()=>{it("has the correct identity",()=>{expect("BAYAN").toBe("BAYAN");expect("1.0.0").toBe("1.0.0")})})
