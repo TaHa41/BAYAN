@@ -4052,7 +4052,9 @@ export default {
         "Disallow: /admin\n" +
         "Disallow: /review\n" +
         "Disallow: /saved\n" +
-        "Sitemap: " + sitemapUrl + "\n",
+        "Sitemap: " + sitemapUrl + "\n" +
+        "Sitemap: " + new URL("/news-sitemap.xml", request.url).toString() + "\n" +
+        "Sitemap: " + new URL("/feed.xml", request.url).toString() + "\n",
         {
           headers: {
             "content-type": "text/plain; charset=utf-8",
@@ -4060,6 +4062,32 @@ export default {
           }
         }
       );
+    }
+
+    if (path === "/news-sitemap.xml") {
+      await ensureNewsCacheTable(env);
+      let articles: any[] = [];
+      try {
+        const cached = await env.DB?.prepare("SELECT articles_json FROM news_cache WHERE cache_key='top:ar' LIMIT 1").first<any>();
+        articles = JSON.parse(cached?.articles_json || "[]");
+      } catch {}
+      const escXml = (v: string) => v.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+      const rows = articles.filter((x) => x?.url && x?.publishedAt && Date.now()-Date.parse(x.publishedAt) <= 48*60*60*1000).slice(0,50);
+      const body = rows.map((x) => "<url><loc>"+escXml(url.origin+"/news")+"</loc><news:news><news:publication><news:name>BAYAN News</news:name><news:language>ar</news:language></news:publication><news:publication_date>"+escXml(String(x.publishedAt))+"</news:publication_date><news:title>"+escXml(String(x.title||""))+"</news:title></news:news></url>").join("");
+      return new Response("<?xml version=\"1.0\" encoding=\"UTF-8\"?><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\" xmlns:news=\"http://www.google.com/schemas/sitemap-news/0.9\">"+body+"</urlset>", {headers:{"content-type":"application/xml; charset=utf-8","cache-control":"public, max-age=300"}});
+    }
+
+    if (path === "/feed.xml") {
+      await ensureNewsCacheTable(env);
+      let articles: any[] = [];
+      try {
+        const cached = await env.DB?.prepare("SELECT articles_json FROM news_cache WHERE cache_key='top:ar' LIMIT 1").first<any>();
+        articles = JSON.parse(cached?.articles_json || "[]");
+      } catch {}
+      if (!articles.length) { try { articles = await liveNewsSearch(env, "", "ar"); } catch {} }
+      const escXml = (v: string) => v.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+      const items = articles.slice(0,20).map((x) => "<item><title>"+escXml(String(x.title||""))+"</title><link>"+escXml(String(x.url||url.origin+"/news"))+"</link><guid isPermaLink=\"false\">"+escXml(String(x.url||x.title||""))+"</guid><description>"+escXml(String(x.description||x.snippet||""))+"</description><pubDate>"+escXml(String(x.publishedAt||new Date().toISOString()))+"</pubDate></item>").join("");
+      return new Response("<?xml version=\"1.0\" encoding=\"UTF-8\"?><rss version=\"2.0\"><channel><title>BAYAN | بيان — أخبار</title><link>"+escXml(url.origin+"/news")+"</link><description>أحدث أخبار بيان.</description>"+items+"</channel></rss>", {headers:{"content-type":"application/rss+xml; charset=utf-8","cache-control":"public, max-age=300"}});
     }
 
     if (path === "/sitemap.xml") {
