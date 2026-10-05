@@ -1,0 +1,2 @@
+export async function weather(){try{const r=await fetch("https://api.open-meteo.com/v1/forecast?latitude=30.0444&longitude=31.2357&current=temperature_2m,relative_humidity_2m,weather_code&timezone=Africa%2FCairo",{signal:AbortSignal.timeout(5000)});if(!r.ok)throw Error();return await r.json()}catch{return null}}
+export async function fx(){try{const r=await fetch("https://api.frankfurter.app/latest?from=USD&to=EGP,EUR,GBP,SAR,AED",{signal:AbortSignal.timeout(5000)});if(!r.ok)throw Error();return await r.json()}catch{return null}}
