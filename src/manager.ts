@@ -1,1 +1,0 @@
-import type{Env}from"./types";import{admin,json}from"./security";export async function manager(req:Request,env:Env){if(!admin(req,env))return json({ok:false,error:"Unauthorized"},401);return json({ok:true,manager:"ready",capabilities:["diagnostics","content-review","image-change","repair-plan","telegram","analytics"]})}
