@@ -31,7 +31,13 @@ interface Env {
 const DEFAULT_OPENAI_MODEL = "gpt-6-luna";
 const OPENAI_FALLBACK_MODELS = ["gpt-6-luna", "gpt-6.1-sol"];
 const DEFAULT_CLOUDFLARE_AI_MODEL = "@cf/openai/gpt-oss-120b";
-const CLOUDFLARE_AI_FALLBACK_MODELS = ["@cf/zai-org/glm-5.3-flash", "@cf/zai-org/glm-4.7-flash"];
+const CLOUDFLARE_AI_FALLBACK_MODELS = [
+  "@cf/openai/gpt-oss-120b",
+  "@cf/deepseek-ai/deepseek-v4-flash-0731",
+  "@cf/zai-org/glm-5.3-flash",
+  "@cf/zai-org/glm-4.7-flash",
+  "@cf/openai/gpt-oss-20b"
+];
 const DEFAULT_AI_GATEWAY = "default";
 const DEFAULT_AI_SEARCH_INSTANCE = "bayan-knowledge";
 const DEFAULT_SEARCH_PROVIDER = "ceramic";
@@ -105,6 +111,11 @@ const openAiResponses = async (env: Env, instructions: string, input: string) =>
     ...OPENAI_FALLBACK_MODELS
   ]));
   for (const model of models) {
+    const cooldownOpen = !(await isCooldownActive("ai-model", "openai:" + model));
+    if (!cooldownOpen) {
+      lastError = "openai_model_cooldown";
+      continue;
+    }
     try {
       const response = await fetch("https://api.openai.com/v1/responses", {
         method: "POST",
@@ -114,9 +125,17 @@ const openAiResponses = async (env: Env, instructions: string, input: string) =>
       if (response.ok) return { ok: true, model, data: await response.json() as any };
       const body = await response.text().catch(() => "");
       lastError = "openai_http_" + response.status + (body ? ":" + cleanText(body, 180) : "");
+      if (/429|rate.?limit|quota|insufficient_quota/i.test(lastError)) {
+        await setCooldown("ai-model", "openai:" + model, 15 * 60);
+      } else if (/^openai_http_(408|409|500|502|503|504)/.test(lastError)) {
+        await setCooldown("ai-model", "openai:" + model, 60);
+      }
       if (![408, 409, 429, 500, 502, 503, 504].includes(response.status)) break;
     } catch (error) {
       lastError = safeErrorMessage(error);
+      if (/429|rate.?limit|quota|insufficient_quota/i.test(lastError)) {
+        await setCooldown("ai-model", "openai:" + model, 15 * 60);
+      }
     }
   }
   throw new Error(lastError);
