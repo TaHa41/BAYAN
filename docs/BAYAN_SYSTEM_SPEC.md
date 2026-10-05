@@ -91,3 +91,12 @@ These incidents must become regression knowledge/tests when a repair is verified
 - Do not edit workflow/security files unless the repair is explicitly a workflow/CI failure and the policy permits it; normal application repair should not alter the security boundary.
 - Never include secrets in prompts, artifacts or logs.
 - Never invent a dependency, endpoint, binding, database column or API.
+
+
+## AI retrieval and failover maintenance — October 2026
+
+BAYAN's AI layer uses an evidence-first retrieval pipeline. Internal AI Search retrieval is configured for hybrid vector + keyword retrieval, query rewriting, and reranking before generation. Retrieved chunks retain relevance metadata so downstream synthesis can distinguish stronger evidence from weak matches.
+
+The generation layer keeps independent provider paths: OpenAI Responses with per-model cooldown handling for quota/rate-limit failures, followed by Cloudflare Workers AI. The Cloudflare fallback chain includes production reasoning-capable models and a lower-latency fallback. Provider failures are treated as availability events rather than evidence, and the answer-quality gate falls back to retrieved evidence instead of presenting an unverified generation.
+
+Publication remains stricter than interactive answers: knowledge articles require evidence from at least two independent source identities, language validation, repetition/source-overlap checks, and successful editorial generation before persistence.
