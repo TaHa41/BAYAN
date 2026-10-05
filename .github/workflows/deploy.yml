@@ -113,8 +113,18 @@ jobs:
         if: steps.credentials.outputs.configured == 'true' && steps.source.outputs.current == 'true'
         shell: bash
         run: |
-          set -euo pipefail
-          node scripts/production-smoke.mjs
+          set +e
+          node scripts/production-smoke.mjs | tee smoke-report.txt
+          status=${PIPESTATUS[0]}
+          echo "SMOKE_EXIT_CODE=${status}" >> smoke-report.txt
+          exit ${status}
+      - name: Upload production smoke report
+        if: always() && steps.credentials.outputs.configured == 'true' && steps.source.outputs.current == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bayan-production-smoke
+          path: smoke-report.txt
+          if-no-files-found: warn
 
       - name: BAYAN AI capability benchmark
         if: steps.credentials.outputs.configured == 'true' && steps.source.outputs.current == 'true'
