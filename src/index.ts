@@ -1177,11 +1177,39 @@ const buildArticleEvidence = async (env: Env, results: any[]) => {
 
 const buildEvidenceArticleFallback = (query: string, results: any[]) => {
   const usable = results.filter((x: any) => x?.title && x?.snippet).slice(0, 8);
-  const sources = new Set(usable.map((x: any) => String(x.source || x.provider || "").toLowerCase()).filter(Boolean));
-  if (!usable.length || !sources.size) return null;
-  // Never persist a source-dump as a "full article". If editorial generation
-  // fails validation, the caller must keep the material in evidence-only state.
-  return null;
+  const sources = Array.from(new Set(usable.map((x: any) => cleanText(x.source || x.provider || x.domain || "", 160)).filter(Boolean)));
+  if (!usable.length || sources.length < 2) return null;
+  const language = /[\\u0600-\\u06FF]/.test(query) ? "ar" : "en";
+  const title = cleanText(usable[0].title || query, 240);
+  const summary = language === "en"
+    ? "An evidence-based BAYAN article assembled from multiple independent news sources. AI editorial generation was unavailable, so BAYAN is showing a clearly labeled evidence synthesis rather than inventing missing facts."
+    : "مقال مبني على الأدلة في بيان، جرى تجميعه من عدة مصادر إخبارية مستقلة. تعذر تشغيل الصياغة بالذكاء الاصطناعي، لذلك يعرض بيان خلاصة أدلة واضحة بدل اختلاق معلومات غير متاحة.";
+  const body: string[] = [];
+  body.push(language === "en" ? "What is reported" : "ما الذي تذكره المصادر");
+  body.push(language === "en"
+    ? "The available reporting describes the following development: " + cleanText(usable[0].snippet, 1100)
+    : "توضح التقارير المتاحة التطور التالي: " + cleanText(usable[0].snippet, 1100));
+  if (usable.length > 1) {
+    body.push(language === "en" ? "Additional evidence" : "أدلة إضافية");
+    for (const item of usable.slice(1, 5)) {
+      const source = cleanText(item.source || item.provider || item.domain || (language === "en" ? "source" : "مصدر"), 140);
+      const date = cleanText(item.date || "", 80);
+      const detail = cleanText(item.snippet, 900);
+      if (!detail) continue;
+      body.push(language === "en"
+        ? source + (date ? " (" + date + ")" : "") + " reports: " + detail
+        : source + (date ? " (" + date + ")" : "") + " يورد: " + detail);
+    }
+  }
+  body.push(language === "en" ? "What the evidence does not establish" : "ما لا تثبته الأدلة");
+  body.push(language === "en"
+    ? "The retrieved material does not by itself establish details that are absent from these reports. BAYAN therefore does not add unverified motives, numbers, outcomes, or predictions."
+    : "لا تثبت المواد المسترجعة وحدها أي تفاصيل غير موجودة في هذه التقارير؛ لذلك لا يضيف بيان دوافع أو أرقامًا أو نتائج أو توقعات غير موثقة.");
+  body.push(language === "en" ? "Sources and timing" : "المصادر والتوقيت");
+  body.push(language === "en"
+    ? "The article was prepared from " + sources.slice(0, 6).join(", ") + ". Publication dates are retained with the evidence where available."
+    : "أُعدت المادة اعتمادًا على: " + sources.slice(0, 6).join("، ") + ". ويحتفظ بيان بتاريخ النشر مع الدليل عندما يكون متاحًا.");
+  return { title, summary, body, evidenceOnly: true, intent: editorialIntent(query) };
 };
 
 const articleQualityCheck = (text: string, query: string, intent: string, evidence: string, language = "ar") => {
@@ -1822,13 +1850,18 @@ const liveNewsSearch = async (env: Env, query = "", language = "ar") => {
 
 const enrichNewsImages = async (items: any[]) => {
   const output = items.slice();
-  const missing = output.map((item, index) => ({ item, index })).filter((x) => !x.item?.image).slice(0, 4);
-  const resolved = await Promise.all(missing.map(async ({ item, index }) => ({
-    index,
-    image: await resolveLicensedEditorialImage(String(item.title || ""))
-  })));
+  const missing = output.map((item, index) => ({ item, index })).filter((x) => !x.item?.image).slice(0, 10);
+  const resolved = await Promise.all(missing.map(async ({ item, index }) => {
+    let image = null;
+    if (item?.url) {
+      try { image = await rssArticleImage(item.url); } catch {}
+    }
+    if (image) return { index, image, imageMeta: { url: image, alt: cleanText(item.title || "", 220), sourceUrl: item.url || image, credit: cleanText(item.source || "Publisher", 160), rightsStatus: "publisher_source", imageSource: "publisher" } };
+    const licensed = await resolveLicensedEditorialImage(String(item.title || ""));
+    return { index, image: licensed?.url || null, imageMeta: licensed || null };
+  }));
   for (const item of resolved) {
-    if (item.image?.url) output[item.index] = { ...output[item.index], image: item.image.url, imageMeta: item.image };
+    if (item.image) output[item.index] = { ...output[item.index], image: item.image, imageMeta: item.imageMeta };
   }
   return output;
 };
@@ -3653,7 +3686,8 @@ export default {
         const searchQuery = q || (lang === "ar" ? "أحدث الأخبار اليوم" : "latest verified news today");
         const live = await liveNewsSearch(env, q, lang);
         if (live.length) {
-          const articles = live.slice(0, 10).map((item: any) => ({
+          const enrichedLive = await enrichNewsImages(live.slice(0, 10));
+          const articles = enrichedLive.slice(0, 10).map((item: any) => ({
             title: item.title,
             description: item.snippet,
             content: item.snippet,
