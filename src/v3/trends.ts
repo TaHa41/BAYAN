@@ -1,0 +1,2 @@
+import type {Env} from "./types";
+export async function trends(env:Env,lang:"ar"|"en"){if(!env.DB)return [];const r=await env.DB.prepare("select event_type as topic,count(*) as n from bayan_analytics_events where language=? and created_at>=datetime('now','-24 hours') group by event_type order by n desc limit 10").bind(lang).all<any>();return r.results||[]}
