@@ -12,3 +12,8 @@ export async function adminAnalytics(env:Env){if(!env.DB)return{events:0,top_pat
 
 export async function setArticleImage(env:Env,slug:string,image:string|null){await env.DB?.prepare("UPDATE knowledge_articles SET hero_image_url=?,hero_image_status=?,updated_at=? WHERE slug=?").bind(image,image?"READY":"NONE",now(),slug).run()}
 export async function reviewContribution(env:Env,id:number,status:string,note:string){await env.DB?.prepare("UPDATE visitor_contributions SET status=?,reviewer_note=?,reviewed_at=? WHERE id=?").bind(status,note||null,now(),id).run()}
+
+export async function saveArticle(env:Env,visitor:string,slug:string){await env.DB?.prepare("INSERT OR IGNORE INTO saved_articles(visitor_id,article_slug,created_at) VALUES(?,?,?)").bind(visitor,slug,now()).run()}
+export async function unsaveArticle(env:Env,visitor:string,slug:string){await env.DB?.prepare("DELETE FROM saved_articles WHERE visitor_id=? AND article_slug=?").bind(visitor,slug).run()}
+export async function savedArticles(env:Env,visitor:string){if(!env.DB)return[];const r=await env.DB.prepare("SELECT a.slug,a.title,a.summary,a.language,a.hero_image_url,s.created_at FROM saved_articles s JOIN knowledge_articles a ON a.slug=s.article_slug WHERE s.visitor_id=? AND a.status='PUBLISHED' ORDER BY s.created_at DESC LIMIT 100").bind(visitor).all();return r.results||[]}
+export async function recordInterest(env:Env,visitor:string,section:string,event:string){try{await env.DB?.prepare("INSERT INTO visitor_interest_events(visitor_id,section,event_type,weight,created_at) VALUES(?,?,?,?,?)").bind(visitor,section,event,1,now()).run()}catch{}}
