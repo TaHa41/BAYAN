@@ -27,7 +27,7 @@ jobs:
           npm run typecheck -- --pretty false --noErrorTruncation 2>&1 | tee typecheck.txt
           status=${PIPESTATUS[0]}
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            gh pr comment "${{ github.event.pull_request.number }}" --body "$(printf '### BAYAN v2 TypeScript diagnostics\\n\\n\\`\\`\\`text\\n%s\\n\\`\\`\\`' "$(cat typecheck.txt)")" || true
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/comments" -f body="BAYAN v2 TypeScript diagnostics:\n$(cat typecheck.txt)" || true
           fi
           exit "$status"
       - run: node --check public/app.js
