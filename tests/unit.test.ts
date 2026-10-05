@@ -1,0 +1,1 @@
+import {describe,it,expect} from "vitest";import {SECTIONS} from "../src/config";describe("BAYAN product foundation",()=>{it("has all required sections",()=>expect(SECTIONS.length).toBe(14));it("has bilingual labels",()=>expect(SECTIONS.every(x=>x[1]&&x[2])).toBe(true));});

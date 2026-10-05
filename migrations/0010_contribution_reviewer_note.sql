@@ -1,4 +1,0 @@
--- Compatibility marker for the contribution schema repair.
--- Fresh databases receive reviewer_note from migration 0003.
--- Legacy databases are repaired by ensureContributionTable at runtime because
--- SQLite/D1 does not support ALTER TABLE ... ADD COLUMN IF NOT EXISTS safely.

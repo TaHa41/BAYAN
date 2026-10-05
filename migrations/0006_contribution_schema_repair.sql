@@ -1,5 +1,0 @@
--- BAYAN schema drift repair
--- visitor_contributions.reviewer_note is already created by the original
--- contribution schema. This migration is intentionally a no-op because
--- SQLite/D1 does not support ALTER TABLE ADD COLUMN IF NOT EXISTS.
--- Keeping this migration empty prevents a duplicate-column failure on remote D1.

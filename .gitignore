@@ -1,9 +1,6 @@
 node_modules/
 .wrangler/
-.dev.vars
+.wrangler-build/
 .env
-.env.*
-!.env.example
-dist/
-coverage/
+.dev.vars
 .DS_Store

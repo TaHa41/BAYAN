@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Sitemap: https://bayan.tahaomar411.workers.dev/sitemap.xml
