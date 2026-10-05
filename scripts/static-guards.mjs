@@ -9,7 +9,7 @@ const html = read("public/index.html");
 const app = read("public/app.js");
 const schema = read("schema.sql");
 const env = read(".env.example");
-const migrations = readdirSync("migrations").filter(x => /^\\d+_.*\\.sql$/.test(x)).sort();
+const migrations = readdirSync("migrations").filter(x => /^\d+_.*\.sql$/.test(x)).sort();
 
 if (pkg.version !== "3.0.0") failures.push("package version must be 3.0.0");
 if (env.includes("BAYAN_VERSION=0.11.2")) failures.push("environment version is stale");
