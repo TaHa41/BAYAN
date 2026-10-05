@@ -1408,7 +1408,7 @@ const enqueueProactiveTopics = async (env: Env) => {
   if (!env.DB) return { ok: false, queued: 0 };
   try {
     await ensureContentQueueRetryColumn(env);
-    const topics = await rssNewsSearch("", "ar");
+    const topics = await liveNewsSearch(env, "", "ar");
     let queued = 0;
     for (const item of topics.slice(0, 4)) {
       const topic = cleanText(item?.title || "", 240);
@@ -3594,31 +3594,6 @@ export default {
       try {
         const lang = (url.searchParams.get("lang") || "ar").toLowerCase();
         if (!["en", "ar"].includes(lang)) return json({ status: "invalid_language", supported: ["en", "ar"] }, 400);
-
-        if (env.GNEWS_API_KEY) {
-          const endpoint = q ? "search" : "top-headlines";
-          const api = "https://gnews.io/api/v4/" + endpoint + "?lang=" + lang + "&max=10&apikey=" + encodeURIComponent(env.GNEWS_API_KEY) + (q ? "&q=" + encodeURIComponent(q) : "&category=general");
-          try {
-            const response = await fetch(api, { signal: AbortSignal.timeout(5000) });
-            if (response.ok) {
-              const data = await response.json() as any;
-              const articles = (data.articles || []).slice(0,10).map((article: any) => ({
-                title: cleanText(article.title, 240),
-                description: cleanText(article.description || article.content, 900),
-                content: cleanText(article.content, 1600),
-                publishedAt: article.publishedAt || null,
-                source: { name: cleanText(article.source?.name, 160) },
-                image: typeof article.image === "string" ? article.image : null,
-                url: typeof article.url === "string" ? article.url : null
-              }));
-              if (articles.length) {
-                await ensureNewsCacheTable(env);
-                try { await env.DB?.prepare("INSERT OR REPLACE INTO news_cache(cache_key,language,provider,articles_json,updated_at) VALUES(?,?,?,?,?)").bind("top:"+lang,lang,"GNews",JSON.stringify(articles),new Date().toISOString()).run(); } catch {}
-                return json({ status: "ok", provider: "GNews", articles, totalArticles: data.totalArticles || articles.length });
-              }
-            }
-          } catch {}
-        }
 
         const searchQuery = q || (lang === "ar" ? "أحدث الأخبار اليوم" : "latest verified news today");
         const live = await liveNewsSearch(env, q, lang);
