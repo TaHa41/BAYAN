@@ -1,0 +1,3 @@
+# BAYAN v1 System Specification
+
+The Worker owns API routing and security. Assets own the browser application. D1 owns persistent editorial, contribution, search, saved-content, analytics and repair state. External providers are isolated services. Search first retrieves internal evidence; AI can draft only from retrieved evidence. News is a separate retrieval stream and is explicitly marked until editorial verification. Admin APIs require the manager token. Scheduled execution records a runtime event. Production deployment applies migrations before deployment and runs a smoke gate.

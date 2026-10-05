@@ -1,0 +1,3 @@
+# BAYAN v1 Product Contract
+
+BAYAN is evidence-first. Search results, retrieved news and verified editorial articles are distinct states. Arabic and English are first-class. Public contributions require review. Admin requires BAYAN_AI_MANAGER_TOKEN. Telegram is the operational notification path; Resend is not required. External providers must fail independently and never blank the whole product. Secrets stay server-side. No AI response may invent evidence.

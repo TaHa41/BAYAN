@@ -1,0 +1,1 @@
+const origin=process.env.BAYAN_ORIGIN||"https://bayan.tahaomar411.workers.dev";const paths=["/","/api/health","/api/features","/robots.txt","/sitemap.xml"];let bad=0;for(const p of paths){try{const r=await fetch(origin+p);console.log(p,r.status);if(!r.ok)bad++}catch(e){console.error(p,e);bad++}}if(bad)process.exit(1);
