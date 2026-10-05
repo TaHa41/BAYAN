@@ -1,4 +1,4 @@
-import{Env,json,admin,unauthorized,clean,now}from"./core";import{news}from"./news";import{answer}from"./ai";import{getNews,getArticle,searchArticles,analytics,contribute,adminContributions,adminAnalytics}from"./db";import{weather,fx}from"./live";import{telegram}from"./notify";
+import{Env,json,admin,unauthorized,clean,now}from"./core";import{news}from"./news";import{answer}from"./ai";import{getNews,getArticle,searchArticles,analytics,contribute,adminContributions,adminAnalytics,setArticleImage,reviewContribution}from"./db";import{weather,fx}from"./live";import{telegram}from"./notify";
 const visitor=(req:Request)=>req.headers.get("x-bayan-visitor")?.slice(0,100)||"anonymous";
 const lang=(u:URL)=>u.searchParams.get("lang")==="en"?"en":"ar";
 export async function api(req:Request,env:Env,url:URL){const p=url.pathname,L=lang(url);
