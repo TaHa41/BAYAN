@@ -2039,6 +2039,29 @@ const internalSearch = async (query: string, env: Env) => {
     attempts
   };
 };
+const aiAnswerQuality = (answer: string, language: string, query: string, results: any[]) => {
+  const text = normalizeGeneratedText(answer);
+  if (!text || text === "Insufficient Evidence" || text.length < 8) return { ok: false, reason: "empty_or_insufficient" };
+  const arabicChars = (text.match(/[\u0600-\u06FF]/g) || []).length;
+  const latinChars = (text.match(/[A-Za-z]/g) || []).length;
+  if (language === "en" && arabicChars > Math.max(24, Math.floor(latinChars * 0.08))) {
+    return { ok: false, reason: "wrong_output_language" };
+  }
+  if (language === "ar" && latinChars > Math.max(40, Math.floor(arabicChars * 0.35)) && !/\b(?:JavaScript|Python|SQL|API|URL|HTML|CSS|AI|Cache|Cloudflare|OpenAI)\b/i.test(text)) {
+    return { ok: false, reason: "wrong_output_language" };
+  }
+  if (/\b(?:SOURCE\s*[0-9]+|source\s*[0-9]+)\b/i.test(text)) return { ok: false, reason: "source_marker_leak" };
+  if (/\b(?:I cannot verify|I don't have access to|as an AI language model)\b/i.test(text) && results.length) return { ok: false, reason: "model_meta_leak" };
+  return { ok: true, reason: null };
+};
+
+const normalizeAiAnswer = (answer: string, language: string, query: string, results: any[]) => {
+  const quality = aiAnswerQuality(answer, language, query, results);
+  if (quality.ok) return { answer: normalizeGeneratedText(answer), quality };
+  if (results.length) return { answer: evidenceFallbackAnswer(query, results, language), quality };
+  return { answer: language === "en" ? "Insufficient Evidence: the AI response did not pass BAYAN's output-quality checks." : "Insufficient Evidence: لم تجتز إجابة الذكاء الاصطناعي فحوص جودة بيان.", quality };
+};
+
 const evidencePrompt = (language: string, query: string, results: any[]) => {
   const evidence = results
     .map((x) => "[" + x.rank + "] " + x.title + " | " + x.source + " | " + (x.date || "date unavailable") + "\n" + x.snippet)
@@ -2496,7 +2519,8 @@ export default {
           answer = textOf(result);
         } catch {}
       }
-      if (!answer) answer = evidenceFallbackAnswer(q, search.results, lang);
+      const normalizedSearchAnswer = normalizeAiAnswer(answer || "", lang, q, search.results);
+      answer = normalizedSearchAnswer.answer;
       await logSearch({
         query: q, language: lang, intent, section,
         status: "DISCOVERED",
@@ -3068,7 +3092,8 @@ export default {
             { role: "system", content: "You are BAYAN AI. Be neutral, useful, explicit about uncertainty, and never fabricate. When verified evidence is supplied, use only that evidence for factual claims. When no evidence is supplied, you may answer general knowledge, reasoning, coding, writing, mathematics, and explanations without pretending they were live-verified. Never invent citations." },
             { role: "user", content: "Mode: " + (body.mode || "knowledge") + "\n" + prompt }
           ]);
-          const aiAnswer = textOf(result);
+          const normalized = normalizeAiAnswer(textOf(result), language, input, results);
+          const aiAnswer = normalized.answer;
           let article: any = null;
           if (results.length && !["code","write"].includes(String(body.mode || "").toLowerCase())) {
             try {
@@ -3131,7 +3156,8 @@ export default {
         }
 
         const data = await response.json() as any;
-        const aiAnswer = textOf(data);
+        const normalized = normalizeAiAnswer(textOf(data), language, input, results);
+        const aiAnswer = normalized.answer;
         let article: any = null;
         if (results.length && !["code","write"].includes(String(body.mode || "").toLowerCase())) {
           try {
