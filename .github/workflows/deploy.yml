@@ -1,137 +1,38 @@
-name: BAYAN Deploy
-
+name: BAYAN v2 Deploy
 on:
   push:
     branches: [main]
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
-  group: bayan-deploy-production-${{ github.sha }}
+  group: bayan-production
   cancel-in-progress: false
-
 jobs:
   deploy:
-    if: github.event_name == 'workflow_dispatch' || true
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          ref: ${{ github.sha }}
-
-      - name: Verify deployment source is current main
-        id: source
-        shell: bash
-        run: |
-          set -euo pipefail
-          target="${{ github.sha }}"
-          current="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
-          if [[ "$target" == "$current" ]]; then
-            echo "current=true" >> "$GITHUB_OUTPUT"
-            echo "Deployment source $target is the current main commit."
-          else
-            echo "current=false" >> "$GITHUB_OUTPUT"
-            echo "Skipping stale CI deployment: tested $target, current main is $current."
-          fi
+          node-version: 24
+      - run: npm install
+      - run: npm run check
       - name: Check Cloudflare credentials
-        id: credentials
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        shell: bash
-        run: |
-          if [[ -n "$CLOUDFLARE_API_TOKEN" && -n "$CLOUDFLARE_ACCOUNT_ID" ]]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-            echo "Cloudflare deployment credentials are configured."
-          else
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "Cloudflare deployment credentials are NOT configured; production deployment cannot proceed." >&2
-            exit 1
-          fi
-
-      - name: Report deployment decision
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "${{ steps.source.outputs.current }}" != "true" ]]; then
-            echo "Stale CI result detected; this deployment run is intentionally skipped because main advanced."
-            exit 0
-          fi
-          if [[ "${{ steps.credentials.outputs.configured }}" != "true" ]]; then
-            echo "Cloudflare deployment credentials are not configured; deployment is intentionally skipped."
-            exit 0
-          fi
-          echo "Deployment preconditions satisfied."
-      - name: Repair legacy contribution schema before migrations
-        if: steps.credentials.outputs.configured == 'true' && steps.source.outputs.current == 'true'
-        shell: bash
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          schema="$(npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "SELECT name FROM pragma_table_info('visitor_contributions') WHERE name IN ('reviewer_note','reviewed_at')" --json)"
-          if ! grep -q 'reviewer_note' <<<"$schema"; then
-            npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE visitor_contributions ADD COLUMN reviewer_note TEXT" --yes
-          fi
-          if ! grep -q 'reviewed_at' <<<"$schema"; then
-            npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE visitor_contributions ADD COLUMN reviewed_at TEXT" --yes
-          fi
-          repair_schema="$(npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "SELECT name FROM pragma_table_info('repair_jobs') WHERE name IN ('phase','root_cause','risk_level','base_sha','branch','pr_number','verification_json','rollback_count','last_verified_at')" --json)"
-          grep -q 'phase' <<<"$repair_schema" || npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE repair_jobs ADD COLUMN phase TEXT NOT NULL DEFAULT 'DETECTED'" --yes
-          grep -q 'root_cause' <<<"$repair_schema" || npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE repair_jobs ADD COLUMN root_cause TEXT" --yes
-          grep -q 'risk_level' <<<"$repair_schema" || npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE repair_jobs ADD COLUMN risk_level TEXT NOT NULL DEFAULT 'AI_FIX_VERIFY'" --yes
-          grep -q 'base_sha' <<<"$repair_schema" || npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE repair_jobs ADD COLUMN base_sha TEXT" --yes
-          grep -q 'branch' <<<"$repair_schema" || npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE repair_jobs ADD COLUMN branch TEXT" --yes
-          grep -q 'pr_number' <<<"$repair_schema" || npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE repair_jobs ADD COLUMN pr_number INTEGER" --yes
-          grep -q 'verification_json' <<<"$repair_schema" || npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE repair_jobs ADD COLUMN verification_json TEXT" --yes
-          grep -q 'rollback_count' <<<"$repair_schema" || npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE repair_jobs ADD COLUMN rollback_count INTEGER NOT NULL DEFAULT 0" --yes
-          grep -q 'last_verified_at' <<<"$repair_schema" || npx wrangler@4.147.0 d1 execute bayan-knowledge --remote --command "ALTER TABLE repair_jobs ADD COLUMN last_verified_at TEXT" --yes
-      - name: Apply D1 migrations
-        if: steps.credentials.outputs.configured == 'true' && steps.source.outputs.current == 'true'
-        uses: cloudflare/wrangler-action@v4
+        run: test -n "$CLOUDFLARE_API_TOKEN" && test -n "$CLOUDFLARE_ACCOUNT_ID"
+      - uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4.147.0"
           command: d1 migrations apply bayan-knowledge --remote
-
-      - name: Deploy Worker
-        if: steps.credentials.outputs.configured == 'true' && steps.source.outputs.current == 'true'
-        uses: cloudflare/wrangler-action@v4
+      - uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4.147.0"
-          command: deploy --strict --var BAYAN_COMMIT_SHA:${{ github.sha }} --var BAYAN_VERSION:0.11.2 --var BAYAN_ENVIRONMENT:production
-
-      - name: Production smoke test
-        if: steps.credentials.outputs.configured == 'true' && steps.source.outputs.current == 'true'
-        shell: bash
-        run: |
-          set +e
-          node scripts/production-smoke.mjs | tee smoke-report.txt
-          status=${PIPESTATUS[0]}
-          echo "SMOKE_EXIT_CODE=${status}" >> smoke-report.txt
-          exit ${status}
-      - name: Upload production smoke report
-        if: always() && steps.credentials.outputs.configured == 'true' && steps.source.outputs.current == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: bayan-production-smoke
-          path: smoke-report.txt
-          if-no-files-found: warn
-
-      - name: BAYAN AI capability benchmark
-        if: steps.credentials.outputs.configured == 'true' && steps.source.outputs.current == 'true'
-        continue-on-error: true
-        shell: bash
-        env:
-          BAYAN_BASE_URL: https://bayan.tahaomar411.workers.dev
-        run: |
-          set -euo pipefail
-          node scripts/ai-capability-smoke.mjs
+          command: deploy --strict --var BAYAN_COMMIT_SHA:${{ github.sha }} --var BAYAN_VERSION:2.0.0

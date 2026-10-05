@@ -105,10 +105,10 @@ jobs:
           if [[ "$status" != "patched_and_verified" ]]; then
             exit 0
           fi
-          gh workflow run "BAYAN CI" --repo "${{ github.repository }}" --ref "$branch"
+          gh workflow run "BAYAN v2 CI" --repo "${{ github.repository }}" --ref "$branch"
           for i in {1..30}; do
             sleep 10
-            run="$(gh run list --repo "${{ github.repository }}" --workflow "BAYAN CI" --branch "$branch" --limit 1 --json status,conclusion,databaseId --jq '.[0]')"
+            run="$(gh run list --repo "${{ github.repository }}" --workflow "BAYAN v2 CI" --branch "$branch" --limit 1 --json status,conclusion,databaseId --jq '.[0]')"
             current="$(node -e 'const x=JSON.parse(process.argv[1]); console.log(x.status)' "$run")"
             conclusion="$(node -e 'const x=JSON.parse(process.argv[1]); console.log(x.conclusion||"")' "$run")"
             echo "CI status=$current conclusion=$conclusion"

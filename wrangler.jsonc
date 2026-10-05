@@ -12,21 +12,6 @@
   "placement": {
     "mode": "smart"
   },
-  "ai": {
-    "binding": "AI",
-    "remote": true
-  },
-  "browser": {
-    "binding": "BROWSER",
-    "remote": true
-  },
-  "ai_search_namespaces": [
-    {
-      "binding": "AI_SEARCH",
-      "namespace": "default",
-      "remote": true
-    }
-  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -35,14 +20,7 @@
     }
   ],
   "keep_vars": true,
-  "secrets": {
-    "required": [
-      "OPENAI_API_KEY",
-      "SEARCH_API_KEY",
-      "GNEWS_API_KEY",
-      "GOLD_API_KEY"
-    ]
-  },
+  
   "observability": {
     "enabled": true,
     "head_sampling_rate": 1,
@@ -60,6 +38,7 @@
       "head_sampling_rate": 0.25
     }
   },
+  "previews": {},
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",

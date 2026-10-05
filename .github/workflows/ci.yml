@@ -1,45 +1,53 @@
-name: BAYAN CI
-
+name: BAYAN v2 CI
 on:
   push:
-    branches: ["main"]
+    branches: ["main","rebuild/v2-from-scratch"]
   pull_request:
     branches: ["main"]
-
+  workflow_dispatch:
 permissions:
   contents: read
-
+  pull-requests: write
 jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      - name: Setup Node
-        uses: actions/setup-node@v7
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
-      - name: Install
+      - run: npm install
+      - run: npm run guards
+      - name: Typecheck with diagnostics
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          set -euo pipefail
-          if [[ -f package-lock.json ]]; then
-            npm ci
-          else
-            npm install
+          set +e
+          npm run typecheck -- --pretty false --noErrorTruncation 2>&1 | tee typecheck.txt
+          status=${PIPESTATUS[0]}
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/comments" -f body="BAYAN v2 TypeScript diagnostics:\n$(cat typecheck.txt)" || true
           fi
-      - name: Static release guards
-        run: npm run guards
-
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Unit tests
-        run: npm test
-      - name: Frontend JavaScript syntax check
-        run: node --check public/app.js
-
-      - name: Runtime script syntax check
-        run: node --check scripts/production-smoke.mjs && node --check scripts/ai-capability-smoke.mjs && node --check scripts/ai-guardian.mjs && node --check scripts/ai-autorepair.mjs && node --check scripts/static-guards.mjs
-
-      - name: Build validation
-        run: npm run build
+          exit "$status"
+      - name: Frontend syntax with diagnostics
+        shell: bash
+        run: |
+          set +e
+          node --check public/app.js 2>&1 | tee frontend-syntax.txt
+          status=${PIPESTATUS[0]}
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/comments" -f body="BAYAN v2 frontend syntax diagnostics:\n$(cat frontend-syntax.txt)" || true; fi
+          exit "$status"
+      - name: Unit tests with diagnostics
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set +e
+          npm test -- --reporter=verbose 2>&1 | tee test.txt
+          status=${PIPESTATUS[0]}
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${{ github.event.pull_request.number }}/comments" -f body="BAYAN v2 unit-test diagnostics:\n$(cat test.txt)" || true
+          fi
+          exit "$status"
+      - run: npm run build

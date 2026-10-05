@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: "*/15 * * * *"
   workflow_run:
-    workflows: ["BAYAN Deploy"]
+    workflows: ["BAYAN v2 Deploy"]
     types: [completed]
   workflow_dispatch:
 

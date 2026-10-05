@@ -1,6 +1,6 @@
 {
   "name": "bayan",
-  "version": "0.11.2",
+  "version": "2.0.0",
   "private": true,
   "description": "BAYAN | بيان — Arabic/English information and knowledge platform",
   "type": "module",
@@ -9,8 +9,10 @@
     "build": "wrangler deploy --dry-run",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "check": "npm run guards && npm run typecheck && node --check public/app.js && npm test && npm run build",
     "guards": "node scripts/static-guards.mjs",
-    "check": "npm run guards && npm run typecheck && node --check public/app.js && npm test && npm run build"
+    "deploy": "wrangler deploy",
+    "preview": "wrangler preview"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261003.1",
@@ -18,5 +20,8 @@
     "vitest": "5.0.3",
     "@types/node": "26.4.0",
     "wrangler": "4.147.0"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
