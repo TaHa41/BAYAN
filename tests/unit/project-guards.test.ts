@@ -27,7 +27,7 @@ describe("BAYAN V3 contracts", () => {
     expect(source).toContain("BAYAN_AI_MANAGER_TOKEN");
     expect(html).toContain("/styles.css");
     expect(html).toContain("/app.js");
-    expect(app).toContain("location.href="/search?q=");
+    expect(app).toContain("location.href=\"/search?q=");
     expect(app).toContain("lang=en");
   });
 
