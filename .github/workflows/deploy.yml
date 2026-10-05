@@ -51,7 +51,8 @@ jobs:
             echo "Cloudflare deployment credentials are configured."
           else
             echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "Cloudflare deployment credentials are not configured; deployment is skipped safely."
+            echo "Cloudflare deployment credentials are NOT configured; production deployment cannot proceed." >&2
+            exit 1
           fi
 
       - name: Report deployment decision
