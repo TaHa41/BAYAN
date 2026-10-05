@@ -1673,7 +1673,7 @@ const rssItems = (xml: string) => {
   return items;
 };
 
-const fetchTextWithTimeout = async (endpoint: string, timeoutMs = 7000) => {
+const fetchTextWithTimeout = async (endpoint: string, timeoutMs = 5000) => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -1694,7 +1694,7 @@ const fetchTextWithTimeout = async (endpoint: string, timeoutMs = 7000) => {
 const rssArticleImage = async (url: string | null) => {
   if (!url || !/^https?:\/\//i.test(url)) return null;
   try {
-    const response = await fetch(url, { headers: { "user-agent": "BAYAN/1.0 news reader", "accept": "text/html,application/xhtml+xml" }, signal: AbortSignal.timeout(4500) });
+    const response = await fetch(url, { headers: { "user-agent": "BAYAN/1.0 news reader", "accept": "text/html,application/xhtml+xml" }, signal: AbortSignal.timeout(2500) });
     if (!response.ok) return null;
     const html = (await response.text()).slice(0, 400000);
     const patterns = [
@@ -1738,9 +1738,9 @@ const rssNewsSearch = async (query = "", language = "ar") => {
     const key = (item.url || item.title).toLowerCase();
     if (!unique.has(key)) unique.set(key, item);
   }
-  const ranked = rerankResults(query, Array.from(unique.values()).slice(0, 30)).slice(0, 12);
+  const ranked = rerankResults(query, Array.from(unique.values()).slice(0, 30)).slice(0, 10);
   const enriched = await Promise.all(ranked.map(async (item: any, index: number) => {
-    if (item.image || !item.url || index >= 10) return item;
+    if (item.image || !item.url || index >= 4) return item;
     const image = await rssArticleImage(item.url);
     return image ? { ...item, image } : item;
   }));
@@ -3548,7 +3548,7 @@ export default {
           const endpoint = q ? "search" : "top-headlines";
           const api = "https://gnews.io/api/v4/" + endpoint + "?lang=" + lang + "&max=10&apikey=" + encodeURIComponent(env.GNEWS_API_KEY) + (q ? "&q=" + encodeURIComponent(q) : "&category=general");
           try {
-            const response = await fetch(api, { signal: AbortSignal.timeout(7000) });
+            const response = await fetch(api, { signal: AbortSignal.timeout(5000) });
             if (response.ok) {
               const data = await response.json() as any;
               const articles = (data.articles || []).slice(0,10).map((article: any) => ({
@@ -3586,6 +3586,18 @@ export default {
           try { await env.DB?.prepare("INSERT OR REPLACE INTO news_cache(cache_key,language,provider,articles_json,updated_at) VALUES(?,?,?,?,?)").bind("top:"+lang,lang,"Google News RSS",JSON.stringify(articles),new Date().toISOString()).run(); } catch {}
           return json({ status: "ok", provider: "Google News RSS", articles, totalArticles: articles.length });
         }
+        // Prefer the last known-good cache before slower search fallbacks.
+        // This prevents a slow provider from making the public news page look empty.
+        await ensureNewsCacheTable(env);
+        try {
+          const cached = await env.DB?.prepare("SELECT provider,articles_json,updated_at FROM news_cache WHERE cache_key=? AND language=?").bind("top:"+lang,lang).first<any>();
+          if (cached?.articles_json) {
+            const articles = JSON.parse(cached.articles_json);
+            if (Array.isArray(articles) && articles.length) {
+              return json({ status: "stale_cache", provider: cached.provider, cacheUpdatedAt: cached.updated_at, articles, totalArticles: articles.length, warning: "LIVE_PROVIDER_UNAVAILABLE_USING_LAST_KNOWN_GOOD_NEWS" });
+            }
+          }
+        } catch {}
         const search = await internalSearch(searchQuery, env);
         if (search.ok && search.results.length) {
           return json({
@@ -3602,11 +3614,11 @@ export default {
             totalArticles: search.results.length
           });
         }
-        // Last safe news fallback: retry direct RSS with broad, language-specific topics.
+        // Only retry RSS with a broad query when the visitor actually searched for news.
         const fallbackQuery = lang === "ar"
           ? "مصر OR العالم OR اقتصاد OR رياضة OR تكنولوجيا"
           : "Egypt OR world OR economy OR sports OR technology";
-        const fallbackRss = await rssNewsSearch(fallbackQuery, lang);
+        const fallbackRss = q ? await rssNewsSearch(fallbackQuery, lang) : [];
         if (fallbackRss.length) {
           const articles = fallbackRss.slice(0,10).map((item:any)=>({title:item.title,description:item.snippet,content:item.snippet,publishedAt:item.date||null,source:{name:item.source},image:item.image||null,url:item.url||null,articleReady:true}));
           await ensureNewsCacheTable(env);
