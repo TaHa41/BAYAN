@@ -275,3 +275,22 @@ main{width:min(1180px,92%)}
 @media(max-width:1000px){.hero{grid-template-columns:1fr;gap:25px}.hero-visual{min-height:250px}.live-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:760px){.live-grid{grid-template-columns:repeat(2,1fr)}.article-grid{grid-template-columns:repeat(2,1fr)}.signal-grid{grid-template-columns:1fr}.footer{grid-template-columns:1fr}.footer-links{justify-content:flex-start}}
 @media(max-width:560px){.hero{padding-top:30px}.hero h1{font-size:46px}.hero-visual{display:none}.live-grid,.article-grid,.grid{grid-template-columns:1fr}.live-card,.topic-card,.article-card{min-height:auto}.section-head{margin-top:38px}.side-menu{width:92vw}}
+
+/* BAYAN Tools activation */
+.tools-grid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+.tool-panel{display:flex;flex-direction:column;gap:12px}
+.tool-form{display:flex;gap:10px;align-items:center}
+.tool-form input{flex:1;min-width:0}
+.tool-results{display:grid;gap:8px;margin-top:4px}
+.tool-result{display:flex;flex-direction:column;gap:4px;padding:12px;border:1px solid var(--border);border-radius:14px;background:var(--surface-2);text-decoration:none}
+.tool-result small,.tool-image small{opacity:.72}
+.image-results{grid-template-columns:repeat(2,minmax(0,1fr))}
+.tool-image{overflow:hidden;border:1px solid var(--border);border-radius:14px;background:var(--surface-2)}
+.tool-image img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover}
+.tool-image div{display:flex;flex-direction:column;gap:5px;padding:9px}
+.tool-image a{font-size:.82rem}
+@media(max-width:760px){
+ .tools-grid{grid-template-columns:1fr}
+ .tool-form{flex-direction:column;align-items:stretch}
+ .image-results{grid-template-columns:1fr 1fr}
+}
