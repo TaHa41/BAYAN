@@ -294,3 +294,23 @@ main{width:min(1180px,92%)}
  .tool-form{flex-direction:column;align-items:stretch}
  .image-results{grid-template-columns:1fr 1fr}
 }
+/* BAYAN visual correction — unified light/dark palette and icon system */
+:root{--bg:#f5f7fa;--surface:#fff;--surface2:#eef2f6;--text:#17212b;--muted:#66727f;--line:rgba(23,33,43,.11);--accent:#0b7285;--accent2:#d39b2a;--glow:rgba(11,114,133,.10);--shadow:0 12px 36px rgba(23,33,43,.07)}
+body.light{--bg:#f5f7fa;--surface:#fff;--surface2:#eef2f6;--text:#17212b;--muted:#66727f;--line:rgba(23,33,43,.11);--accent:#0b7285;--accent2:#b87914;--glow:rgba(11,114,133,.09);--shadow:0 12px 36px rgba(23,33,43,.07)}
+body:not(.light){--bg:#0d1117;--surface:#151b23;--surface2:#1c2530;--text:#eef3f7;--muted:#9ba8b5;--line:rgba(238,243,247,.10);--accent:#55c6d8;--accent2:#e0b45c;--glow:rgba(85,198,216,.10);--shadow:0 16px 45px rgba(0,0,0,.28)}
+body{background:radial-gradient(700px 380px at 85% -10%,color-mix(in srgb,var(--accent) 7%,transparent),transparent 70%),radial-gradient(650px 360px at -10% 55%,color-mix(in srgb,var(--accent2) 5%,transparent),transparent 70%),var(--bg)}
+body:before,body:after{filter:blur(70px);opacity:.22;animation:none!important}
+.site-header{background:color-mix(in srgb,var(--bg) 96%,transparent);border-bottom:1px solid var(--line);box-shadow:0 4px 18px rgba(0,0,0,.035)}
+.brand strong,.brand-copy strong{background:none!important;color:var(--text)!important}.brand-copy span{color:var(--muted)}
+.nav a.active{background:color-mix(in srgb,var(--accent) 10%,var(--surface));border-color:color-mix(in srgb,var(--accent) 24%,transparent);color:var(--accent)}
+.section-icon{color:var(--accent)!important;stroke:currentColor!important;fill:none!important}
+.menu-icon,.manager-edge-menu nav a span{background:color-mix(in srgb,var(--accent) 10%,var(--surface2))!important;color:var(--accent)!important}
+.topic-card .section-icon{color:var(--accent)!important}
+.primary,.searchbar button{background:var(--accent)!important;color:#fff!important}.primary:hover{background:color-mix(in srgb,var(--accent) 88%,#000)!important}
+a,.article-kicker,.article-section,.eyebrow,.number,.result-number,.source-name{color:var(--accent)}
+.page-title,.hero h1 span{background:none!important;color:var(--text)!important}
+.badge,.verified-pill,.source-count{background:color-mix(in srgb,var(--accent) 8%,var(--surface))!important;color:var(--accent)!important;border-color:color-mix(in srgb,var(--accent) 24%,var(--line))!important}
+.card,.topic-card,.article-card,.data-card,.panel,.admin-card{border-color:var(--line)!important;box-shadow:var(--shadow)}
+.card:hover,.topic-card:hover,.article-card:hover,.data-card:hover{border-color:color-mix(in srgb,var(--accent) 30%,var(--line))!important;box-shadow:0 18px 42px color-mix(in srgb,var(--accent) 7%,transparent)}
+.searchbar:focus-within,input:focus,textarea:focus,select:focus{border-color:var(--accent)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 10%,transparent)!important}
+.side-menu-links a:hover,.manager-edge-menu nav a:hover,.manager-edge-menu nav a.active{background:color-mix(in srgb,var(--accent) 9%,var(--surface))!important;color:var(--accent)!important}
