@@ -1421,6 +1421,37 @@ const resolveLicensedEditorialImage = async (query: string) => {
   }
 };
 
+const resolveWikimediaEditorialImage = async (query: string) => {
+  const cleanQuery = cleanText(query, 180);
+  if (!cleanQuery) return null;
+  try {
+    const endpoint = "https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrsearch=" + encodeURIComponent(cleanQuery) + "&gsrlimit=8&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=1200&format=json&origin=*";
+    const response = await fetch(endpoint, { headers: { "accept": "application/json", "user-agent": "BAYAN/1.0 image resolver" }, signal: AbortSignal.timeout(5000) });
+    if (!response.ok) return null;
+    const data = await response.json() as any;
+    const terms = cleanQuery.toLowerCase().split(/\s+/).filter((x) => x.length > 2);
+    const candidates = (Object.values(data?.query?.pages || {}) as any[]).map((page: any) => {
+      const info = page?.imageinfo?.[0];
+      const meta = info?.extmetadata || {};
+      const title = cleanText(String(page?.title || "").replace(/^File:/i, ""), 240);
+      const description = cleanText(String(meta?.ImageDescription?.value || meta?.ObjectName?.value || "").replace(/<[^>]+>/g, " "), 500);
+      const hay = (title + " " + description).toLowerCase();
+      const score = terms.filter((term) => hay.includes(term)).length;
+      return {
+        url: typeof info?.thumburl === "string" ? info.thumburl : (typeof info?.url === "string" ? info.url : null),
+        alt: description || title || cleanQuery,
+        title,
+        credit: cleanText(String(meta?.Artist?.value || "Wikimedia Commons").replace(/<[^>]+>/g, " "), 160),
+        license: cleanText(String(meta?.LicenseShortName?.value || meta?.UsageTerms?.value || ""), 160),
+        sourceUrl: typeof info?.descriptionurl === "string" ? info.descriptionurl : null,
+        score
+      };
+    }).filter((x) => x.url && x.license && x.score > 0).sort((a, b) => b.score - a.score);
+    const best = candidates[0];
+    return best ? { ...best, rightsStatus: "license_identified", imageSource: "Wikimedia Commons" } : null;
+  } catch { return null; }
+};
+
 const chooseNewsImage = async (title: string, sourceUrl: string | null, suppliedImage: string | null, sourceName = "News source") => {
   if (suppliedImage && /^https?:\/\//i.test(suppliedImage)) {
     return { url: suppliedImage, alt: cleanText(title, 220), credit: cleanText(sourceName, 160), sourceUrl: sourceUrl || suppliedImage, license: null, rightsStatus: "publisher_source", imageSource: "publisher" };
