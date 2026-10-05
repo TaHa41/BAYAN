@@ -1725,7 +1725,9 @@ const rssNewsSearch = async (query = "", language = "ar") => {
         language === "ar"
           ? "https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdff8b8cab9"
           : "https://www.aljazeera.com/xml/rss/all.xml",
-        language === "ar" ? "https://feeds.bbci.co.uk/arabic/rss.xml" : "https://feeds.bbci.co.uk/news/rss.xml"
+        language === "ar" ? "https://feeds.bbci.co.uk/arabic/rss.xml" : "https://feeds.bbci.co.uk/news/rss.xml",
+        language === "ar" ? "https://rss.dw.com/rdf/rss-ar-all" : "https://rss.dw.com/rdf/rss-en-all",
+        language === "ar" ? "https://www.france24.com/ar/rss" : "https://www.france24.com/en/rss"
       ];
   const settled = await Promise.allSettled(feeds.map((endpoint) => fetchTextWithTimeout(endpoint)));
   const collected: any[] = [];
