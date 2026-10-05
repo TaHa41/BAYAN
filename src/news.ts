@@ -1,7 +1,7 @@
-import{Env,clean,hash,now}from"./core";import{saveNews}from"./db";
+import{Env,clean,hash,now}from"./core";import{saveNews}from"./db";import{enrichImages}from"./images";
 const FEEDS=["https://www.aljazeera.net/aljazeera/rss","https://feeds.bbci.co.uk/arabic/rss.xml","https://news.google.com/rss?hl=ar&gl=EG&ceid=EG:ar"];
 const xml=(s:string,tag:string)=>{const m=s.match(new RegExp("<"+tag+"[^>]*>([\\s\\S]*?)</"+tag+">","i"));return m?clean(m[1].replace(/<!\\[CDATA\\[|\\]\\]>/g,"").replace(/<[^>]+>/g," ")): ""};
 export async function fetchFeed(url:string){const r=await fetch(url,{headers:{"user-agent":"BAYAN/2.0"},signal:AbortSignal.timeout(7000)});if(!r.ok)throw Error("feed_http_"+r.status);const t=await r.text();const blocks=t.match(/<item[\\s>][\\s\\S]*?<\\/item>/gi)||[];return blocks.map(b=>({title:xml(b,"title"),link:xml(b,"link"),description:xml(b,"description"),publishedAt:xml(b,"pubDate")})).filter(x=>x.title&&x.link)}
 export async function collectNews(env:Env){const all:any[]=[];for(const f of FEEDS){try{for(const x of await fetchFeed(f)){const id=(await hash(x.link||x.title)).slice(0,24);all.push({...x,slug:"news-"+id,sourceUrl:x.link,sourceName:new URL(f).hostname,summary:clean(x.description||x.title,700),body:clean(x.description||x.title,3000),sources:[{name:new URL(f).hostname,url:x.link,publishedAt:x.publishedAt}],language:"ar",image:null})}}catch{}}
-const unique=Array.from(new Map(all.map(x=>[x.slug,x])).values()).slice(0,30);for(const x of unique)await saveNews(env,x);return unique}
+const unique=Array.from(new Map(all.map(x=>[x.slug,x])).values()).slice(0,30);const enriched=await enrichImages(unique);for(const x of enriched)await saveNews(env,x);return enriched}
 export async function news(env:Env){const cached=await import("./db").then(m=>m.getNews(env,30));try{const fresh=await collectNews(env);return fresh.length?fresh:cached}catch{return cached}}
