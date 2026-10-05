@@ -99,7 +99,23 @@ const cloudflareKnowledgeSearch = async (env: Env, query: string) => {
   if (!env.AI_SEARCH) throw new Error("cloudflare_ai_search_not_configured");
   const instance = env.AI_SEARCH.get(env.AI_SEARCH_INSTANCE?.trim() || DEFAULT_AI_SEARCH_INSTANCE);
   return instance.search({
-    messages: [{ role: "user", content: query }]
+    messages: [{ role: "user", content: query }],
+    ai_search_options: {
+      retrieval: {
+        retrieval_type: "hybrid",
+        match_threshold: 0.32,
+        max_num_results: 12,
+        return_on_failure: true
+      },
+      query_rewrite: {
+        enabled: true
+      },
+      reranking: {
+        enabled: true,
+        model: "@cf/baai/bge-reranker-base",
+        match_threshold: 0.32
+      }
+    }
   });
 };
 
@@ -1916,7 +1932,11 @@ const internalSearch = async (query: string, env: Env) => {
           date: item?.item?.timestamp ? new Date(Number(item.item.timestamp) * 1000).toISOString() : null,
           snippet: cleanText(item?.text, 900),
           url: typeof item?.item?.key === "string" && /^https?:\/\//i.test(item.item.key) ? item.item.key : null,
-          score: typeof item?.score === "number" ? item.score : null
+          score: typeof item?.scoring_details?.reranking_score === "number"
+            ? item.scoring_details.reranking_score
+            : (typeof item?.score === "number" ? item.score : null),
+          vectorScore: typeof item?.scoring_details?.vector_score === "number" ? item.scoring_details.vector_score : null,
+          keywordScore: typeof item?.scoring_details?.keyword_score === "number" ? item.scoring_details.keyword_score : null
         })).filter((x: any) => x.title && x.snippet);
       }
       if (provider === "gnews") {
