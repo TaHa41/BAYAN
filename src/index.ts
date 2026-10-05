@@ -293,7 +293,6 @@ const renderHtml = async (response: Response, requestUrl: URL, env?: Env) => {
       "الشروط": "Terms",
       "تواصل": "Contact",
       "المحفوظات": "Saved",
-      "أدوات بيان": "BAYAN Tools",
       "إدارة بيان": "BAYAN Management",
       "بيان": "BAYAN"
     };
