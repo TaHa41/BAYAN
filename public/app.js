@@ -479,4 +479,3 @@ document.addEventListener("click",(event)=>{
 window.addEventListener("popstate",()=>safeRenderRoute(location.pathname.replace(/^\//,"").replace(/\/$/,"")));
 if(localStorage.getItem("bayan-theme")==="light")document.body.classList.add("light");document.querySelector("#theme")?.addEventListener("click",()=>{document.body.classList.toggle("light");localStorage.setItem("bayan-theme",document.body.classList.contains("light")?"light":"dark")});document.querySelector("#language")?.addEventListener("click",()=>{const u=new URL(location.href);u.searchParams.set("lang",isEn?"ar":"en");location.href=u});document.querySelector("#year").textContent=new Date().getFullYear()
 })();
-\n// BAYAN frontend syntax-audit checkpoint\n
