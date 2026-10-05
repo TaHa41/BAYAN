@@ -55,7 +55,7 @@ if (!source.includes(`path === "/api/news"`) || !source.includes("Google News RS
 if (!source.includes("provider_unavailable") || !source.includes("articles: []")) failures.push("news failure contract is incomplete");
 if (!app.includes("newsPage") || !app.includes("open-news-article")) failures.push("news article UI contract is incomplete");
 if (!app.includes("function toolsPage()") || !app.includes("/api/maps/search") || !app.includes("/api/images")) failures.push("tools UI does not activate maps/image discovery");
-const contract = readText("docs/BAYAN_PRODUCT_CONTRACT.md");
+const contract = read("docs/BAYAN_PRODUCT_CONTRACT.md");
 for (const required of ["Visitor experience","Management","Reliability","Preservation rule","BAYAN_AI_MANAGER_TOKEN","Telegram","Resend is not a required runtime dependency","No core route may call an undefined renderer"]) {
   if (!contract.includes(required)) failures.push("product contract missing: " + required);
 }
