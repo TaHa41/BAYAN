@@ -111,7 +111,7 @@ body:before{background:radial-gradient(circle,color-mix(in srgb,var(--accent) 25
 :root{
   --bg:#07070d;--surface:#101019;--surface-2:#171723;--surface-3:#201f2e;
   --text:#f7f5ff;--muted:#aaa6b9;--line:rgba(255,255,255,.09);
-  --accent:#a855f7;--accent-strong:#c084fc;--accent-2:#2dd4bf;
+  --accent:#2563eb;--accent-strong:#c084fc;--accent-2:#14b8a6;
   --accent-soft:rgba(168,85,247,.12);--teal-soft:rgba(45,212,191,.10);
   --danger:#fb7185;--success:#34d399;--radius:22px;--shadow:0 24px 70px rgba(0,0,0,.30);
 }
