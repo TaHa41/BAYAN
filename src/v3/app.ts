@@ -1,7 +1,7 @@
 import type {Runtime} from "./types";
 import {json,headers} from "./security";import {listArticles,getArticle,save,unsave,saved,contribution,analytics} from "./db";import {search} from "./search";import {weather,fx} from "./live";import {news,newsAsArticles} from "./news";import {trends} from "./trends";import {answer} from "./ai";import {manager} from "./manager";
 const visitor=(r:Request)=>r.headers.get("x-bayan-visitor")||"anonymous";
-const page=async(rt:Runtime)=>{if(!rt.env.ASSETS)return new Response("BAYAN",{status:503});const u=new URL(rt.request.url);const assetLike=/\.[a-zA-Z0-9]+$/.test(u.pathname);return rt.env.ASSETS.fetch(assetLike?rt.request:new Request(new URL("/index.html",rt.request),rt.request));};
+const page=async(rt:Runtime)=>{if(!rt.env.ASSETS)return new Response("BAYAN",{status:503});const u=new URL(rt.request.url);const assetLike=/\.[a-zA-Z0-9]+$/.test(u.pathname);return rt.env.ASSETS.fetch(assetLike?rt.request:new Request(new URL("/index.html",rt.request.url),rt.request));};
 export async function handle(rt:Runtime){const u=new URL(rt.request.url),p=u.pathname,lang=u.searchParams.get("lang")==="en"?"en":"ar";if(p.startsWith("/api/")){try{
 if(p==="/api/health"||p==="/health")return json({ok:true,service:"bayan-v3",time:new Date().toISOString()},200,headers());
 if(p==="/api/features")return json({ok:true,version:"3",features:["search","articles","news","trends","prices","weather","tools","saved","contribute","admin","telegram","analytics"]},200,headers());
