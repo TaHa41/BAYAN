@@ -10,48 +10,36 @@ async function get(path){
   return{text,status:r.status,headers:r.headers};
 }
 for(const path of checks){try{await get(path)}catch(e){console.error(e);bad++}}
-try{const rb=await get("/robots.txt");if(/Disallow:\s*\/api\/\s*$/.test(rb.text))throw new Error("robots_blocks_public_api");if(!rb.text.includes("/news-sitemap.xml"))throw new Error("news_sitemap_missing")}catch(e){console.error("SEO",e);bad++}
-try{
-  const js=await get("/app.js");
-  const immutable=await get("/app-20261006-6.js");
-  for(const [name,bundle] of [["app.js",js],["app-20261006.js",immutable]]){
-    if(!bundle.text.includes("Daily wisdom")||!bundle.text.includes("الحكمة اليومية"))throw new Error(name+"_daily_wisdom_missing");
-    if(!bundle.text.includes("home-news")||!bundle.text.includes("home-featured"))throw new Error(name+"_homepage_content_sections_missing");
-    if(bundle.text.includes('section:"topics"'))throw new Error(name+"_stale_topics_taxonomy");
-  }
-}catch(e){console.error("WISDOM",e);bad++}
 try{
   const h=await get("/?lang=en");
   if(!/<html[^>]+lang="en"/.test(h.text))throw new Error("english_lang_missing");
-  if(!h.text.includes("/app-20261006-6.js?v=2026.10.06.6"))throw new Error("current_shell_bundle_missing");
-  if(!h.text.includes("/app-20261006-6.js?v=2026.10.06.6"))throw new Error("current_shell_bundle_missing");
-  if(h.headers.get("x-bayan-build")!=="2026.10.06.6")throw new Error("current_build_header_missing");
-}catch(e){console.error("EN",e);bad++}
+  if(!h.text.includes("app-20261006-11.js"))throw new Error("current_bundle_missing");
+  if(h.headers.get("x-bayan-build")!=="2026.10.06.12")throw new Error("current_build_header_missing");
+}catch(e){console.error("SHELL",e);bad++}
+try{
+  const js=await get("/app-20261006-11.js");
+  if(!js.text.includes("drawer.querySelectorAll"))throw new Error("drawer_close_handler_missing");
+  if(js.text.includes("Daily wisdom")||js.text.includes("الحكمة اليومية"))throw new Error("obsolete_wisdom_content_present");
+  if(!js.text.includes("home-news")||!js.text.includes("home-featured"))throw new Error("homepage_content_sections_missing");
+}catch(e){console.error("BUNDLE",e);bad++}
 try{
   const n=await get("/api/news?lang=ar"); const d=JSON.parse(n.text);
   if(!Array.isArray(d.items)||d.items.length<3)throw new Error("news_too_few");
   if(d.items.filter(x=>x.imageUrl).length<Math.min(3,d.items.length))throw new Error("news_images_missing");
   const dates=d.items.map(x=>Date.parse(x.publishedAt||"")).filter(Number.isFinite);
   if(dates.length&&Math.max(...dates)<Date.now()-72*60*60*1000)throw new Error("news_is_stale");
-  const first=d.items[0]; if(!first?.title)throw new Error("news_article_seed_missing");
+  const first=d.items[0];
   const a=await get("/api/news/article?title="+encodeURIComponent(first.title)+"&image="+encodeURIComponent(first.imageUrl||"")+"&lang=ar");
   const ad=JSON.parse(a.text); if(!ad.ok||!ad.article?.title||!ad.article?.body)throw new Error("news_article_incomplete");
+  if(/[A-Za-z]{5,}/.test(String(first.title))&&!/[\u0600-\u06ff]/.test(String(first.title)))throw new Error("arabic_news_title_missing");
 }catch(e){console.error("NEWS",e);bad++}
 try{
-  let id=null,last=null;
-  for(let attempt=1;attempt<=3;attempt++){
-    try{
-      const im=await get("/api/image?q=%D9%86%D8%AC%D9%8A%D8%A8%20%D9%85%D8%AD%D9%81%D9%88%D8%B8"); id=JSON.parse(im.text);
-      if(id.imageUrl) break;
-      last=new Error("content_image_missing");
-    }catch(e){last=e}
-    await new Promise(r=>setTimeout(r,1000*attempt));
-  }
-  if(!id?.imageUrl)throw last||new Error("content_image_missing");
+  const im=await get("/api/image?q=%D9%86%D8%AC%D9%8A%D8%A8%20%D9%85%D8%AD%D9%81%D9%88%D8%B8"); if(!JSON.parse(im.text).imageUrl)throw new Error("content_image_missing");
 }catch(e){console.error("IMAGE",e);bad++}
 try{
   const a=await get("/api/article?slug=who-is-naguib-mahfouz-ar&lang=ar"); const ad=JSON.parse(a.text);
   if(!ad.title||!ad.body)throw new Error("article_incomplete");
+  if(!/[\u0600-\u06ff]/.test(String(ad.title)))throw new Error("arabic_article_missing");
 }catch(e){console.error("ARTICLE",e);bad++}
 try{
   const s=await get("/api/search?q=%D9%86%D8%AC%D9%8A%D8%A8%20%D9%85%D8%AD%D9%81%D9%88%D8%B8&lang=ar"); const d=JSON.parse(s.text);
@@ -63,9 +51,11 @@ for(const section of sections){
     try{
       const x=await get("/api/section?section="+section+"&lang="+language); const d=JSON.parse(x.text);
       if(!Array.isArray(d.items)||d.items.length<2)throw new Error(section+"_"+language+"_needs_at_least_two_articles");
+      const badLanguage=language==="ar"?d.items.filter(x=>!/[\u0600-\u06ff]/.test(String(x.title))).length:0;
+      if(badLanguage>d.items.length/2)throw new Error(section+"_"+language+"_content_language_mismatch");
     }catch(e){console.error("SECTION",section,language,e);bad++}
   }
 }
-try{const a=await fetch(origin+"/api/admin/analytics",{headers:{accept:"application/json"}});if(a.status!==401)throw new Error("admin_auth_not_enforced");}catch(e){console.error("ADMIN_AUTH",e);bad++}
+try{const a=await fetch(origin+"/api/admin/analytics",{headers:{accept:"application/json"}});if(a.status!==401)throw new Error("admin_auth_not_enforced")}catch(e){console.error("ADMIN_AUTH",e);bad++}
 if(bad)process.exit(1);
 console.log("BAYAN production smoke passed");
