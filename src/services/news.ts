@@ -71,7 +71,7 @@ const readFeed = async (name: string, url: string): Promise<Story[]> => {
           title: tag("title"),
           summary: tag("description").slice(0, 1000),
           url: tag("link"),
-          publisher: name,
+          publisher: tag("source") || name,
           publishedAt: tag("pubDate"),
           imageUrl,
           imageAlt: tag("title"),
