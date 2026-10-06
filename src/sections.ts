@@ -13,7 +13,6 @@ export const sections: Section[] = [
 {slug:"people",ar:"الأشخاص",en:"People",descriptionAr:"صفحات شخصيات تجمع السيرة والإنجازات والمصادر.",descriptionEn:"People pages combining biography, work, events and sources.",icon:"◎"},
 {slug:"sports",ar:"الرياضة والبيانات",en:"Sports & Data",descriptionAr:"رياضة ونتائج وإحصاءات وسجلات قابلة للتحقق.",descriptionEn:"Sports, results, statistics and records with evidence.",icon:"△"},
 {slug:"travel",ar:"السفر",en:"Travel",descriptionAr:"وجهات وأماكن ونصائح سفر مبنية على مصادر.",descriptionEn:"Destinations, places and travel guidance based on sources.",icon:"✈"},
-{slug:"news",ar:"الأخبار",en:"News",descriptionAr:"أخبار حديثة من مزودات متعددة مع المصدر والوقت والصورة.",descriptionEn:"Current news from multiple providers with source, time and imagery.",icon:"◈"},
 {slug:"trends",ar:"الاهتمام والاتجاهات",en:"Interest & Trends",descriptionAr:"ما يهتم به الناس، منفصل عن الأخبار الموثقة.",descriptionEn:"What people are interested in, separated from verified news.",icon:"↗"},
 {slug:"prices",ar:"الأسعار والبيانات الحية",en:"Prices & Live Data",descriptionAr:"طقس وعملات وذهب وبيانات حية.",descriptionEn:"Weather, currencies, gold and live data.",icon:"₿"}
 ];
