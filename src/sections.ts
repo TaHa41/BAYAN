@@ -13,7 +13,5 @@ export const sections:Section[]=[
 {slug:"people",ar:"خارج الخريطة",en:"Beyond the Map",descriptionAr:"السفر والوجهات والأماكن والتجارب والمعلومات العملية.",descriptionEn:"Travel, destinations, places and practical journey knowledge.",icon:"✈"},
 {slug:"sports",ar:"عين الاتجاهات",en:"Trend Lens",descriptionAr:"ما يلفت الانتباه ويتغير في اهتمامات الناس، منفصلًا عن الخبر المؤكد.",descriptionEn:"Changing public interests, kept separate from verified news.",icon:"↗"},
 {slug:"travel",ar:"لوحة البيانات",en:"Data Board",descriptionAr:"بيانات حية ومؤشرات وأرقام تتغير باستمرار.",descriptionEn:"Live data, indicators and numbers that change continuously.",icon:"◉"},
-{slug:"trends",ar:"ملفات خاصة",en:"Special Files",descriptionAr:"ملفات تجمع الأدلة والسياق حول موضوعات تستحق المتابعة.",descriptionEn:"Evidence-rich files that bring context to subjects worth following.",icon:"▣"},
-{slug:"prices",ar:"مباشر",en:"Live",descriptionAr:"بيانات لحظية مثل الطقس والعملات والذهب والأسعار.",descriptionEn:"Live indicators such as weather, currencies, gold and prices.",icon:"◎"}
 ];
 export const sectionBySlug=(slug:string)=>sections.find(s=>s.slug===slug);
