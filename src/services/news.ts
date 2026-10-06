@@ -186,9 +186,11 @@ const wikipediaImage = async (query: string): Promise<string | undefined> => {
   }
 };
 
-const wikipediaExactImage=async(query:string):Promise<string|undefined>=>{for(const lang of ["ar","en"]){try{const u="https://"+lang+".wikipedia.org/api/rest_v1/page/summary/"+encodeURIComponent(query.trim().replace(/\\s+/g,"_"));const r=await fetch(u,{signal:AbortSignal.timeout(2500),headers:{accept:"application/json"}});if(r.ok){const d=await r.json<any>();if(d.thumbnail?.source||d.originalimage?.source)return d.thumbnail?.source||d.originalimage?.source}}catch{}}};
+const wikipediaExactImage=async(query:string):Promise<string|undefined>=>{for(const lang of ["ar","en"]){try{const u="https://"+lang+".wikipedia.org/w/api.php?action=query&prop=pageimages&piprop=original|thumbnail&titles="+encodeURIComponent(query)+"&format=json&origin=*";const r=await fetch(u,{signal:AbortSignal.timeout(3000),headers:{accept:"application/json"}});if(!r.ok)continue;const d=await r.json<any>();const p=Object.values(d.query?.pages||{})[0] as any;if(p?.original?.source||p?.thumbnail?.source)return p.original?.source||p.thumbnail?.source}catch{}}};
 export async function findRelatedImage(query: string): Promise<string | undefined> {
   try {
+    const exact = await wikipediaExactImage(query);
+    if (exact) return exact;
     const variants=[query,query.split(/\s+/).slice(0,6).join(" "),query.split(/[،,:-]/)[0]].filter(Boolean);if(/نجيب محفوظ|naguib mahfouz/i.test(query))return "https://commons.wikimedia.org/wiki/Special:FilePath/Naguib%20Mahfouz%20HR.jpg?width=1200";
     for(const v of variants){
       const [summary,wiki,wd]=await Promise.all([wikipediaSummaryImage(v),wikipediaImage(v),wikidataImage(v)]);
