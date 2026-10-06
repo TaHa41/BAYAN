@@ -1,27 +1,20 @@
 export type Locale = "ar" | "en";
-
-export type Section = {
-  slug: string;
-  ar: string;
-  en: string;
-  descriptionAr: string;
-  descriptionEn: string;
-  icon: string;
-};
-
+export type Section = {slug:string;ar:string;en:string;descriptionAr:string;descriptionEn:string;icon:string};
 export const sections: Section[] = [
-  {slug:"news",ar:"الأخبار",en:"News",descriptionAr:"أخبار موثقة ومحدثة مع السياق والصورة والمصدر.",descriptionEn:"Verified, current stories with context, imagery and source metadata.",icon:"◈"},
-  {slug:"people",ar:"الأشخاص",en:"People",descriptionAr:"صفحات شخصيات تجمع السيرة والإنجازات والأحداث والمصادر.",descriptionEn:"Modern person pages combining biography, work, events and sources.",icon:"◎"},
-  {slug:"topics",ar:"المواضيع",en:"Topics",descriptionAr:"ملفات مرتبة تجمع كل ما نعرفه عن موضوع أو قضية.",descriptionEn:"Structured topic pages that bring together the full picture.",icon:"◇"},
-  {slug:"stories",ar:"القصص",en:"Stories",descriptionAr:"قصص وحكايات وملفات سردية مبنية على الأدلة.",descriptionEn:"Evidence-based stories, timelines and narrative explainers.",icon:"✦"},
-  {slug:"guides",ar:"الشرح والأدلة",en:"Guides & How-to",descriptionAr:"إجابات عملية: كيف تفعل، تصلح، تتعلم أو تحل مشكلة.",descriptionEn:"Practical answers for doing, fixing, learning and solving problems.",icon:"✓"},
-  {slug:"technology",ar:"التقنية والبرمجة",en:"Technology & Coding",descriptionAr:"تقنية وذكاء اصطناعي وبرمجة وحلول عملية محدثة.",descriptionEn:"Technology, AI, coding and practical technical solutions.",icon:"⌘"},
-  {slug:"science",ar:"العلوم",en:"Science",descriptionAr:"شرح علمي واضح للأفكار والاكتشافات والظواهر.",descriptionEn:"Clear, evidence-based explanations of science and discoveries.",icon:"◌"},
-  {slug:"health",ar:"الصحة",en:"Health",descriptionAr:"معلومات صحية موثوقة مع توضيح حدود الدليل.",descriptionEn:"Reliable health information with evidence limits made clear.",icon:"＋"},
-  {slug:"economy",ar:"الاقتصاد والأسعار",en:"Economy & Prices",descriptionAr:"اقتصاد وأسعار وذهب وعملات وبيانات حية.",descriptionEn:"Economy, prices, gold, currencies and live data.",icon:"₿"},
-  {slug:"world",ar:"العالم والأماكن",en:"World & Places",descriptionAr:"دول ومدن وأماكن وأحداث حول العالم، مع فلاتر جغرافية.",descriptionEn:"Countries, cities, places and global events with geographic filters.",icon:"⌖"},
-  {slug:"history-culture",ar:"التاريخ والثقافة",en:"History & Culture",descriptionAr:"تاريخ وثقافة وفنون وتراث في صفحات مترابطة.",descriptionEn:"History, culture, arts and heritage in connected pages.",icon:"▱"},
-  {slug:"sports",ar:"الرياضة والبيانات",en:"Sports & Data",descriptionAr:"رياضة ونتائج وإحصاءات وسجلات قابلة للفهم والتحقق.",descriptionEn:"Sports, results, statistics and records presented with evidence.",icon:"△"}
+{slug:"egypt",ar:"مصر",en:"Egypt",descriptionAr:"المحتوى الموثق عن مصر والأحداث والشخصيات والبيانات.",descriptionEn:"Verified knowledge about Egypt, events, people and data.",icon:"⌂"},
+{slug:"arab",ar:"العالم العربي",en:"Arab World",descriptionAr:"أخبار وملفات العالم العربي مع السياق والمصادر.",descriptionEn:"Arab-world news and knowledge with context and sources.",icon:"◇"},
+{slug:"world",ar:"العالم",en:"World",descriptionAr:"دول وأحداث وموضوعات عالمية قابلة للتحقق.",descriptionEn:"Countries, global events and verifiable topics.",icon:"⌖"},
+{slug:"science",ar:"العلوم",en:"Science",descriptionAr:"شرح علمي واضح للأفكار والاكتشافات والظواهر.",descriptionEn:"Clear, evidence-based explanations of science and discoveries.",icon:"◌"},
+{slug:"economy",ar:"الاقتصاد",en:"Economy",descriptionAr:"اقتصاد وأسواق وأسعار وبيانات مالية.",descriptionEn:"Economy, markets, prices and financial data.",icon:"₿"},
+{slug:"politics",ar:"السياسة",en:"Politics",descriptionAr:"سياسة وشؤون عامة مع فصل الخبر عن التحليل.",descriptionEn:"Politics and public affairs with news separated from analysis.",icon:"◎"},
+{slug:"technology",ar:"التقنية والذكاء الاصطناعي",en:"Technology & AI",descriptionAr:"تقنية وذكاء اصطناعي وبرمجة وحلول عملية.",descriptionEn:"Technology, AI, coding and practical solutions.",icon:"⌘"},
+{slug:"health",ar:"الصحة",en:"Health",descriptionAr:"معلومات صحية موثوقة مع حدود الدليل.",descriptionEn:"Reliable health information with evidence limits made clear.",icon:"＋"},
+{slug:"history",ar:"التاريخ والثقافة",en:"History & Culture",descriptionAr:"تاريخ وثقافة وفنون وتراث في صفحات مترابطة.",descriptionEn:"History, culture, arts and heritage in connected pages.",icon:"▱"},
+{slug:"people",ar:"الأشخاص",en:"People",descriptionAr:"صفحات شخصيات تجمع السيرة والإنجازات والمصادر.",descriptionEn:"People pages combining biography, work, events and sources.",icon:"◎"},
+{slug:"sports",ar:"الرياضة والبيانات",en:"Sports & Data",descriptionAr:"رياضة ونتائج وإحصاءات وسجلات قابلة للتحقق.",descriptionEn:"Sports, results, statistics and records with evidence.",icon:"△"},
+{slug:"travel",ar:"السفر",en:"Travel",descriptionAr:"وجهات وأماكن ونصائح سفر مبنية على مصادر.",descriptionEn:"Destinations, places and travel guidance based on sources.",icon:"✈"},
+{slug:"news",ar:"الأخبار",en:"News",descriptionAr:"أخبار حديثة من مزودات متعددة مع المصدر والوقت والصورة.",descriptionEn:"Current news from multiple providers with source, time and imagery.",icon:"◈"},
+{slug:"trends",ar:"الاهتمام والاتجاهات",en:"Interest & Trends",descriptionAr:"ما يهتم به الناس، منفصل عن الأخبار الموثقة.",descriptionEn:"What people are interested in, separated from verified news.",icon:"↗"},
+{slug:"prices",ar:"الأسعار والبيانات الحية",en:"Prices & Live Data",descriptionAr:"طقس وعملات وذهب وبيانات حية.",descriptionEn:"Weather, currencies, gold and live data.",icon:"₿"}
 ];
-
-export const sectionBySlug = (slug: string) => sections.find(s => s.slug === slug);
+export const sectionBySlug = (slug:string) => sections.find(s=>s.slug===slug);
