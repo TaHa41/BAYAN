@@ -51,8 +51,9 @@ async function aiSearch(env:Env,q:string):Promise<Candidate[]>{
     return chunks.slice(0,12).map((x:any)=>({title:cleanText(x.title||x.filename||"BAYAN evidence"),summary:cleanText(x.content||x.text||"").slice(0,1800),section:String(x.metadata?.section||"topics"),kind:"web",evidence:"mixed",sources:[source(cleanText(x.title||"Evidence"),String(x.metadata?.publisher||"BAYAN AI Search"),String(x.url||"https://bayan.tahaomar411.workers.dev/"))],score:58,provider:"Cloudflare AI Search"}));
   }catch{return[]}
 }
+async function settings(env:Env){try{const r=await env.DB.prepare("SELECT key,value FROM admin_settings").all<any>();return Object.fromEntries((r.results||[]).map((x:any)=>[x.key,x.value]))}catch{return{}}}
 export async function search(env:Env,q:string,language:Locale):Promise<SearchResponse>{
-  const [local, wiki, wd, gd, oa, remote] = await Promise.all([searchArticles(env,q,language),wikipedia(env,q,language),wikidata(q),gdelt(q),openAlex(q),aiSearch(env,q)]);
+  const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const [local, wiki, wd, gd, oa, remote] = await Promise.all([searchArticles(env,q,language,max),s.source_wikipedia==="0"?[]:wikipedia(env,q,language),s.source_wikidata==="0"?[]:wikidata(q),s.source_gdelt==="0"?[]:gdelt(q),s.source_openalex==="0"?[]:openAlex(q),s.source_ai_search==="0"?[]:aiSearch(env,q)]);
   const candidates:Candidate[]=[
     ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wd,...gd,...oa,...remote
   ];
@@ -60,7 +61,7 @@ export async function search(env:Env,q:string,language:Locale):Promise<SearchRes
   const results=candidates.sort((a,b)=>b.score-a.score).filter(x=>{
     const k=x.title.toLowerCase().replace(/\W+/g," ")+"|"+x.summary.toLowerCase().slice(0,160);
     if(seen.has(k))return false; seen.add(k); return true;
-  }).slice(0,20).map(({score,provider,...x})=>x);
+  }).slice(0,max).map(({score,provider,...x})=>x);
   const providers=[...new Set(candidates.map(x=>x.provider))];
   const status=results.length>=3?"verified":results.length?"mixed":"insufficient";
   const message=results.length?undefined:(language==="ar"?"لم نجد أدلة كافية بعد؛ تم فحص مسارات البحث المتاحة دون اختلاق إجابة.":"Not enough evidence was found after checking the available search paths; BAYAN will not invent an answer.");
