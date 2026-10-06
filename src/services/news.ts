@@ -242,7 +242,7 @@ export async function news(env: Env, lang: Locale) {
   );
   let all = batches.flat();
   if (lang === "ar") {
-    all = all.filter((story) => hasArabic(story.title));
+    all = all.filter((story) => hasArabic(story.title) && (!story.summary || hasArabic(story.summary)));
     if (!all.length) all = await googleArabicFallback();
     if (!all.length) all = (await gdeltFallback(lang)).filter((story) => hasArabic(story.title));
   } else if (!all.length) {
