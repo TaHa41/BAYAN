@@ -14,6 +14,8 @@ try{const rb=await get("/robots.txt");if(/Disallow:\s*\/api\/\s*$/.test(rb.text)
 try{
   const js=await get("/app.js");
   if(!js.text.includes("Daily wisdom")||!js.text.includes("الحكمة اليومية"))throw new Error("daily_wisdom_missing_from_home_bundle");
+  if(!js.text.includes("home-news")||!js.text.includes("home-featured"))throw new Error("homepage_content_sections_missing");
+  if(js.text.includes('section:"topics"'))throw new Error("stale_topics_taxonomy_in_frontend");
 }catch(e){console.error("WISDOM",e);bad++}
 try{
   const h=await get("/?lang=en");
