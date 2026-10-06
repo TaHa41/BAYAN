@@ -24,7 +24,7 @@ async function wikipedia(env:Env,q:string,language:Locale):Promise<Candidate[]>{
     const u=api+"?action=query&generator=search&gsrsearch="+encodeURIComponent(q)+"&gsrlimit=6&prop=extracts|pageimages&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=900&format=json&origin=*";
     const r=await timeout(u); if(!r.ok)return[];
     const d=await r.json<any>(); return Object.values(d.query?.pages||{}).map((x:any)=>({
-      title:cleanText(x.title),summary:cleanText(x.extract).slice(0,1800),section:"topics",kind:"web",evidence:"mixed",
+      title:cleanText(x.title),summary:cleanText(x.extract).slice(0,1800),section:"world",kind:"web",evidence:"mixed",
       sources:[source(x.title,language==="ar"?"Wikipedia Arabic":"Wikipedia",api.replace("api.php","wiki/")+encodeURIComponent(String(x.title).replace(/ /g,"_")))],
       url:"https://"+(language==="ar"?"ar":"en")+".wikipedia.org/wiki/"+encodeURIComponent(String(x.title).replace(/ /g,"_")),
       score:scoreSource("Wikipedia",x.title,q)+8,provider:"Wikipedia"
