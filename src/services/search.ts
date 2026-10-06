@@ -38,6 +38,12 @@ async function wikidata(q:string):Promise<Candidate[]>{
     return (d.search||[]).map((x:any)=>({title:cleanText(x.label||x.id),summary:cleanText(x.description||"").slice(0,900),section:"people",kind:"web",evidence:"mixed",sources:[source(x.label||x.id,"Wikidata","https://www.wikidata.org/wiki/"+x.id)],score:scoreSource("Wikidata",x.label||"",q),provider:"Wikidata"}));
   }catch{return[]}
 }
+async function gdelt(q:string):Promise<Candidate[]>{
+ try{const u="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(q)+"&mode=artlist&maxrecords=8&format=json&sort=HybridRel";const r=await timeout(u,4000);if(!r.ok)return[];const d=await r.json<any>();return(d.articles||[]).map((x:any)=>({title:cleanText(x.title),summary:cleanText(x.seendate||"")+" "+cleanText(x.domain||""),section:"news",kind:"web",evidence:"mixed",sources:[source(x.title,x.domain||"GDELT",x.url)],url:x.url,score:scoreSource(x.domain||"GDELT",x.title,q),provider:"GDELT"})).filter((x:any)=>x.title&&x.url)}catch{return[]}
+}
+async function openAlex(q:string):Promise<Candidate[]>{
+ try{const u="https://api.openalex.org/works?search="+encodeURIComponent(q)+"&per-page=5";const r=await timeout(u,4000);if(!r.ok)return[];const d=await r.json<any>();return(d.results||[]).map((x:any)=>({title:cleanText(x.title||""),summary:cleanText(x.abstract_inverted_index?Object.keys(x.abstract_inverted_index).slice(0,80).join(" "):x.primary_location?.source?.display_name||"Research work"),section:"science",kind:"web",evidence:"mixed",sources:[source(x.title||"Research work","OpenAlex",x.id)],url:x.id,score:64,provider:"OpenAlex"})).filter((x:any)=>x.title)}catch{return[]}
+}
 async function aiSearch(env:Env,q:string):Promise<Candidate[]>{
   try{
     if(!env.AI_SEARCH)return[]; const r=await env.AI_SEARCH.get(env.BAYAN_AI_SEARCH_INSTANCE||"default").search({messages:[{role:"user",content:q}]});
@@ -46,9 +52,9 @@ async function aiSearch(env:Env,q:string):Promise<Candidate[]>{
   }catch{return[]}
 }
 export async function search(env:Env,q:string,language:Locale):Promise<SearchResponse>{
-  const [local, wiki, wd, remote] = await Promise.all([searchArticles(env,q,language),wikipedia(env,q,language),wikidata(q),aiSearch(env,q)]);
+  const [local, wiki, wd, gd, oa, remote] = await Promise.all([searchArticles(env,q,language),wikipedia(env,q,language),wikidata(q),gdelt(q),openAlex(q),aiSearch(env,q)]);
   const candidates:Candidate[]=[
-    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wd,...remote
+    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wd,...gd,...oa,...remote
   ];
   const seen=new Set<string>();
   const results=candidates.sort((a,b)=>b.score-a.score).filter(x=>{
@@ -56,7 +62,7 @@ export async function search(env:Env,q:string,language:Locale):Promise<SearchRes
     if(seen.has(k))return false; seen.add(k); return true;
   }).slice(0,20).map(({score,provider,...x})=>x);
   const providers=[...new Set(candidates.map(x=>x.provider))];
-  const status=results.length>=2?"verified":results.length?"mixed":"insufficient";
+  const status=results.length>=3?"verified":results.length?"mixed":"insufficient";
   const message=results.length?undefined:(language==="ar"?"لم نجد أدلة كافية بعد؛ تم فحص مسارات البحث المتاحة دون اختلاق إجابة.":"Not enough evidence was found after checking the available search paths; BAYAN will not invent an answer.");
   await saveSearch(env,q,language,intent(q),status,results.length);
   return {query:q,locale:language,results,providers,status,message};
