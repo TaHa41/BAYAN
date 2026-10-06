@@ -1,16 +1,251 @@
-import type {Env,Locale,Source} from "../types";
-type Story={title:string;summary:string;url:string;publisher:string;publishedAt?:string;imageUrl?:string;imageAlt?:string};
-const feeds=(lang:Locale)=>lang==="ar"
-?[["BBC Arabic","https://feeds.bbci.co.uk/arabic/rss.xml"],["Al Jazeera Arabic","https://www.aljazeera.net/aljazeera/rss"],["DW Arabic","https://rss.dw.com/rdf/rss-ar-all"],["France 24 Arabic","https://www.france24.com/ar/rss"],["Sky News Arabia","https://www.skynewsarabia.com/rss"]]
-:[["BBC","https://feeds.bbci.co.uk/news/rss.xml"],["Al Jazeera","https://www.aljazeera.com/xml/rss/all.xml"],["DW","https://rss.dw.com/rdf/rss-en-all"],["France 24","https://www.france24.com/en/rss"],["The Guardian","https://www.theguardian.com/world/rss"]];
-const esc=(s:string)=>s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,"$1").replace(/<[^>]+>/g," ").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&#x27;/g,"'").replace(/\s+/g," ").trim();
-const readFeed=async(name:string,url:string):Promise<Story[]>=>{try{const c=new AbortController();const t=setTimeout(()=>c.abort(),5000);const r=await fetch(url,{signal:c.signal,headers:{accept:"application/rss+xml, application/xml, text/xml"}});clearTimeout(t);if(!r.ok)return[];const x=await r.text();return[...x.matchAll(/<item[\s\S]*?<\/item>/gi)].slice(0,12).map(m=>{const z=m[0],tag=(n:string)=>esc(z.match(new RegExp("<"+n+"[^>]*>([\\s\\S]*?)<\\/"+n+">","i"))?.[1]||"");const image=z.match(/<(?:media:content|media:thumbnail|enclosure)[^>]+url=["']([^"']+)["']/i)?.[1];return{title:tag("title"),summary:tag("description").slice(0,1000),url:tag("link"),publisher:name,publishedAt:tag("pubDate"),imageUrl:image,imageAlt:tag("title")}}).filter(s=>s.title&&s.url)}catch{return[]}};
-async function sourceImage(url:string):Promise<string|undefined>{try{const r=await fetch(url,{signal:AbortSignal.timeout(2500),headers:{accept:"text/html"}});if(!r.ok)return;const h=await r.text();return h.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1]||h.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i)?.[1]}catch{return}}
-const terms=(s:string)=>s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu," ").split(/\s+/).filter(x=>x.length>2);
-async function wikipediaImage(query:string):Promise<string|undefined>{try{const api="https://ar.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch="+encodeURIComponent(query)+"&gsrlimit=3&prop=pageimages&piprop=thumbnail&pithumbsize=1200&format=json&origin=*";const r=await fetch(api,{signal:AbortSignal.timeout(3000),headers:{accept:"application/json"}});if(!r.ok)return;const d=await r.json<any>();const p=Object.values(d.query?.pages||{}) as any[];return p.find(x=>x.thumbnail?.source)?.thumbnail?.source}catch{return}}\nexport async function findRelatedImage(query:string):Promise<string|undefined>{try{const wiki=await wikipediaImage(query);if(wiki)return wiki;const u="https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch="+encodeURIComponent(query)+"&gsrnamespace=6&gsrlimit=8&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=1200&format=json&origin=*";const r=await fetch(u,{signal:AbortSignal.timeout(3500),headers:{accept:"application/json"}});if(!r.ok)return;const d=await r.json<any>();const pages=Object.values(d.query?.pages||{}) as any[];const q=terms(query);let best:any;let bestScore=0;for(const p of pages){const name=String(p.title||"");const info=p.imageinfo?.[0];const hay=terms(name+" "+(info?.extmetadata?.ImageDescription?.value||"")).join(" ");const hit=q.filter(t=>hay.includes(t)).length;const score=q.length?hit/q.length:0;if(score>bestScore){bestScore=score;best=info}}return bestScore>=0.45?(best?.thumburl||best?.url):undefined}catch{return}}
-export async function news(env:Env,lang:Locale){
- const fs=feeds(lang); const batches=await Promise.all(fs.map(([n,u])=>readFeed(n,u))); const all=batches.flat();
- const seen=new Set<string>(); const unique=all.filter(s=>{const k=s.title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu," ").trim();if(seen.has(k))return false;seen.add(k);return true}).slice(0,Math.max(6,Math.min(40,Number((await env.DB.prepare("SELECT value FROM admin_settings WHERE key=?").bind("news_items").first<any>())?.value||24))));
- const enriched=await Promise.all(unique.map(async s=>{if(s.imageUrl)return s; const direct=await sourceImage(s.url); if(direct)return {...s,imageUrl:direct}; const img=await findRelatedImage(s.title+" "+s.summary); return img?{...s,imageUrl:img}:s;}));
- return {ok:enriched.length>0,providers:fs.map(x=>x[0]),items:enriched.map(s=>({title:s.title,summary:s.summary,url:s.url,publisher:s.publisher,publishedAt:s.publishedAt,imageUrl:s.imageUrl,imageAlt:s.imageAlt||s.title,sources:[{title:s.title,publisher:s.publisher,url:s.url,publishedAt:s.publishedAt,imageUrl:s.imageUrl} as Source],evidence:"mixed" as const}))};
+import type { Env, Locale, Source } from "../types";
+
+type Story = {
+  title: string;
+  summary: string;
+  url: string;
+  publisher: string;
+  publishedAt?: string;
+  imageUrl?: string;
+  imageAlt?: string;
+};
+
+const feeds = (lang: Locale) =>
+  lang === "ar"
+    ? [
+        ["BBC Arabic", "https://feeds.bbci.co.uk/arabic/rss.xml"],
+        ["Al Jazeera Arabic", "https://www.aljazeera.net/aljazeera/rss"],
+        ["DW Arabic", "https://rss.dw.com/rdf/rss-ar-all"],
+        ["France 24 Arabic", "https://www.france24.com/ar/rss"],
+        ["Sky News Arabia", "https://www.skynewsarabia.com/rss"],
+      ]
+    : [
+        ["BBC", "https://feeds.bbci.co.uk/news/rss.xml"],
+        ["Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml"],
+        ["DW", "https://rss.dw.com/rdf/rss-en-all"],
+        ["France 24", "https://www.france24.com/en/rss"],
+        ["The Guardian", "https://www.theguardian.com/world/rss"],
+      ];
+
+const esc = (s: string) =>
+  s
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const readFeed = async (name: string, url: string): Promise<Story[]> => {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { accept: "application/rss+xml, application/xml, text/xml" },
+    });
+    clearTimeout(timer);
+    if (!response.ok) return [];
+
+    const xml = await response.text();
+    return [...xml.matchAll(/<item[\s\S]*?<\/item>/gi)]
+      .slice(0, 12)
+      .map((match) => {
+        const item = match[0];
+        const tag = (name: string) =>
+          esc(
+            item.match(
+              new RegExp("<" + name + "[^>]*>([\\s\\S]*?)</" + name + ">", "i"),
+            )?.[1] || "",
+          );
+        const imageUrl = item.match(
+          /<(?:media:content|media:thumbnail|enclosure)[^>]+url=["']([^"']+)["']/i,
+        )?.[1];
+
+        return {
+          title: tag("title"),
+          summary: tag("description").slice(0, 1000),
+          url: tag("link"),
+          publisher: name,
+          publishedAt: tag("pubDate"),
+          imageUrl,
+          imageAlt: tag("title"),
+        };
+      })
+      .filter((story) => story.title && story.url);
+  } catch {
+    return [];
+  }
+};
+
+const sourceImage = async (url: string): Promise<string | undefined> => {
+  try {
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(2500),
+      headers: { accept: "text/html" },
+    });
+    if (!response.ok) return;
+    const html = await response.text();
+
+    return (
+      html.match(
+        /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+      )?.[1] ||
+      html.match(
+        /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+      )?.[1]
+    );
+  } catch {
+    return;
+  }
+};
+
+const terms = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .split(/\s+/)
+    .filter((term) => term.length > 2);
+
+const wikipediaImage = async (query: string): Promise<string | undefined> => {
+  try {
+    const url =
+      "https://ar.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=" +
+      encodeURIComponent(query) +
+      "&gsrlimit=3&prop=pageimages&piprop=thumbnail&pithumbsize=1200&format=json&origin=*";
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(3000),
+      headers: { accept: "application/json" },
+    });
+    if (!response.ok) return;
+
+    const data = await response.json<any>();
+    const pages = Object.values(data.query?.pages || {}) as any[];
+    return pages.find((page) => page.thumbnail?.source)?.thumbnail?.source;
+  } catch {
+    return;
+  }
+};
+
+export async function findRelatedImage(query: string): Promise<string | undefined> {
+  try {
+    const wikiImage = await wikipediaImage(query);
+    if (wikiImage) return wikiImage;
+
+    const url =
+      "https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=" +
+      encodeURIComponent(query) +
+      "&gsrnamespace=6&gsrlimit=8&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=1200&format=json&origin=*";
+
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(3500),
+      headers: { accept: "application/json" },
+    });
+    if (!response.ok) return;
+
+    const data = await response.json<any>();
+    const pages = Object.values(data.query?.pages || {}) as any[];
+    const queryTerms = terms(query);
+
+    let best: any;
+    let bestScore = 0;
+
+    for (const page of pages) {
+      const info = page.imageinfo?.[0];
+      if (!info) continue;
+
+      const haystack = terms(
+        String(page.title || "") +
+          " " +
+          String(info.extmetadata?.ImageDescription?.value || ""),
+      ).join(" ");
+
+      const hits = queryTerms.filter((term) => haystack.includes(term)).length;
+      const score = queryTerms.length ? hits / queryTerms.length : 0;
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = info;
+      }
+    }
+
+    return bestScore >= 0.35 ? best?.thumburl || best?.url : undefined;
+  } catch {
+    return;
+  }
+}
+
+export async function news(env: Env, lang: Locale) {
+  const providers = feeds(lang);
+  const batches = await Promise.all(
+    providers.map(([name, url]) => readFeed(name, url)),
+  );
+  const all = batches.flat();
+
+  const seen = new Set<string>();
+  const limit = Math.max(
+    6,
+    Math.min(
+      40,
+      Number(
+        (
+          await env.DB.prepare(
+            "SELECT value FROM admin_settings WHERE key=?",
+          )
+            .bind("news_items")
+            .first<any>()
+        )?.value || 24,
+      ),
+    ),
+  );
+
+  const unique = all
+    .filter((story) => {
+      const key = story.title
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}]+/gu, " ")
+        .trim();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, limit);
+
+  const enriched = await Promise.all(
+    unique.map(async (story) => {
+      if (story.imageUrl) return story;
+
+      const direct = await sourceImage(story.url);
+      if (direct) return { ...story, imageUrl: direct };
+
+      const image = await findRelatedImage(story.title + " " + story.summary);
+      return image ? { ...story, imageUrl: image } : story;
+    }),
+  );
+
+  return {
+    ok: enriched.length > 0,
+    providers: providers.map(([name]) => name),
+    items: enriched.map((story) => ({
+      title: story.title,
+      summary: story.summary,
+      url: story.url,
+      publisher: story.publisher,
+      publishedAt: story.publishedAt,
+      imageUrl: story.imageUrl,
+      imageAlt: story.imageAlt || story.title,
+      sources: [
+        {
+          title: story.title,
+          publisher: story.publisher,
+          url: story.url,
+          publishedAt: story.publishedAt,
+          imageUrl: story.imageUrl,
+        } as Source,
+      ],
+      evidence: "mixed" as const,
+    })),
+  };
 }
