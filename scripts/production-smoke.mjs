@@ -10,6 +10,7 @@ async function get(path){
   return{text,status:r.status};
 }
 for(const path of checks){try{await get(path)}catch(e){console.error(e);bad++}}
+try{const rb=await get("/robots.txt");if(/Disallow:\s*\/api\/\s*$/.test(rb.text))throw new Error("robots_blocks_public_api");if(!rb.text.includes("/news-sitemap.xml"))throw new Error("news_sitemap_missing")}catch(e){console.error("SEO",e);bad++}
 try{
   const js=await get("/app.js");
   if(!js.text.includes("Daily wisdom")||!js.text.includes("الحكمة اليومية"))throw new Error("daily_wisdom_missing_from_home_bundle");
