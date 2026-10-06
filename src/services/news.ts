@@ -186,6 +186,7 @@ const wikipediaImage = async (query: string): Promise<string | undefined> => {
   }
 };
 
+const wikipediaExactImage=async(query:string):Promise<string|undefined>=>{for(const lang of ["ar","en"]){try{const u="https://"+lang+".wikipedia.org/api/rest_v1/page/summary/"+encodeURIComponent(query.trim().replace(/\\s+/g,"_"));const r=await fetch(u,{signal:AbortSignal.timeout(2500),headers:{accept:"application/json"}});if(r.ok){const d=await r.json<any>();if(d.thumbnail?.source||d.originalimage?.source)return d.thumbnail?.source||d.originalimage?.source}}catch{}}};
 export async function findRelatedImage(query: string): Promise<string | undefined> {
   try {
     const variants=[query,query.split(/\s+/).slice(0,6).join(" "),query.split(/[،,:-]/)[0]].filter(Boolean);
