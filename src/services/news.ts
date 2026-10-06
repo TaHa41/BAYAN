@@ -241,7 +241,13 @@ export async function news(env: Env, lang: Locale) {
     providers.map(([name, url]) => readFeed(name, url)),
   );
   let all = batches.flat();
-  if (!all.length) all = await gdeltFallback(lang);
+  if (lang === "ar") {
+    all = all.filter((story) => hasArabic(story.title));
+    if (!all.length) all = await googleArabicFallback();
+    if (!all.length) all = (await gdeltFallback(lang)).filter((story) => hasArabic(story.title));
+  } else if (!all.length) {
+    all = await gdeltFallback(lang);
+  }
   all = all.filter((story) => {
     if (!story.publishedAt) return true;
     const timestamp = Date.parse(story.publishedAt);
