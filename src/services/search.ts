@@ -54,7 +54,7 @@ async function aiSearch(env:Env,q:string):Promise<Candidate[]>{
 async function settings(env:Env){try{const r=await env.DB.prepare("SELECT key,value FROM admin_settings").all<any>();return Object.fromEntries((r.results||[]).map((x:any)=>[x.key,x.value]))}catch{return{}}}
 export async function search(env:Env,q:string,language:Locale):Promise<SearchResponse>{
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const [local, wiki, wd, gd, oa, remote] = await Promise.all([searchArticles(env,q,language,max),s.source_wikipedia==="0"?[]:wikipedia(env,q,language),s.source_wikidata==="0"?[]:wikidata(q),s.source_gdelt==="0"?[]:gdelt(q),s.source_openalex==="0"?[]:openAlex(q),s.source_ai_search==="0"?[]:aiSearch(env,q)]);
-  const candidates:Candidate[]=[
+  const providerAttempted=["BAYAN Knowledge Base","Wikipedia","Wikidata","GDELT","OpenAlex","Cloudflare AI Search"];const candidates:Candidate[]=[
     ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wd,...gd,...oa,...remote
   ];
   const seen=new Set<string>();
@@ -66,7 +66,7 @@ export async function search(env:Env,q:string,language:Locale):Promise<SearchRes
   const status=results.length>=3?"verified":results.length?"mixed":"insufficient";
   const message=results.length?undefined:(language==="ar"?"لم نجد أدلة كافية بعد؛ تم فحص مسارات البحث المتاحة دون اختلاق إجابة.":"Not enough evidence was found after checking the available search paths; BAYAN will not invent an answer.");
   await saveSearch(env,q,language,intent(q),status,results.length);
-  return {query:q,locale:language,results,providers,status,message};
+  return {query:q,locale:language,results,providers,providerAttempted,status,message};
 }
 function intent(q:string){
   const s=q.toLowerCase();
