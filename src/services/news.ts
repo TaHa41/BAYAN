@@ -109,6 +109,47 @@ const terms = (value: string) =>
     .split(/\s+/)
     .filter((term) => term.length > 2);
 
+const wikidataImage = async (query: string): Promise<string | undefined> => {
+  try {
+    for (const language of ["ar", "en"]) {
+      const searchUrl =
+        "https://www.wikidata.org/w/api.php?action=wbsearchentities&search=" +
+        encodeURIComponent(query) +
+        "&language=" +
+        language +
+        "&limit=3&format=json&origin=*";
+      const searchResponse = await fetch(searchUrl, {
+        signal: AbortSignal.timeout(2500),
+        headers: { accept: "application/json" },
+      });
+      if (!searchResponse.ok) continue;
+      const searchData = await searchResponse.json<any>();
+      const ids = (searchData.search || []).map((x: any) => x.id).filter(Boolean).slice(0, 3);
+      if (!ids.length) continue;
+
+      const entityUrl =
+        "https://www.wikidata.org/w/api.php?action=wbgetentities&ids=" +
+        ids.join("|") +
+        "&props=claims&format=json&origin=*";
+      const entityResponse = await fetch(entityUrl, {
+        signal: AbortSignal.timeout(2500),
+        headers: { accept: "application/json" },
+      });
+      if (!entityResponse.ok) continue;
+      const entityData = await entityResponse.json<any>();
+
+      for (const id of ids) {
+        const filename =
+          entityData.entities?.[id]?.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
+        if (filename) {
+          return "https://commons.wikimedia.org/wiki/Special:Redirect/file/" + encodeURIComponent(filename);
+        }
+      }
+    }
+  } catch {}
+  return;
+};
+
 const wikipediaImage = async (query: string): Promise<string | undefined> => {
   try {
     const url =
