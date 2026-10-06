@@ -11,9 +11,7 @@
     ["history","أرقام الملعب","Numbers of the Game","الرياضة والنتائج والإحصاءات والسجلات بلغة الأرقام.","Sports, results, statistics and records through numbers.","△"],
     ["people","خارج الخريطة","Beyond the Map","السفر والوجهات والأماكن والتجارب والمعلومات العملية.","Travel, destinations, places and practical journey knowledge.","✈"],
     ["sports","عين الاتجاهات","Trend Lens","ما يلفت الانتباه ويتغير في اهتمامات الناس، منفصلًا عن الخبر المؤكد.","Changing public interests, kept separate from verified news.","↗"],
-    ["travel","لوحة البيانات","Data Board","بيانات حية ومؤشرات وأرقام تتغير باستمرار.","Live data, indicators and numbers that change continuously.","◉"],
-    ["trends","ملفات خاصة","Special Files","ملفات تجمع الأدلة والسياق حول موضوعات تستحق المتابعة.","Evidence-rich files that bring context to subjects worth following.","▣"],
-    ["prices","مباشر","Live","بيانات لحظية مثل الطقس والعملات والذهب والأسعار.","Live indicators such as weather, currencies, gold and prices.","◎"]
+    ["travel","لوحة البيانات","Data Board","بيانات حية ومؤشرات وأرقام تتغير باستمرار.","Live data, indicators and numbers that change continuously.","◉"]
   ];  const params = new URLSearchParams(location.search);
   const lang = params.get("lang") === "en" ? "en" : "ar";
   const ar = lang === "ar";
@@ -408,9 +406,10 @@
   }
 
   async function renderSection(slug) {
-    const section=sections.find((item)=>item[0]===slug); if(!section||slug==="prices")return;
+    const section=sections.find((item)=>item[0]===slug); if(!section)return;
     app.innerHTML='<section class="page"><div class="page-head"><span class="eyebrow">'+escapeHtml(section[5])+" "+t("قسم معرفي","Knowledge section")+'</span><h1>'+escapeHtml(ar?section[1]:section[2])+'</h1><p>'+escapeHtml(ar?section[3]:section[4])+'</p></div><div id="wisdom" class="wisdom-card"><span class="kicker">'+t("حكمة بيان","BAYAN Insight")+'</span><p>'+t("جاري اختيار عبارة…","Selecting an insight…")+'</p></div><div id="section-content" class="article-grid"><div class="notice">'+t("جاري تحميل المواد…","Loading content…")+"</div></div></section>";
     try{const wd=await api("/api/wisdom?section="+encodeURIComponent(slug)+"&lang="+lang);const w=document.querySelector("#wisdom p");if(w)w.textContent=wd.wisdom||"";}catch{}
+    if(slug==="travel"){return renderPrices();}
     if(slug==="egypt"){try{const data=await api("/api/news?lang="+lang),out=document.querySelector("#section-content"),items=(data.items||[]).slice(0,12);out.innerHTML=items.length?items.map(item=>'<a class="article-card" href="/news?story='+encodeURIComponent(item.title)+'&lang='+lang+'">'+imageHtml(item)+'<div class="article-card-body"><span class="kicker">'+escapeHtml(item.publisher||t("الأخبار","News"))+'</span><h3>'+escapeHtml(item.title)+'</h3><p>'+escapeHtml(item.summary||"")+'</p><span class="read">'+t("اقرأ داخل بيان","Read inside BAYAN")+" →</span></div></a>").join(""):'<div class="notice">'+t("لا توجد أخبار متاحة الآن.","No current news is available right now.")+"</div>";hydrateSectionImages(items);}catch{document.querySelector("#section-content").innerHTML='<div class="notice">'+t("تعذر تحميل الأخبار الآن.","News could not be loaded right now.")+"</div>"}return;}
     try{const data=await api("/api/section?section="+encodeURIComponent(slug)+"&lang="+lang),out=document.querySelector("#section-content");out.innerHTML=data.items?.length?data.items.map(articleCard).join(""):'<div class="notice"><h2>'+t("لا توجد مواد منشورة في هذا القسم بعد.","No published material in this section yet.")+'</h2><p>'+t("سيظهر هنا المحتوى بعد مروره بمسار الاسترجاع والتحقق والمراجعة.","Content appears here after retrieval, verification and review.")+"</p></div>";if(data.items?.length)hydrateSectionImages(data.items);}catch{document.querySelector("#section-content").innerHTML='<div class="notice">'+t("تعذر تحميل القسم الآن.","This section could not be loaded right now.")+"</div>"}
   }
