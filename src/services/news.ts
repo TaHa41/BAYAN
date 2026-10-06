@@ -209,7 +209,18 @@ export async function news(env: Env, lang: Locale) {
   const batches = await Promise.all(
     providers.map(([name, url]) => readFeed(name, url)),
   );
-  const all = batches.flat();
+  const all = batches.flat().filter((story) => {
+    if (!story.publishedAt) return true;
+    const timestamp = Date.parse(story.publishedAt);
+    if (!Number.isFinite(timestamp)) return true;
+    return Date.now() - timestamp <= 72 * 60 * 60 * 1000;
+  });
+
+  all.sort((a,b) => {
+    const at = a.publishedAt ? Date.parse(a.publishedAt) : 0;
+    const bt = b.publishedAt ? Date.parse(b.publishedAt) : 0;
+    return (Number.isFinite(bt) ? bt : 0) - (Number.isFinite(at) ? at : 0);
+  });
 
   const seen = new Set<string>();
   const limit = Math.max(
