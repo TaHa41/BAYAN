@@ -127,7 +127,7 @@
       "A person, news story, topic, question, how-to, technical problem or live price — we retrieve, verify and organize the full picture before claiming certainty.") +
       '</p>' + searchBox() + '<div class="trust-row"><span>✓ ' + t("أدلة ومصادر","Evidence & sources") +
       '</span><span>◉ ' + t("تحديث مستمر","Continuously updated") + '</span><span>⌁ ' + t("ذكاء يساعدك","AI assistance") +
-      '</span></div></div><div class="section-intro"><span class="eyebrow">' + t("استكشف المعرفة","Explore knowledge") +
+      '</span></div><div class="wisdom-card" aria-label="' + t("الحكمة اليومية","Daily wisdom") + '"><span class="eyebrow">' + t("الحكمة اليومية","Daily wisdom") + '</span><blockquote>“' + t("فَإِنَّ مَعَ الْعُسْرِ يُسْرًا","Indeed, with hardship comes ease.") + '”</blockquote><p class="wisdom-source">' + t("القرآن الكريم — سورة الشرح، الآية 5","The Qur’an — Ash-Sharh 94:5") + '</p></div></div><div class="section-intro"><span class="eyebrow">' + t("استكشف المعرفة","Explore knowledge") +
       '</span><div class="section-grid">' + sections.map((s) =>
         '<a class="section-card" href="/' + s[0] + '?lang=' + lang + '"><span class="section-icon">' + s[5] +
         '</span><div><h2>' + escapeHtml(ar ? s[1] : s[2]) + '</h2><p>' + escapeHtml(ar ? s[3] : s[4]) +
