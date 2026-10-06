@@ -1,19 +1,19 @@
 (() => {
   const sections = [
-    ["egypt","نبض مصر","Egypt in Focus","أهم ما يخص مصر من أخبار ومعلومات وبيانات وشخصيات.","News, knowledge, data and people connected to Egypt.","🇪🇬"],
-    ["arab","المشهد العربي","Arab Scene","أحداث وقضايا وقصص من العالم العربي مع سياقها ومصادرها.","Events, issues and stories from the Arab world with context and sources.","✦"],
-    ["world","حول العالم","Around the World","أحداث وقصص ومعلومات دولية تتجاوز الخبر إلى الفهم.","Global events, stories and knowledge beyond the headline.","◉"],
-    ["science","اكتشف","Discover","علوم وفضاء وطبيعة واكتشافات وشرح مبسط قائم على الأدلة.","Science, space, nature and discoveries explained with evidence.","✧"],
-    ["economy","اقتصاد وحياة","Economy & Life","مال وأسواق وأسعار وقرارات اقتصادية وتأثيرها على الحياة اليومية.","Money, markets, prices and how economic decisions affect daily life.","◆"],
-    ["politics","المشهد السياسي","The Political Scene","سياسة وشأن عام مع فصل الوقائع عن التحليل والادعاءات.","Politics and public affairs with facts separated from analysis and claims.","◇"],
-    ["technology","عالم التقنية","Tech & AI","ذكاء اصطناعي وتقنية وبرمجة وابتكار وحلول عملية.","AI, technology, software, innovation and practical solutions.","⌘"],
-    ["health","صحة الإنسان","Human Health","صحة وطب وتغذية ومعلومات طبية مع حدود واضحة للدليل.","Health, medicine and nutrition with clear evidence limits.","+"],
-    ["history","ذاكرة وثقافة","History & Culture","تاريخ وفنون وتراث وثقافة لفهم الحاضر من جذوره.","History, arts, heritage and culture that put the present in context.","▱"],
-    ["people","وجوه وحكايات","People & Stories","شخصيات مؤثرة وسير وقصص وتجارب تستحق المعرفة.","Influential people, biographies and stories worth knowing.","●"],
-    ["sports","رياضة بالأرقام","Sports & Numbers","أخبار ونتائج وإحصاءات وسجلات رياضية قابلة للتحقق.","Sports news, results, statistics and verifiable records.","△"],
-    ["travel","اكتشف العالم","Explore","وجهات وأماكن وتجارب سفر ومعلومات عملية من مصادر موثوقة.","Destinations, places and practical travel knowledge from reliable sources.","✈"],
-    ["trends","على الرادار","On the Radar","ما يشغل الناس واتجاهات الاهتمام، منفصلًا عن الأخبار المؤكدة.","Public interests and trends, kept separate from verified news.","↗"],
-    ["prices","بيانات الآن","Live Data","طقس وعملات وذهب وأسعار ومؤشرات تتغير باستمرار.","Weather, currencies, gold, prices and continuously changing indicators.","◈"]
+    ["egypt","نبض الخبر","News Pulse","أهم الوقائع والتطورات التي تمس الحياة والأحداث المحلية.","The key developments and facts shaping local life.","✦"],
+    ["arab","مساحة المعرفة","Knowledge Space","معرفة موثقة وشرح وسياق يساعد على فهم ما حولنا.","Verified knowledge, explanation and context.","◇"],
+    ["world","حركة المال","Money in Motion","المال والأسواق والأسعار والقرارات الاقتصادية وتأثيرها.","Money, markets, prices and the forces moving the economy.","◆"],
+    ["science","لعبة السياسة","Politics at Play","القرارات والسياسات والقوى التي تصنع المشهد العام.","Decisions, policies and forces shaping public affairs.","◈"],
+    ["economy","نبض التقنية","Tech Pulse","التقنية والذكاء الاصطناعي والابتكار وما يتغير بسرعة.","Technology, AI, innovation and fast-moving change.","⌘"],
+    ["politics","حياة أفضل","Better Living","الصحة والعادات والمعلومات العملية التي تساعد في الحياة اليومية.","Health, habits and practical knowledge for everyday life.","+"],
+    ["technology","ذاكرة المكان","Memory of Place","التاريخ والثقافة والفنون والآثار والقصص التي تحفظ الذاكرة.","History, culture, arts, heritage and stories that preserve memory.","▱"],
+    ["health","وجوه مؤثرة","People of Impact","شخصيات وسير وتجارب وأعمال صنعت أثرًا واضحًا.","People, biographies and work that made a documented impact.","●"],
+    ["history","أرقام الملعب","Numbers of the Game","الرياضة والنتائج والإحصاءات والسجلات بلغة الأرقام.","Sports, results, statistics and records through numbers.","△"],
+    ["people","خارج الخريطة","Beyond the Map","السفر والوجهات والأماكن والتجارب والمعلومات العملية.","Travel, destinations, places and practical journey knowledge.","✈"],
+    ["sports","عين الاتجاهات","Trend Lens","ما يلفت الانتباه ويتغير في اهتمامات الناس، منفصلًا عن الخبر المؤكد.","Changing public interests, kept separate from verified news.","↗"],
+    ["travel","لوحة البيانات","Data Board","بيانات حية ومؤشرات وأرقام تتغير باستمرار.","Live data, indicators and numbers that change continuously.","◉"],
+    ["trends","ملفات خاصة","Special Files","ملفات تجمع الأدلة والسياق حول موضوعات تستحق المتابعة.","Evidence-rich files that bring context to subjects worth following.","▣"],
+    ["prices","مباشر","Live","بيانات لحظية مثل الطقس والعملات والذهب والأسعار.","Live indicators such as weather, currencies, gold and prices.","◎"]
   ];  const params = new URLSearchParams(location.search);
   const lang = params.get("lang") === "en" ? "en" : "ar";
   const ar = lang === "ar";
@@ -408,27 +408,11 @@
   }
 
   async function renderSection(slug) {
-    const section = sections.find((item) => item[0] === slug);
-    if (!section || slug === "news" || slug === "prices") return;
-    app.innerHTML =
-      '<section class="page"><div class="page-head"><span class="eyebrow">' + escapeHtml(section[5]) +
-      " " + t("قسم معرفي","Knowledge section") + '</span><h1>' +
-      escapeHtml(ar ? section[1] : section[2]) + '</h1><p>' +
-      escapeHtml(ar ? section[3] : section[4]) + '</p></div><div id="section-content" class="article-grid">' +
-      '<div class="notice">' + t("جاري تحميل المواد…","Loading content…") + "</div></div></section>";
-    try {
-      const data = await api("/api/section?section=" + encodeURIComponent(slug) + "&lang=" + lang);
-      const output = document.querySelector("#section-content");
-      output.innerHTML = data.items?.length
-        ? data.items.map(articleCard).join("")
-        : '<div class="notice"><h2>' + t("لا توجد مواد منشورة في هذا القسم بعد.","No published material in this section yet.") +
-          '</h2><p>' + t("سيظهر هنا المحتوى بعد مروره بمسار الاسترجاع والتحقق والمراجعة.",
-          "Content appears here after retrieval, verification and review.") + "</p></div>";
-      if (data.items?.length) hydrateSectionImages(data.items);
-    } catch {
-      document.querySelector("#section-content").innerHTML =
-        '<div class="notice">' + t("تعذر تحميل القسم الآن.","This section could not be loaded right now.") + "</div>";
-    }
+    const section=sections.find((item)=>item[0]===slug); if(!section||slug==="prices")return;
+    app.innerHTML='<section class="page"><div class="page-head"><span class="eyebrow">'+escapeHtml(section[5])+" "+t("قسم معرفي","Knowledge section")+'</span><h1>'+escapeHtml(ar?section[1]:section[2])+'</h1><p>'+escapeHtml(ar?section[3]:section[4])+'</p></div><div id="wisdom" class="wisdom-card"><span class="kicker">'+t("حكمة بيان","BAYAN Insight")+'</span><p>'+t("جاري اختيار عبارة…","Selecting an insight…")+'</p></div><div id="section-content" class="article-grid"><div class="notice">'+t("جاري تحميل المواد…","Loading content…")+"</div></div></section>";
+    try{const wd=await api("/api/wisdom?section="+encodeURIComponent(slug)+"&lang="+lang);const w=document.querySelector("#wisdom p");if(w)w.textContent=wd.wisdom||"";}catch{}
+    if(slug==="egypt"){try{const data=await api("/api/news?lang="+lang),out=document.querySelector("#section-content"),items=(data.items||[]).slice(0,12);out.innerHTML=items.length?items.map(item=>'<a class="article-card" href="/news?story='+encodeURIComponent(item.title)+'&lang='+lang+'">'+imageHtml(item)+'<div class="article-card-body"><span class="kicker">'+escapeHtml(item.publisher||t("الأخبار","News"))+'</span><h3>'+escapeHtml(item.title)+'</h3><p>'+escapeHtml(item.summary||"")+'</p><span class="read">'+t("اقرأ داخل بيان","Read inside BAYAN")+" →</span></div></a>").join(""):'<div class="notice">'+t("لا توجد أخبار متاحة الآن.","No current news is available right now.")+"</div>";hydrateSectionImages(items);}catch{document.querySelector("#section-content").innerHTML='<div class="notice">'+t("تعذر تحميل الأخبار الآن.","News could not be loaded right now.")+"</div>"}return;}
+    try{const data=await api("/api/section?section="+encodeURIComponent(slug)+"&lang="+lang),out=document.querySelector("#section-content");out.innerHTML=data.items?.length?data.items.map(articleCard).join(""):'<div class="notice"><h2>'+t("لا توجد مواد منشورة في هذا القسم بعد.","No published material in this section yet.")+'</h2><p>'+t("سيظهر هنا المحتوى بعد مروره بمسار الاسترجاع والتحقق والمراجعة.","Content appears here after retrieval, verification and review.")+"</p></div>";if(data.items?.length)hydrateSectionImages(data.items);}catch{document.querySelector("#section-content").innerHTML='<div class="notice">'+t("تعذر تحميل القسم الآن.","This section could not be loaded right now.")+"</div>"}
   }
 
   async function render() {
