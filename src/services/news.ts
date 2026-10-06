@@ -11,6 +11,6 @@ export async function findRelatedImage(query:string):Promise<string|undefined>{t
 export async function news(env:Env,lang:Locale){
  const fs=feeds(lang); const batches=await Promise.all(fs.map(([n,u])=>readFeed(n,u))); const all=batches.flat();
  const seen=new Set<string>(); const unique=all.filter(s=>{const k=s.title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu," ").trim();if(seen.has(k))return false;seen.add(k);return true}).slice(0,Math.max(6,Math.min(40,Number((await env.DB.prepare("SELECT value FROM admin_settings WHERE key=?").bind("news_items").first<any>())?.value||24))));
- const enriched=await Promise.all(unique.map(async s=>{if(s.imageUrl)return s; const direct=await sourceImage(s.url); if(direct)return {...s,imageUrl:direct}; const img=await wikimediaImage(s.title+" "+s.summary); return img?{...s,imageUrl:img}:s;}));
+ const enriched=await Promise.all(unique.map(async s=>{if(s.imageUrl)return s; const direct=await sourceImage(s.url); if(direct)return {...s,imageUrl:direct}; const img=await findRelatedImage(s.title+" "+s.summary); return img?{...s,imageUrl:img}:s;}));
  return {ok:enriched.length>0,providers:fs.map(x=>x[0]),items:enriched.map(s=>({title:s.title,summary:s.summary,url:s.url,publisher:s.publisher,publishedAt:s.publishedAt,imageUrl:s.imageUrl,imageAlt:s.imageAlt||s.title,sources:[{title:s.title,publisher:s.publisher,url:s.url,publishedAt:s.publishedAt,imageUrl:s.imageUrl} as Source],evidence:"mixed" as const}))};
 }
