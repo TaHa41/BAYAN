@@ -119,19 +119,23 @@
   }
 
   async function renderHome() {
-    app.innerHTML =
-      '<section class="home"><div class="home-copy"><span class="eyebrow">' +
-      t("BAYAN | بيان — مركز معرفة حي","BAYAN | A living knowledge platform") +
-      '</span><h1>' + t("أي شيء تريد معرفته.<br><em>ابحث عنه هنا.</em>","Anything you want to know.<br><em>Find it here.</em>") +
-      '</h1><p>' + t("شخصية، خبر، موضوع، سؤال، طريقة، مشكلة تقنية أو سعر لحظي — نبحث، نتحقق، ونرتب لك الصورة كاملة قبل أن ندّعي اليقين.",
-      "A person, news story, topic, question, how-to, technical problem or live price — we retrieve, verify and organize the full picture before claiming certainty.") +
-      '</p>' + searchBox() + '<div class="trust-row"><span>✓ ' + t("أدلة ومصادر","Evidence & sources") +
-      '</span><span>◉ ' + t("تحديث مستمر","Continuously updated") + '</span><span>⌁ ' + t("ذكاء يساعدك","AI assistance") +
-      '</span></div><div class="wisdom-card" aria-label="' + t("الحكمة اليومية","Daily wisdom") + '"><span class="eyebrow">' + t("الحكمة اليومية","Daily wisdom") + '</span><blockquote>“' + t("فَإِنَّ مَعَ الْعُسْرِ يُسْرًا","Indeed, with hardship comes ease.") + '”</blockquote><p class="wisdom-source">' + t("القرآن الكريم — سورة الشرح، الآية 5","The Qur’an — Ash-Sharh 94:5") + '</p></div></div><div class="section-intro"><span class="eyebrow">' + t("استكشف المعرفة","Explore knowledge") +
-      '</span><div class="section-grid">' + sections.map((s) =>
-        '<a class="section-card" href="/' + s[0] + '?lang=' + lang + '"><span class="section-icon">' + s[5] +
-        '</span><div><h2>' + escapeHtml(ar ? s[1] : s[2]) + '</h2><p>' + escapeHtml(ar ? s[3] : s[4]) +
-        '</p></div><b>↗</b></a>').join("") + "</div><div class="home-content"><div class="page-head home-feed-head"><span class="eyebrow">' + t("آخر ما نُشر","Latest published") + '</span><h2>' + t("المعرفة والأخبار في الصفحة الرئيسية","Knowledge and news on the homepage") + '</h2></div><div id="home-news" class="article-grid"><div class="notice loading">' + t("جاري تحديث الأخبار…","Refreshing news…") + '</div></div><div id="home-featured" class="article-grid"></div></div></div></section>";
+    app.innerHTML = \`
+      <section class="home">
+        <div class="home-copy">
+          <span class="eyebrow">\${t("BAYAN | بيان — مركز معرفة حي","BAYAN | A living knowledge platform")}</span>
+          <h1>\${t("أي شيء تريد معرفته.<br><em>ابحث عنه هنا.</em>","Anything you want to know.<br><em>Find it here.</em>")}</h1>
+          <p>\${t("شخصية، خبر، موضوع، سؤال، طريقة، مشكلة تقنية أو سعر لحظي — نبحث، نتحقق، ونرتب لك الصورة كاملة قبل أن ندّعي اليقين.","A person, news story, topic, question, how-to, technical problem or live price — we retrieve, verify and organize the full picture before claiming certainty.")}</p>
+          \${searchBox()}
+          <div class="trust-row"><span>✓ \${t("أدلة ومصادر","Evidence & sources")}</span><span>◉ \${t("تحديث مستمر","Continuously updated")}</span><span>⌁ \${t("ذكاء يساعدك","AI assistance")}</span></div>
+          <div class="wisdom-card" aria-label="\${t("الحكمة اليومية","Daily wisdom")}"><span class="eyebrow">\${t("الحكمة اليومية","Daily wisdom")}</span><blockquote>“\${t("فَإِنَّ مَعَ الْعُسْرِ يُسْرًا","Indeed, with hardship comes ease.")}”</blockquote><p class="wisdom-source">\${t("القرآن الكريم — سورة الشرح، الآية 5","The Qur’an — Ash-Sharh 94:5")}</p></div>
+        </div>
+        <div class="section-intro"><span class="eyebrow">\${t("استكشف المعرفة","Explore knowledge")}</span><div class="section-grid">\${sections.map((s) => '<a class="section-card" href="/' + s[0] + '?lang=' + lang + '"><span class="section-icon">' + s[5] + '</span><div><h2>' + escapeHtml(ar ? s[1] : s[2]) + '</h2><p>' + escapeHtml(ar ? s[3] : s[4]) + '</p></div><b>↗</b></a>').join("")}</div></div>
+        <div class="home-content">
+          <div class="page-head home-feed-head"><span class="eyebrow">\${t("آخر ما نُشر","Latest published")}</span><h2>\${t("المعرفة والأخبار في الصفحة الرئيسية","Knowledge and news on the homepage")}</h2></div>
+          <div id="home-news" class="article-grid"><div class="notice loading">\${t("جاري تحديث الأخبار…","Refreshing news…")}</div></div>
+          <div id="home-featured" class="article-grid"></div>
+        </div>
+      </section>\`;
     bindSearch();
     try {
       const [newsData, ...sectionData] = await Promise.all([
@@ -143,25 +147,16 @@
       const newsOut = document.querySelector("#home-news");
       const newsItems = (newsData.items || []).slice(0, 6);
       newsOut.innerHTML = newsItems.length
-        ? newsItems.map((item) =>
-          '<a class="article-card" href="/news?story=' + encodeURIComponent(item.title) + '&lang=' + lang + '">' +
-          imageHtml(item) + '<div class="article-card-body"><span class="kicker">' +
-          escapeHtml(item.publisher || t("الأخبار","News")) + '</span><h3>' + escapeHtml(item.title) +
-          '</h3><p>' + escapeHtml(item.summary || "") + '</p><div class="source-line">' +
-          escapeHtml(item.publishedAt || "") + '</div><span class="read">' + t("اقرأ داخل بيان","Read inside BAYAN") + " →</span></div></a>"
-        ).join("")
+        ? newsItems.map((item) => '<a class="article-card" href="/news?story=' + encodeURIComponent(item.title) + '&lang=' + lang + '">' + imageHtml(item) + '<div class="article-card-body"><span class="kicker">' + escapeHtml(item.publisher || t("الأخبار","News")) + '</span><h3>' + escapeHtml(item.title) + '</h3><p>' + escapeHtml(item.summary || "") + '</p><div class="source-line">' + escapeHtml(item.publishedAt || "") + '</div><span class="read">' + t("اقرأ داخل بيان","Read inside BAYAN") + " →</span></div></a>").join("")
         : '<div class="notice">' + t("لا توجد أخبار حديثة متاحة الآن؛ لن نعرض خبرًا مختلقًا.","No current news is available right now; BAYAN will not invent a story.") + "</div>";
       const featured = sectionData.flatMap((x) => x.items || []).slice(0, 9);
       const featuredOut = document.querySelector("#home-featured");
-      featuredOut.innerHTML = featured.length
-        ? featured.map(articleCard).join("")
-        : '<div class="notice">' + t("لا توجد مواد منشورة إضافية الآن.","No additional published material is available right now.") + "</div>";
+      featuredOut.innerHTML = featured.length ? featured.map(articleCard).join("") : '<div class="notice">' + t("لا توجد مواد منشورة إضافية الآن.","No additional published material is available right now.") + "</div>";
       hydrateSectionImages(featured);
     } catch {
-      document.querySelector("#home-news").innerHTML = '<div class="notice">' +
-        t("تعذر تحديث محتوى الصفحة الرئيسية الآن. الأقسام ما زالت متاحة من القائمة.","Homepage content could not be refreshed. Sections remain available from the menu.") + "</div>";
+      const out=document.querySelector("#home-news");
+      if(out) out.innerHTML='<div class="notice">' + t("تعذر تحديث محتوى الصفحة الرئيسية الآن. الأقسام ما زالت متاحة من القائمة.","Homepage content could not be refreshed. Sections remain available from the menu.") + "</div>";
     }
-  }
   }
 
   async function renderSearch() {
