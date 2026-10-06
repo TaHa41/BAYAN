@@ -38,8 +38,16 @@ try{
   const ad=JSON.parse(a.text); if(!ad.ok||!ad.article?.title||!ad.article?.body)throw new Error("news_article_incomplete");
 }catch(e){console.error("NEWS",e);bad++}
 try{
-  const im=await get("/api/image?q=%D9%86%D8%AC%D9%8A%D8%A8%20%D9%85%D8%AD%D9%81%D9%88%D8%B8"); const id=JSON.parse(im.text);
-  if(!id.imageUrl)throw new Error("content_image_missing");
+  let id=null,last=null;
+  for(let attempt=1;attempt<=3;attempt++){
+    try{
+      const im=await get("/api/image?q=%D9%86%D8%AC%D9%8A%D8%A8%20%D9%85%D8%AD%D9%81%D9%88%D8%B8"); id=JSON.parse(im.text);
+      if(id.imageUrl) break;
+      last=new Error("content_image_missing");
+    }catch(e){last=e}
+    await new Promise(r=>setTimeout(r,1000*attempt));
+  }
+  if(!id?.imageUrl)throw last||new Error("content_image_missing");
 }catch(e){console.error("IMAGE",e);bad++}
 try{
   const a=await get("/api/article?slug=who-is-naguib-mahfouz-ar&lang=ar"); const ad=JSON.parse(a.text);
