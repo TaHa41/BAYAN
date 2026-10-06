@@ -188,19 +188,19 @@ const wikipediaImage = async (query: string): Promise<string | undefined> => {
 
 export async function findRelatedImage(query: string): Promise<string | undefined> {
   try {
-    const [wiki, wd] = await Promise.all([wikipediaImage(query), wikidataImage(query)]);
-    if (wiki) return wiki;
-    if (wd) return wd;
+    const variants=[query,query.split(/\s+/).slice(0,6).join(" "),query.split(/[،,:-]/)[0]].filter(Boolean);
+    for(const v of variants){
+      const [summary,wiki,wd]=await Promise.all([wikipediaSummaryImage(v),wikipediaImage(v),wikidataImage(v)]);
+      if(summary)return summary;if(wiki)return wiki;if(wd)return wd;
+    }
     const url="https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch="+encodeURIComponent(query)+"&gsrnamespace=6&gsrlimit=10&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=1200&format=json&origin=*";
     const response=await fetch(url,{signal:AbortSignal.timeout(3500),headers:{accept:"application/json"}});
     if(!response.ok)return;
-    const data=await response.json<any>(); const pages=Object.values(data.query?.pages||{}) as any[]; const q=terms(query);
-    let best:any,bestScore=0;
+    const data=await response.json<any>();const pages=Object.values(data.query?.pages||{}) as any[];const q=terms(query);let best:any,bestScore=0;
     for(const page of pages){const info=page.imageinfo?.[0];if(!info)continue;const hay=terms(String(page.title||"")+" "+String(info.extmetadata?.ImageDescription?.value||"")).join(" ");const hits=q.filter(term=>hay.includes(term)).length;const score=q.length?hits/q.length:0;if(score>bestScore){bestScore=score;best=info}}
-    return bestScore>=0.55?(best?.thumburl||best?.url):undefined;
+    return bestScore>=0.45?(best?.thumburl||best?.url):undefined;
   }catch{return}
 }
-
 export async function news(env: Env, lang: Locale) {
   const providers = feeds(lang);
   const batches = await Promise.all(
