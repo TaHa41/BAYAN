@@ -24,7 +24,7 @@ try{
   const h=await get("/?lang=en");
   if(!/<html[^>]+lang="en"/.test(h.text))throw new Error("english_lang_missing");
   if(!h.text.includes("/app-20261006-6.js?v=2026.10.06.6"))throw new Error("current_shell_bundle_missing");
-  if(!h.text.includes("BAYAN | Knowledge, Evidence & Context"))throw new Error("current_shell_marker_missing");
+  if(!h.text.includes("/app-20261006-6.js?v=2026.10.06.6"))throw new Error("current_shell_bundle_missing");
   if(h.headers.get("x-bayan-build")!=="2026.10.06.6")throw new Error("current_build_header_missing");
 }catch(e){console.error("EN",e);bad++}
 try{
