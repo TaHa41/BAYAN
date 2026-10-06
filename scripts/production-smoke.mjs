@@ -40,6 +40,7 @@ try{
   const a=await get("/api/article?slug=who-is-naguib-mahfouz-ar&lang=ar"); const ad=JSON.parse(a.text);
   if(!ad.title||!ad.body)throw new Error("article_incomplete");
   if(!/[\u0600-\u06ff]/.test(String(ad.title)))throw new Error("arabic_article_missing");
+  if(!/[\u0600-\u06ff]/.test(String(ad.body)))throw new Error("arabic_article_body_missing");
 }catch(e){console.error("ARTICLE",e);bad++}
 try{
   const s=await get("/api/search?q=%D9%86%D8%AC%D9%8A%D8%A8%20%D9%85%D8%AD%D9%81%D9%88%D8%B8&lang=ar"); const d=JSON.parse(s.text);
