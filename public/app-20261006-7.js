@@ -464,13 +464,20 @@
           t("نشر","Approve") + '</button><button class="reviewBtn" data-id="' + escapeHtml(item.id) +
           '" data-action="REJECT">' + t("رفض","Reject") + "</button></div>").join("") + "</div></div>";
 
-        output.insertAdjacentHTML("beforeend", '<div class="admin-card"><h2>' + t("إدارة صور المقالات","Article image management") + '</h2><p>' + t("يمكنك تغيير صورة أي مقال منشور دون تعديل الكود.","Change the image of any published article without editing code.") + '</p><div class="admin-list">' + (articles.items || []).slice(0,20).map((item) => '<div class="image-admin-row"><b>' + escapeHtml(item.title) + '</b><input class="field article-image-url" data-slug="' + escapeHtml(item.slug) + '" data-language="' + escapeHtml(item.language) + '" value="' + escapeHtml(item.image_url || "") + '" placeholder="https://..."><button class="reviewBtn imageSave" data-slug="' + escapeHtml(item.slug) + '" data-language="' + escapeHtml(item.language) + '">' + t("حفظ الصورة","Save image") + '</button></div>').join("") + '</div></div>');
+        output.insertAdjacentHTML("beforeend", '<div class="admin-card image-manager"><div class="image-manager-head"><div><span class="kicker">' + t("الصور","Images") + '</span><h2>' + t("تغيير صور المقالات","Change article images") + '</h2><p>' + t("اختر المقال، ضع رابط الصورة، شاهد المعاينة ثم اضغط حفظ. لا تحتاج لتعديل أي كود.","Choose an article, paste an image URL, preview it, then save. No code changes are needed.") + '</p></div><div class="image-manager-tip">' + t("مهم: استخدم رابط صورة مباشر يبدأ بـ https://","Tip: use a direct image URL starting with https://") + '</div></div><div class="image-admin-grid">' + (articles.items || []).slice(0,20).map((item) => '<article class="image-admin-card"><div class="image-admin-preview">' + (item.image_url ? '<img src="' + escapeHtml(item.image_url) + '" alt="' + escapeHtml(item.image_alt || item.title) + '" loading="lazy">' : '<div class="image-admin-empty">BAYAN</div>') + '</div><div class="image-admin-body"><div class="image-admin-title">' + escapeHtml(item.title) + '</div><div class="image-admin-meta">' + escapeHtml(item.language === "en" ? "English" : "العربية") + '</div><label class="image-admin-label">' + t("رابط الصورة","Image URL") + '<input class="field article-image-url" data-slug="' + escapeHtml(item.slug) + '" data-language="' + escapeHtml(item.language) + '" value="' + escapeHtml(item.image_url || "") + '" placeholder="https://example.com/image.jpg"></label><button class="primary imageSave" data-slug="' + escapeHtml(item.slug) + '" data-language="' + escapeHtml(item.language) + '">' + t("حفظ الصورة","Save image") + '</button><div class="image-save-status" data-status="' + escapeHtml(item.slug) + '-' + escapeHtml(item.language) + '"></div></div></article>').join("") + '</div></div>');
         document.querySelectorAll(".imageSave").forEach((button) => {
           button.onclick = async () => {
             const input = document.querySelector('.article-image-url[data-slug="' + CSS.escape(button.dataset.slug) + '"][data-language="' + CSS.escape(button.dataset.language) + '"]');
-            if (!input?.value.trim()) return;
-            await adminApi("/api/admin/article-image", {method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({slug:button.dataset.slug,language:button.dataset.language,imageUrl:input.value.trim(),imageAlt:button.dataset.slug})});
-            load();
+            const status = document.querySelector('.image-save-status[data-status="' + CSS.escape(button.dataset.slug + "-" + button.dataset.language) + '"]');
+            if (!input?.value.trim()) { if(status) status.textContent=t("أدخل رابط الصورة أولًا.","Enter an image URL first."); return; }
+            button.disabled=true; button.textContent=t("جاري الحفظ…","Saving…");
+            try {
+              await adminApi("/api/admin/article-image", {method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({slug:button.dataset.slug,language:button.dataset.language,imageUrl:input.value.trim(),imageAlt:input.value.trim()})});
+              if(status) status.textContent=t("تم حفظ الصورة بنجاح.","Image saved successfully.");
+              const card=button.closest(".image-admin-card"), img=card?.querySelector(".image-admin-preview img");
+              if(img) img.src=input.value.trim(); else if(card) card.querySelector(".image-admin-preview").innerHTML='<img src="' + escapeHtml(input.value.trim()) + '" alt="" loading="lazy">';
+            } catch { if(status) status.textContent=t("تعذر حفظ الصورة. تحقق من الرابط.","Could not save the image. Check the URL."); }
+            finally { button.disabled=false; button.textContent=t("حفظ الصورة","Save image"); }
           };
         });
         document.querySelector("#saveSettings").onclick = async () => {
