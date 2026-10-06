@@ -2,16 +2,16 @@
   const sections = [
     ["egypt","مصر الآن","Egypt","ملفات مصر ومعلوماتها وأحداثها وشخصياتها وبياناتها.","Egyptian knowledge, events, people and data.","🇪🇬"],
     ["arab","العرب","Arab World","ملفات دول العالم العربي وأحداثها وسياقها ومصادرها.","Arab-world countries, events, context and sources.","✦"],
-    ["world","العالم","World","دول وأحداث وقضايا عالمية مع معلومات قابلة للتحقق.","Countries, global events and verifiable knowledge.","◉"],
+    ["world","حول العالم","World","دول وأحداث وقضايا عالمية مع معلومات قابلة للتحقق.","Countries, global events and verifiable knowledge.","◉"],
     ["science","اكتشاف وعلوم","Science & Discoveries","علوم واكتشافات وشرح مبسط مبني على الأدلة.","Science, discoveries and evidence-based explanations.","✧"],
     ["economy","مال وأعمال","Economy & Money","اقتصاد وأسواق وأموال وأسعار وبيانات مالية.","Economy, markets, money, prices and financial data.","◆"],
-    ["politics","سياسة وشأن عام","Politics & Public Affairs","أخبار السياسة والشأن العام مع فصل الخبر عن التحليل.","Politics and public affairs, separating news from analysis.","◇"],
+    ["politics","سياسة عامة","Politics & Public Affairs","أخبار السياسة والشأن العام مع فصل الخبر عن التحليل.","Politics and public affairs, separating news from analysis.","◇"],
     ["technology","تقنية وذكاء اصطناعي","Technology & AI","تقنية وذكاء اصطناعي وبرمجة وحلول عملية.","Technology, AI, coding and practical solutions.","⌘"],
     ["health","الصحة","Health & Medicine","معلومات صحية وطبية موثوقة مع حدود الدليل.","Reliable health and medical information with evidence limits.","+"],
     ["history","تاريخ وثقافة","History & Culture","تاريخ وثقافة وفنون وتراث في صفحات مترابطة.","History, culture, arts and heritage in connected pages.","▤"],
     ["people","شخصيات وقصص","People","ملفات الشخصيات وسيرهم وإنجازاتهم وأهم الأحداث المرتبطة بهم.","People, biographies, achievements and related events.","●"],
     ["sports","رياضة وأرقام","Sports & Statistics","رياضة ونتائج وإحصاءات وسجلات قابلة للتحقق.","Sports, results, statistics and verifiable records.","△"],
-    ["travel","سفر ووجهات","Travel & Destinations","وجهات وأماكن ونصائح سفر مبنية على مصادر.","Destinations, places and source-based travel guidance.","✈"],
+    ["travel","وجهات وسفر","Travel & Destinations","وجهات وأماكن ونصائح سفر مبنية على مصادر.","Destinations, places and source-based travel guidance.","✈"],
     ["trends","ما يهم الناس","Interests & Trends","ما يهتم به الناس واتجاهات البحث، منفصلًا عن الأخبار الموثقة.","Public interests and search trends, separate from verified news.","↗"],
     ["prices","مباشر الآن","Live Data & Prices","طقس وعملات وذهب وأسعار وبيانات تتغير باستمرار.","Weather, currencies, gold, prices and changing live data.","◈"]
   ];
