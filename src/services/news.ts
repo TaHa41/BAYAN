@@ -13,11 +13,14 @@ type Story = {
 const feeds = (lang: Locale) =>
   lang === "ar"
     ? [
-        ["BBC Arabic", "https://feeds.bbci.co.uk/arabic/rss.xml"],
-        ["Al Jazeera Arabic", "https://www.aljazeera.net/aljazeera/rss"],
-        ["DW Arabic", "https://rss.dw.com/rdf/rss-ar-all"],
-        ["France 24 Arabic", "https://www.france24.com/ar/rss"],
-        ["Sky News Arabia", "https://www.skynewsarabia.com/rss"],
+        ["بي بي سي عربي", "https://feeds.bbci.co.uk/arabic/rss.xml"],
+        ["الجزيرة", "https://www.aljazeera.net/aljazeera/rss"],
+        ["DW عربية", "https://rss.dw.com/rdf/rss-ar-all"],
+        ["فرانس 24 عربي", "https://www.france24.com/ar/rss"],
+        ["سكاي نيوز عربية", "https://www.skynewsarabia.com/rss"],
+        ["أخبار Google عربية", "https://news.google.com/rss?hl=ar&gl=EG&ceid=EG:ar"],
+        ["أخبار مصر", "https://news.google.com/rss/search?q=مصر&hl=ar&gl=EG&ceid=EG:ar"],
+        ["أخبار عربية", "https://news.google.com/rss/search?q=العالم%20العربي&hl=ar&gl=EG&ceid=EG:ar"],
       ]
     : [
         ["BBC", "https://feeds.bbci.co.uk/news/rss.xml"],
@@ -204,6 +207,17 @@ export async function findRelatedImage(query: string): Promise<string | undefine
     return bestScore>=0.45?(best?.thumburl||best?.url):undefined;
   }catch{return}
 }
+const hasArabic = (value: string) => /[\\u0600-\\u06ff]/.test(value);
+const googleArabicFallback = async (): Promise<Story[]> => {
+  const feeds = [
+    ["أخبار Google عربية", "https://news.google.com/rss?hl=ar&gl=EG&ceid=EG:ar"],
+    ["أخبار مصر", "https://news.google.com/rss/search?q=مصر&hl=ar&gl=EG&ceid=EG:ar"],
+    ["أخبار عربية", "https://news.google.com/rss/search?q=العالم%20العربي&hl=ar&gl=EG&ceid=EG:ar"],
+  ] as [string,string][];
+  const batches = await Promise.all(feeds.map(([name,url]) => readFeed(name,url)));
+  return batches.flat().filter(x => hasArabic(x.title));
+};
+
 const gdeltFallback = async (lang: Locale): Promise<Story[]> => {
   try {
     const query = lang === "ar" ? "أخبار" : "news";
