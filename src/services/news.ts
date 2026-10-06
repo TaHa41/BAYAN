@@ -204,12 +204,31 @@ export async function findRelatedImage(query: string): Promise<string | undefine
     return bestScore>=0.45?(best?.thumburl||best?.url):undefined;
   }catch{return}
 }
+const gdeltFallback = async (lang: Locale): Promise<Story[]> => {
+  try {
+    const query = lang === "ar" ? "أخبار" : "news";
+    const url = "https://api.gdeltproject.org/api/v2/doc/doc?query=" + encodeURIComponent(query) + "&mode=artlist&maxrecords=12&format=json&sort=HybridRel";
+    const response = await fetch(url, { signal: AbortSignal.timeout(5000), headers: { accept: "application/json" } });
+    if (!response.ok) return [];
+    const data = await response.json<any>();
+    return (data.articles || []).map((x:any) => ({
+      title: esc(String(x.title || "")),
+      summary: esc(String(x.seendate || "") + " " + String(x.domain || "")),
+      url: String(x.url || ""),
+      publisher: String(x.domain || "GDELT"),
+      publishedAt: String(x.seendate || "")
+    })).filter((x:Story) => x.title && x.url);
+  } catch { return []; }
+};
+
 export async function news(env: Env, lang: Locale) {
   const providers = feeds(lang);
   const batches = await Promise.all(
     providers.map(([name, url]) => readFeed(name, url)),
   );
-  const all = batches.flat().filter((story) => {
+  let all = batches.flat();
+  if (!all.length) all = await gdeltFallback(lang);
+  all = all.filter((story) => {
     if (!story.publishedAt) return true;
     const timestamp = Date.parse(story.publishedAt);
     if (!Number.isFinite(timestamp)) return true;
