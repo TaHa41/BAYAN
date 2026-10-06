@@ -150,6 +150,22 @@ const wikidataImage = async (query: string): Promise<string | undefined> => {
   return;
 };
 
+const wikipediaSummaryImage = async (query: string): Promise<string | undefined> => {
+  try {
+    const title = query.trim().replace(/\s+/g, "_");
+    const url = "https://ar.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(title);
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(2500),
+      headers: { accept: "application/json" },
+    });
+    if (!response.ok) return;
+    const data = await response.json<any>();
+    return data.thumbnail?.source || data.originalimage?.source;
+  } catch {
+    return;
+  }
+};
+
 const wikipediaImage = async (query: string): Promise<string | undefined> => {
   try {
     const url =
