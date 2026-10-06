@@ -1,0 +1,20 @@
+name: BAYAN post-deploy production guardian
+on:
+  workflow_run:
+    workflows: ["BAYAN v1 production deploy"]
+    types: [completed]
+permissions:
+  contents: read
+jobs:
+  production_guardian:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Production guardian smoke
+        run: node scripts/production-smoke.mjs
