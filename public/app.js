@@ -384,7 +384,7 @@
         "Control retrieval, sources, images, repairs and monitoring from one place.") +
       '</p></div><div class="admin-login"><input id="adminToken" class="field" type="password" placeholder="' +
       t("رمز مدير بيان","BAYAN manager token") + '"><button id="adminSave" class="primary">' +
-      t("دخول","Enter") + '</button></div><div id="adminOut"></div></section>';
+      t("دخول","Enter") + '</button><button id="adminRepair" class="navbtn">' + t("تشخيص وإصلاح آمن بالذكاء الاصطناعي","AI diagnose & safe repair") + '</button></div><div id="adminOut"></div></section>';
 
     const token = () => sessionStorage.getItem("bayan-admin-token") || "";
     document.querySelector("#adminSave").onclick = () => {
@@ -411,9 +411,9 @@
       output.innerHTML = '<div class="notice loading">' +
         t("جاري تحميل حالة النظام…","Loading system status…") + "</div>";
       try {
-        const [health, settings, repairs, runtime, analytics, contributions] = await Promise.all([
+        const [health, settings, repairs, runtime, analytics, contributions, articles] = await Promise.all([
           api("/api/health"), adminApi("/api/admin/settings"), adminApi("/api/admin/repairs"),
-          adminApi("/api/admin/runtime"), adminApi("/api/admin/analytics"), adminApi("/api/admin/contributions")
+          adminApi("/api/admin/runtime"), adminApi("/api/admin/analytics"), adminApi("/api/admin/contributions"), adminApi("/api/admin/articles")
         ]);
         const setting = Object.fromEntries((settings.items || []).map((item) => [item.key, item.value]));
         output.innerHTML =
@@ -460,6 +460,15 @@
           t("نشر","Approve") + '</button><button class="reviewBtn" data-id="' + escapeHtml(item.id) +
           '" data-action="REJECT">' + t("رفض","Reject") + "</button></div>").join("") + "</div></div>";
 
+        output.insertAdjacentHTML("beforeend", '<div class="admin-card"><h2>' + t("إدارة صور المقالات","Article image management") + '</h2><p>' + t("يمكنك تغيير صورة أي مقال منشور دون تعديل الكود.","Change the image of any published article without editing code.") + '</p><div class="admin-list">' + (articles.items || []).slice(0,20).map((item) => '<div class="image-admin-row"><b>' + escapeHtml(item.title) + '</b><input class="field article-image-url" data-slug="' + escapeHtml(item.slug) + '" data-language="' + escapeHtml(item.language) + '" value="' + escapeHtml(item.image_url || "") + '" placeholder="https://..."><button class="reviewBtn imageSave" data-slug="' + escapeHtml(item.slug) + '" data-language="' + escapeHtml(item.language) + '">' + t("حفظ الصورة","Save image") + '</button></div>').join("") + '</div></div>');
+        document.querySelectorAll(".imageSave").forEach((button) => {
+          button.onclick = async () => {
+            const input = document.querySelector('.article-image-url[data-slug="' + CSS.escape(button.dataset.slug) + '"][data-language="' + CSS.escape(button.dataset.language) + '"]');
+            if (!input?.value.trim()) return;
+            await adminApi("/api/admin/article-image", {method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({slug:button.dataset.slug,language:button.dataset.language,imageUrl:input.value.trim(),imageAlt:button.dataset.slug})});
+            load();
+          };
+        });
         document.querySelector("#saveSettings").onclick = async () => {
           for (const element of document.querySelectorAll(".setting")) {
             await adminApi("/api/admin/settings", {
@@ -491,6 +500,16 @@
             : t("تعذر تحميل لوحة الإدارة.","Admin panel could not be loaded.")) + "</div>";
       }
     }
+    document.querySelector("#adminRepair").onclick = async () => {
+      const output = document.querySelector("#adminOut");
+      output.innerHTML = '<div class="notice loading">' + t("بيان يفحص الحالة ويحاول مسار الإصلاح الآمن…","BAYAN is checking the system and attempting the safe repair path…") + "</div>";
+      try {
+        const data = await adminApi("/api/admin/repair");
+        output.innerHTML = '<div class="notice"><h2>' + (data.ok ? t("لا توجد مشكلة حتمية مكتشفة.","No deterministic failure was detected.") : t("تم تسجيل المشكلة للتشخيص وإعادة المحاولة.","The failure was recorded for diagnosis and retry.")) + "</h2><p>" + escapeHtml((data.failures || []).join(" · ")) + "</p></div>";
+      } catch {
+        output.innerHTML = '<div class="notice">' + t("تعذر تشغيل مسار الإصلاح الآمن.","The safe repair path could not be started.") + "</div>";
+      }
+    };
     load();
   }
 
