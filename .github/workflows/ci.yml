@@ -1,7 +1,7 @@
 name: BAYAN v1 CI
 on:
   push:
-    branches: [v1]
+    branches: [v1,main,bayan-v1-knowledge-redesign]
   pull_request:
     branches: [v1,main]
 jobs:
