@@ -1,11 +1,14 @@
-name: BAYAN v1 production quality gate
+name: BAYAN v1 production deploy
 on:
   workflow_dispatch:
   push:
     branches: [main]
+permissions:
+  contents: read
 jobs:
-  quality:
+  deploy:
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -13,3 +16,8 @@ jobs:
           node-version: 24
       - run: npm install
       - run: npm run check
+      - name: Deploy to Cloudflare Workers
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy
