@@ -188,50 +188,17 @@ const wikipediaImage = async (query: string): Promise<string | undefined> => {
 
 export async function findRelatedImage(query: string): Promise<string | undefined> {
   try {
-    const wikiImage = await wikipediaImage(query);
-    if (wikiImage) return wikiImage;
-
-    const url =
-      "https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=" +
-      encodeURIComponent(query) +
-      "&gsrnamespace=6&gsrlimit=8&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=1200&format=json&origin=*";
-
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(3500),
-      headers: { accept: "application/json" },
-    });
-    if (!response.ok) return;
-
-    const data = await response.json<any>();
-    const pages = Object.values(data.query?.pages || {}) as any[];
-    const queryTerms = terms(query);
-
-    let best: any;
-    let bestScore = 0;
-
-    for (const page of pages) {
-      const info = page.imageinfo?.[0];
-      if (!info) continue;
-
-      const haystack = terms(
-        String(page.title || "") +
-          " " +
-          String(info.extmetadata?.ImageDescription?.value || ""),
-      ).join(" ");
-
-      const hits = queryTerms.filter((term) => haystack.includes(term)).length;
-      const score = queryTerms.length ? hits / queryTerms.length : 0;
-
-      if (score > bestScore) {
-        bestScore = score;
-        best = info;
-      }
-    }
-
-    return bestScore >= 0.35 ? best?.thumburl || best?.url : undefined;
-  } catch {
-    return;
-  }
+    const [wiki, wd] = await Promise.all([wikipediaImage(query), wikidataImage(query)]);
+    if (wiki) return wiki;
+    if (wd) return wd;
+    const url="https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch="+encodeURIComponent(query)+"&gsrnamespace=6&gsrlimit=10&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=1200&format=json&origin=*";
+    const response=await fetch(url,{signal:AbortSignal.timeout(3500),headers:{accept:"application/json"}});
+    if(!response.ok)return;
+    const data=await response.json<any>(); const pages=Object.values(data.query?.pages||{}) as any[]; const q=terms(query);
+    let best:any,bestScore=0;
+    for(const page of pages){const info=page.imageinfo?.[0];if(!info)continue;const hay=terms(String(page.title||"")+" "+String(info.extmetadata?.ImageDescription?.value||"")).join(" ");const hits=q.filter(term=>hay.includes(term)).length;const score=q.length?hits/q.length:0;if(score>bestScore){bestScore=score;best=info}}
+    return bestScore>=0.55?(best?.thumburl||best?.url):undefined;
+  }catch{return}
 }
 
 export async function news(env: Env, lang: Locale) {
