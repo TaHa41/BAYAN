@@ -41,7 +41,7 @@ try{
 for(const section of sections){
   try{
     const x=await get("/api/section?section="+section+"&lang=ar"); const d=JSON.parse(x.text);
-    if(!Array.isArray(d.items)||d.items.length<1)throw new Error(section+"_empty");
+    if(!Array.isArray(d.items)||d.items.length<2)throw new Error(section+"_needs_at_least_two_articles");
   }catch(e){console.error("SECTION",section,e);bad++}
 }
 if(bad)process.exit(1);
