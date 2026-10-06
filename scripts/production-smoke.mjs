@@ -7,7 +7,7 @@ async function get(path){
   const text=await r.text();
   console.log(path,r.status,text.slice(0,220));
   if(!r.ok)throw new Error(path+" status "+r.status);
-  return{text,status:r.status};
+  return{text,status:r.status,headers:r.headers};
 }
 for(const path of checks){try{await get(path)}catch(e){console.error(e);bad++}}
 try{const rb=await get("/robots.txt");if(/Disallow:\s*\/api\/\s*$/.test(rb.text))throw new Error("robots_blocks_public_api");if(!rb.text.includes("/news-sitemap.xml"))throw new Error("news_sitemap_missing")}catch(e){console.error("SEO",e);bad++}
@@ -25,6 +25,7 @@ try{
   if(!/<html[^>]+lang="en"/.test(h.text))throw new Error("english_lang_missing");
   if(!h.text.includes("/app-20261006.js?v=2026.10.06.3"))throw new Error("current_shell_bundle_missing");
   if(!h.text.includes("BAYAN | Knowledge, Evidence & Context"))throw new Error("current_shell_marker_missing");
+  if(h.headers.get("x-bayan-build")!=="2026.10.06.3")throw new Error("current_build_header_missing");
 }catch(e){console.error("EN",e);bad++}
 try{
   const n=await get("/api/news?lang=ar"); const d=JSON.parse(n.text);
@@ -50,10 +51,14 @@ try{
   if(!Array.isArray(d.providerAttempted)||d.providerAttempted.length<5)throw new Error("provider_coverage_missing");
 }catch(e){console.error("SEARCH",e);bad++}
 for(const section of sections){
-  try{
-    const x=await get("/api/section?section="+section+"&lang=ar"); const d=JSON.parse(x.text);
-    if(!Array.isArray(d.items)||d.items.length<2)throw new Error(section+"_needs_at_least_two_articles");
-  }catch(e){console.error("SECTION",section,e);bad++}
+  for(const language of ["ar","en"]){
+    try{
+      const x=await get("/api/section?section="+section+"&lang="+language); const d=JSON.parse(x.text);
+      if(!Array.isArray(d.items)||d.items.length<2)throw new Error(section+"_"+language+"_needs_at_least_two_articles");
+    }catch(e){console.error("SECTION",section,language,e);bad++}
+  }
 }
 if(bad)process.exit(1);
 console.log("BAYAN production smoke passed");
+
+try{const a=await fetch(origin+"/api/admin/analytics",{headers:{accept:"application/json"}});if(a.status!==401)throw new Error("admin_auth_not_enforced");}catch(e){console.error("ADMIN_AUTH",e);bad++}
