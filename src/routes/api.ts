@@ -3,8 +3,14 @@ import type{Env,Source}from"../types";import{json,locale,body}from"../http";impo
   const title=clean(u.searchParams.get("title")||"",500),image=clean(u.searchParams.get("image")||"",2000);
   if(!title)return json({error:"title_required"},400);
   try{
-    const found=await search(env,title,lang);
-    if(!found.results.length)return json({error:"article_source_unavailable",status:found.status},503);
+    let found:any={results:[],status:"insufficient"};
+    try{found=await search(env,title,lang)}catch{}
+    if(!found.results.length){
+      const live=await news(env,lang);
+      const story=live.items?.find((x:any)=>String(x.title).trim()===title.trim())||live.items?.find((x:any)=>String(x.title).includes(title.slice(0,80)));
+      if(!story)return json({error:"article_source_unavailable",status:"insufficient"},503);
+      return json({ok:true,article:{title:story.title,summary:story.summary||"",body:story.summary||story.title,sources:story.sources||[],image:image||story.imageUrl||null,status:"source_only",providerCount:1}});
+    }
     let generated:{status:string;answer?:string;sources?:Source[]}={status:"mixed"};
     try{generated=await ask(env,title,lang,found.results)}catch{}
     const evidenceBody=found.results.slice(0,8).map((x:any)=>x.title+"\n"+x.summary).filter(Boolean).join("\n\n");
