@@ -97,11 +97,21 @@
       url.searchParams.set("lang", ar ? "en" : "ar");
       location.href = url;
     };
-    if (localStorage.getItem("bayan-theme") === "dark") document.body.classList.add("dark");
-    document.querySelector("#theme").onclick = () => {
-      document.body.classList.toggle("dark");
-      localStorage.setItem("bayan-theme", document.body.classList.contains("dark") ? "dark" : "light");
+    const applyTheme = () => {
+      const mode = localStorage.getItem("bayan-theme") || "auto";
+      const dark = mode === "dark" || (mode === "auto" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.body.classList.toggle("dark", dark);
+      const themeButton = document.querySelector("#theme");
+      if (themeButton) themeButton.title = t("المظهر: " + (mode === "dark" ? "داكن" : mode === "light" ? "فاتح" : "تلقائي"), "Theme: " + (mode === "dark" ? "Dark" : mode === "light" ? "Light" : "Auto"));
     };
+    applyTheme();
+    document.querySelector("#theme").onclick = () => {
+      const mode = localStorage.getItem("bayan-theme") || "auto";
+      const next = mode === "auto" ? "light" : mode === "light" ? "dark" : "auto";
+      localStorage.setItem("bayan-theme", next);
+      applyTheme();
+    };
+    window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", applyTheme);
   }
 
   async function hydrateSectionImages(items) {
@@ -125,7 +135,7 @@
           <span class="eyebrow">${t("BAYAN | بيان — مركز معرفة حي","BAYAN | A living knowledge platform")}</span>
           <h1>${t("أي شيء تريد معرفته.<br><em>ابحث عنه هنا.</em>","Anything you want to know.<br><em>Find it here.</em>")}</h1>
           <p>${t("شخصية، خبر، موضوع، سؤال، طريقة، مشكلة تقنية أو سعر لحظي — نبحث، نتحقق، ونرتب لك الصورة كاملة قبل أن ندّعي اليقين.","A person, news story, topic, question, how-to, technical problem or live price — we retrieve, verify and organize the full picture before claiming certainty.")}</p>
-          ${searchBox()}
+          ${searchBox()}<div class="home-actions"><a class="primary" href="/ask?lang=${lang}">${t("اسأل بيان","Ask BAYAN")}</a></div>
           <div class="trust-row"><span>✓ ${t("أدلة ومصادر","Evidence & sources")}</span><span>◉ ${t("تحديث مستمر","Continuously updated")}</span><span>⌁ ${t("ذكاء يساعدك","AI assistance")}</span></div>
           <div class="wisdom-card" aria-label="${t("الحكمة اليومية","Daily wisdom")}"><span class="eyebrow">${t("الحكمة اليومية","Daily wisdom")}</span><blockquote>“${t("فَإِنَّ مَعَ الْعُسْرِ يُسْرًا","Indeed, with hardship comes ease.")}”</blockquote><p class="wisdom-source">${t("القرآن الكريم — سورة الشرح، الآية 5","The Qur’an — Ash-Sharh 94:5")}</p></div>
         </div>
@@ -140,7 +150,7 @@
     try {
       const [newsData, ...sectionData] = await Promise.all([
         api("/api/news?lang=" + lang),
-        ...sections.filter((s) => !["news","prices","trends"].includes(s[0])).slice(0, 6).map((s) =>
+        ...sections.filter((s) => !["news","prices","trends"].includes(s[0])).map((s) =>
           api("/api/section?section=" + encodeURIComponent(s[0]) + "&lang=" + lang).catch(() => ({items: []}))
         )
       ]);
