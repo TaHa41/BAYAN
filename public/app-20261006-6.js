@@ -63,6 +63,8 @@
 
   function renderShell() {
     document.documentElement.lang = lang;
+    const footerLabels = ar ? ["عن بيان","المنهجية","الخصوصية","الشروط"] : ["About BAYAN","Methodology","Privacy","Terms"];
+    ["f-about","f-method","f-privacy","f-terms"].forEach((id,i)=>{ const el=document.getElementById(id); if(el){ el.textContent=footerLabels[i]; const u=new URL(el.href,location.origin); u.searchParams.set("lang",lang); el.href=u.pathname+"?lang="+lang; }});
     document.documentElement.dir = ar ? "rtl" : "ltr";
     const brand = document.querySelector(".brand span");
     if (brand) brand.textContent = ar ? "بيان" : "BAYAN";
