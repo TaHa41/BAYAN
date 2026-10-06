@@ -63,8 +63,9 @@ export async function search(env:Env,q:string,language:Locale):Promise<SearchRes
     if(seen.has(k))return false; seen.add(k); return true;
   }).slice(0,max).map(({score,provider,...x})=>x);
   const providers=[...new Set(candidates.map(x=>x.provider))];
+  const publishers=[...new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean))];
   const configuredMin=Math.max(2,Math.min(5,Number(s.min_sources||3)));
-  const status=results.length===0?"insufficient":providers.length>=configuredMin?"verified":"mixed";
+  const status=results.length===0?"insufficient":publishers.length>=configuredMin?"verified":"mixed";
   const message=results.length?undefined:(language==="ar"?"لم نجد أدلة كافية بعد؛ تم فحص مسارات البحث المتاحة دون اختلاق إجابة.":"Not enough evidence was found after checking the available search paths; BAYAN will not invent an answer.");
   await saveSearch(env,q,language,intent(q),status,results.length);
   return {query:q,locale:language,results,providers,providerAttempted,status,message};
