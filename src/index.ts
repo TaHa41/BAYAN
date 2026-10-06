@@ -4,7 +4,7 @@ const SHELL=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewpo
 async function page(request:Request,env:Env){
   const u=new URL(request.url);
   // Static assets should bypass HTML transformation and remain edge-cacheable.
-  if (/^\\/(app(?:-[^/]+)?\\.js|styles\\.css|manifest\\.json|favicon\\.(?:ico|png|svg))$/.test(u.pathname)) {
+  if (/^\/(app(?:-[^/]+)?\.js|styles\.css|manifest\.json|favicon\.(?:ico|png|svg))$/.test(u.pathname)) {
     const response = await env.ASSETS.fetch(request);
     const headers = new Headers(response.headers);
     headers.set("Cache-Control", "public, max-age=31536000, immutable");
