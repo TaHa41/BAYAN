@@ -49,18 +49,6 @@
       "<h3>" + escapeHtml(item.title) + "</h3><p>" + escapeHtml(item.summary) + '</p><span class="read">' +
       t("اقرأ الملف","Read the file") + " →</span></div></a>";
 
-  const wisdoms = [
-    ["فَإِنَّ مَعَ الْعُسْرِ يُسْرًا","Indeed, with hardship comes ease.","القرآن الكريم — سورة الشرح، الآية 5","The Qur’an — Ash-Sharh 94:5"],
-    ["وَقُلْ رَبِّ زِدْنِي عِلْمًا","And say: My Lord, increase me in knowledge.","القرآن الكريم — سورة طه، الآية 114","The Qur’an — Taha 20:114"],
-    ["إِنَّ اللَّهَ مَعَ الصَّابِرِينَ","Indeed, Allah is with the patient.","القرآن الكريم — سورة البقرة، الآية 153","The Qur’an — Al-Baqarah 2:153"],
-    ["وَفَوْقَ كُلِّ ذِي عِلْمٍ عَلِيمٌ","Above every possessor of knowledge is one more knowing.","القرآن الكريم — سورة يوسف، الآية 76","The Qur’an — Yusuf 12:76"],
-    ["إِنَّ مَعَ الْعُسْرِ يُسْرًا","Indeed, with hardship comes ease.","القرآن الكريم — سورة الشرح، الآية 6","The Qur’an — Ash-Sharh 94:6"]
-  ];
-  const wisdomCard = () => {
-    const item = wisdoms[Math.floor(Date.now() / 30000) % wisdoms.length];
-    return '<div class="wisdom-card" aria-label="' + t("الحكمة اليومية","Daily wisdom") + '"><span class="eyebrow">' + t("الحكمة اليومية","Daily wisdom") + '</span><blockquote>“' + t(item[0],item[1]) + '”</blockquote><p class="wisdom-source">' + t(item[2],item[3]) + '</p></div>';
-  };
-
   function searchBox(value = "") {
     return '<form class="search" id="search"><input name="q" value="' + escapeHtml(value) +
       '" placeholder="' + t("ابحث عن شخص، خبر، سؤال، سعر أو أي موضوع…","Search for a person, news story, question, price or any topic…") +
@@ -99,7 +87,7 @@
       link("/contribute?lang=" + lang, t("ساهم بمعلومة","Contribute")) +
       link("/saved?lang=" + lang, t("المحفوظات","Saved")) +
       link("/tools?lang=" + lang, t("الأدوات","Tools")) +
-      link("/admin?lang=" + lang, "Admin") +
+      link("/admin?lang=" + lang, t("الإدارة","Admin")) +
       "</div>";
 
     document.querySelector("#menu").onclick = () => drawer.classList.toggle("open");
@@ -144,22 +132,20 @@
     app.innerHTML = `
       <section class="home">
         <div class="home-copy">
-          <span class="eyebrow">${t("BAYAN | بيان — مركز معرفة حي","BAYAN | A living knowledge platform")}</span>
+          <span class="eyebrow">${t("بيان — مركز معرفة موثوق","BAYAN — a trusted knowledge center")}</span>
           <h1>${t("أي شيء تريد معرفته.<br><em>ابحث عنه هنا.</em>","Anything you want to know.<br><em>Find it here.</em>")}</h1>
           <p>${t("شخصية، خبر، موضوع، سؤال، طريقة، مشكلة تقنية أو سعر لحظي — نبحث، نتحقق، ونرتب لك الصورة كاملة قبل أن ندّعي اليقين.","A person, news story, topic, question, how-to, technical problem or live price — we retrieve, verify and organize the full picture before claiming certainty.")}</p>
           ${searchBox()}<div class="home-actions"><a class="primary" href="/ask?lang=${lang}">${t("اسأل بيان","Ask BAYAN")}</a></div>
           <div class="trust-row"><span>✓ ${t("أدلة ومصادر","Evidence & sources")}</span><span>◉ ${t("تحديث مستمر","Continuously updated")}</span><span>⌁ ${t("ذكاء يساعدك","AI assistance")}</span></div>
-          ${wisdomCard()}
         </div>
-        <div class="section-intro"><span class="eyebrow">${t("استكشف المعرفة","Explore knowledge")}</span><div class="section-grid">${sections.map((s) => '<a class="section-card" href="/' + s[0] + '?lang=' + lang + '"><span class="section-icon">' + s[5] + '</span><div><h2>' + escapeHtml(ar ? s[1] : s[2]) + '</h2><p>' + escapeHtml(ar ? s[3] : s[4]) + '</p></div><b>↗</b></a>').join("")}</div></div>
+        <div class="section-intro"><span class="eyebrow">${t("استكشف الأقسام","Explore sections")}</span><div class="section-grid">${sections.map((s) => '<a class="section-card" href="/' + s[0] + '?lang=' + lang + '"><span class="section-icon">' + s[5] + '</span><div><h2>' + escapeHtml(ar ? s[1] : s[2]) + '</h2><p>' + escapeHtml(ar ? s[3] : s[4]) + '</p></div><b>↗</b></a>').join("")}</div></div>
         <div class="home-content">
-          <div class="page-head home-feed-head"><span class="eyebrow">${t("آخر ما نُشر","Latest published")}</span><h2>${t("المعرفة والأخبار في الصفحة الرئيسية","Knowledge and news on the homepage")}</h2></div>
+          <div class="page-head home-feed-head"><span class="eyebrow">${t("آخر ما نُشر","Latest published")}</span><h2>${t("أحدث المعرفة والأخبار","Latest knowledge and news")}</h2></div>
           <div id="home-news" class="article-grid"><div class="notice loading">${t("جاري تحديث الأخبار…","Refreshing news…")}</div></div>
           <div id="home-featured" class="article-grid"></div>
         </div>
       </section>`;
     bindSearch();
-    const wisdomTimer = setInterval(() => { const card = document.querySelector(".wisdom-card"); if (card) card.outerHTML = wisdomCard(); else clearInterval(wisdomTimer); }, 30000);
     try {
       const [newsData, ...sectionData] = await Promise.all([
         api("/api/news?lang=" + lang),
