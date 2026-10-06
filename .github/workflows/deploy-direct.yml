@@ -2,9 +2,6 @@ name: BAYAN production direct deploy
 on:
   push:
     branches: [main]
-concurrency:
-  group: bayan-production-direct
-  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
