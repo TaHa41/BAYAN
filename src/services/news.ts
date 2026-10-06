@@ -207,7 +207,7 @@ export async function findRelatedImage(query: string): Promise<string | undefine
     return bestScore>=0.45?(best?.thumburl||best?.url):undefined;
   }catch{return}
 }
-const hasArabic = (value: string) => /[\\u0600-\\u06ff]/.test(value);
+const hasArabic = (value: string) => /[\u0600-\u06ff]/.test(value);
 const googleArabicFallback = async (): Promise<Story[]> => {
   const feeds = [
     ["أخبار Google عربية", "https://news.google.com/rss?hl=ar&gl=EG&ceid=EG:ar"],
