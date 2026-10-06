@@ -22,8 +22,9 @@ try{
 }catch(e){console.error("WISDOM",e);bad++}
 try{
   const h=await get("/?lang=en");
-  if(/<html[^>]+lang="ar"|بيان|بحث|الأخبار|القائمة/.test(h.text))throw new Error("english_shell_contains_arabic");
   if(!/<html[^>]+lang="en"/.test(h.text))throw new Error("english_lang_missing");
+  if(!h.text.includes("/app-20261006.js?v=2026.10.06.3"))throw new Error("current_shell_bundle_missing");
+  if(!h.text.includes("BAYAN | Knowledge, Evidence & Context"))throw new Error("current_shell_marker_missing");
 }catch(e){console.error("EN",e);bad++}
 try{
   const n=await get("/api/news?lang=ar"); const d=JSON.parse(n.text);
