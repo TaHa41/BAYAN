@@ -23,6 +23,7 @@ try{
   if(!js.text.includes("home-news")||!js.text.includes("home-featured"))throw new Error("homepage_content_sections_missing");
 }catch(e){console.error("BUNDLE",e);bad++}
 try{
+  const w=await get("/api/wisdom?section=arab&lang=ar"); const wd=JSON.parse(w.text); if(!wd.wisdom||!/[\u0600-\u06ff]/.test(String(wd.wisdom)))throw new Error("wisdom_missing");
   const n=await get("/api/news?lang=ar"); const d=JSON.parse(n.text);
   if(!Array.isArray(d.items)||d.items.length<3)throw new Error("news_too_few");
   if(d.items.filter(x=>x.imageUrl).length<Math.min(3,d.items.length))throw new Error("news_images_missing");
