@@ -387,147 +387,25 @@
   }
 
   async function renderAdmin() {
-    app.innerHTML =
-      '<section class="page admin-page"><div class="page-head"><span class="eyebrow">BAYAN CONTROL CENTER</span><h1>' +
-      t("مركز تحكم بيان","BAYAN Control Center") + '</h1><p>' +
-      t("تحكم في البحث والمصادر والصور والإصلاحات والمراقبة من مكان واحد.",
-        "Control retrieval, sources, images, repairs and monitoring from one place.") +
-      '</p></div><div class="admin-login"><input id="adminToken" class="field" type="password" placeholder="' +
-      t("رمز مدير بيان","BAYAN manager token") + '"><button id="adminSave" class="primary">' +
-      t("دخول","Enter") + '</button><button id="adminRepair" class="navbtn">' + t("تشخيص وإصلاح آمن بالذكاء الاصطناعي","AI diagnose & safe repair") + '</button></div><div id="adminOut"></div></section>';
-
-    const token = () => sessionStorage.getItem("bayan-admin-token") || "";
-    document.querySelector("#adminSave").onclick = () => {
-      const value = document.querySelector("#adminToken").value.trim();
-      if (value) sessionStorage.setItem("bayan-admin-token", value);
-      load();
-    };
-
-    async function adminApi(url, options = {}) {
-      const headers = new Headers(options.headers || {});
-      headers.set("x-bayan-manager-token", token());
-      const response = await fetch(url, {...options, headers});
-      if (response.status === 401) throw new Error("unauthorized");
-      return response.json();
-    }
-
-    async function load() {
-      const output = document.querySelector("#adminOut");
-      if (!token()) {
-        output.innerHTML = '<div class="notice">' +
-          t("أدخل رمز المدير لعرض لوحة التحكم.","Enter the manager token to open the control center.") + "</div>";
-        return;
-      }
-      output.innerHTML = '<div class="notice loading">' +
-        t("جاري تحميل حالة النظام…","Loading system status…") + "</div>";
-      try {
-        const [health, settings, repairs, runtime, analytics, contributions, articles] = await Promise.all([
-          api("/api/health"), adminApi("/api/admin/settings"), adminApi("/api/admin/repairs"),
-          adminApi("/api/admin/runtime"), adminApi("/api/admin/analytics"), adminApi("/api/admin/contributions"), adminApi("/api/admin/articles")
-        ]);
-        const setting = Object.fromEntries((settings.items || []).map((item) => [item.key, item.value]));
-        output.innerHTML =
-          '<div class="admin-grid"><div class="admin-card"><span class="kicker">' + t("الحالة","Status") +
-          '</span><h2>🟢 ' + t("النظام يعمل","System online") + '</h2><p>BAYAN v' +
-          escapeHtml(health.version || "1.0.0") + '</p></div><div class="admin-card"><span class="kicker">' +
-          t("المصادر","Sources") + '</span><h2>' + escapeHtml(setting.min_sources || "3") +
-          '+</h2><p>' + t("الحد الأدنى للأدلة","Minimum evidence sources") +
-          '</p></div><div class="admin-card"><span class="kicker">' + t("الإصلاح الذاتي","Self-healing") +
-          '</span><h2>' + (setting.auto_repair === "1" ? "🟢" : "⏸️") +
-          '</h2><p>' + t("مسموح للإصلاحات الآمنة","Safe repairs enabled") + '</p></div></div>' +
-          '<div class="admin-card"><h2>' + t("سياسة البحث والصور","Search & image policy") +
-          '</h2><div class="admin-controls">' +
-          [["min_sources",t("الحد الأدنى للمصادر","Minimum sources")],["max_sources",t("أقصى عدد مصادر","Maximum sources")],
-           ["news_items",t("عدد الأخبار","News items")],["search_timeout_ms",t("مهلة البحث بالمللي ثانية","Search timeout ms")],
-           ["source_wikipedia","Wikipedia"],["source_wikidata","Wikidata"],["source_gdelt","GDELT News"],
-           ["source_openalex","OpenAlex Research"],["source_ai_search","Cloudflare AI Search"]]
-          .map(([key,label]) => '<label>' + label + '<input class="field setting" data-key="' + key +
-            '" value="' + escapeHtml(setting[key] || "") + '"></label>').join("") +
-          '<label><input type="checkbox" class="setting-check" data-key="image_required" ' +
-          (setting.image_required === "1" ? "checked" : "") + '>' +
-          t("الصورة مطلوبة عند النشر","Require an image when publishing") + '</label><label><input type="checkbox" class="setting-check" data-key="image_fallback" ' +
-          (setting.image_fallback === "1" ? "checked" : "") + '>' +
-          t("استخدم مسارات صور احتياطية","Use image fallback paths") + '</label><label><input type="checkbox" class="setting-check" data-key="auto_repair" ' +
-          (setting.auto_repair === "1" ? "checked" : "") + '>' +
-          t("الإصلاح الآمن التلقائي","Enable safe automatic repair") +
-          '</label><button id="saveSettings" class="primary">' + t("حفظ الإعدادات","Save settings") +
-          '</button></div></div>' +
-          '<div class="admin-card"><h2>' + t("الإصلاحات","Repairs") + '</h2><div class="admin-list">' +
-          (repairs.items || []).slice(0,10).map((item) => '<div><b>' + escapeHtml(item.status) +
-          '</b> · ' + escapeHtml(item.signature || "") + "<small>" + escapeHtml(item.updated_at || "") +
-          "</small></div>").join("") + '</div></div>' +
-          '<div class="admin-card"><h2>' + t("آخر المشاكل","Recent runtime events") + '</h2><div class="admin-list">' +
-          (runtime.items || []).slice(0,10).map((item) => '<div><b>' + escapeHtml(item.level) +
-          '</b> · ' + escapeHtml(item.kind) + " — " + escapeHtml(item.message) + "</div>").join("") +
-          '</div></div><div class="admin-card"><h2>' + t("أكثر الاستخدامات","Usage") +
-          '</h2><div class="admin-list">' + (analytics.items || []).slice(0,10).map((item) =>
-          '<div><b>' + escapeHtml(item.count) + '</b> · ' + escapeHtml(item.event) + " · " +
-          escapeHtml(item.path) + "</div>").join("") + '</div></div>' +
-          '<div class="admin-card"><h2>' + t("المساهمات","Contributions") +
-          '</h2><div class="admin-list">' + (contributions.items || []).filter((item) => item.status === "PENDING").slice(0,10).map((item) =>
-          '<div><b>' + escapeHtml(item.title) +
-          '</b><button class="reviewBtn" data-id="' + escapeHtml(item.id) + '" data-action="APPROVE">' +
-          t("نشر","Approve") + '</button><button class="reviewBtn" data-id="' + escapeHtml(item.id) +
-          '" data-action="REJECT">' + t("رفض","Reject") + "</button></div>").join("") + "</div></div>";
-
-        output.insertAdjacentHTML("beforeend", '<div class="admin-card image-manager"><div class="image-manager-head"><div><span class="kicker">' + t("الصور","Images") + '</span><h2>' + t("تغيير صور المقالات","Change article images") + '</h2><p>' + t("اختر المقال، ضع رابط الصورة، شاهد المعاينة ثم اضغط حفظ. لا تحتاج لتعديل أي كود.","Choose an article, paste an image URL, preview it, then save. No code changes are needed.") + '</p></div><div class="image-manager-tip">' + t("مهم: استخدم رابط صورة مباشر يبدأ بـ https://","Tip: use a direct image URL starting with https://") + '</div></div><div class="image-admin-grid">' + (articles.items || []).slice(0,20).map((item) => '<article class="image-admin-card"><div class="image-admin-preview">' + (item.image_url ? '<img src="' + escapeHtml(item.image_url) + '" alt="' + escapeHtml(item.image_alt || item.title) + '" loading="lazy">' : '<div class="image-admin-empty">BAYAN</div>') + '</div><div class="image-admin-body"><div class="image-admin-title">' + escapeHtml(item.title) + '</div><div class="image-admin-meta">' + escapeHtml(item.language === "en" ? "English" : "العربية") + '</div><label class="image-admin-label">' + t("رابط الصورة","Image URL") + '<input class="field article-image-url" data-slug="' + escapeHtml(item.slug) + '" data-language="' + escapeHtml(item.language) + '" value="' + escapeHtml(item.image_url || "") + '" placeholder="https://example.com/image.jpg"></label><button class="primary imageSave" data-slug="' + escapeHtml(item.slug) + '" data-language="' + escapeHtml(item.language) + '">' + t("حفظ الصورة","Save image") + '</button><div class="image-save-status" data-status="' + escapeHtml(item.slug) + '-' + escapeHtml(item.language) + '"></div></div></article>').join("") + '</div></div>');
-        document.querySelectorAll(".imageSave").forEach((button) => {
-          button.onclick = async () => {
-            const input = document.querySelector('.article-image-url[data-slug="' + CSS.escape(button.dataset.slug) + '"][data-language="' + CSS.escape(button.dataset.language) + '"]');
-            const status = document.querySelector('.image-save-status[data-status="' + CSS.escape(button.dataset.slug + "-" + button.dataset.language) + '"]');
-            if (!input?.value.trim()) { if(status) status.textContent=t("أدخل رابط الصورة أولًا.","Enter an image URL first."); return; }
-            button.disabled=true; button.textContent=t("جاري الحفظ…","Saving…");
-            try {
-              await adminApi("/api/admin/article-image", {method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({slug:button.dataset.slug,language:button.dataset.language,imageUrl:input.value.trim(),imageAlt:input.value.trim()})});
-              if(status) status.textContent=t("تم حفظ الصورة بنجاح.","Image saved successfully.");
-              const card=button.closest(".image-admin-card"), img=card?.querySelector(".image-admin-preview img");
-              if(img) img.src=input.value.trim(); else if(card) card.querySelector(".image-admin-preview").innerHTML='<img src="' + escapeHtml(input.value.trim()) + '" alt="" loading="lazy">';
-            } catch { if(status) status.textContent=t("تعذر حفظ الصورة. تحقق من الرابط.","Could not save the image. Check the URL."); }
-            finally { button.disabled=false; button.textContent=t("حفظ الصورة","Save image"); }
-          };
-        });
-        document.querySelector("#saveSettings").onclick = async () => {
-          for (const element of document.querySelectorAll(".setting")) {
-            await adminApi("/api/admin/settings", {
-              method:"POST", headers:{"content-type":"application/json"},
-              body:JSON.stringify({key:element.dataset.key,value:element.value})
-            });
-          }
-          for (const element of document.querySelectorAll(".setting-check")) {
-            await adminApi("/api/admin/settings", {
-              method:"POST", headers:{"content-type":"application/json"},
-              body:JSON.stringify({key:element.dataset.key,value:element.checked ? "1" : "0"})
-            });
-          }
-          load();
-        };
-        document.querySelectorAll(".reviewBtn").forEach((button) => {
-          button.onclick = async () => {
-            await adminApi("/api/admin/contributions/review", {
-              method:"POST", headers:{"content-type":"application/json"},
-              body:JSON.stringify({id:Number(button.dataset.id),action:button.dataset.action})
-            });
-            load();
-          };
-        });
-      } catch (error) {
-        output.innerHTML = '<div class="notice">' +
-          (String(error).includes("unauthorized")
-            ? t("رمز المدير غير صحيح.","Invalid manager token.")
-            : t("تعذر تحميل لوحة الإدارة.","Admin panel could not be loaded.")) + "</div>";
-      }
-    }
-    document.querySelector("#adminRepair").onclick = async () => {
-      const output = document.querySelector("#adminOut");
-      output.innerHTML = '<div class="notice loading">' + t("بيان يفحص الحالة ويحاول مسار الإصلاح الآمن…","BAYAN is checking the system and attempting the safe repair path…") + "</div>";
-      try {
-        const data = await adminApi("/api/admin/repair");
-        output.innerHTML = '<div class="notice"><h2>' + (data.ok ? t("لا توجد مشكلة حتمية مكتشفة.","No deterministic failure was detected.") : t("تم تسجيل المشكلة للتشخيص وإعادة المحاولة.","The failure was recorded for diagnosis and retry.")) + "</h2><p>" + escapeHtml((data.failures || []).join(" · ")) + "</p></div>";
-      } catch {
-        output.innerHTML = '<div class="notice">' + t("تعذر تشغيل مسار الإصلاح الآمن.","The safe repair path could not be started.") + "</div>";
-      }
-    };
-    load();
+    app.innerHTML='<section class="page admin-page"><div class="page-head"><span class="eyebrow">BAYAN CONTROL CENTER</span><h1>'+t("مركز تحكم بيان","BAYAN Control Center")+'</h1><p>'+t("تحكم كامل في المحتوى والنشر والأقسام والإعدادات والمراقبة.","Full control over content, publishing, sections, settings and monitoring.")+'</p></div><div class="admin-login"><input id="adminToken" class="field" type="password" placeholder="'+t("رمز مدير بيان","BAYAN manager token")+'"><button id="adminSave" class="primary">'+t("دخول","Enter")+'</button><button id="adminRepair" class="navbtn">'+t("تشخيص وإصلاح","Diagnose & Repair")+'</button></div><div id="adminOut"></div></section>';
+    const token=()=>sessionStorage.getItem("bayan-admin-token")||"";
+    document.querySelector("#adminSave").onclick=()=>{const v=document.querySelector("#adminToken").value.trim();if(v)sessionStorage.setItem("bayan-admin-token",v);load();};
+    async function adminApi(url,options={}){const h=new Headers(options.headers||{});h.set("x-bayan-manager-token",token());const r=await fetch(url,{...options,headers:h});if(r.status===401)throw new Error("unauthorized");if(!r.ok)throw new Error("http_"+r.status);return r.json();}
+    const opts=()=>sections.filter(x=>x[0]!=="prices").map(x=>'<option value="'+x[0]+'">'+escapeHtml(ar?x[1]:x[2])+'</option>').join("");
+    async function load(){const o=document.querySelector("#adminOut");if(!token()){o.innerHTML='<div class="notice">'+t("أدخل رمز المدير لفتح الإدارة.","Enter the manager token to open admin.")+"</div>";return;}o.innerHTML='<div class="notice loading">'+t("جاري تحميل الإدارة…","Loading admin…")+"</div>";
+      try{const [health,settings,repairs,runtime,analytics,contributions,articles]=await Promise.all([api("/api/health"),adminApi("/api/admin/settings"),adminApi("/api/admin/repairs"),adminApi("/api/admin/runtime"),adminApi("/api/admin/analytics"),adminApi("/api/admin/contributions"),adminApi("/api/admin/articles")]);const st=Object.fromEntries((settings.items||[]).map(x=>[x.key,x.value])),list=articles.items||[];
+      o.innerHTML='<div class="admin-grid"><div class="admin-card"><span class="kicker">'+t("الحالة","Status")+'</span><h2>🟢 '+t("يعمل","Online")+'</h2><p>BAYAN v'+escapeHtml(health.version||"1.0.0")+'</p></div><div class="admin-card"><span class="kicker">'+t("المقالات","Articles")+'</span><h2>'+list.length+'</h2><p>'+t("كل الحالات","All statuses")+'</p></div><div class="admin-card"><span class="kicker">'+t("الإصلاح الذاتي","Self-healing")+'</span><h2>'+(st.auto_repair==="1"?"🟢":"⏸️")+'</h2></div></div>';
+      o.innerHTML+='<div class="admin-card"><h2>'+t("إعدادات التحكم","Control settings")+'</h2><div class="admin-controls">'+[["min_sources",t("الحد الأدنى للمصادر","Minimum sources")],["max_sources",t("أقصى المصادر","Maximum sources")],["news_items",t("عدد الأخبار","News items")],["search_timeout_ms",t("مهلة البحث","Search timeout")]].map(x=>'<label>'+x[1]+'<input class="field setting" data-key="'+x[0]+'" value="'+escapeHtml(st[x[0]]||"")+'"></label>').join("")+'<label><input type="checkbox" class="setting-check" data-key="image_required" '+(st.image_required==="1"?"checked":"")+'> '+t("إلزام الصورة","Require image")+'</label><label><input type="checkbox" class="setting-check" data-key="auto_repair" '+(st.auto_repair==="1"?"checked":"")+'> '+t("الإصلاح التلقائي الآمن","Safe auto repair")+'</label><button id="saveSettings" class="primary">'+t("حفظ","Save")+'</button></div></div>';
+      o.innerHTML+='<div class="admin-card"><h2>'+t("إدارة المحتوى","Content management")+'</h2><div class="admin-list">'+list.slice(0,100).map((x,i)=>'<div class="admin-article-row"><b>'+escapeHtml(x.title)+'</b><small>'+escapeHtml(x.language==="en"?"English":"العربية")+' · '+escapeHtml(x.section)+' · '+escapeHtml(x.status)+'</small><button class="editArticle navbtn" data-i="'+i+'">'+t("تحرير","Edit")+'</button><button class="statusArticle navbtn" data-slug="'+escapeHtml(x.slug)+'" data-lang="'+x.language+'" data-status="'+(x.status==="PUBLISHED"?"DRAFT":"PUBLISHED")+'">'+(x.status==="PUBLISHED"?t("إخفاء","Unpublish"):t("نشر","Publish"))+'</button><button class="deleteArticle navbtn" data-slug="'+escapeHtml(x.slug)+'" data-lang="'+x.language+'">'+t("حذف","Delete")+'</button></div>').join("")+'</div><div id="articleEditor"></div></div>';
+      o.innerHTML+='<div class="admin-card"><h2>'+t("المساهمات","Contributions")+'</h2><div class="admin-list">'+(contributions.items||[]).filter(x=>x.status==="PENDING").slice(0,30).map(x=>'<div><b>'+escapeHtml(x.title)+'</b> <button class="reviewBtn navbtn" data-id="'+x.id+'" data-action="APPROVE">'+t("نشر","Approve")+'</button><button class="reviewBtn navbtn" data-id="'+x.id+'" data-action="REJECT">'+t("رفض","Reject")+'</button></div>').join("")+'</div></div>';
+      o.innerHTML+='<div class="admin-card"><h2>'+t("المراقبة والإصلاحات","Monitoring & repairs")+'</h2><div class="admin-list">'+(runtime.items||[]).slice(0,8).map(x=>'<div><b>'+escapeHtml(x.level)+'</b> · '+escapeHtml(x.kind)+' — '+escapeHtml(x.message)+'</div>').join("")+(repairs.items||[]).slice(0,8).map(x=>'<div><b>'+escapeHtml(x.status)+'</b> · '+escapeHtml(x.signature)+'</div>').join("")+'</div></div>';
+      document.querySelector("#saveSettings").onclick=async()=>{for(const e of document.querySelectorAll(".setting,.setting-check"))await adminApi("/api/admin/settings",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({key:e.dataset.key,value:e.type==="checkbox"?(e.checked?"1":"0"):e.value})});load();};
+      document.querySelectorAll(".statusArticle").forEach(b=>b.onclick=async()=>{await adminApi("/api/admin/article/status",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({slug:b.dataset.slug,language:b.dataset.lang,status:b.dataset.status})});load();});
+      document.querySelectorAll(".deleteArticle").forEach(b=>b.onclick=async()=>{if(confirm(t("حذف المقال نهائيًا؟","Delete permanently?")))await adminApi("/api/admin/article/delete",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({slug:b.dataset.slug,language:b.dataset.lang})});load();});
+      document.querySelectorAll(".editArticle").forEach(b=>b.onclick=()=>{const x=list[Number(b.dataset.i)],e=document.querySelector("#articleEditor");e.innerHTML='<div class="admin-card"><h3>'+t("تحرير المقال","Edit article")+'</h3><input id="edTitle" class="field" value="'+escapeHtml(x.title)+'"><textarea id="edSummary" class="field" rows="3">'+escapeHtml(x.summary||"")+'</textarea><textarea id="edBody" class="field" rows="10">'+escapeHtml(x.body||"")+'</textarea><select id="edSection" class="field">'+opts()+'</select><select id="edStatus" class="field"><option>PUBLISHED</option><option>DRAFT</option><option>ARCHIVED</option></select><input id="edImage" class="field" value="'+escapeHtml(x.image_url||"")+'" placeholder="https://..."><button id="edSave" class="primary">'+t("حفظ التعديلات","Save changes")+'</button></div>';document.querySelector("#edSection").value=x.section;document.querySelector("#edStatus").value=x.status;document.querySelector("#edSave").onclick=async()=>{await adminApi("/api/admin/article",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({slug:x.slug,language:x.language,title:document.querySelector("#edTitle").value,summary:document.querySelector("#edSummary").value,articleBody:document.querySelector("#edBody").value,section:document.querySelector("#edSection").value,status:document.querySelector("#edStatus").value,imageUrl:document.querySelector("#edImage").value,imageAlt:document.querySelector("#edTitle").value})});load();};});
+      document.querySelectorAll(".reviewBtn").forEach(b=>b.onclick=async()=>{await adminApi("/api/admin/contributions/review",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({id:Number(b.dataset.id),action:b.dataset.action})});load();});
+      }catch(e){o.innerHTML='<div class="notice">'+(String(e).includes("unauthorized")?t("رمز المدير غير صحيح.","Invalid manager token."):t("تعذر تحميل لوحة الإدارة.","Admin panel failed to load."))+"</div>";}}
+    document.querySelector("#adminRepair").onclick=async()=>{const o=document.querySelector("#adminOut");o.innerHTML='<div class="notice loading">'+t("جاري التشخيص…","Diagnosing…")+"</div>";try{const d=await adminApi("/api/admin/repair");o.innerHTML='<div class="notice"><h2>'+escapeHtml(d.ok?t("لا توجد مشكلة حتمية.","No deterministic failure."):t("تم تسجيل المشكلة.","Failure recorded."))+'</h2></div>';}catch{o.innerHTML='<div class="notice">'+t("تعذر الإصلاح.","Repair failed.")+"</div>";}};load();
   }
 
   async function renderSection(slug) {
