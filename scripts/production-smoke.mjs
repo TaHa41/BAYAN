@@ -13,7 +13,7 @@ for(const path of checks){try{await get(path)}catch(e){console.error(e);bad++}}
 try{const rb=await get("/robots.txt");if(/Disallow:\s*\/api\/\s*$/.test(rb.text))throw new Error("robots_blocks_public_api");if(!rb.text.includes("/news-sitemap.xml"))throw new Error("news_sitemap_missing")}catch(e){console.error("SEO",e);bad++}
 try{
   const js=await get("/app.js");
-  const immutable=await get("/app-20261006.js");
+  const immutable=await get("/app-20261006-6.js");
   for(const [name,bundle] of [["app.js",js],["app-20261006.js",immutable]]){
     if(!bundle.text.includes("Daily wisdom")||!bundle.text.includes("الحكمة اليومية"))throw new Error(name+"_daily_wisdom_missing");
     if(!bundle.text.includes("home-news")||!bundle.text.includes("home-featured"))throw new Error(name+"_homepage_content_sections_missing");
@@ -23,7 +23,7 @@ try{
 try{
   const h=await get("/?lang=en");
   if(!/<html[^>]+lang="en"/.test(h.text))throw new Error("english_lang_missing");
-  if(!h.text.includes("/app-20261006.js?v=2026.10.06.6"))throw new Error("current_shell_bundle_missing");
+  if(!h.text.includes("/app-20261006-6.js?v=2026.10.06.6"))throw new Error("current_shell_bundle_missing");
   if(!h.text.includes("BAYAN | Knowledge, Evidence & Context"))throw new Error("current_shell_marker_missing");
   if(h.headers.get("x-bayan-build")!=="2026.10.06.6")throw new Error("current_build_header_missing");
 }catch(e){console.error("EN",e);bad++}
