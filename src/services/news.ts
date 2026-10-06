@@ -237,22 +237,20 @@ export async function news(env: Env, lang: Locale) {
     })
     .slice(0, limit);
 
-  const enriched = await Promise.all(
-    unique.map(async (story) => {
-      if (story.imageUrl) return story;
-
-      const direct = await sourceImage(story.url);
-      if (direct) return { ...story, imageUrl: direct };
-
-      const image = await findRelatedImage(story.title + " " + story.summary);
-      return image ? { ...story, imageUrl: image } : story;
-    }),
-  );
+  const enriched = await Promise.all(unique.map(async (story) => {
+    if (story.imageUrl) return story;
+    const direct = await sourceImage(story.url);
+    if (direct) return { ...story, imageUrl: direct };
+    const image = await findRelatedImage(story.title + " " + story.summary);
+    return image ? { ...story, imageUrl: image } : story;
+  }));
+  // Image lookup is enrichment only: an image-provider outage must never hide a valid story.
+  const finalStories = enriched;
 
   return {
     ok: enriched.length > 0,
     providers: providers.map(([name]) => name),
-    items: enriched.map((story) => ({
+    items: finalStories.map((story) => ({
       title: story.title,
       summary: story.summary,
       url: story.url,
