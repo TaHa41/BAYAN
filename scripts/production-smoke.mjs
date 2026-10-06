@@ -13,9 +13,12 @@ for(const path of checks){try{await get(path)}catch(e){console.error(e);bad++}}
 try{const rb=await get("/robots.txt");if(/Disallow:\s*\/api\/\s*$/.test(rb.text))throw new Error("robots_blocks_public_api");if(!rb.text.includes("/news-sitemap.xml"))throw new Error("news_sitemap_missing")}catch(e){console.error("SEO",e);bad++}
 try{
   const js=await get("/app.js");
-  if(!js.text.includes("Daily wisdom")||!js.text.includes("الحكمة اليومية"))throw new Error("daily_wisdom_missing_from_home_bundle");
-  if(!js.text.includes("home-news")||!js.text.includes("home-featured"))throw new Error("homepage_content_sections_missing");
-  if(js.text.includes('section:"topics"'))throw new Error("stale_topics_taxonomy_in_frontend");
+  const immutable=await get("/app-20261006.js");
+  for(const [name,bundle] of [["app.js",js],["app-20261006.js",immutable]]){
+    if(!bundle.text.includes("Daily wisdom")||!bundle.text.includes("الحكمة اليومية"))throw new Error(name+"_daily_wisdom_missing");
+    if(!bundle.text.includes("home-news")||!bundle.text.includes("home-featured"))throw new Error(name+"_homepage_content_sections_missing");
+    if(bundle.text.includes('section:"topics"'))throw new Error(name+"_stale_topics_taxonomy");
+  }
 }catch(e){console.error("WISDOM",e);bad++}
 try{
   const h=await get("/?lang=en");
