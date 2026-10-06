@@ -58,7 +58,6 @@ for(const section of sections){
     }catch(e){console.error("SECTION",section,language,e);bad++}
   }
 }
+try{const a=await fetch(origin+"/api/admin/analytics",{headers:{accept:"application/json"}});if(a.status!==401)throw new Error("admin_auth_not_enforced");}catch(e){console.error("ADMIN_AUTH",e);bad++}
 if(bad)process.exit(1);
 console.log("BAYAN production smoke passed");
-
-try{const a=await fetch(origin+"/api/admin/analytics",{headers:{accept:"application/json"}});if(a.status!==401)throw new Error("admin_auth_not_enforced");}catch(e){console.error("ADMIN_AUTH",e);bad++}
