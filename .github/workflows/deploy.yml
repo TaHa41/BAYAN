@@ -3,6 +3,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+concurrency:
+  group: bayan-production
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -27,6 +30,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy
       - name: Verify deployed build marker
-        run: node -e "console.log(\"Deployment commit: \" + process.env.GITHUB_SHA)"
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+        run: node -e "console.log(\"Deployment commit: \" + process.env.EXPECTED_COMMIT)"
       - name: Production smoke test
         run: node scripts/production-smoke.mjs
