@@ -11,6 +11,10 @@ async function get(path){
 }
 for(const path of checks){try{await get(path)}catch(e){console.error(e);bad++}}
 try{
+  const js=await get("/app.js");
+  if(!js.text.includes("Daily wisdom")||!js.text.includes("الحكمة اليومية"))throw new Error("daily_wisdom_missing_from_home_bundle");
+}catch(e){console.error("WISDOM",e);bad++}
+try{
   const h=await get("/?lang=en");
   if(/<html[^>]+lang="ar"|بيان|بحث|الأخبار|القائمة/.test(h.text))throw new Error("english_shell_contains_arabic");
   if(!/<html[^>]+lang="en"/.test(h.text))throw new Error("english_lang_missing");
