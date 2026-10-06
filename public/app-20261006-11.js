@@ -1,21 +1,20 @@
 (() => {
   const sections = [
-    ["egypt","مصر الآن","Egypt","ملفات مصر ومعلوماتها وأحداثها وشخصياتها وبياناتها.","Egyptian knowledge, events, people and data.","🇪🇬"],
-    ["arab","العرب","Arab World","ملفات دول العالم العربي وأحداثها وسياقها ومصادرها.","Arab-world countries, events, context and sources.","✦"],
-    ["world","حول العالم","World","دول وأحداث وقضايا عالمية مع معلومات قابلة للتحقق.","Countries, global events and verifiable knowledge.","◉"],
-    ["science","اكتشاف وعلوم","Science & Discoveries","علوم واكتشافات وشرح مبسط مبني على الأدلة.","Science, discoveries and evidence-based explanations.","✧"],
-    ["economy","مال وأعمال","Economy & Money","اقتصاد وأسواق وأموال وأسعار وبيانات مالية.","Economy, markets, money, prices and financial data.","◆"],
-    ["politics","سياسة عامة","Politics & Public Affairs","أخبار السياسة والشأن العام مع فصل الخبر عن التحليل.","Politics and public affairs, separating news from analysis.","◇"],
-    ["technology","تقنية وذكاء اصطناعي","Technology & AI","تقنية وذكاء اصطناعي وبرمجة وحلول عملية.","Technology, AI, coding and practical solutions.","⌘"],
-    ["health","الصحة","Health & Medicine","معلومات صحية وطبية موثوقة مع حدود الدليل.","Reliable health and medical information with evidence limits.","+"],
-    ["history","تاريخ وثقافة","History & Culture","تاريخ وثقافة وفنون وتراث في صفحات مترابطة.","History, culture, arts and heritage in connected pages.","▤"],
-    ["people","شخصيات وقصص","People","ملفات الشخصيات وسيرهم وإنجازاتهم وأهم الأحداث المرتبطة بهم.","People, biographies, achievements and related events.","●"],
-    ["sports","رياضة وأرقام","Sports & Statistics","رياضة ونتائج وإحصاءات وسجلات قابلة للتحقق.","Sports, results, statistics and verifiable records.","△"],
-    ["travel","وجهات وسفر","Travel & Destinations","وجهات وأماكن ونصائح سفر مبنية على مصادر.","Destinations, places and source-based travel guidance.","✈"],
-    ["trends","ما يهم الناس","Interests & Trends","ما يهتم به الناس واتجاهات البحث، منفصلًا عن الأخبار الموثقة.","Public interests and search trends, separate from verified news.","↗"],
-    ["prices","مباشر الآن","Live Data & Prices","طقس وعملات وذهب وأسعار وبيانات تتغير باستمرار.","Weather, currencies, gold, prices and changing live data.","◈"]
-  ];
-  const params = new URLSearchParams(location.search);
+    ["egypt","نبض مصر","Egypt in Focus","أهم ما يخص مصر من أخبار ومعلومات وبيانات وشخصيات.","News, knowledge, data and people connected to Egypt.","🇪🇬"],
+    ["arab","المشهد العربي","Arab Scene","أحداث وقضايا وقصص من العالم العربي مع سياقها ومصادرها.","Events, issues and stories from the Arab world with context and sources.","✦"],
+    ["world","حول العالم","Around the World","أحداث وقصص ومعلومات دولية تتجاوز الخبر إلى الفهم.","Global events, stories and knowledge beyond the headline.","◉"],
+    ["science","اكتشف","Discover","علوم وفضاء وطبيعة واكتشافات وشرح مبسط قائم على الأدلة.","Science, space, nature and discoveries explained with evidence.","✧"],
+    ["economy","اقتصاد وحياة","Economy & Life","مال وأسواق وأسعار وقرارات اقتصادية وتأثيرها على الحياة اليومية.","Money, markets, prices and how economic decisions affect daily life.","◆"],
+    ["politics","المشهد السياسي","The Political Scene","سياسة وشأن عام مع فصل الوقائع عن التحليل والادعاءات.","Politics and public affairs with facts separated from analysis and claims.","◇"],
+    ["technology","عالم التقنية","Tech & AI","ذكاء اصطناعي وتقنية وبرمجة وابتكار وحلول عملية.","AI, technology, software, innovation and practical solutions.","⌘"],
+    ["health","صحة الإنسان","Human Health","صحة وطب وتغذية ومعلومات طبية مع حدود واضحة للدليل.","Health, medicine and nutrition with clear evidence limits.","+"],
+    ["history","ذاكرة وثقافة","History & Culture","تاريخ وفنون وتراث وثقافة لفهم الحاضر من جذوره.","History, arts, heritage and culture that put the present in context.","▱"],
+    ["people","وجوه وحكايات","People & Stories","شخصيات مؤثرة وسير وقصص وتجارب تستحق المعرفة.","Influential people, biographies and stories worth knowing.","●"],
+    ["sports","رياضة بالأرقام","Sports & Numbers","أخبار ونتائج وإحصاءات وسجلات رياضية قابلة للتحقق.","Sports news, results, statistics and verifiable records.","△"],
+    ["travel","اكتشف العالم","Explore","وجهات وأماكن وتجارب سفر ومعلومات عملية من مصادر موثوقة.","Destinations, places and practical travel knowledge from reliable sources.","✈"],
+    ["trends","على الرادار","On the Radar","ما يشغل الناس واتجاهات الاهتمام، منفصلًا عن الأخبار المؤكدة.","Public interests and trends, kept separate from verified news.","↗"],
+    ["prices","بيانات الآن","Live Data","طقس وعملات وذهب وأسعار ومؤشرات تتغير باستمرار.","Weather, currencies, gold, prices and continuously changing indicators.","◈"]
+  ];  const params = new URLSearchParams(location.search);
   const lang = params.get("lang") === "en" ? "en" : "ar";
   const ar = lang === "ar";
   const t = (a, e) => ar ? a : e;
