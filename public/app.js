@@ -214,14 +214,25 @@
       const story = storyTitle ? items.find((item) => item.title === storyTitle) : null;
       if (story) {
         output.className = "results";
-        output.innerHTML =
-          '<article class="article-full">' + imageHtml(story, "article-hero-image") +
-          '<span class="eyebrow">' + escapeHtml(story.publisher || "News") + "</span><h1>" +
-          escapeHtml(story.title) + '</h1><p class="lead">' + escapeHtml(story.summary || "") +
-          '</p><div class="sources-box"><h2>' + t("بيانات الخبر","Story metadata") +
-          '</h2><div class="source-line">' + escapeHtml(story.publisher || "") +
-          '</div><div class="source-line">' + escapeHtml(story.publishedAt || "") +
-          "</div></div></article>";
+        try {
+          const articleData = await api("/api/news/article?title=" + encodeURIComponent(story.title) +
+            "&image=" + encodeURIComponent(story.imageUrl || "") + "&lang=" + lang);
+          const article = articleData.article;
+          output.innerHTML =
+            '<article class="article-full">' + (article.image ?
+            '<img class="article-hero-image" src="' + escapeHtml(article.image) + '" alt="' + escapeHtml(article.title) + '">' : "") +
+            '<span class="eyebrow">' + escapeHtml(story.publisher || "News") + "</span><h1>" +
+            escapeHtml(article.title) + '</h1><p class="lead">' + escapeHtml(article.summary || story.summary || "") +
+            '</p><div class="article-body">' + String(article.body || "").split(/\n+/).map((line) =>
+            "<p>" + escapeHtml(line) + "</p>").join("") +
+            '</div><div class="sources-box"><h2>' + t("الأدلة والمصادر","Evidence & sources") + "</h2>" +
+            (article.sources || []).map((source) =>
+              '<div class="source-line">' + escapeHtml(source.publisher || "") + " · " + escapeHtml(source.title || "") +
+              "</div>").join("") + "</div></article>";
+        } catch {
+          output.innerHTML = '<div class="notice">' +
+            t("تعذر تجهيز المقال الكامل من الأدلة الآن.","The full evidence-based article could not be prepared right now.") + "</div>";
+        }
         return;
       }
       output.innerHTML = items.length
