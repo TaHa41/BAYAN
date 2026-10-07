@@ -13,14 +13,15 @@ for(const path of checks){try{await get(path)}catch(e){console.error(e);bad++}}
 try{
   const h=await get("/?lang=en");
   if(!/<html[^>]+lang="en"/.test(h.text))throw new Error("english_lang_missing");
-  if(!h.text.includes("app-20261006-16.js"))throw new Error("current_bundle_missing");
-  if(!h.text.includes("app-20261006-16.js?v=2026.10.07.20"))throw new Error("current_shell_bundle_version_missing");
+  if(!h.text.includes("app-20261007-21.js"))throw new Error("current_bundle_missing");
+  if(!h.text.includes("app-20261007-21.js?v=2026.10.07.21"))throw new Error("current_shell_bundle_version_missing");
 }catch(e){console.error("SHELL",e);bad++}
 try{
-  const js=await get("/app-20261006-16.js");
+  const js=await get("/app-20261007-21.js");
   if(!js.text.includes("drawer.querySelectorAll"))throw new Error("drawer_close_handler_missing");
   if(js.text.includes("Daily wisdom")||js.text.includes("الحكمة اليومية"))throw new Error("obsolete_wisdom_content_present");
   if(!js.text.includes("home-news")||!js.text.includes("home-featured"))throw new Error("homepage_content_sections_missing");
+  if(!js.text.includes("section-retry")||!js.text.includes("timeoutMs: 8000"))throw new Error("section_resilience_missing");
 }catch(e){console.error("BUNDLE",e);bad++}
 try{
   const w=await get("/api/wisdom?section=arab&lang=ar"); const wd=JSON.parse(w.text); if(!wd.wisdom||!/[\u0600-\u06ff]/.test(String(wd.wisdom)))throw new Error("wisdom_missing");
