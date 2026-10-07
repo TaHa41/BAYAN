@@ -208,6 +208,28 @@ export async function findRelatedImage(query: string): Promise<string | undefine
   }catch{return}
 }
 const hasArabic = (value: string) => /[\u0600-\u06ff]/.test(value);
+
+const readNewsCache = async (env: Env, lang: Locale): Promise<{items: Story[]; updatedAt?: string} | null> => {
+  try {
+    const row = await env.DB.prepare("SELECT payload,updated_at FROM news_cache WHERE language=? LIMIT 1").bind(lang).first<any>();
+    if (!row?.payload) return null;
+    const updatedAt = String(row.updated_at || "");
+    const age = updatedAt ? Date.now() - Date.parse(updatedAt) : Number.POSITIVE_INFINITY;
+    if (!Number.isFinite(age) || age > 72 * 60 * 60 * 1000) return null;
+    const items = JSON.parse(String(row.payload));
+    return Array.isArray(items) ? {items, updatedAt} : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeNewsCache = async (env: Env, lang: Locale, items: Story[]) => {
+  try {
+    await env.DB.prepare(
+      "INSERT INTO news_cache(language,payload,updated_at) VALUES(?,?,?) ON CONFLICT(language) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at"
+    ).bind(lang, JSON.stringify(items.slice(0, 40)), new Date().toISOString()).run();
+  } catch {}
+};
 const googleArabicFallback = async (): Promise<Story[]> => {
   const feeds = [
     ["أخبار Google عربية", "https://news.google.com/rss?hl=ar&gl=EG&ceid=EG:ar"],
@@ -301,8 +323,36 @@ export async function news(env: Env, lang: Locale) {
   // Image lookup is enrichment only: an image-provider outage must never hide a valid story.
   const finalStories = enriched;
 
+  if (finalStories.length) {
+    await writeNewsCache(env, lang, finalStories);
+  } else {
+    const cached = await readNewsCache(env, lang);
+    if (cached?.items?.length) {
+      return {
+        ok: true,
+        stale: true,
+        cachedAt: cached.updatedAt,
+        providers: providers.map(([name]) => name),
+        items: cached.items.map((story) => ({
+          ...story,
+          sources: [
+            {
+              title: story.title,
+              publisher: story.publisher,
+              url: story.url,
+              publishedAt: story.publishedAt,
+              imageUrl: story.imageUrl,
+            } as Source,
+          ],
+          evidence: "mixed" as const,
+        })),
+      };
+    }
+  }
+
   return {
     ok: finalStories.length > 0,
+    stale: false,
     providers: providers.map(([name]) => name),
     items: finalStories.map((story) => ({
       title: story.title,
