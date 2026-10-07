@@ -324,17 +324,25 @@ export async function news(env: Env, lang: Locale) {
   // Image lookup is enrichment only: an image-provider outage must never hide a valid story.
   const finalStories = enriched;
 
-  if (finalStories.length) {
+  const cached = await readNewsCache(env, lang);
+  // Keep a healthy cache behind the live providers. If providers return nothing
+  // (or only a partial batch), reuse recent verified stories instead of rendering
+  // an empty news page.
+  if (finalStories.length >= 3) {
     await writeNewsCache(env, lang, finalStories);
-  } else {
-    const cached = await readNewsCache(env, lang);
-    if (cached?.items?.length) {
+  } else if (cached?.items?.length) {
+    const seenTitles = new Set(finalStories.map((story) => story.title.trim().toLowerCase()));
+    const merged = [
+      ...finalStories,
+      ...cached.items.filter((story) => !seenTitles.has(story.title.trim().toLowerCase())),
+    ].slice(0, Math.max(6, Math.min(40, limit)));
+    if (merged.length >= 3) {
       return {
         ok: true,
-        stale: true,
+        stale: finalStories.length === 0,
         cachedAt: cached.updatedAt,
         providers: providers.map(([name]) => name),
-        items: cached.items.map((story) => ({
+        items: merged.map((story) => ({
           ...story,
           sources: [
             {
@@ -349,6 +357,10 @@ export async function news(env: Env, lang: Locale) {
         })),
       };
     }
+  }
+
+  if (finalStories.length) {
+    await writeNewsCache(env, lang, finalStories);
   }
 
   return {
