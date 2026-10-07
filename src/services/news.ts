@@ -218,7 +218,11 @@ const readNewsCache = async (env: Env, lang: Locale): Promise<{items: Story[]; u
     if (!Number.isFinite(age) || age > 72 * 60 * 60 * 1000) return null;
     const items = JSON.parse(String(row.payload));
     return Array.isArray(items) ? {items, updatedAt} : null;
-  } catch {
+  } catch (error) {
+    try {
+      await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)")
+        .bind("WARN", "news_cache_read", String(error).slice(0, 500), new Date().toISOString()).run();
+    } catch {}
     return null;
   }
 };
@@ -228,7 +232,12 @@ const writeNewsCache = async (env: Env, lang: Locale, items: Story[]) => {
     await env.DB.prepare(
       "INSERT INTO news_cache(language,payload,updated_at) VALUES(?,?,?) ON CONFLICT(language) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at"
     ).bind(lang, JSON.stringify(items.slice(0, 40)), new Date().toISOString()).run();
-  } catch {}
+  } catch (error) {
+    try {
+      await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)")
+        .bind("WARN", "news_cache_write", String(error).slice(0, 500), new Date().toISOString()).run();
+    } catch {}
+  }
 };
 const googleArabicFallback = async (): Promise<Story[]> => {
   const feeds = [
