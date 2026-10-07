@@ -73,6 +73,15 @@
     });
   }
 
+  const safeStorage = {
+    get(key, fallback = null) {
+      try { return window.localStorage.getItem(key) ?? fallback; } catch { return fallback; }
+    },
+    set(key, value) {
+      try { window.localStorage.setItem(key, value); } catch {}
+    }
+  };
+
   function renderShell() {
     document.documentElement.lang = lang;
     const footerLabels = ar ? ["عن بيان","المنهجية","الخصوصية","الشروط"] : ["About BAYAN","Methodology","Privacy","Terms"];
@@ -116,7 +125,7 @@
       location.href = url;
     };
     const applyTheme = () => {
-      const mode = localStorage.getItem("bayan-theme") || "auto";
+      const mode = safeStorage.get("bayan-theme","auto");
       const dark = mode === "dark" || (mode === "auto" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
       document.body.classList.toggle("dark", dark);
       const themeButton = document.querySelector("#theme");
@@ -126,7 +135,7 @@
     document.querySelector("#theme").onclick = () => {
       const mode = localStorage.getItem("bayan-theme") || "auto";
       const next = mode === "auto" ? "light" : mode === "light" ? "dark" : "auto";
-      localStorage.setItem("bayan-theme", next);
+      safeStorage.set("bayan-theme", next);
       applyTheme();
     };
     window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", applyTheme);
@@ -523,5 +532,19 @@
       t("الصفحة غير موجودة.","Page not found.") + "</p></div></section>";
   }
 
-  render();
+  Promise.resolve().then(() => render()).catch((error) => {
+    try {
+      console.error("BAYAN frontend boot failed", error);
+      if (app) {
+        app.innerHTML =
+          '<section class="page"><div class="notice"><h1>' +
+          t("تعذر تشغيل واجهة بيان","BAYAN could not start") +
+          '</h1><p>' +
+          t("حدث خطأ في تشغيل الواجهة. أعد تحميل الصفحة، وإذا استمر الخطأ سيظل البلاغ مسجلًا للمراجعة.",
+            "The interface failed to start. Reload the page; if the problem persists, it will be logged for review.") +
+          '</p><button class="primary" onclick="location.reload()">' +
+          t("إعادة تحميل","Reload") + "</button></div></section>";
+      }
+    } catch {}
+  });
 })();
