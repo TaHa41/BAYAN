@@ -264,10 +264,11 @@ export async function news(env: Env, lang: Locale) {
   );
   let all = batches.flat();
   if (lang === "ar") {
-    all = all.filter((story) => hasArabic(story.title) && (!story.summary || hasArabic(story.summary)));
+    // A publisher may return an Arabic headline with an English or empty description.
+    // The headline is the authoritative language signal; never discard a valid Arabic story because of metadata language.
+    all = all.filter((story) => hasArabic(story.title));
     if (!all.length) all = await googleArabicFallback();
     if (!all.length) all = (await gdeltFallback(lang)).filter((story) => hasArabic(story.title));
-    all = all.filter((story) => hasArabic(story.title));
   } else if (!all.length) {
     all = await gdeltFallback(lang);
   }
