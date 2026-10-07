@@ -1,17 +1,21 @@
 (() => {
   const sections = [
-    ["egypt","مصر الآن","Egypt Now","أخبار ومعرفة وبيانات موثقة عن مصر.","Verified news, knowledge and data about Egypt.","🇪🇬"],
-    ["arab","العرب","The Arab World","الأحداث والمعرفة والسياق في العالم العربي.","Events, knowledge and context across the Arab world.","◇"],
-    ["world","حول العالم","Around the World","أهم الأحداث والمعرفة والسياق من العالم.","Major events, knowledge and context from around the world.","◆"],
-    ["science","اكتشاف وعلوم","Discovery & Science","اكتشافات وعلوم وحقائق مبنية على الأدلة.","Discoveries, science and evidence-based facts.","⚗"],
-    ["economy","مال وأعمال","Money & Business","الاقتصاد والأسواق والمال وقرارات الأعمال.","Economics, markets, money and business decisions.","◈"],
-    ["politics","سياسة عامة","Public Policy","السياسات والقرارات والقوى المؤثرة في الشأن العام.","Policies, decisions and forces shaping public affairs.","▣"],
+    ["science","علوم وفهم","Science & Understanding","علوم واكتشافات وشرح مبني على الأدلة.","Science, discoveries and evidence-based explanations.","⚗"],
     ["technology","تقنية وذكاء اصطناعي","Technology & AI","التقنية والذكاء الاصطناعي والابتكار.","Technology, artificial intelligence and innovation.","⌘"],
-    ["health","الصحة","Health","معلومات صحية موثقة وشرح واضح.","Verified health information explained clearly.","+"],
-    ["history","تاريخ وثقافة","History & Culture","التاريخ والثقافة والفنون والتراث.","History, culture, arts and heritage.","▱"],
-    ["people","شخصيات وقصص","People & Stories","شخصيات وقصص وسير مبنية على مصادر.","People, stories and sourced biographies.","●"],
-    ["sports","رياضة وأرقام","Sports & Numbers","الرياضة والنتائج والإحصاءات والسجلات.","Sports, results, statistics and records.","△"],
-    ["travel","وجهات وسفر","Destinations & Travel","الوجهات والمعلومات العملية للسفر.","Destinations and practical travel knowledge.","✈"]
+    ["economy","اقتصاد ومال","Economy & Money","الاقتصاد والأسواق والمال والقرارات المالية.","Economics, markets, money and financial decisions.","◈"],
+    ["politics","سياسة وشأن عام","Politics & Public Affairs","السياسات والقرارات والشأن العام.","Politics, public policy and public affairs.","▣"],
+    ["health","صحة وطب","Health & Medicine","الصحة والطب والمعلومات الصحية الموثقة.","Health, medicine and evidence-based health information.","+"],
+    ["history","تاريخ وثقافة","History & Culture","التاريخ والثقافة والتراث.","History, culture and heritage.","▱"],
+    ["people","أشخاص وسير","People & Biographies","الأشخاص والسير والقصص الموثقة.","People, biographies and sourced stories.","●"],
+    ["sports","رياضة وبيانات","Sports & Data","الرياضة والنتائج والإحصاءات والبيانات.","Sports, results, statistics and data.","△"],
+    ["travel","سفر وأماكن","Travel & Places","السفر والوجهات والأماكن والمعلومات العملية.","Travel, destinations, places and practical information.","✈"],
+    ["art","فن وترفيه","Arts & Entertainment","الفن والترفيه والثقافة الشعبية.","Arts, entertainment and popular culture.","✦"],
+    ["news","أخبار موثقة","Verified News","أخبار حديثة تُعرض بعد التحقق من مصادرها.","Current news presented after source verification.","◉"],
+    ["trends","اهتمام واتجاهات","Interest & Trends","ما يلفت اهتمام الناس واتجاهات النقاش، مع فصلها عن الأخبار الموثقة.","What captures attention and discussion trends, kept separate from verified news.","↗"],
+    ["prices","أسعار وبيانات مباشرة","Prices & Live Data","الأسعار والطقس والعملات والبيانات الحية.","Prices, weather, currencies and live data.","◌"],
+    ["egypt","مصر","Egypt","المعرفة والأخبار والبيانات المتعلقة بمصر.","Knowledge, news and data about Egypt.","🇪🇬"],
+    ["arab","العالم العربي","Arab World","المعرفة والأخبار والسياق في العالم العربي.","Knowledge, news and context across the Arab world.","◇"],
+    ["world","العالم","World","المعرفة والأخبار والسياق من أنحاء العالم.","Knowledge, news and context from around the world.","◆"]
   ]; const params = new URLSearchParams(location.search);
   const lang = params.get("lang") === "en" ? "en" : "ar";
   const ar = lang === "ar";
