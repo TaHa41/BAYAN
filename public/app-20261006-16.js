@@ -1,18 +1,18 @@
 (() => {
   const sections = [
-    ["egypt","مصر","Egypt","أخبار ومعرفة ووقائع موثقة عن مصر.","Verified news, knowledge and facts about Egypt.","🇪🇬"],
-    ["arab","العالم العربي","Arab World","المعرفة والأحداث والسياق في العالم العربي.","Knowledge, events and context across the Arab world.","◇"],
-    ["world","العالم","World","أهم الأحداث والمعرفة والسياق من حول العالم.","Major events, knowledge and context from around the world.","◆"],
-    ["science","العلوم","Science","اكتشافات ونظريات وحقائق علمية موثقة.","Documented discoveries, theories and scientific facts.","⚗"],
-    ["economy","الاقتصاد","Economy","الاقتصاد والأسواق والأسعار والقرارات المؤثرة.","Economics, markets, prices and influential decisions.","◈"],
-    ["politics","السياسة","Politics","القرارات والسياسات والقوى التي تصنع المشهد العام.","Decisions, policies and forces shaping public affairs.","▣"],
-    ["technology","التقنية والذكاء الاصطناعي","Technology & AI","التقنية والذكاء الاصطناعي والابتكار.","Technology, AI and innovation.","⌘"],
-    ["health","الصحة","Health","معلومات صحية موثقة وشرح واضح بعيدًا عن الادعاءات.","Verified health information explained clearly.","+"],
-    ["history","التاريخ والثقافة","History & Culture","التاريخ والثقافة والفنون والتراث.","History, culture, arts and heritage.","▱"],
-    ["people","الأشخاص","People","شخصيات وسير وأعمال صنعت أثرًا موثقًا.","People, biographies and documented impact.","●"],
-    ["sports","الرياضة والبيانات","Sports & Data","الرياضة والنتائج والإحصاءات والسجلات.","Sports, results, statistics and records.","△"],
-    ["travel","السفر","Travel","الوجهات والأماكن والمعلومات العملية للسفر.","Destinations, places and practical travel knowledge.","✈"]
-  ];  const params = new URLSearchParams(location.search);
+    ["egypt","مصر الآن","Egypt Now","أخبار ومعرفة وبيانات موثقة عن مصر.","Verified news, knowledge and data about Egypt.","🇪🇬"],
+    ["arab","العرب","The Arab World","الأحداث والمعرفة والسياق في العالم العربي.","Events, knowledge and context across the Arab world.","◇"],
+    ["world","حول العالم","Around the World","أهم الأحداث والمعرفة والسياق من العالم.","Major events, knowledge and context from around the world.","◆"],
+    ["science","اكتشاف وعلوم","Discovery & Science","اكتشافات وعلوم وحقائق مبنية على الأدلة.","Discoveries, science and evidence-based facts.","⚗"],
+    ["economy","مال وأعمال","Money & Business","الاقتصاد والأسواق والمال وقرارات الأعمال.","Economics, markets, money and business decisions.","◈"],
+    ["politics","سياسة عامة","Public Policy","السياسات والقرارات والقوى المؤثرة في الشأن العام.","Policies, decisions and forces shaping public affairs.","▣"],
+    ["technology","تقنية وذكاء اصطناعي","Technology & AI","التقنية والذكاء الاصطناعي والابتكار.","Technology, artificial intelligence and innovation.","⌘"],
+    ["health","الصحة","Health","معلومات صحية موثقة وشرح واضح.","Verified health information explained clearly.","+"],
+    ["history","تاريخ وثقافة","History & Culture","التاريخ والثقافة والفنون والتراث.","History, culture, arts and heritage.","▱"],
+    ["people","شخصيات وقصص","People & Stories","شخصيات وقصص وسير مبنية على مصادر.","People, stories and sourced biographies.","●"],
+    ["sports","رياضة وأرقام","Sports & Numbers","الرياضة والنتائج والإحصاءات والسجلات.","Sports, results, statistics and records.","△"],
+    ["travel","وجهات وسفر","Destinations & Travel","الوجهات والمعلومات العملية للسفر.","Destinations and practical travel knowledge.","✈"]
+  ]; const params = new URLSearchParams(location.search);
   const lang = params.get("lang") === "en" ? "en" : "ar";
   const ar = lang === "ar";
   const t = (a, e) => ar ? a : e;
