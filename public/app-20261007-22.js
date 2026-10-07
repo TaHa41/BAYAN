@@ -32,7 +32,7 @@
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 9000));
     try {
-      const response = await fetch(url + separator + "_b=20261007.21", {
+      const response = await fetch(url + separator + "_b=20261007.22", {
         ...options,
         cache: "no-store",
         signal: controller.signal
@@ -89,6 +89,7 @@
     document.documentElement.dir = ar ? "rtl" : "ltr";
     const brand = document.querySelector(".brand span");
     if (brand) brand.textContent = ar ? "بيان" : "BAYAN";
+    if (!nav || !drawer || !app) return;
     nav.innerHTML =
       link("/search?lang=" + lang, t("بحث","Search")) +
       link("/news?lang=" + lang, t("الأخبار","News")) +
@@ -111,19 +112,19 @@
       link("/admin?lang=" + lang, t("الإدارة","Admin")) +
       "</div>";
 
-    document.querySelector("#menu").onclick = () => drawer.classList.toggle("open");
-    document.querySelector("#closeDrawer").onclick = () => drawer.classList.remove("open");
+    document.querySelector("#menu")?.addEventListener("click", () => drawer.classList.toggle("open"));
+    document.querySelector("#closeDrawer")?.addEventListener("click", () => drawer.classList.remove("open"));
     drawer.querySelectorAll("a").forEach((item) => {
       item.addEventListener("click", () => drawer.classList.remove("open"));
     });
     drawer.addEventListener("click", (event) => {
       if (event.target === drawer) drawer.classList.remove("open");
     });
-    document.querySelector("#lang").onclick = () => {
+    document.querySelector("#lang")?.addEventListener("click", () => {
       const url = new URL(location.href);
       url.searchParams.set("lang", ar ? "en" : "ar");
       location.href = url;
-    };
+    });
     const applyTheme = () => {
       const mode = safeStorage.get("bayan-theme","auto");
       const dark = mode === "dark" || (mode === "auto" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -132,12 +133,12 @@
       if (themeButton) themeButton.title = t("المظهر: " + (mode === "dark" ? "داكن" : mode === "light" ? "فاتح" : "تلقائي"), "Theme: " + (mode === "dark" ? "Dark" : mode === "light" ? "Light" : "Auto"));
     };
     applyTheme();
-    document.querySelector("#theme").onclick = () => {
-      const mode = localStorage.getItem("bayan-theme") || "auto";
+    document.querySelector("#theme")?.addEventListener("click", () => {
+      const mode = safeStorage.get("bayan-theme","auto");
       const next = mode === "auto" ? "light" : mode === "light" ? "dark" : "auto";
       safeStorage.set("bayan-theme", next);
       applyTheme();
-    };
+    });
     window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", applyTheme);
   }
 
