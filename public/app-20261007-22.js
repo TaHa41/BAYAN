@@ -184,6 +184,12 @@
     ]);
 
     const newsOut = document.querySelector("#home-news");
+    if (newsData.stale && newsOut) {
+      newsOut.insertAdjacentHTML("beforebegin", '<div class="notice">' +
+        t("الأخبار المباشرة متوقفة مؤقتًا؛ نعرض آخر نسخة متحققة محفوظة.",
+          "Live news is temporarily unavailable; showing the latest verified cached stories.") +
+        "</div>");
+    }
     const newsItems = (newsData.items || [])
       .filter((item) => !ar || /[\u0600-\u06ff]/.test(String(item.title || "")))
       .slice(0, 6);
@@ -278,6 +284,12 @@
       const data = await api("/api/news?lang=" + lang);
       const items = data.items || [];
       const output = document.querySelector("#news");
+      if (data.stale && output) {
+        output.insertAdjacentHTML("beforebegin", '<div class="notice">' +
+          t("المعروض هنا آخر أخبار متحققة محفوظة مؤقتًا؛ تعذر الوصول إلى مزودات الأخبار المباشرة الآن.",
+            "These are the latest verified stories temporarily cached because live news providers are unavailable right now.") +
+          "</div>");
+      }
       const story = storyTitle ? items.find((item) => item.title === storyTitle) : null;
       if (story) {
         output.className = "results";
