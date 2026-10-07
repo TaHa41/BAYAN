@@ -405,6 +405,30 @@
     document.querySelector("#adminRepair").onclick=async()=>{const o=document.querySelector("#adminOut");o.innerHTML='<div class="notice loading">'+t("جاري التشخيص…","Diagnosing…")+"</div>";try{const d=await adminApi("/api/admin/repair");o.innerHTML='<div class="notice"><h2>'+escapeHtml(d.ok?t("لا توجد مشكلة حتمية.","No deterministic failure."):t("تم تسجيل المشكلة.","Failure recorded."))+'</h2></div>';}catch{o.innerHTML='<div class="notice">'+t("تعذر الإصلاح.","Repair failed.")+"</div>";}};load();
   }
 
+  async function renderSaved() {
+    app.innerHTML='<section class="page"><div class="page-head"><span class="eyebrow">'+t("مكتبتك","Your library")+'</span><h1>'+t("المحفوظات","Saved")+'</h1><p>'+t("المقالات التي حفظتها على هذا الجهاز.","Articles saved on this device.")+'</p></div><div id="saved-content" class="article-grid"><div class="notice loading">'+t("جاري التحميل…","Loading…")+'</div></div></section>';
+    try{const data=await api("/api/saved"),items=[];for(const row of data.items||[]){try{const a=await api("/api/article?slug="+encodeURIComponent(row.slug)+"&lang="+lang);if(a)items.push(a)}catch{}}const out=document.querySelector("#saved-content");out.innerHTML=items.length?items.map(articleCard).join(""):'<div class="notice">'+t("لا توجد مقالات محفوظة بعد.","No saved articles yet.")+"</div>";hydrateSectionImages(items);}catch{document.querySelector("#saved-content").innerHTML='<div class="notice">'+t("تعذر تحميل المحفوظات الآن.","Saved items could not be loaded right now.")+"</div>"}
+  }
+
+  async function renderTools() {
+    app.innerHTML='<section class="page"><div class="page-head"><span class="eyebrow">'+t("أدوات بيان","BAYAN tools")+'</span><h1>'+t("الأدوات","Tools")+'</h1><p>'+t("أدوات مباشرة للبحث والبيانات والتحقق.","Direct tools for search, live data and verification.")+'</p></div><div class="section-grid">'+[
+      ["/search?lang="+lang,t("البحث","Search"),t("ابحث في المعرفة والمصادر.","Search knowledge and sources.")],
+      ["/ask?lang="+lang,t("اسأل بيان","Ask BAYAN"),t("اسأل سؤالًا واجمع الأدلة.","Ask a question and gather evidence.")],
+      ["/prices?lang="+lang,t("البيانات الحية","Live Data"),t("الطقس والعملات والذهب.","Weather, FX and gold.")],
+      ["/contribute?lang="+lang,t("المساهمة","Contribute"),t("أرسل معلومة للمراجعة.","Submit information for review.")]
+    ].map(x=>'<a class="section-card" href="'+x[0]+'"><div><h2>'+x[1]+'</h2><p>'+x[2]+'</p></div><b>↗</b></a>').join("")+'</div></section>';
+  }
+
+  async function renderStatic(kind) {
+    const data={
+      about:[t("عن بيان","About BAYAN"),t("بيان مركز معرفة وأخبار وبيانات مبني على الأدلة والتحقق قبل الادعاء.","BAYAN is a knowledge, news and live-data service built around evidence and verification.")],
+      methodology:[t("المنهجية","Methodology"),t("نسترجع الأدلة أولًا، نقارن المصادر، ثم نعرض ما يمكن دعمه بوضوح ونذكر نقص الأدلة عند الحاجة.","We retrieve evidence first, compare sources, then present what can be supported and clearly state when evidence is insufficient.")],
+      privacy:[t("الخصوصية","Privacy"),t("نستخدم الحد الأدنى اللازم لتشغيل الخدمة وقياس الاستخدام التقني، وتظل إحصاءات الزيارات الإدارية خاصة.","We use only the information needed to operate the service and measure technical usage; visit analytics remain private to the administrator.")],
+      terms:[t("الشروط","Terms"),t("المحتوى المعروض للمعلومات العامة ولا يغني عن التحقق المستقل أو المشورة المتخصصة عند الحاجة.","Content is provided for general information and does not replace independent verification or professional advice when needed.")]
+    }[kind];
+    app.innerHTML='<section class="page narrow"><div class="page-head"><span class="eyebrow">BAYAN</span><h1>'+data[0]+'</h1></div><article class="answer"><p>'+data[1]+'</p></article></section>';
+  }
+
   async function renderSection(slug) {
     const section=sections.find((item)=>item[0]===slug); if(!section)return;
     app.innerHTML='<section class="page"><div class="page-head"><span class="eyebrow">'+escapeHtml(section[5])+" "+t("قسم معرفي","Knowledge section")+'</span><h1>'+escapeHtml(ar?section[1]:section[2])+'</h1><p>'+escapeHtml(ar?section[3]:section[4])+'</p></div><div id="wisdom" class="wisdom-card"><span class="kicker">'+t("حكمة بيان","BAYAN Insight")+'</span><p>'+t("جاري اختيار عبارة…","Selecting an insight…")+'</p></div><div id="section-content" class="article-grid"><div class="notice">'+t("جاري تحميل المواد…","Loading content…")+"</div></div></section>";
@@ -422,6 +446,9 @@
     if (path === "ask") return renderAsk();
     if (path === "contribute") return renderContribute();
     if (path === "prices") return renderPrices();
+    if (path === "saved") return renderSaved();
+    if (path === "tools") return renderTools();
+    if (["about","methodology","privacy","terms"].includes(path)) return renderStatic(path);
     if (path === "admin") return renderAdmin();
     const section = sections.find((item) => item[0] === path);
     if (section) return renderSection(path);
