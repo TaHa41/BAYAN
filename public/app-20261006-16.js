@@ -28,7 +28,8 @@
   }[m]));
 
   const api = async (url, options) => {
-    const response = await fetch(url, options);
+    const separator = url.includes("?") ? "&" : "?";
+    const response = await fetch(url + separator + "_b=20261007", { cache: "no-store", ...(options || {}) });
     if (!response.ok) throw new Error("http_" + response.status);
     return response.json();
   };
@@ -161,11 +162,11 @@
         )
       ]);
       const newsOut = document.querySelector("#home-news");
-      const newsItems = (newsData.items || []).slice(0, 6);
+      const newsItems = (newsData.items || []).filter((item) => !ar || /[\u0600-\u06ff]/.test(String(item.title || ""))).slice(0, 6);
       newsOut.innerHTML = newsItems.length
         ? newsItems.map((item) => '<a class="article-card" href="/news?story=' + encodeURIComponent(item.title) + '&lang=' + lang + '">' + imageHtml(item) + '<div class="article-card-body"><span class="kicker">' + escapeHtml(item.publisher || t("الأخبار","News")) + '</span><h3>' + escapeHtml(item.title) + '</h3><p>' + escapeHtml(item.summary || "") + '</p><div class="source-line">' + escapeHtml(item.publishedAt || "") + '</div><span class="read">' + t("اقرأ داخل بيان","Read inside BAYAN") + " →</span></div></a>").join("")
         : '<div class="notice">' + t("لا توجد أخبار حديثة متاحة الآن؛ لن نعرض خبرًا مختلقًا.","No current news is available right now; BAYAN will not invent a story.") + "</div>";
-      const featured = sectionData.flatMap((x) => x.items || []).slice(0, 9);
+      const featured = sectionData.flatMap((x) => x.items || []).filter((item) => !ar || /[\u0600-\u06ff]/.test(String(item.title || ""))).slice(0, 9);
       const featuredOut = document.querySelector("#home-featured");
       featuredOut.innerHTML = featured.length ? featured.map(articleCard).join("") : '<div class="notice">' + t("لا توجد مواد منشورة إضافية الآن.","No additional published material is available right now.") + "</div>";
       hydrateSectionImages(featured);
