@@ -14,7 +14,7 @@ try{
   const h=await get("/?lang=en");
   if(!/<html[^>]+lang="en"/.test(h.text))throw new Error("english_lang_missing");
   if(!h.text.includes("app-20261006-16.js"))throw new Error("current_bundle_missing");
-  if(!h.text.includes("app-20261006-16.js?v=2026.10.07.18"))throw new Error("current_shell_bundle_version_missing");
+  if(!h.text.includes("app-20261006-16.js?v=2026.10.07.19"))throw new Error("current_shell_bundle_version_missing");
 }catch(e){console.error("SHELL",e);bad++}
 try{
   const js=await get("/app-20261006-16.js");
