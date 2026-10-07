@@ -1,5 +1,5 @@
 const origin=process.env.BAYAN_ORIGIN||"https://bayan.tahaomar411.workers.dev";
-const checks=["/","/api/health","/api/features","/api/live/weather","/api/live/fx","/api/live/gold","/robots.txt","/sitemap.xml","/news-sitemap.xml"];
+const checks=["/","/saved?lang=ar","/tools?lang=ar","/about?lang=ar","/methodology?lang=ar","/privacy?lang=ar","/terms?lang=ar","/api/health","/api/features","/api/live/weather","/api/live/fx","/api/live/gold","/robots.txt","/sitemap.xml","/news-sitemap.xml"];
 const sections=["egypt","arab","world","science","economy","politics","technology","health","history","people","sports","travel"];
 let bad=0;
 async function get(path){
