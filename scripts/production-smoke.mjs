@@ -22,6 +22,8 @@ try{
   if(js.text.includes("Daily wisdom")||js.text.includes("الحكمة اليومية"))throw new Error("obsolete_wisdom_content_present");
   if(!js.text.includes("home-news")||!js.text.includes("home-featured"))throw new Error("homepage_content_sections_missing");
   if(!js.text.includes("section-retry")||!js.text.includes("timeoutMs: 8000"))throw new Error("section_resilience_missing");
+  if(!js.text.includes("async function renderNews()"))throw new Error("news_renderer_async_missing");
+  if(!js.text.includes("search-answer"))throw new Error("search_answer_ui_missing");
 }catch(e){console.error("BUNDLE",e);bad++}
 try{
   const w=await get("/api/wisdom?section=arab&lang=ar"); const wd=JSON.parse(w.text); if(!wd.wisdom||!/[\u0600-\u06ff]/.test(String(wd.wisdom)))throw new Error("wisdom_missing");
