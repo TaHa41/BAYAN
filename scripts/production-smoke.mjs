@@ -1,6 +1,6 @@
 const origin=process.env.BAYAN_ORIGIN||"https://bayan.tahaomar411.workers.dev";
 const checks=["/","/saved?lang=ar","/tools?lang=ar","/about?lang=ar","/methodology?lang=ar","/privacy?lang=ar","/terms?lang=ar","/api/health","/api/features","/api/live/weather","/api/live/fx","/api/live/gold","/news?lang=ar","/prices?lang=ar","/art?lang=ar","/trends?lang=ar","/robots.txt","/sitemap.xml","/news-sitemap.xml"];
-const sections=["science","technology","economy","politics","health","history","people","sports","travel","art","news","trends","prices","egypt","arab","world"];
+const sections=["science","technology","economy","politics","health","history","people","sports","travel","art","news","trends","egypt","arab","world"];
 let bad=0;
 async function get(path){
   const r=await fetch(origin+path,{redirect:"manual",headers:{accept:"application/json,text/plain,*/*"}});
@@ -59,6 +59,9 @@ for(const section of sections){
     }catch(e){console.error("SECTION",section,language,e);bad++}
   }
 }
+try{
+  for(const live of ["/api/live/weather","/api/live/fx","/api/live/gold"]){const z=await get(live);if(!z.text||z.text.length<20)throw new Error("live_data_empty_"+live)}
+}catch(e){console.error("LIVE_DATA",e);bad++}
 try{const a=await fetch(origin+"/api/admin/analytics",{headers:{accept:"application/json"}});if(a.status!==401)throw new Error("admin_auth_not_enforced")}catch(e){console.error("ADMIN_AUTH",e);bad++}
 if(bad)process.exit(1);
 console.log("BAYAN production smoke passed");
