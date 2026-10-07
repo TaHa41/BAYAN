@@ -174,26 +174,32 @@
         </div>
       </section>`;
     bindSearch();
-    try {
-      const [newsData, ...sectionData] = await Promise.all([
-        api("/api/news?lang=" + lang),
-        ...sections.filter((s) => !["news","prices","trends"].includes(s[0])).map((s) =>
-          api("/api/section?section=" + encodeURIComponent(s[0]) + "&lang=" + lang).catch(() => ({items: []}))
-        )
-      ]);
-      const newsOut = document.querySelector("#home-news");
-      const newsItems = (newsData.items || []).filter((item) => !ar || /[\u0600-\u06ff]/.test(String(item.title || ""))).slice(0, 6);
-      newsOut.innerHTML = newsItems.length
-        ? newsItems.map((item) => '<a class="article-card" href="/news?story=' + encodeURIComponent(item.title) + '&lang=' + lang + '">' + imageHtml(item) + '<div class="article-card-body"><span class="kicker">' + escapeHtml(item.publisher || t("الأخبار","News")) + '</span><h3>' + escapeHtml(item.title) + '</h3><p>' + escapeHtml(item.summary || "") + '</p><div class="source-line">' + escapeHtml(item.publishedAt || "") + '</div><span class="read">' + t("اقرأ داخل بيان","Read inside BAYAN") + " →</span></div></a>").join("")
-        : '<div class="notice">' + t("لا توجد أخبار حديثة متاحة الآن؛ لن نعرض خبرًا مختلقًا.","No current news is available right now; BAYAN will not invent a story.") + "</div>";
-      const featured = sectionData.flatMap((x) => x.items || []).filter((item) => !ar || /[\u0600-\u06ff]/.test(String(item.title || ""))).slice(0, 9);
-      const featuredOut = document.querySelector("#home-featured");
-      featuredOut.innerHTML = featured.length ? featured.map(articleCard).join("") : '<div class="notice">' + t("لا توجد مواد منشورة إضافية الآن.","No additional published material is available right now.") + "</div>";
-      hydrateSectionImages(featured);
-    } catch {
-      const out=document.querySelector("#home-news");
-      if(out) out.innerHTML='<div class="notice">' + t("تعذر تحديث محتوى الصفحة الرئيسية الآن. الأقسام ما زالت متاحة من القائمة.","Homepage content could not be refreshed. Sections remain available from the menu.") + "</div>";
-    }
+    const newsTask = api("/api/news?lang=" + lang).catch(() => ({items: []}));
+    const sectionTasks = sections
+      .filter((s) => !["news","prices","trends"].includes(s[0]))
+      .map((s) => api("/api/section?section=" + encodeURIComponent(s[0]) + "&lang=" + lang).catch(() => ({items: []})));
+    const [newsData, sectionData] = await Promise.all([
+      newsTask,
+      Promise.all(sectionTasks)
+    ]);
+
+    const newsOut = document.querySelector("#home-news");
+    const newsItems = (newsData.items || [])
+      .filter((item) => !ar || /[\u0600-\u06ff]/.test(String(item.title || "")))
+      .slice(0, 6);
+    newsOut.innerHTML = newsItems.length
+      ? newsItems.map((item) => '<a class="article-card" href="/news?story=' + encodeURIComponent(item.title) + '&lang=' + lang + '">' + imageHtml(item) + '<div class="article-card-body"><span class="kicker">' + escapeHtml(item.publisher || t("الأخبار","News")) + '</span><h3>' + escapeHtml(item.title) + '</h3><p>' + escapeHtml(item.summary || "") + '</p><div class="source-line">' + escapeHtml(item.publishedAt || "") + '</div><span class="read">' + t("اقرأ داخل بيان","Read inside BAYAN") + " →</span></div></a>").join("")
+      : '<div class="notice">' + t("لا توجد أخبار حديثة متاحة الآن؛ لن نعرض خبرًا مختلقًا.","No current news is available right now; BAYAN will not invent a story.") + "</div>";
+
+    const featured = sectionData
+      .flatMap((x) => x.items || [])
+      .filter((item) => !ar || /[\u0600-\u06ff]/.test(String(item.title || "")))
+      .slice(0, 9);
+    const featuredOut = document.querySelector("#home-featured");
+    featuredOut.innerHTML = featured.length
+      ? featured.map(articleCard).join("")
+      : '<div class="notice">' + t("لا توجد مواد منشورة إضافية الآن.","No additional published material is available right now.") + "</div>";
+    hydrateSectionImages(featured);
   }
 
   async function renderSearch() {
