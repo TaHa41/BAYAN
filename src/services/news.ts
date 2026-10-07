@@ -276,10 +276,18 @@ export async function news(env: Env, lang: Locale) {
     // A publisher may return an Arabic headline with an English or empty description.
     // The headline is the authoritative language signal; never discard a valid Arabic story because of metadata language.
     all = all.filter((story) => hasArabic(story.title));
-    if (!all.length) all = await googleArabicFallback();
-    if (!all.length) all = (await gdeltFallback(lang)).filter((story) => hasArabic(story.title));
-  } else if (!all.length) {
-    all = await gdeltFallback(lang);
+    // Do not wait for a total provider outage before falling back: a partial RSS
+    // batch is common and must not produce an almost-empty BAYAN news page.
+    if (all.length < 3) {
+      const fallback = await googleArabicFallback();
+      all = [...all, ...fallback];
+    }
+    if (all.length < 3) {
+      const fallback = (await gdeltFallback(lang)).filter((story) => hasArabic(story.title));
+      all = [...all, ...fallback];
+    }
+  } else if (all.length < 3) {
+    all = [...all, ...(await gdeltFallback(lang))];
   }
   all = all.filter((story) => {
     if (!story.publishedAt) return true;
@@ -348,7 +356,7 @@ export async function news(env: Env, lang: Locale) {
     if (merged.length >= 3) {
       return {
         ok: true,
-        stale: finalStories.length === 0,
+        stale: true,
         cachedAt: cached.updatedAt,
         providers: providers.map(([name]) => name),
         items: merged.map((story) => ({
