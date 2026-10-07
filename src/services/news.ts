@@ -245,6 +245,7 @@ export async function news(env: Env, lang: Locale) {
     all = all.filter((story) => hasArabic(story.title) && (!story.summary || hasArabic(story.summary)));
     if (!all.length) all = await googleArabicFallback();
     if (!all.length) all = (await gdeltFallback(lang)).filter((story) => hasArabic(story.title));
+    all = all.filter((story) => hasArabic(story.title));
   } else if (!all.length) {
     all = await gdeltFallback(lang);
   }
@@ -290,18 +291,18 @@ export async function news(env: Env, lang: Locale) {
     })
     .slice(0, limit);
 
-  const enriched = await Promise.all(unique.map(async (story) => {
-    if (story.imageUrl) return story;
+  const enriched = await Promise.all(unique.map(async (story, index) => {
+    if (story.imageUrl || index >= 6) return story;
     const direct = await sourceImage(story.url);
     if (direct) return { ...story, imageUrl: direct };
-    const image = await findRelatedImage(story.title + " " + story.summary);
+    const image = await findRelatedImage(story.title);
     return image ? { ...story, imageUrl: image } : story;
   }));
   // Image lookup is enrichment only: an image-provider outage must never hide a valid story.
   const finalStories = enriched;
 
   return {
-    ok: enriched.length > 0,
+    ok: finalStories.length > 0,
     providers: providers.map(([name]) => name),
     items: finalStories.map((story) => ({
       title: story.title,
