@@ -174,13 +174,12 @@ const wikipediaImage = async (query: string): Promise<string | undefined> => {
     const url =
       "https://ar.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=" +
       encodeURIComponent(query) +
-      "&gsrlimit=3&prop=pageimages&piprop=thumbnail&pithumbsize=1200&format=json&origin=*";
+      "&gsrlimit=2&prop=pageimages&piprop=thumbnail&pithumbsize=1200&format=json&origin=*";
     const response = await fetch(url, {
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(2500),
       headers: { accept: "application/json" },
     });
     if (!response.ok) return;
-
     const data = await response.json<any>();
     const pages = Object.values(data.query?.pages || {}) as any[];
     return pages.find((page) => page.thumbnail?.source)?.thumbnail?.source;
@@ -189,24 +188,37 @@ const wikipediaImage = async (query: string): Promise<string | undefined> => {
   }
 };
 
-const wikipediaExactImage=async(query:string):Promise<string|undefined>=>{for(const lang of ["ar","en"]){try{const u="https://"+lang+".wikipedia.org/w/api.php?action=query&prop=pageimages&piprop=original|thumbnail&titles="+encodeURIComponent(query)+"&format=json&origin=*";const r=await fetch(u,{signal:AbortSignal.timeout(3000),headers:{accept:"application/json"}});if(!r.ok)continue;const d=await r.json<any>();const p=Object.values(d.query?.pages||{})[0] as any;if(p?.original?.source||p?.thumbnail?.source)return p.original?.source||p.thumbnail?.source}catch{}}};
+const wikipediaExactImage=async(query:string):Promise<string|undefined>=>{
+  for(const lang of ["ar","en"]){
+    try{
+      const u="https://"+lang+".wikipedia.org/w/api.php?action=query&prop=pageimages&piprop=thumbnail&titles="+encodeURIComponent(query)+"&format=json&origin=*";
+      const r=await fetch(u,{signal:AbortSignal.timeout(2500),headers:{accept:"application/json"}});
+      if(!r.ok) continue;
+      const d=await r.json<any>();
+      const p=Object.values(d.query?.pages||{})[0] as any;
+      if(p?.thumbnail?.source) return p.thumbnail.source;
+    }catch{}
+  }
+};
+
 export async function findRelatedImage(query: string): Promise<string | undefined> {
   try {
+    if(/نجيب محفوظ|naguib mahfouz/i.test(query)){
+      return "https://commons.wikimedia.org/wiki/Special:FilePath/Naguib%20Mahfouz%20HR.jpg?width=1200";
+    }
     const exact = await wikipediaExactImage(query);
     if (exact) return exact;
-    const variants=[query,query.split(/\s+/).slice(0,6).join(" "),query.split(/[،,:-]/)[0]].filter(Boolean);if(/نجيب محفوظ|naguib mahfouz/i.test(query))return "https://commons.wikimedia.org/wiki/Special:FilePath/Naguib%20Mahfouz%20HR.jpg?width=1200";
-    for(const v of variants){
-      const [summary,wiki,wd]=await Promise.all([wikipediaSummaryImage(v),wikipediaImage(v),wikidataImage(v)]);
-      if(summary)return summary;if(wiki)return wiki;if(wd)return wd;
+    const firstVariant = query.trim().split(/[،,:-]/)[0].split(/\\s+/).slice(0,6).join(" ").trim();
+    if (firstVariant && firstVariant !== query.trim()) {
+      const image = await wikipediaImage(firstVariant);
+      if (image) return image;
     }
-    const url="https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch="+encodeURIComponent(query)+"&gsrnamespace=6&gsrlimit=10&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=1200&format=json&origin=*";
-    const response=await fetch(url,{signal:AbortSignal.timeout(3500),headers:{accept:"application/json"}});
-    if(!response.ok)return;
-    const data=await response.json<any>();const pages=Object.values(data.query?.pages||{}) as any[];const q=terms(query);let best:any,bestScore=0;
-    for(const page of pages){const info=page.imageinfo?.[0];if(!info)continue;const hay=terms(String(page.title||"")+" "+String(info.extmetadata?.ImageDescription?.value||"")).join(" ");const hits=q.filter(term=>hay.includes(term)).length;const score=q.length?hits/q.length:0;if(score>bestScore){bestScore=score;best=info}}
-    return bestScore>=0.45?(best?.thumburl||best?.url):undefined;
-  }catch{return}
+    return await wikipediaImage(query);
+  } catch {
+    return;
+  }
 }
+
 const hasArabic = (value: string) => /[\u0600-\u06ff]/.test(value);
 
 const readNewsCache = async (env: Env, lang: Locale): Promise<{items: Story[]; updatedAt?: string} | null> => {
@@ -332,10 +344,13 @@ export async function news(env: Env, lang: Locale) {
     .slice(0, limit);
 
   const enriched = await Promise.all(unique.map(async (story, index) => {
-    if (story.imageUrl || index >= 6) return story;
+    // Keep news requests safely below the Workers Free subrequest budget.
+    // RSS already supplies images for many publishers; only enrich the first
+    // four image-less stories and use a bounded Wikipedia lookup as fallback.
+    if (story.imageUrl || index >= 4) return story;
     const direct = await sourceImage(story.url);
     if (direct) return { ...story, imageUrl: direct };
-    const image = await findRelatedImage(story.title);
+    const image = await wikipediaExactImage(story.title);
     return image ? { ...story, imageUrl: image } : story;
   }));
   // Image lookup is enrichment only: an image-provider outage must never hide a valid story.
