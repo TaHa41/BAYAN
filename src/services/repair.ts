@@ -74,6 +74,7 @@ async function repairRuntime(env:Env,failures:string[]){
     actions.push("admin settings verified")
   }catch{}
   actions.push(...await repairTaxonomy(env));
+  if(failures.includes("search"))actions.push("Recent search API failures detected; provider diagnosis and manual/deployment review required. Search is not marked repaired by database checks.");
   if(failures.includes("news_cache"))actions.push("no healthy Arabic and English news cache; live news is refreshed through /api/news and will not be fabricated");
     if(failures.includes("articles"))try{
     const row=await env.DB.prepare("SELECT COUNT(*) count FROM articles WHERE status='PUBLISHED'").first<any>();
@@ -109,7 +110,8 @@ export async function selfHeal(env:Env){
     ["images",async()=>{const row=await env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN image_url IS NULL OR trim(image_url)='' THEN 1 ELSE 0 END) AS missing FROM (SELECT image_url FROM articles WHERE status='PUBLISHED' ORDER BY updated_at DESC LIMIT 12)").first<any>();return Number(row?.total||0)>0&&Number(row?.missing||0)<=3}],
     ["contributions",async()=>{await env.DB.prepare("SELECT 1 FROM contributions LIMIT 1").first();return true}],
     ["repair_state",async()=>{await env.DB.prepare("SELECT 1 FROM repair_jobs LIMIT 1").first();return true}],
-    ["settings",async()=>{await env.DB.prepare("SELECT key FROM admin_settings LIMIT 1").first();return true}]
+    ["settings",async()=>{await env.DB.prepare("SELECT key FROM admin_settings LIMIT 1").first();return true}],
+    ["search",async()=>{const row=await env.DB.prepare("SELECT COUNT(*) count FROM runtime_events WHERE kind='search_api_failed' AND created_at>=?").bind(new Date(Date.now()-60*60*1000).toISOString()).first<any>();return Number(row?.count||0)===0}]
   ];
   const failures:string[]=[];
   for(const[c,fn]of checks)try{if(!(await fn())){failures.push(c);await record(env,"error","health",c+" check failed")}}catch(e){failures.push(c);await record(env,"error","health",c+" failed: "+String(e))}
@@ -125,7 +127,7 @@ export async function selfHeal(env:Env){
     const newsHealthy=await newsCacheHealthy(env);
     const imageRow=await env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN image_url IS NULL OR trim(image_url)='' THEN 1 ELSE 0 END) AS missing FROM (SELECT image_url FROM articles WHERE status='PUBLISHED' ORDER BY updated_at DESC LIMIT 12)").first<any>();
     const imagesHealthy=Number(imageRow?.total||0)>0&&Number(imageRow?.missing||0)<=3;
-    verification=db&&Number(article?.count||0)>0&&missing.length===0&&newsHealthy&&imagesHealthy?"verified_runtime":"needs_deployment_or_manual_review";
+    verification=db&&Number(article?.count||0)>0&&missing.length===0&&newsHealthy&&imagesHealthy&&!failures.includes("search")?"verified_runtime":"needs_deployment_or_manual_review";
   }catch{verification="verification_failed"}
   const signature=failures.join(",");
   const nextStatus=verification==="verified_runtime"?"REPAIRED":"REVIEW";
