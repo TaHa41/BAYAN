@@ -418,8 +418,9 @@
   async function renderPrices() {
     app.innerHTML =
       '<section class="page"><div class="page-head"><span class="eyebrow">' +
-      t("بيانات حية","Live data") + '</span><h1>' + t("الأسعار والبيانات الحية","Prices & Live Data") +
-      '</h1></div><div class="live-grid"><div class="live" id="weather">…</div><div class="live" id="fx">…</div><div class="live" id="gold">…</div></div></section>';
+      t("بيانات مباشرة","Live data") + '</span><h1>' + t("الأسعار والبيانات الحية","Prices & Live Data") +
+      '</h1><p>' + t("بيانات محدثة من مزوداتها، مع توضيح المصدر والزمن بدل عرض الرقم منفصلًا.","Updated data from its providers, with source and timing shown alongside every value.") +
+      '</p></div><div class="live-grid"><article class="live live-card" id="weather">…</article><article class="live live-card" id="fx">…</article><article class="live live-card" id="gold">…</article></div></section>';
     try {
       const [weather, fx, gold] = await Promise.all([
         api("/api/live/weather"), api("/api/live/fx"), api("/api/live/gold")
