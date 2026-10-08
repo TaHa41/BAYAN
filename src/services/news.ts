@@ -49,48 +49,58 @@ const readFeed = async (name: string, url: string): Promise<Story[]> => {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: { accept: "application/rss+xml, application/xml, text/xml, */*", "user-agent": "BAYAN/1.2 (+https://bayan.tahaomar411.workers.dev)" },
-    });
-    clearTimeout(timer);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        signal: controller.signal,
+        headers: { accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, */*", "user-agent": "BAYAN/1.3 (+https://bayan.tahaomar411.workers.dev)" },
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     if (!response.ok) return [];
-
     const xml = await response.text();
-    return [...xml.matchAll(/<item[\s\S]*?<\/item>/gi)]
-      .slice(0, 12)
-      .map((match) => {
-        const item = match[0];
-        const tag = (name: string) =>
-          esc(
-            item.match(
-              new RegExp("<" + name + "[^>]*>([\s\S]*?)</" + name + ">", "i"),
-            )?.[1] || "",
-          );
-        // RSS providers vary: some expose media:content/enclosure, while others
-        // embed the thumbnail only as an <img> inside description/content:encoded.
-        const imageUrl = (
-          item.match(/<(?:media:content|media:thumbnail|enclosure)[^>]+url=["']([^"']+)["']/i)?.[1] ||
-          item.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1] ||
-          item.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1]
-        )?.replace(/&amp;/g, "&");
-
-        return {
-          title: tag("title"),
-          summary: tag("description").slice(0, 1000),
-          url: tag("link"),
-          publisher: tag("source") || name,
-          publishedAt: tag("pubDate"),
-          imageUrl,
-          imageAlt: tag("title"),
-        };
-      })
-      .filter((story) => story.title && story.url);
+    // RSS uses <item>; Atom uses <entry>. Parse both so feeds do not silently
+    // become empty just because a publisher changed its feed format.
+    const entries = [...xml.matchAll(/<(item|entry)\b[\s\S]*?<\/\1>/gi)].slice(0, 16);
+    return entries.map((match) => {
+      const item = match[0];
+      const tag = (...names: string[]) => {
+        for (const name of names) {
+          const value = item.match(new RegExp("<" + name.replace(":", "\\:") + "\\b[^>]*>([\\s\\S]*?)</" + name + "\\s*>", "i"))?.[1];
+          if (value) return esc(value);
+        }
+        return "";
+      };
+      const linkTag = item.match(/<link\b[^>]*href=["']([^"']+)["'][^>]*\/?>/i)?.[1] || "";
+      const link = tag("link") || linkTag;
+      const rawDate = tag("pubDate", "dc:date", "published", "updated", "date", "lastBuildDate");
+      const parsedDate = rawDate ? Date.parse(rawDate) : Number.NaN;
+      const publishedAt = Number.isFinite(parsedDate) ? new Date(parsedDate).toISOString() : "";
+      const imageUrl = (
+        item.match(/<(?:media:content|media:thumbnail|enclosure)\b[^>]+url=["']([^"']+)["']/i)?.[1] ||
+        item.match(/<img\b[^>]+src=["']([^"']+)["']/i)?.[1] ||
+        item.match(/<content\b[^>]+src=["']([^"']+)["']/i)?.[1]
+      )?.replace(/&amp;/g, "&");
+      const title = tag("title");
+      const summary = tag("content:encoded", "description", "summary", "content").slice(0, 1800);
+      const sourceName = tag("source");
+      const publisher = sourceName || name;
+      const absoluteUrl = link ? (link.startsWith("http") ? link : new URL(link, url).toString()) : "";
+      return {
+        title,
+        summary,
+        url: absoluteUrl,
+        publisher,
+        publishedAt: publishedAt || undefined,
+        imageUrl,
+        imageAlt: title,
+      };
+    }).filter((story) => story.title && story.url);
   } catch {
     return [];
   }
 };
-
 const sourceImage = async (url: string): Promise<string | undefined> => {
   try {
     const response = await fetch(url, {
