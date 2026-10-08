@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 const read = (path) => readFileSync(new URL("../" + path, import.meta.url), "utf8");
 const news = read("src/services/news.ts");
 const wisdom = read("src/wisdom.ts");
-const app = read("public/app-20261008-01.js");
+const app = read("public/app-20261009-01.js");
 const index = read("src/index.ts");
 const api = read("src/routes/api.ts");
 const checks = [
@@ -11,10 +11,13 @@ const checks = [
   ["wisdom endpoint rotates every 30 seconds", wisdom.includes("Date.now()/1000/30")],
   ["wisdom has dedicated news and arts entries", /news:\{ar:/.test(wisdom) && /art:\{ar:/.test(wisdom)],
   ["browser refreshes wisdom every 30 seconds", app.includes("const wisdomTimer = setInterval") && app.includes("}, 30000)")],
-  ["asset build version matches production smoke contract", index.includes('const BUILD="2026.10.08.07";')],
+  ["asset build version matches production smoke contract", index.includes('const BUILD="2026.10.09.01";') && index.includes("app-20261009-01.js")],
   ["evidence-only article body uses real line breaks", !/x\.title\+"\\\\n"\+x\.summary/.test(api) && /x\.title\+"\\n"\+x\.summary/.test(api)],
   ["Telegram contribution notification uses real line break", !/BAYAN: مساهمة جديدة للمراجعة\\\\n/.test(api) && /BAYAN: مساهمة جديدة للمراجعة\\n/.test(api)],
   ["explicit lang query overrides browser language", read("src/http.ts").includes('if(requested==="ar")return"ar"')],
+  ["section fallback content is filtered by locale", api.includes('lang==="ar"?hasArabic(title)&&hasArabic(summary)') && api.includes('!hasArabic(title)&&!hasArabic(summary)')],
+  ["RTL drawer uses a reversible off-canvas transform", read("public/styles.css").includes('html[dir="rtl"] .drawer,html[dir="ltr"] .drawer{transform:translateX(110%)}') && read("public/app-20261009-01.js").includes('drawer.querySelector("#closeDrawer")?.addEventListener')],
+  ["news rejects missing and future publication dates", news.includes("const isFreshNews") && news.includes("all = all.filter(isFreshNews)") && news.includes("timestamp <= Date.now() + 5 * 60 * 1000")],
   ["legacy news cache payload column is migrated", read("src/schema.ts").includes("ALTER TABLE news_cache ADD COLUMN payload TEXT")],
   ["page view metrics exclude non-page events", read("src/db.ts").includes("event='page' AND created_at>=?")],
   ["admin has authenticated Telegram test route", api.includes('/api/admin/telegram-test') && api.includes("telegram_delivery_failed")],
