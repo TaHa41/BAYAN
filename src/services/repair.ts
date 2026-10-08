@@ -106,3 +106,12 @@ export async function selfHeal(env:Env){
   await notify(env,"BAYAN AI Self-Healing\nFailures: "+failures.join(", ")+"\nAction: "+(actions.join("; ")||"none")+"\nVerification: "+verification);
   return{ok:verification==="verified_runtime",failures,diagnosis,actions,verification};
 }
+
+export async function aiRepairRequest(env:Env,problem:string){
+  const issue=String(problem||"").trim().slice(0,4000);
+  if(!issue) return {ok:false,error:"problem_required"};
+  await record(env,"warn","ai_repair_request","User-reported problem: "+issue);
+  const diagnosis=await diagnose(env,[issue]);
+  const result=await selfHeal(env);
+  return {ok:result.ok,problem:issue,diagnosis,health:result};
+}
