@@ -14,6 +14,7 @@ const scoreSource=(publisher:string, title:string, q:string) => {
   const p=publisher.toLowerCase(), t=title.toLowerCase(), terms=q.toLowerCase().split(/\s+/).filter(x=>x.length>2);
   let score=0;
   if(/wikipedia|wikidata/.test(p))score+=72;
+  if(/pubmed|ncbi|crossref|openalex|nih|cdc|world health organization|who\\.int|nature\\.com|science\\.org|gov\\b/.test(p))score+=82;
   if(/bbc|reuters|ap|associated press|france 24|dw|al jazeera|sky news/.test(p))score+=78;
   if(terms.filter(x=>t.includes(x)).length)score+=Math.min(20,terms.filter(x=>t.includes(x)).length*6);
   return Math.min(100,score);
