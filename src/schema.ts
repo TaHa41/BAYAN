@@ -2,7 +2,7 @@ import type{Env}from"./types";let ready:Promise<void>|undefined;const statements
   try{
     const columns=await env.DB.prepare("PRAGMA table_info(saved_articles)").all<any>();
     const names=(columns.results||[]).map((column:any)=>String(column.name));
-    const legacy=["article_slug","saved_slug","article_id","article_url","url"].find((name)=>names.includes(name));
+    const legacy=["article_slug","saved_slug","article_id","article_url","url"].find((name)=>names.includes(name))||names.find((name)=>!["id","visitor_id","created_at","slug"].includes(name));
     if(names.length&&names.includes("visitor_id")&&names.includes("created_at")&&(!names.includes("slug")||legacy)){
       const source=legacy||"slug";
       await env.DB.prepare("CREATE TABLE IF NOT EXISTS saved_articles_compat(visitor_id TEXT NOT NULL,slug TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(visitor_id,slug))").run();
