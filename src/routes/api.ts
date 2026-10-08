@@ -45,11 +45,13 @@ if(u.pathname==="/api/admin/article/expand"&&request.method==="POST"){
   const discovery=await bounded(search(env,String(row.title),language,{publish:false}),7000).catch(()=>({results:[] as any[]}));
   const discovered=Array.isArray(discovery.results)?discovery.results.slice(0,5):[];
   const combinedSources=[...storedSources,...discovered.flatMap((item:any)=>item.sources||[])];
-  const seenUrls=new Set<string>();
+  const seenUrls=new Set<string>(),seenDomains=new Set<string>();
   const sources=combinedSources.filter((source:any)=>{
     const url=String(source.url||"");
     if(!url.startsWith("https://")||seenUrls.has(url))return false;
-    seenUrls.add(url);return true;
+    let domain="";try{domain=new URL(url).hostname.replace(/^www\./,"")}catch{return false}
+    if(!domain||seenDomains.has(domain))return false;
+    seenUrls.add(url);seenDomains.add(domain);return true;
   }).slice(0,5);
   const domains=new Set(sources.map((source:any)=>{try{return new URL(source.url).hostname.replace(/^www\./,"")}catch{return ""}}).filter(Boolean));
   if(sources.length<2||domains.size<2)return json({ok:false,error:"insufficient_sources",message:language==="ar"?"تعذر العثور على مصدرين مستقلين صالحين لهذا المقال. لم يتم تغيير المحتوى.":"Could not find two independent valid sources for this article. No content was changed."},422);
