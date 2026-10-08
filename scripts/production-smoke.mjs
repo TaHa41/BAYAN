@@ -14,6 +14,12 @@ async function get(path){
 }
 for(const path of checks){try{await get(path)}catch(e){console.error(e);bad++}}
 try{
+  const sitemap=await get("/sitemap.xml");
+  if(!sitemap.text.includes("?lang=ar")||!sitemap.text.includes("?lang=en")||!sitemap.text.includes("<lastmod>"))throw new Error("localized_sitemap_or_lastmod_missing");
+  const robots=await get("/robots.txt");
+  if(!robots.text.includes("Sitemap:")||!robots.text.includes("Disallow: /admin"))throw new Error("robots_policy_missing");
+}catch(e){console.error("SEO",e);bad++}
+try{
   const h=await get("/?lang=en");
   if(!/<html[^>]+lang="en"/.test(h.text))throw new Error("english_lang_missing");
   const bundleMatch=h.text.match(/<script src="(\/app-[^"]+\.js\?v=[^"]+)"/);
