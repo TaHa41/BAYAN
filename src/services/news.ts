@@ -415,28 +415,10 @@ export async function news(env: Env, lang: Locale) {
   const batches = await Promise.all(
     providers.map(([name, url]) => readFeed(name, url)),
   );
-  let all = batches.flat();
-  if (lang === "ar") {
-    // A publisher may return an Arabic headline with an English or empty description.
-    // The headline is the authoritative language signal; never discard a valid Arabic story because of metadata language.
-    all = all.filter((story) => hasArabic(story.title)).map((story) => ({ ...story, summary: languageSafeText(story.summary, "ar") ? story.summary : "" }));
-    // Do not wait for a total provider outage before falling back: a partial RSS
-    // batch is common and must not produce an almost-empty BAYAN news page.
-    if (all.length < 3) {
-      const fallback = await googleArabicFallback();
-      all = [...all, ...fallback];
-    }
-    if (all.length < 3) {
-      const fallback = (await gdeltFallback(lang)).filter((story) => hasArabic(story.title));
-      all = [...all, ...fallback];
-    }
-  } else {
-    // English mode must never surface Arabic headlines, including from fallback providers.
-    all = all.filter((story) => !hasArabic(story.title)).map((story) => ({ ...story, summary: languageSafeText(story.summary, "en") ? story.summary : "" }));
-    if (all.length < 3) {
-      all = [...all, ...(await gdeltFallback(lang)).filter((story) => !hasArabic(story.title))];
-    }
-  }
+  let all = batches.flat()
+    .filter((story) => lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title))
+    .map((story) => ({ ...story, summary: languageSafeText(story.summary, lang) ? story.summary : "" }));
+
   const isFreshNews = (story: Story) => {
     // "Latest news" must have a verifiable publication/observation time.
     // Unknown or malformed dates are not silently promoted to current news.
@@ -448,25 +430,25 @@ export async function news(env: Env, lang: Locale) {
   };
   all = all.filter(isFreshNews);
 
+  // If live RSS feeds are thin or unavailable, query all independent fallbacks
+  // together. Serial retries repeatedly queried Google News and could exhaust the
+  // Worker time budget before any stories reached the page.
   if (all.length < 3) {
-    const fallback = (lang === "ar" ? await googleArabicFallback() : await googleEnglishFallback()).filter(isFreshNews);
-    all = [...all, ...fallback];
-  }
-  if (all.length < 3) {
-    const fallback = await aiSearchNews(env, lang);
-    all = [...all, ...fallback];
-  }
-  if (all.length < 3) {
-    const fallback = await bingNewsFallback(lang);
-    all = [...all, ...fallback];
-  }
-  if (all.length < 3) {
-    const fallback = await directNewsPageFallback(lang);
+    const [google, gdelt, aiSearch, bing, direct] = await Promise.all([
+      lang === "ar" ? googleArabicFallback() : googleEnglishFallback(),
+      gdeltFallback(lang),
+      aiSearchNews(env, lang),
+      bingNewsFallback(lang),
+      directNewsPageFallback(lang),
+    ]);
+    const fallback = [...google, ...gdelt, ...aiSearch, ...bing, ...direct]
+      .filter((story) => lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title))
+      .map((story) => ({ ...story, summary: languageSafeText(story.summary, lang) ? story.summary : "" }))
+      .filter(isFreshNews);
     all = [...all, ...fallback];
   }
 
-  // Apply freshness checks after every fallback too. Previously, the final HTML fallback
-  // was appended after the freshness filter and could bypass it.
+  // Recheck freshness after merging fallbacks, then display newest first.
   all = all.filter(isFreshNews);
   all.sort((a,b) => {
     const at = a.publishedAt ? Date.parse(a.publishedAt) : 0;
