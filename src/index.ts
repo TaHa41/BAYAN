@@ -16,7 +16,8 @@ async function page(request:Request,env:Env){
 if(path==="/news"&&u.searchParams.has("story")){
   try{
     const row=await env.DB.prepare("SELECT payload FROM news_cache WHERE language=? LIMIT 1").bind(lang).first<any>();
-    const items=JSON.parse(String(row?.payload||"{}")).items||[];
+    const cached=JSON.parse(String(row?.payload||"[]"));
+    const items=Array.isArray(cached)?cached:(Array.isArray(cached.items)?cached.items:[]);
     const story=items.find((item:any)=>String(item.title||"")===String(u.searchParams.get("story")||""));
     if(story){
       title=String(story.title||title)+" | BAYAN";
