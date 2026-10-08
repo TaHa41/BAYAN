@@ -505,27 +505,42 @@
     app.innerHTML =
       '<section class="page"><div class="page-head"><span class="eyebrow">' +
       t("بيانات مباشرة","Live data") + '</span><h1>' + t("الأسعار والبيانات الحية","Prices & Live Data") +
-      '</h1><p>' + t("بيانات محدثة من مزوداتها، مع توضيح المصدر والزمن بدل عرض الرقم منفصلًا.","Updated data from its providers, with source and timing shown alongside every value.") +
-      '</p></div><div class="live-grid"><article class="live live-card" id="weather">…</article><article class="live live-card" id="fx">…</article><article class="live live-card" id="gold">…</article></div></section>';
+      '</h1><p>' + t("أسعار العملات والمعادن والطاقة والعملات الرقمية ومؤشرات الأسواق، مع المصدر والوحدة ووقت التحديث.","Currencies, metals, energy, crypto and market indices with provider, units and update time.") +
+      '</p></div><div class="live-grid market-overview"><article class="live live-card" id="weather">…</article><article class="live live-card" id="fx">…</article><article class="live live-card" id="gold">…</article></div><h2 class="section-title">'+t("أسواق ومواد إضافية","More markets & commodities")+'</h2><div class="live-grid" id="marketExtras"><div class="notice loading">'+t("جاري تحميل الأسعار من المزودات…","Loading provider quotes…")+'</div></div><p class="muted">'+t("الأسعار إرشادية وقد تتأخر أو تتوقف عند تعطل المزود؛ تحقق من المصدر قبل اتخاذ قرارات مالية.","Quotes are indicative and may be delayed or unavailable; verify with the provider before making financial decisions.")+'</p></section>';
     try {
       const [weather, fx, gold] = await Promise.all([
         api("/api/live/weather"), api("/api/live/fx"), api("/api/live/gold")
       ]);
+      const current = weather.current || {};
       document.querySelector("#weather").innerHTML =
-        '<span class="kicker">' + t("الطقس","Weather") + "</span><h2>" +
-        escapeHtml(weather.current?.temperature_2m ?? "—") + ' °C</h2><p>' +
-        escapeHtml(weather.provider || "") + "</p>";
+        '<span class="kicker">' + t("الطقس في الغردقة","Hurghada weather") + "</span><h2>" +
+        escapeHtml(current.temperature_2m ?? "—") + ' °C</h2><p>' +
+        t("الرطوبة: ","Humidity: ") + escapeHtml(current.relative_humidity_2m ?? "—") + '% · ' +
+        t("الرياح: ","Wind: ") + escapeHtml(current.wind_speed_10m ?? "—") + ' km/h</p><span class="source-line">' +
+        escapeHtml(weather.provider || "Open-Meteo") + "</span>";
+      const currencyNames = {EGP:"الجنيه المصري / Egyptian pound",EUR:"اليورو / Euro",GBP:"الجنيه الإسترليني / British pound",SAR:"الريال السعودي / Saudi riyal",AED:"الدرهم الإماراتي / UAE dirham",KWD:"الدينار الكويتي / Kuwaiti dinar",QAR:"الريال القطري / Qatari riyal",BHD:"الدينار البحريني / Bahraini dinar",OMR:"الريال العماني / Omani rial",JOD:"الدينار الأردني / Jordanian dinar",TRY:"الليرة التركية / Turkish lira",JPY:"الين الياباني / Japanese yen",CNY:"اليوان الصيني / Chinese yuan",CAD:"الدولار الكندي / Canadian dollar",AUD:"الدولار الأسترالي / Australian dollar",CHF:"الفرنك السويسري / Swiss franc",INR:"الروبية الهندية / Indian rupee",ILS:"الشيكل / Israeli shekel",LYD:"الدينار الليبي / Libyan dinar",TND:"الدينار التونسي / Tunisian dinar",MAD:"الدرهم المغربي / Moroccan dirham",ZAR:"الراند الجنوب أفريقي / South African rand"};
+      const rates = fx.rates || {};
+      const currencyRows = Object.entries(rates).filter(([code,value]) => Number.isFinite(Number(value))).map(([code,value]) =>
+        '<div class="market-row"><span>'+escapeHtml(code)+' <small>'+escapeHtml(currencyNames[code]||code)+'</small></span><strong>'+escapeHtml(Number(value).toLocaleString(undefined,{maximumFractionDigits:4}))+'</strong></div>'
+      ).join("");
       document.querySelector("#fx").innerHTML =
-        '<span class="kicker">' + t("العملات","Currencies") + '</span><h2>USD / EGP</h2><p>' +
-        escapeHtml(fx.rates?.EGP ?? "—") + '</p><span class="source-line">' +
-        escapeHtml(fx.provider || "") + "</span>";
+        '<span class="kicker">' + t("أسعار الصرف","Exchange rates") + '</span><h2>1 USD</h2><p>' +
+        t("القيمة مقابل العملات التالية","Value against the following currencies") + '</p><div class="market-list">' +
+        (currencyRows || '<div class="notice">'+t("بيانات العملات غير متاحة الآن","Currency data unavailable")+'</div>') +
+        '</div><span class="source-line">' + escapeHtml(fx.provider || "Frankfurter v2") + " · " + t("الوحدة: عملة لكل دولار أمريكي","Units: currency per 1 USD") + "</span>";
       document.querySelector("#gold").innerHTML =
-        '<span class="kicker">' + t("الذهب","Gold") + "</span><h2>" +
-        escapeHtml(gold.price ?? gold.gold?.["24K"] ?? "—") + '</h2><p>' +
-        escapeHtml(gold.provider || "") + "</p>";
+        '<span class="kicker">' + t("الذهب عيار 24","Gold 24K") + "</span><h2>" +
+        escapeHtml(gold.price == null ? "—" : Number(gold.price).toLocaleString(undefined,{maximumFractionDigits:2})) + '</h2><p>' +
+        t("جنيه مصري / جرام (سعر مرجعي)","EGP / gram (reference price)") + '</p><span class="source-line">' +
+        escapeHtml(gold.provider || "Gold provider") + "</span>";
+      const markets = Array.isArray(gold.markets) ? gold.markets : [];
+      const extras = document.querySelector("#marketExtras");
+      extras.innerHTML = markets.length ? markets.map(item =>
+        '<article class="live live-card market-card"><span class="kicker">'+escapeHtml(ar ? (item.ar||item.symbol) : (item.en||item.symbol))+'</span><h2>'+escapeHtml(item.price == null ? "—" : Number(item.price).toLocaleString(undefined,{maximumFractionDigits:4}))+'</h2><p>'+escapeHtml(item.unit||item.currency||"")+'</p><span class="source-line">'+escapeHtml(item.provider||"Yahoo Finance")+' · '+escapeHtml(item.symbol||"")+'</span></article>'
+      ).join("") : '<div class="notice">'+t("لم تتوفر أسعار الأسواق الإضافية من المزودات في الوقت الحالي.","Additional market quotes are currently unavailable from providers.")+'</div>';
     } catch {
       document.querySelector(".live-grid").innerHTML =
-        '<div class="notice">' + t("تعذر تحديث البيانات الحية.","Live data could not be refreshed.") + "</div>";
+        '<div class="notice">' + t("تعذر تحديث البيانات الحية. حاول مرة أخرى لاحقًا.","Live data could not be refreshed. Please try again later.") + "</div>";
     }
   }
 
