@@ -52,12 +52,13 @@
       ? '<img loading="lazy" class="' + className + '" src="' + escapeHtml(item.imageUrl) + '" alt="' + escapeHtml(item.imageAlt || item.title || "") + '">'
       : '<div class="image-placeholder">BAYAN</div>';
 
-  const articleCard = (item) =>
-    '<a class="article-card" href="/article/' + encodeURIComponent(item.slug || "") + '?lang=' + lang + '">' +
-      imageHtml(item) +
+  const articleCard = (item) => {
+    const body = imageHtml(item) +
       '<div class="article-card-body"><span class="kicker">' + escapeHtml(item.section || t("مادة","Content")) + "</span>" +
-      "<h3>" + escapeHtml(item.title) + "</h3><p>" + escapeHtml(item.summary) + '</p><span class="read">' +
-      t("اقرأ الملف","Read the file") + " →</span></div></a>";
+      "<h3>" + escapeHtml(item.title) + "</h3><p>" + escapeHtml(item.summary || "") + '</p><span class="read">' +
+      t(item.slug ? "اقرأ الملف" : "مصدر موثق", item.slug ? "Read the file" : "Verified source") + " →</span></div>";
+    return item.slug ? '<a class="article-card" href="/article/' + encodeURIComponent(item.slug) + '?lang=' + lang + '">' + body + "</a>" : '<article class="article-card evidence-card">' + body + "</article>";
+  };
 
   function searchBox(value = "") {
     return '<form class="search" id="search"><input name="q" value="' + escapeHtml(value) +
@@ -230,7 +231,7 @@
       '</span><h1>' + t("ابحث عن أي شيء","Search for anything") + '</h1><p>' +
       t("الشخصيات والموضوعات والأخبار والقصص والأسئلة والحلول والبيانات الحية في مسار واحد.",
         "People, topics, news, stories, questions, solutions and live data in one search.") +
-      '</p></div>' + searchBox(query) + '<div class="wisdom-card search-wisdom"><span class="kicker">' + t("حكمة بيان","BAYAN Insight") + '</span><p>' + t("المعلومة تصبح أقوى عندما نعرف مصدرها وزمنها وسياقها.","Information becomes stronger when its source, timing and context are clear.") + '</p></div><div id="out" class="results"></div></section>';
+      '</p></div>' + searchBox(query) + '<div id="out" class="results"></div></section>';
     bindSearch();
     if (!query) return;
     try {
@@ -496,8 +497,7 @@
       '<div class="page-head"><span class="eyebrow">' + escapeHtml(section[5]) + " " + t("قسم معرفي","Knowledge section") +
       '</span><h1>' + escapeHtml(ar ? section[1] : section[2]) + '</h1><p>' +
       escapeHtml(ar ? section[3] : section[4]) + '</p></div>' +
-      '<div id="wisdom" class="wisdom-card"><span class="kicker">' + t("حكمة بيان","BAYAN Insight") +
-      '</span><p>' + t("جاري اختيار عبارة…","Selecting an insight…") + '</p></div>' +
+
       '<div id="section-content" class="article-grid"><div class="notice">' +
       t("جاري تحميل المواد…","Loading content…") + '</div></div></section>';
 
@@ -524,16 +524,6 @@
       if (items.length) hydrateSectionImages(items).catch(() => {});
     };
 
-    const wisdomTask = api("/api/wisdom?section=" + encodeURIComponent(slug) + "&lang=" + lang, { timeoutMs: 5000 })
-      .then((wd) => {
-        const w = document.querySelector("#wisdom p");
-        if (w) w.textContent = wd.wisdom || "";
-      })
-      .catch(() => {
-        const w = document.querySelector("#wisdom p");
-        if (w) w.textContent = t("لا تتوفر الحكمة الآن.","Insight is unavailable right now.");
-      });
-
     try {
       await loadContent();
     } catch {
@@ -543,7 +533,6 @@
         '</p><button class="primary" id="section-retry">' + t("إعادة المحاولة","Retry") + "</button></div>";
       document.querySelector("#section-retry")?.addEventListener("click", () => renderSection(slug));
     }
-    await wisdomTask;
   }
 
   async function render() {
