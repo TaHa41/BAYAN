@@ -82,7 +82,11 @@ async function repairRuntime(env:Env,failures:string[]){
   if(failures.includes("news_cache")&&failures.includes("images")){
     try{const previous=await env.DB.prepare("SELECT action FROM repair_jobs WHERE signature=?").bind(failures.join(",")).first<any>();previousAction=String(previous?.action||"")}catch{}
   }
-  const imageOnlyPass=failures.includes("news_cache")&&failures.includes("images")&&previousAction.includes("image repair deferred until the next run");
+  let priorNewsRefresh=false;
+  if(failures.includes("news_cache")&&failures.includes("images")){
+    try{const history=await env.DB.prepare("SELECT COUNT(*) AS n FROM repair_attempts WHERE signature=? AND action LIKE '%live news refresh attempted%'").bind(failures.join(",")).first<any>();priorNewsRefresh=Number(history?.n||0)>0}catch{}
+  }
+  const imageOnlyPass=failures.includes("news_cache")&&failures.includes("images")&&priorNewsRefresh;
   if(failures.includes("news_cache")&&!imageOnlyPass){
     const refreshed:string[]=[];
     for(const language of ["ar","en"] as const){
