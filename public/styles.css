@@ -164,3 +164,5 @@ html[dir="rtl"] .section-card:before{inset:0 0 0 auto;border-radius:0 18px 18px 
 .dark .notice-error{background:#321d1d;color:#ffb1a9}
 @media(max-width:700px){.admin-page{padding-top:20px}.admin-login{grid-template-columns:1fr}.admin-login>*{grid-column:1/-1!important}.admin-shortcuts{top:64px}.admin-panel{scroll-margin-top:125px}.admin-article-row{align-items:flex-start!important}.admin-article-row small{width:100%;margin:0!important}.admin-article-row .navbtn{flex:1}.admin-page>.page-head{border-radius:18px}.section-icon{width:40px;height:40px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+.section-icon svg,.drawer-icon svg{display:block;width:23px;height:23px;stroke:currentColor}.drawer-icon svg{width:21px;height:21px}.section-icon,.drawer-icon{line-height:1}.section-icon svg path,.section-icon svg circle,.section-icon svg rect,.drawer-icon svg path,.drawer-icon svg circle,.drawer-icon svg rect{vector-effect:non-scaling-stroke}
