@@ -52,17 +52,37 @@
     }
   };
 
+  window.BAYAN_IMAGE_RETRY = async (img) => {
+    if (!img) return;
+    const showFallback = () => {
+      img.onerror = null;
+      img.style.display = "none";
+      const fallback = document.createElement("div");
+      fallback.className = "image-placeholder";
+      fallback.textContent = "BAYAN";
+      img.insertAdjacentElement("afterend", fallback);
+    };
+    if (img.dataset.retrying === "1") { showFallback(); return; }
+    img.dataset.retrying = "1";
+    try {
+      const query = img.dataset.imageQuery || img.alt || "";
+      const data = await api("/api/image?q=" + encodeURIComponent(query), {timeoutMs:12000});
+      if (data?.imageUrl && data.imageUrl !== img.src) { img.src = data.imageUrl; return; }
+    } catch {}
+    showFallback();
+  };
+
   const link = (url, label, cls = "") =>
     '<a class="' + cls + '" href="' + url + '">' + label + "</a>";
 
   const imageHtml = (item, className = "article-card-image") =>
     item.imageUrl
-      ? '<img loading="lazy" class="' + className + '" src="' + escapeHtml(item.imageUrl) + '" alt="' + escapeHtml(item.imageAlt || item.title || "") + '" onerror="this.onerror=null;this.style.display=\'none\';this.insertAdjacentHTML(\'afterend\',\'<div class=&quot;image-placeholder&quot;>BAYAN</div>\')">'
+      ? '<img loading="lazy" class="' + className + '" src="' + escapeHtml(item.imageUrl) + '" alt="' + escapeHtml(item.imageAlt || item.title || "") + '" data-image-query="' + escapeHtml(String(item.title || "") + " " + String(item.summary || "")) + '" onerror="window.BAYAN_IMAGE_RETRY(this)">'
       : '<div class="image-placeholder">BAYAN</div>';
 
   const heroImageHtml = (url, alt) =>
     '<img class="article-hero-image" src="' + escapeHtml(url) + '" alt="' + escapeHtml(alt || "") +
-    '" onerror="this.onerror=null;this.style.display=\'none\';this.insertAdjacentHTML(\'afterend\',\'<div class=&quot;image-placeholder&quot;>BAYAN</div>\')">';
+    '" data-image-query="' + escapeHtml(alt || "") + '" onerror="window.BAYAN_IMAGE_RETRY(this)">';
 
   const articleCard = (item) => {
     const sectionMeta = sections.find((section) => section[0] === item.section);
