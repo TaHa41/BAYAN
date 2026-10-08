@@ -2,15 +2,15 @@ import type{Article,Env,Locale}from"./types";import{now}from"./config";export as
 export async function analyticsStats(env:Env){
   const day=new Date(Date.now()-86400000).toISOString(),week=new Date(Date.now()-604800000).toISOString(),month=new Date(Date.now()-2592000000).toISOString();
   const r=await env.DB.batch([
-    env.DB.prepare("SELECT COUNT(*) AS total FROM analytics"),
-    env.DB.prepare("SELECT COUNT(DISTINCT visitor_hash) AS unique_visitors FROM analytics"),
-    env.DB.prepare("SELECT COUNT(*) AS total FROM analytics WHERE created_at>=?").bind(day),
-    env.DB.prepare("SELECT COUNT(DISTINCT visitor_hash) AS unique_visitors FROM analytics WHERE created_at>=?").bind(day),
+    env.DB.prepare("SELECT COUNT(*) AS total FROM analytics WHERE event='page'"),
+    env.DB.prepare("SELECT COUNT(DISTINCT visitor_hash) AS unique_visitors FROM analytics WHERE event='page'"),
+    env.DB.prepare("SELECT COUNT(*) AS total FROM analytics WHERE event='page' AND created_at>=?").bind(day),
+    env.DB.prepare("SELECT COUNT(DISTINCT visitor_hash) AS unique_visitors FROM analytics WHERE event='page' AND created_at>=?").bind(day),
     env.DB.prepare("SELECT COUNT(*) AS total FROM analytics WHERE created_at>=?").bind(week),
     env.DB.prepare("SELECT COUNT(DISTINCT visitor_hash) AS unique_visitors FROM analytics WHERE created_at>=?").bind(week),
     env.DB.prepare("SELECT COUNT(*) AS total FROM analytics WHERE created_at>=?").bind(month),
     env.DB.prepare("SELECT COUNT(DISTINCT visitor_hash) AS unique_visitors FROM analytics WHERE created_at>=?").bind(month),
-    env.DB.prepare("SELECT path,COUNT(*) AS visits FROM analytics WHERE created_at>=? GROUP BY path ORDER BY visits DESC LIMIT 15").bind(month),
+    env.DB.prepare("SELECT path,COUNT(*) AS visits FROM analytics WHERE event='page' AND created_at>=? GROUP BY path ORDER BY visits DESC LIMIT 15").bind(month),
     env.DB.prepare("SELECT event,COUNT(*) AS count FROM analytics WHERE created_at>=? GROUP BY event ORDER BY count DESC LIMIT 15").bind(month),
     env.DB.prepare("SELECT language,COUNT(*) AS count FROM analytics WHERE created_at>=? GROUP BY language ORDER BY count DESC").bind(month),
     env.DB.prepare("SELECT query,COUNT(*) AS count,MAX(created_at) AS last_seen FROM searches GROUP BY query ORDER BY count DESC,last_seen DESC LIMIT 15"),
