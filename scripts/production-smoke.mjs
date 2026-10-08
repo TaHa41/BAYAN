@@ -43,6 +43,7 @@ try{
   if(!Array.isArray(d.items)||d.items.length<3)throw new Error("news_too_few");
   if(d.items.some(x=>!/[\u0600-\u06ff]/.test(String(x.title||""))))throw new Error("arabic_news_contains_non_arabic_title");
   if(d.items.some(x=>/[A-Za-z]{5,}/.test(String(x.summary||""))&&!/[\u0600-\u06ff]/.test(String(x.summary||""))))throw new Error("arabic_news_contains_english_summary");
+  if(d.items.some(x=>!Date.parse(String(x.publishedAt||""))))throw new Error("arabic_news_missing_publication_date");
   if(d.items.filter(x=>x.imageUrl).length<Math.min(3,d.items.length))throw new Error("news_images_missing");
   const dates=d.items.map(x=>Date.parse(x.publishedAt||"")).filter(Number.isFinite);
   if(dates.length&&Math.max(...dates)<Date.now()-72*60*60*1000)throw new Error("news_is_stale");
