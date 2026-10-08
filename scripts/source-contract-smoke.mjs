@@ -36,7 +36,8 @@ const checks = [
   ["admin exposes content quality metrics", read("src/db.ts").includes("length(trim(body))<500") && app.includes("analytics.contentQuality?.short_bodies")],
   ["top searches are isolated by language", read("src/db.ts").includes("FROM searches WHERE language=?") && api.includes("analyticsStats(env,lang)")],
   ["self-healing checks news and image health before reporting success", repair.includes('["news_cache",async()=>await newsCacheHealthy(env)]') && repair.includes('["images",async()=>') && repair.includes("newsHealthy&&imagesHealthy")],
-  ["self-healing alerts are deduplicated", repair.includes("Date.now()-previousTime<30*60*1000") && repair.includes("if(shouldNotify)await notify")]
+  ["self-healing alerts are deduplicated", repair.includes("Date.now()-previousTime<30*60*1000") && repair.includes("if(shouldNotify)await notify")],
+  ["obsolete repair jobs resolve when core runtime checks pass", repair.includes('if(!failures.some((failure)=>["database","articles","sections"].includes(failure)))await resolveVerifiedLegacyJobs(env)')]
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
