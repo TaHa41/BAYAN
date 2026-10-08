@@ -107,6 +107,39 @@ async function pubmedSearch(q:string,language:Locale):Promise<Candidate[]>{
   }catch{return[]}
 }
 
+async function openAiWebSearch(env:Env,q:string,language:Locale):Promise<Candidate[]>{
+  if(!env.OPENAI_API_KEY)return[];
+  try{
+    const response=await fetch("https://api.openai.com/v1/responses",{
+      method:"POST",
+      headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},
+      signal:AbortSignal.timeout(18000),
+      body:JSON.stringify({
+        model:env.OPENAI_MODEL||"gpt-5-mini",
+        tools:[{type:"web_search"}],
+        instructions:language==="ar"
+          ?"ابحث على الويب عن مصادر حقيقية. أعد JSON فقط بالشكل {\"results\":[{\"title\":\"...\",\"summary\":\"...\",\"url\":\"...\"}]}. أجب بالعربية، ولا تخترع روابط. استخدم فقط روابط وجدتها أداة البحث، وفضّل الجهات الرسمية والجامعات والأبحاث ووكالات الأنباء المعروفة."
+          :"Search the web for real sources. Return JSON only in the shape {\"results\":[{\"title\":\"...\",\"summary\":\"...\",\"url\":\"...\"}]}. Use English and never invent URLs. Use only pages found by the web-search tool, preferring official institutions, universities, research, and reputable newsrooms.",
+        input:"Search query: "+q+". Return up to six distinct useful sources with concise source-specific summaries."
+      })
+    });
+    if(!response.ok)return[];
+    const data=await response.json<any>();
+    const output=String(data.output_text||"").trim();
+    const cited=new Map<string,string>();
+    for(const item of data.output||[])for(const part of item.content||[])for(const ann of part.annotations||[]){
+      if(ann.type==="url_citation"&&/^https:\/\//i.test(String(ann.url||"")))cited.set(String(ann.url),String(ann.title||""));
+    }
+    if(!cited.size)return[];
+    let parsed:any;
+    try{parsed=JSON.parse(output)}catch{return Array.from(cited.entries()).slice(0,5).map(([url,title])=>({title:cleanText(title||q),summary:cleanText(output).slice(0,1200),section:"world",kind:"web",evidence:"mixed",sources:[source(cleanText(title||q),"OpenAI Web Search",url)],url,score:66,provider:"OpenAI Web Search"})).filter(x=>x.title&&x.summary&&languageSafe(x,language));}
+    const rows=Array.isArray(parsed?.results)?parsed.results:[];
+    return rows.filter((x:any)=>x&&cited.has(String(x.url||""))).slice(0,6).map((x:any)=>{
+      const url=String(x.url),title=cleanText(x.title||cited.get(url)||q),summary=cleanText(x.summary||"").slice(0,1500);
+      return {title,summary,section:"world",kind:"web",evidence:"mixed",sources:[source(title,"OpenAI Web Search",url)],url,score:scoreSource("OpenAI Web Search",title,q)+8,provider:"OpenAI Web Search"};
+    }).filter((x:Candidate)=>x.title&&x.summary&&languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary));
+  }catch{return[]}
+}
 async function openAlex(q:string):Promise<Candidate[]>{
  try{const u="https://api.openalex.org/works?search="+encodeURIComponent(q)+"&per-page=5";const r=await timeout(u,4000);if(!r.ok)return[];const d=await r.json<any>();return(d.results||[]).map((x:any)=>({title:cleanText(x.title||""),summary:cleanText(x.abstract_inverted_index?Object.keys(x.abstract_inverted_index).slice(0,80).join(" "):x.primary_location?.source?.display_name||"Research work"),section:"science",kind:"web",evidence:"mixed",sources:[source(x.title||"Research work","OpenAlex",x.id)],url:x.id,score:64,provider:"OpenAlex"})).filter((x:any)=>x.title)}catch{return[]}
 }
@@ -209,6 +242,9 @@ if(!local.length && !wiki.length && !wd.length && !gd.length && !oa.length && !r
   if(candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)).length<2){const broadened=await safe(broadGdelt(q),[]);candidates.push(...broadened);}
   if(candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)).length<2){
     candidates.push(...await safe(expandedSearch(env,q,language),[]));
+  }
+  if(candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)).length<2){
+    candidates.push(...await safe(openAiWebSearch(env,q,language),[]));
   }
   const seen=new Set<string>();
   const results=candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)).sort((a,b)=>b.score-a.score).filter(x=>{
