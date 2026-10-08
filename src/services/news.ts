@@ -72,7 +72,12 @@ const readFeed = async (name: string, url: string): Promise<Story[]> => {
         }
         return "";
       };
-      const linkTag = item.match(/<link\b[^>]*href=["']([^"']+)["'][^>]*\/?>/i)?.[1] || "";
+      const atomLinks = [...item.matchAll(/<link\b([^>]*)\/?>/gi)].map((match) => ({
+        href: match[1].match(/\bhref=["']([^"']+)["']/i)?.[1] || "",
+        rel: match[1].match(/\brel=["']([^"']+)["']/i)?.[1] || "",
+      }));
+      const linkTag = (atomLinks.find((entry) => entry.rel === "alternate" && entry.href.startsWith("http")) ||
+        atomLinks.find((entry) => entry.href.startsWith("http")) || atomLinks[0])?.href || "";
       const link = tag("link") || linkTag;
       const rawDate = tag("pubDate", "dc:date", "published", "updated", "date", "lastBuildDate");
       const parsedDate = rawDate ? Date.parse(rawDate) : Number.NaN;
