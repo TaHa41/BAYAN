@@ -499,11 +499,18 @@
       '</span><h1>' + escapeHtml(ar ? section[1] : section[2]) + '</h1><p>' +
       escapeHtml(ar ? section[3] : section[4]) + '</p></div>' +
 
+      '<div class="wisdom-card"><p id="wisdom-text">' + t("المعلومة تصبح أقوى عندما نعرف مصدرها وسياقها.","Information becomes stronger when its source and context are clear.") + '</p></div>' +
       '<div id="section-content" class="article-grid"><div class="notice">' +
       t("جاري تحميل المواد…","Loading content…") + '</div></div></section>';
 
     const content = document.querySelector("#section-content");
     if (!content) return;
+
+    api("/api/wisdom?section=" + encodeURIComponent(slug) + "&lang=" + lang, { timeoutMs: 5000 })
+      .then((wd) => {
+        const el = document.querySelector("#wisdom-text");
+        if (el && wd?.wisdom) el.textContent = wd.wisdom;
+      }).catch(() => {});
 
     const loadContent = async () => {
       let data;
