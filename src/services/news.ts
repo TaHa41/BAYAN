@@ -328,7 +328,7 @@ export async function news(env: Env, lang: Locale) {
   });
 
   if (all.length < 3) {
-    const fallback = lang === "ar" ? await googleArabicFallback() : await googleEnglishFallback();
+    const fallback = (lang === "ar" ? await googleArabicFallback() : await googleEnglishFallback()).filter((story) => { if (!story.publishedAt) return true; const timestamp = Date.parse(story.publishedAt); return !Number.isFinite(timestamp) || Date.now() - timestamp <= 72 * 60 * 60 * 1000; });
     all = [...all, ...fallback];
   }
 
