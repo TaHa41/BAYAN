@@ -8,9 +8,9 @@ const timeout = async (url:string, ms=4500) => {
   try { return await fetch(url,{signal:c.signal,headers:{accept:"application/json,text/plain,*/*"}}); }
   finally { clearTimeout(t); }
 };
-const cleanText=(s:string)=>String(s||"").replace(/<[^>]+>/g," ").replace(/\\s+/g," ").trim();
+const cleanText=(s:string)=>String(s||"").replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim();
 const scoreSource=(publisher:string, title:string, q:string) => {
-  const p=publisher.toLowerCase(), t=title.toLowerCase(), terms=q.toLowerCase().split(/\\s+/).filter(x=>x.length>2);
+  const p=publisher.toLowerCase(), t=title.toLowerCase(), terms=q.toLowerCase().split(/\s+/).filter(x=>x.length>2);
   let score=0;
   if(/wikipedia|wikidata/.test(p))score+=72;
   if(/bbc|reuters|ap|associated press|france 24|dw|al jazeera|sky news/.test(p))score+=78;
@@ -70,22 +70,22 @@ async function googleNews(q:string,language:Locale):Promise<Candidate[]>{
     const hl=language==="ar"?"ar":"en",gl=language==="ar"?"EG":"US",ceid=language==="ar"?"EG:ar":"US:en";
     const u="https://news.google.com/rss/search?q="+encodeURIComponent(q)+"&hl="+hl+"&gl="+gl+"&ceid="+ceid;
     const r=await timeout(u,4500);if(!r.ok)return[];const xml=await r.text();
-    const decode=(v:string)=>cleanText(v.replace(/<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>/g,"$1").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'"));
-    return [...xml.matchAll(/<item>([\\s\\S]*?)<\\/item>/gi)].slice(0,10).map((m:any)=>{
-      const field=(name:string)=>decode(m[1].match(new RegExp("<"+name+"[^>]*>([\\\\s\\S]*?)<\\/"+name+">","i"))?.[1]||"");
+    const decode=(v:string)=>cleanText(v.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,"$1").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'"));
+    return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)].slice(0,10).map((m:any)=>{
+      const field=(name:string)=>decode(m[1].match(new RegExp("<"+name+"[^>]*>([\\s\S]*?)<\/"+name+">","i"))?.[1]||"");
       const title=field("title"),url=field("link"),pub=field("source")||"Google News";
       return {title,summary:field("description").slice(0,1200),section:"news",kind:"web",evidence:"mixed",sources:[source(title,pub,url)],url,score:scoreSource(pub,title,q)+4,provider:"Google News RSS"} as Candidate;
     }).filter((x:any)=>x.title&&x.url&&languageSafe(x,language));
   }catch{return[]}
 }
 async function broadGdelt(q:string):Promise<Candidate[]>{
-  const variants=[q,q.split(/\\s+/).slice(0,6).join(" "),q.split(/\\s+/).slice(0,3).join(" ")].filter(Boolean);
+  const variants=[q,q.split(/\s+/).slice(0,6).join(" "),q.split(/\s+/).slice(0,3).join(" ")].filter(Boolean);
   const all:Candidate[]=[];
   for(const v of variants){const x=await gdelt(v);all.push(...x);if(all.length>=8)break}
   return all;
 }
 async function settings(env:Env){try{const r=await env.DB.prepare("SELECT key,value FROM admin_settings").all<any>();return Object.fromEntries((r.results||[]).map((x:any)=>[x.key,x.value]))}catch{return{}}}
-const hasArabic=(value:string)=>/[\\u0600-\\u06ff]/.test(String(value||""));
+const hasArabic=(value:string)=>/[\u0600-\u06ff]/.test(String(value||""));
 const hasLatin=(value:string)=>/[A-Za-z]/.test(String(value||""));
 // Titles determine the result locale. Provider summaries often include foreign
 // names, attribution or translated metadata; drop a mismatched summary instead
@@ -101,13 +101,13 @@ const localizeCandidate=(x:Candidate,language:Locale):Candidate=>{
 };
 export async function search(env:Env,q:string,language:Locale):Promise<SearchResponse>{
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};let [local, wiki, wd, gd, oa, remote, dd, gn] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe(s.source_openalex==="0"?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[]),safe(googleNews(q,language),[])]);
-  if(![...local,...wiki,...wd,...gd,...oa,...remote,...dd,...gn].some(x=>languageSafe(x,language))){const variants=[q,q.split(/\\s+/).slice(0,7).join(" "),q.split(/\\s+/).slice(0,4).join(" ")].filter((v,i,a)=>v&&a.indexOf(v)===i);const retries=await Promise.all(variants.map(v=>safe(googleNews(v,language),[])));gn=[...gn,...retries.flat()].slice(0,30);if(![...local,...wiki,...wd,...gd,...oa,...remote,...dd,...gn].some(x=>languageSafe(x,language)))gd=[...gd,...await broadGdelt(q)];}
+  if(![...local,...wiki,...wd,...gd,...oa,...remote,...dd,...gn].some(x=>languageSafe(x,language))){const variants=[q,q.split(/\s+/).slice(0,7).join(" "),q.split(/\s+/).slice(0,4).join(" ")].filter((v,i,a)=>v&&a.indexOf(v)===i);const retries=await Promise.all(variants.map(v=>safe(googleNews(v,language),[])));gn=[...gn,...retries.flat()].slice(0,30);if(![...local,...wiki,...wd,...gd,...oa,...remote,...dd,...gn].some(x=>languageSafe(x,language)))gd=[...gd,...await broadGdelt(q)];}
   const providerAttempted=["BAYAN Knowledge Base","Wikipedia","Wikidata","GDELT","OpenAlex","Cloudflare AI Search","DuckDuckGo","Google News RSS"];const candidates:Candidate[]=[
     ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wd,...gd,...oa,...remote,...dd,...gn
   ].filter(x=>languageSafe(x,language)).map(x=>localizeCandidate(x,language));
   const seen=new Set<string>();
   const results=candidates.sort((a,b)=>b.score-a.score).filter(x=>{
-    const k=x.title.toLowerCase().replace(/\\W+/g," ")+"|"+x.summary.toLowerCase().slice(0,160);
+    const k=x.title.toLowerCase().replace(/\W+/g," ")+"|"+x.summary.toLowerCase().slice(0,160);
     if(seen.has(k))return false; seen.add(k); return true;
   }).slice(0,max).map(({score,provider,...x})=>x);
   const providers=[...new Set(candidates.map(x=>x.provider))];
