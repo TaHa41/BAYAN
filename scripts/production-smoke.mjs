@@ -48,6 +48,24 @@ try{
   const im=await get("/api/image?q=%D9%86%D8%AC%D9%8A%D8%A8%20%D9%85%D8%AD%D9%81%D9%88%D8%B8"); if(!JSON.parse(im.text).imageUrl)throw new Error("content_image_missing");
 }catch(e){console.error("IMAGE",e);bad++}
 try{
+  const a=await get("/api/article?slug=who-is-naguib-mahfouz-en&lang=en"); const ad=JSON.parse(a.text);
+  if(!ad.title||!ad.body||/[\u0600-\u06ff]/.test(String(ad.title))||/[\u0600-\u06ff]/.test(String(ad.body)))throw new Error("english_article_language_mismatch");
+}catch(e){console.error("ARTICLE_EN",e);bad++}
+try{
+  const ar=await fetch(origin+"/api/ask?lang=ar",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:"من هو نجيب محفوظ؟"})});
+  const d=await ar.json(); if(!ar.ok||!d.status||!d.answer)throw new Error("ask_ar_unavailable");
+  if(/[A-Za-z]{8,}/.test(String(d.answer))&&!/[\u0600-\u06ff]/.test(String(d.answer)))throw new Error("ask_ar_language_mismatch");
+}catch(e){console.error("ASK_AR",e);bad++}
+try{
+  const en=await fetch(origin+"/api/ask?lang=en",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:"Who was Naguib Mahfouz?"})});
+  const d=await en.json(); if(!en.ok||!d.status||!d.answer)throw new Error("ask_en_unavailable");
+  if(/[\u0600-\u06ff]/.test(String(d.answer)))throw new Error("ask_en_language_mismatch");
+}catch(e){console.error("ASK_EN",e);bad++}
+try{
+  const x=await fetch(origin+"/api/admin/ai-repair",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({problem:"production smoke authorization test"})});
+  if(x.status!==401)throw new Error("ai_repair_auth_not_enforced");
+}catch(e){console.error("AI_REPAIR_AUTH",e);bad++}
+try{
   const a=await get("/api/article?slug=who-is-naguib-mahfouz-ar&lang=ar"); const ad=JSON.parse(a.text);
   if(!ad.title||!ad.body)throw new Error("article_incomplete");
   if(!/[\u0600-\u06ff]/.test(String(ad.title)))throw new Error("arabic_article_missing");
