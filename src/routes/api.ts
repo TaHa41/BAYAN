@@ -57,7 +57,8 @@ if(u.pathname==="/api/admin/article/expand"&&request.method==="POST"){
     const url=String(source.url||"");
     const extracted=await bounded(sourceArticleText(url,language),4500).catch(()=>"");
     const description=String(source.summary||"")||await bounded(sourceDescription(url,language),2500).catch(()=>"");
-    const summary=extracted||(language==="ar"?/[\u0600-\u06ff]/.test(description):! /[\u0600-\u06ff]/.test(description)?description:"");
+    const descriptionMatches=language==="ar"?/[\u0600-\u06ff]/.test(description):! /[\u0600-\u06ff]/.test(description);
+    const summary=extracted||(descriptionMatches?description:"");
     return {title:String(source.title||row.title),summary,section:String(row.section||"world"),kind:"web",evidence:"mixed",sources:[source]} as any;
   }));
   const searchEvidence=discovered.filter((item:any)=>String(item.summary||"").trim().length>=120);
