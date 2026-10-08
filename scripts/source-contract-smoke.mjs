@@ -39,7 +39,11 @@ const checks = [
   ["self-healing alerts are deduplicated", repair.includes("Date.now()-previousTime<30*60*1000") && repair.includes("if(shouldNotify)await notify")],
   ["obsolete repair jobs resolve when core runtime checks pass", repair.includes('if(!failures.some((failure)=>["database","articles","sections"].includes(failure)))await resolveVerifiedLegacyJobs(env)')],
   ["article expansion is evidence-gated and review-only", api.includes('/api/admin/article/expand') && api.includes("DRAFT_REVIEW_REQUIRED") && api.includes('search(env,String(row.title),language,{publish:false})') && app.includes('id="edExpand"') && app.includes("draft.draft")],
-  ["news section uses live news and SEO reads the actual cache array", api.includes('if(section==="news"){const live=await news(env,lang)') && index.includes("const items=Array.isArray(cached)?cached") ]
+  ["news section uses live news and SEO reads the actual cache array", api.includes('if(section==="news"){const live=await news(env,lang)') && index.includes("const items=Array.isArray(cached)?cached") ],
+  ["news-cache health checks freshness and locale independently from optional imagery", repair.includes("if(fresh.length<3)return false;") && !repair.includes("fresh.filter((item:any)=>Boolean(item.imageUrl))")],
+  ["self-healing repairs missing article and cached-news images in bounded batches", repair.includes("LIMIT 12") && repair.includes("filledNews") && repair.includes("slice(0,4)")],
+  ["admin repair monitor exposes review states and verification details", app.includes('"REVIEW","REPAIRED"') && app.includes("x.verification") && app.includes("x.action||x.diagnosis")],
+  ["admin layout and icon containers have responsive design refinements", read("public/styles.css").includes(".admin-shortcuts{position:sticky") && read("public/styles.css").includes(".section-icon,.drawer-icon") && read("public/styles.css").includes("@media(max-width:700px)")]
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
