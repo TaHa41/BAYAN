@@ -14,12 +14,12 @@ for(const path of checks){try{await get(path)}catch(e){console.error(e);bad++}}
 try{
   const h=await get("/?lang=en");
   if(!/<html[^>]+lang="en"/.test(h.text))throw new Error("english_lang_missing");
-  if(!h.text.includes("app-20261008-01.js"))throw new Error("current_bundle_missing");
-  if(!h.text.includes("app-20261008-01.js?v=2026.10.08.07"))throw new Error("current_shell_bundle_version_missing");
+  if(!h.text.includes("app-20261009-01.js"))throw new Error("current_bundle_missing");
+  if(!h.text.includes("app-20261009-01.js?v=2026.10.09.01"))throw new Error("current_shell_bundle_version_missing");
   if(!h.text.includes("fallback-home")||!h.text.includes("Start searching")||h.text.includes("ابدأ البحث")||h.text.includes("??lang="))throw new Error("english_shell_fallback_not_localized");
 }catch(e){console.error("SHELL",e);bad++}
 try{
-  const js=await get("/app-20261008-01.js");
+  const js=await get("/app-20261009-01.js");
   bundleText=js.text;
   if(!js.text.includes('closest("#closeDrawer")'))throw new Error("drawer_close_handler_missing");
   if(js.text.includes("Daily wisdom")||js.text.includes("الحكمة اليومية"))throw new Error("obsolete_wisdom_content_present");
