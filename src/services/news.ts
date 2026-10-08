@@ -230,25 +230,55 @@ const wikipediaExactImage=async(query:string):Promise<string|undefined>=>{
 };
 
 export async function findRelatedImage(query: string): Promise<string | undefined> {
-  try {
-    if(/نجيب محفوظ|naguib mahfouz/i.test(query)){
-      return "https://commons.wikimedia.org/wiki/Special:FilePath/Naguib%20Mahfouz%20HR.jpg?width=1200";
-    }
-    const exact = await wikipediaExactImage(query);
-    if (exact) return exact;
-    const summaryImage = await wikipediaSummaryImage(query);
-    if (summaryImage) return summaryImage;
-    const firstVariant = query.trim().split(/[،,:-]/)[0].split(/\s+/).slice(0,6).join(" ").trim();
-    if (firstVariant && firstVariant !== query.trim()) {
-      const image = await wikipediaImage(firstVariant);
-      if (image) return image;
-    }
-    const searched = await wikipediaImage(query);
-    if (searched) return searched;
-    return await wikidataImage(query);
-  } catch {
-    return;
+  const cleanQuery = String(query || "").replace(/https?:\/\/\S+/g, " ").replace(/\s+/g, " ").trim().slice(0, 220);
+  if (!cleanQuery) return undefined;
+  if (/نجيب محفوظ|naguib mahfouz/i.test(cleanQuery)) {
+    return "https://commons.wikimedia.org/wiki/Special:FilePath/Naguib%20Mahfouz%20HR.jpg?width=1200";
   }
+
+  // One Commons search is cheaper and more useful for editorial subjects than
+  // making a long chain of Wikipedia/Wikidata requests for every missing image.
+  try {
+    const commonsUrl = "https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=" +
+      encodeURIComponent(cleanQuery) +
+      "&gsrnamespace=6&gsrlimit=6&prop=imageinfo&iiprop=url&iiurlwidth=1200&format=json&origin=*";
+    const response = await fetch(commonsUrl, {
+      signal: AbortSignal.timeout(3500),
+      headers: { accept: "application/json" },
+    });
+    if (response.ok) {
+      const data = await response.json<any>();
+      const pages = Object.values(data.query?.pages || {}) as any[];
+      const meaningful = terms(cleanQuery).filter((term) => term.length >= 4).slice(0, 8);
+      const ranked = pages.map((page) => {
+        const label = String(page.title || "").replace(/^File:/i, "").toLowerCase();
+        const matches = meaningful.filter((term) => label.includes(term)).length;
+        const url = String(page.imageinfo?.[0]?.thumburl || page.imageinfo?.[0]?.url || "");
+        return { url, matches };
+      }).filter((item) => item.url.startsWith("https://") && item.matches > 0)
+        .sort((a, b) => b.matches - a.matches);
+      if (ranked[0]?.url) return ranked[0].url;
+    }
+  } catch {}
+
+  // Single-locale exact lookup as a bounded fallback. Avoid a cascade of API
+  // calls that can exhaust the Workers Free subrequest budget during repair.
+  try {
+    const language = /[\u0600-\u06ff]/.test(cleanQuery) ? "ar" : "en";
+    const url = "https://" + language + ".wikipedia.org/w/api.php?action=query&prop=pageimages&piprop=thumbnail&pithumbsize=1200&titles=" +
+      encodeURIComponent(cleanQuery) + "&format=json&origin=*";
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(2500),
+      headers: { accept: "application/json" },
+    });
+    if (response.ok) {
+      const data = await response.json<any>();
+      const pages = Object.values(data.query?.pages || {}) as any[];
+      const image = pages.find((page) => page.thumbnail?.source)?.thumbnail?.source;
+      if (typeof image === "string" && image.startsWith("https://")) return image;
+    }
+  } catch {}
+  return undefined;
 }
 
 const hasArabic = (value: string) => /[\u0600-\u06ff]/.test(String(value || ""));
