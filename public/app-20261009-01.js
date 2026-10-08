@@ -38,7 +38,7 @@
     };
     return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+(paths[key]||paths.world)+'</svg>';
   };
-  const primarySections = sections.filter((section) => !["egypt","arab","world"].includes(section[0]));
+  const primarySections = sections; // The three former geographic buckets are now editorial categories and remain visible.
   const params = new URLSearchParams(location.search);
   const lang = params.get("lang") === "en" ? "en" : "ar";
   const ar = lang === "ar";
