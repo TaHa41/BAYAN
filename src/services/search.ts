@@ -191,7 +191,7 @@ if(!local.length && !wiki.length && !wd.length && !gd.length && !oa.length && !r
   ];
   // A provider can return results that are unusable for the requested language.
   // Retry broad GDELT variants when that happens instead of stopping because raw candidates existed.
-  if(!candidates.some(x=>languageSafe(x,language))){const broadened=await safe(broadGdelt(q),[]);candidates.push(...broadened);}
+  if(candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)).length<2){const broadened=await safe(broadGdelt(q),[]);candidates.push(...broadened);}
   const seen=new Set<string>();
   const results=candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)).sort((a,b)=>b.score-a.score).filter(x=>{
     const k=x.title.toLowerCase().replace(/\W+/g," ")+"|"+x.summary.toLowerCase().slice(0,160);
