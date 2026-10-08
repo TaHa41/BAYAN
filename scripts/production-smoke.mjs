@@ -2,6 +2,7 @@ const origin=process.env.BAYAN_ORIGIN||"https://bayan.tahaomar411.workers.dev";
 const checks=["/","/saved?lang=ar","/tools?lang=ar","/about?lang=ar","/methodology?lang=ar","/privacy?lang=ar","/terms?lang=ar","/api/health","/api/features","/api/live/weather","/api/live/fx","/api/live/gold","/news?lang=ar","/news?lang=en","/prices?lang=ar","/art?lang=ar","/trends?lang=ar","/robots.txt","/sitemap.xml","/news-sitemap.xml"];
 const sections=["science","technology","economy","politics","health","history","people","sports","travel","art","news","trends","prices","egypt","arab","world"];
 let bad=0;
+let bundleText="";
 async function get(path){
   const r=await fetch(origin+path,{redirect:"manual",headers:{accept:"application/json,text/plain,*/*"}});
   const text=await r.text();
@@ -19,7 +20,8 @@ try{
 }catch(e){console.error("SHELL",e);bad++}
 try{
   const js=await get("/app-20261008-01.js");
-  if(!js.text.includes("drawer.querySelectorAll"))throw new Error("drawer_close_handler_missing");
+  bundleText=js.text;
+  if(!js.text.includes('closest("#closeDrawer")'))throw new Error("drawer_close_handler_missing");
   if(js.text.includes("Daily wisdom")||js.text.includes("الحكمة اليومية"))throw new Error("obsolete_wisdom_content_present");
   if(!js.text.includes("home-news")||!js.text.includes("home-featured"))throw new Error("homepage_content_sections_missing");
   if(!js.text.includes("section-retry")||!js.text.includes("timeoutMs: 8000"))throw new Error("section_resilience_missing");
@@ -29,7 +31,7 @@ try{
 }catch(e){console.error("BUNDLE",e);bad++}
 try{
   const w=await get("/api/wisdom?section=arab&lang=ar"); const wd=JSON.parse(w.text); if(!wd.wisdom||!/[\u0600-\u06ff]/.test(String(wd.wisdom)))throw new Error("wisdom_missing");
-  if(!js.text.includes("const wisdomTimer = setInterval"))throw new Error("wisdom_rotation_not_enabled");
+  if(!bundleText.includes("const wisdomTimer = setInterval"))throw new Error("wisdom_rotation_not_enabled");
   const n=await get("/api/news?lang=ar"); const d=JSON.parse(n.text);
   if(!Array.isArray(d.items)||d.items.length<3)throw new Error("news_too_few");
   if(d.items.filter(x=>x.imageUrl).length<Math.min(3,d.items.length))throw new Error("news_images_missing");
