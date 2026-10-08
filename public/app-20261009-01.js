@@ -108,7 +108,7 @@
   const articleCard = (item) => {
     const sectionMeta = sections.find((section) => section[0] === item.section);
     const sectionLabel = sectionMeta ? (ar ? sectionMeta[1] : sectionMeta[2]) : t("مادة معرفية","Knowledge item");
-    const href = item.slug ? "/article/" + encodeURIComponent(item.slug) + "?lang=" + lang : "/search?q=" + encodeURIComponent(item.title || "") + "&lang=" + lang;
+    const href = item.href || (item.slug ? "/article/" + encodeURIComponent(item.slug) + "?lang=" + lang : "/search?q=" + encodeURIComponent(item.title || "") + "&lang=" + lang);
     const body = imageHtml(item) +
       '<div class="article-card-body"><span class="kicker">' + escapeHtml(sectionLabel) + "</span>" +
       "<h3>" + escapeHtml(item.title) + "</h3><p>" + escapeHtml(item.summary || "") + '</p><span class="read">' +
@@ -423,13 +423,15 @@
         return;
       }
       output.innerHTML = items.length
-        ? items.map((item) =>
-          '<a class="article-card" href="/news?story=' + encodeURIComponent(item.title) + '&lang=' + lang + '">' +
+        ? items.map((item) => {
+          const href="/news?story="+encodeURIComponent(item.title)+"&lang="+lang;
+          return '<article class="article-card"><a class="article-card-link" href="'+href+'">' +
           imageHtml(item) + '<div class="article-card-body"><span class="kicker">' +
           escapeHtml(item.publisher || t("مصدر إخباري","News")) + "</span><h2>" + escapeHtml(item.title) +
           "</h2><p>" + escapeHtml(item.summary) + '</p><div class="source-line">' +
           escapeHtml(formatDate(item.publishedAt)) + '</div><span class="read">' +
-          t("اقرأ داخل بيان","Read inside BAYAN") + " →</span></div></a>").join("")
+          t("اقرأ داخل بيان","Read inside BAYAN") + " →</span></div></a>" + socialActions({...item, href, _key:"news:"+item.title}) + "</article>";
+        }).join("")
         : '<div class="notice">' + t("لم يرجع أي مزود أخبار مادة الآن. لن نعرض أخبارًا مختلقة.",
           "No news provider returned a story right now. BAYAN will not invent news.") + "</div>";
       if (items.length) hydrateSectionImages(items);
@@ -607,7 +609,7 @@
   function getSavedItems() { return readList(SAVED_KEY); }
   function socialActions(item) {
     const key=itemKey(item), saved=getSavedItems().some(x=>itemKey(x)===key), likes=readList(LIKES_KEY), liked=likes.some(x=>x.key===key), count=Number((likes.find(x=>x.key===key)||{}).count||0);
-    const payload={title:String(item.title||""),summary:String(item.summary||""),section:String(item.section||"world"),slug:String(item.slug||""),sources:Array.isArray(item.sources)?item.sources:[],url:String(item.url||""),imageUrl:String(item.imageUrl||""),_key:key,_lang:lang};
+    const payload={title:String(item.title||""),summary:String(item.summary||""),section:String(item.section||"world"),slug:String(item.slug||""),sources:Array.isArray(item.sources)?item.sources:[],url:String(item.url||""),href:String(item.href||""),imageUrl:String(item.imageUrl||""),_key:key,_lang:lang};
     const encoded=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
     return '<div class="social-actions" data-item="'+encoded+'"><button type="button" class="social-btn" data-social="save" aria-pressed="'+saved+'">'+(saved?"✓ ":"＋ ")+t("حفظ","Save")+'</button><button type="button" class="social-btn" data-social="share">↗ '+t("مشاركة","Share")+'</button><button type="button" class="social-btn" data-social="like" aria-pressed="'+liked+'">'+(liked?"♥":"♡")+' '+t("إعجاب","Like")+' <span class="like-count">'+count+'</span></button></div>';
   }
@@ -635,7 +637,7 @@
       return;
     }
     if(action==="share"){
-      const shareUrl=item.slug?new URL("/article/"+encodeURIComponent(item.slug)+"?lang="+lang,location.origin).href:new URL("/search?q="+encodeURIComponent(item.title||params.get("q")||"")+"&lang="+lang,location.origin).href;
+      const shareUrl=item.href?new URL(item.href,location.origin).href:(item.slug?new URL("/article/"+encodeURIComponent(item.slug)+"?lang="+lang,location.origin).href:new URL("/search?q="+encodeURIComponent(item.title||params.get("q")||"")+"&lang="+lang,location.origin).href);
       const shareData={title:item.title||"BAYAN | بيان",text:item.summary||item.title||"",url:shareUrl};
       try{if(navigator.share)await navigator.share(shareData);else if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(shareUrl);button.textContent=t("تم نسخ الرابط","Link copied");}else{window.prompt(t("انسخ رابط المشاركة","Copy share link"),shareUrl);}}catch{}
     }
