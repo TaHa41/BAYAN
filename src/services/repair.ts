@@ -12,7 +12,7 @@ async function newsCacheHealthy(env:Env){
       const localeMatch=language==="ar"?/[\u0600-\u06ff]/.test(title):!/[\u0600-\u06ff]/.test(title);
       return localeMatch&&Number.isFinite(date)&&date<=Date.now()+5*60*1000&&Date.now()-date<=72*60*60*1000;
     });
-    if(fresh.length<3||fresh.filter((item:any)=>Boolean(item.imageUrl)).length<3)return false;
+    if(fresh.length<3)return false;
   }
   return true;
 }
@@ -91,11 +91,25 @@ async function repairRuntime(env:Env,failures:string[]){
     if(missing.length)actions.push("missing section content: "+missing.join(", "));
   }catch{}
   if(failures.includes("images"))try{
-    const rows=await env.DB.prepare("SELECT id,title,summary FROM articles WHERE status='PUBLISHED' AND (image_url IS NULL OR trim(image_url)='') ORDER BY updated_at DESC LIMIT 6").all<any>();
-    let filled=0;
-    for(const row of rows.results||[])try{const url=await findRelatedImage(String(row.title)+" "+String(row.summary||""));if(url){await env.DB.prepare("UPDATE articles SET image_url=?,updated_at=? WHERE id=?").bind(url,now(),row.id).run();filled++}}catch{}
-    actions.push("image repair attempted for "+filled+" article(s)");
-  }catch{}
+    const rows=await env.DB.prepare("SELECT id,title,summary FROM articles WHERE status='PUBLISHED' AND (image_url IS NULL OR trim(image_url)='') ORDER BY updated_at DESC LIMIT 12").all<any>();
+    let filledArticles=0;
+    for(const row of rows.results||[])try{const url=await findRelatedImage(String(row.title)+" "+String(row.summary||""));if(url){await env.DB.prepare("UPDATE articles SET image_url=?,updated_at=? WHERE id=? AND (image_url IS NULL OR trim(image_url)='')").bind(url,now(),row.id).run();filledArticles++}}catch{}
+    let filledNews=0;
+    for(const language of ["ar","en"] as const)try{
+      const row=await env.DB.prepare("SELECT payload FROM news_cache WHERE language=? LIMIT 1").bind(language).first<any>();
+      if(!row?.payload)continue;
+      const parsed=JSON.parse(String(row.payload));
+      const items:any[]=Array.isArray(parsed)?parsed:(Array.isArray(parsed?.items)?parsed.items:[]);
+      let changed=false;
+      for(const item of items.filter((entry:any)=>!entry.imageUrl).slice(0,4)){
+        const url=await findRelatedImage(String(item.title||"")+" "+String(item.summary||""));
+        if(url){item.imageUrl=url;item.imageAlt=String(item.title||"");filledNews++;changed=true}
+      }
+      if(changed&&Array.isArray(parsed))await env.DB.prepare("UPDATE news_cache SET payload=?,updated_at=? WHERE language=?").bind(JSON.stringify(items.slice(0,40)),now(),language).run();
+      else if(changed&&parsed&&Array.isArray(parsed.items))await env.DB.prepare("UPDATE news_cache SET payload=?,updated_at=? WHERE language=?").bind(JSON.stringify({...parsed,items:items.slice(0,40)}),now(),language).run();
+    }catch{}
+    actions.push("image repair filled "+filledArticles+" article(s) and "+filledNews+" cached news image(s); attempted up to 12 articles and 4 stories per locale");
+  }catch{actions.push("image repair failed before completion; inspect runtime_events for database or image-provider errors")}
   return actions;
 }
 
