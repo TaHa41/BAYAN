@@ -127,6 +127,7 @@
       drawer.classList.contains("open") ? closeDrawer() : openDrawer();
     });
     drawer.querySelector("#closeDrawer")?.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); closeDrawer(); });
+    document.addEventListener("click", (event) => { const target = event.target instanceof Element ? event.target : null; if (drawer.classList.contains("open") && target && !drawer.contains(target) && !target.closest("#menu")) closeDrawer(); });
     drawer.addEventListener("click", (event) => {
       const target = event.target instanceof Element ? event.target : null;
       if (target?.closest("#closeDrawer")) { event.preventDefault(); closeDrawer(); return; }
