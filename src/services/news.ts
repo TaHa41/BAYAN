@@ -527,7 +527,7 @@ export async function news(env: Env, lang: Locale) {
     if (story.imageUrl || index >= 6) return story;
     const direct = await sourceImage(story.url);
     if (direct) return { ...story, imageUrl: direct };
-    const image = await wikipediaExactImage(story.title);
+    const image = await findRelatedImage(story.title);
     return image ? { ...story, imageUrl: image } : story;
   }));
   // Image lookup is enrichment only: an image-provider outage must never hide a valid story.
