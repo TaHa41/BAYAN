@@ -27,7 +27,7 @@ try{
   if(!js.text.includes("section-retry")||!js.text.includes("timeoutMs: 8000"))throw new Error("section_resilience_missing");
   if(!js.text.includes("async function renderNews()"))throw new Error("news_renderer_async_missing");
   if(!js.text.includes("search-answer"))throw new Error("search_answer_ui_missing");
-  if(!js.text.includes("const wisdomTimer = setInterval")||!js.text.includes("}, 30000)"))throw new Error("wisdom_rotation_not_30_seconds");
+  if(!bundleText.includes("const wisdomTimer = setInterval")||!js.text.includes("}, 30000)"))throw new Error("wisdom_rotation_not_30_seconds");
 }catch(e){console.error("BUNDLE",e);bad++}
 try{
   const w=await get("/api/wisdom?section=arab&lang=ar"); const wd=JSON.parse(w.text); if(!wd.wisdom||!/[\u0600-\u06ff]/.test(String(wd.wisdom)))throw new Error("wisdom_missing");
