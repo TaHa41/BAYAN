@@ -71,9 +71,9 @@ async function googleNews(q:string,language:Locale):Promise<Candidate[]>{
     const u="https://news.google.com/rss/search?q="+encodeURIComponent(q)+"&hl="+hl+"&gl="+gl+"&ceid="+ceid;
     const r=await timeout(u,4500);if(!r.ok)return[];
     const xml=await r.text();
-    const decode=(v:string)=>cleanText(v.replace(/<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>/g,"$1").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'"));
+    const decode=(v:string)=>cleanText(v.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,"$1").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'"));
     const field=(item:string,name:string)=>decode(item.match(new RegExp("<"+name+"(?:\\s[^>]*)?>([\\s\\S]*?)</"+name+">","i"))?.[1]||"");
-    return [...xml.matchAll(/<item(?:\\s[^>]*)?>([\\s\\S]*?)<\\/item>/gi)].slice(0,10).map((m:any)=>{
+    return [...xml.matchAll(/<item(?:\s[^>]*)?>([\s\S]*?)<\/item>/gi)].slice(0,10).map((m:any)=>{
       const title=field(m[1],"title"),url=field(m[1],"link"),publisher=field(m[1],"source")||"Google News";
       return {title,summary:field(m[1],"description").slice(0,1200),section:"news",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+4,provider:"Google News RSS"} as Candidate;
     }).filter((x:any)=>x.title&&x.url&&languageSafe(x,language));
@@ -131,7 +131,7 @@ const localizeCandidate=(x:Candidate,language:Locale):Candidate=>{
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};let [local, wiki, wd, gd, oa, remote, dd, gn] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe(s.source_openalex==="0"?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[]),safe(googleNews(q,language),[])]);
   const hasLocaleResults=()=>[...local,...wiki,...wd,...gd,...oa,...remote,...dd,...gn].some(x=>languageSafe(x,language));
   if(!hasLocaleResults()){
-    const variants=[q,q.split(/\\s+/).slice(0,7).join(" "),q.split(/\\s+/).slice(0,4).join(" ")].filter((v,i,a)=>v&&a.indexOf(v)===i);
+    const variants=[q,q.split(/\s+/).slice(0,7).join(" "),q.split(/\s+/).slice(0,4).join(" ")].filter((v,i,a)=>v&&a.indexOf(v)===i);
     const retries=await Promise.all(variants.map(v=>safe(googleNews(v,language),[])));
     gn=[...gn,...retries.flat()].slice(0,30);
     if(!hasLocaleResults())gd=[...gd,...await broadGdelt(q)];
