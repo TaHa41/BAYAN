@@ -132,7 +132,7 @@ async function openAiWebSearch(env:Env,q:string,language:Locale):Promise<Candida
     }
     if(!cited.size)return[];
     let parsed:any;
-    try{parsed=JSON.parse(output)}catch{return Array.from(cited.entries()).slice(0,5).map(([url,title])=>({title:cleanText(title||q),summary:cleanText(output).slice(0,1200),section:"world",kind:"web",evidence:"mixed",sources:[source(cleanText(title||q),new URL(url).hostname.replace(/^www\./i,""),url)],url,score:66,provider:"OpenAI Web Search"})).filter(x=>x.title&&x.summary&&languageSafe(x,language));}
+    try{parsed=JSON.parse(output)}catch{return Array.from(cited.entries()).slice(0,5).map(([url,title])=>({title:cleanText(title||q),summary:cleanText(output).slice(0,1200),section:"world",kind:"web" as const,evidence:"mixed" as const,sources:[source(cleanText(title||q),new URL(url).hostname.replace(/^www\./i,""),url)],url,score:66,provider:"OpenAI Web Search"})).filter(x=>x.title&&x.summary&&languageSafe(x,language));}
     const rows=Array.isArray(parsed?.results)?parsed.results:[];
     return rows.filter((x:any)=>x&&cited.has(String(x.url||""))).slice(0,6).map((x:any)=>{
       const url=String(x.url),title=cleanText(x.title||cited.get(url)||q),summary=cleanText(x.summary||"").slice(0,1500);
