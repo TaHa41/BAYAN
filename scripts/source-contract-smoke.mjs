@@ -5,6 +5,7 @@ const wisdom = read("src/wisdom.ts");
 const app = read("public/app-20261009-01.js");
 const index = read("src/index.ts");
 const api = read("src/routes/api.ts");
+const search = read("src/services/search.ts");
 const checks = [
   ["news fallback does not invent publication time", !news.includes("publishedAt:new Date().toISOString()") && news.includes("const publishedAt = dateMatch")],
   ["freshness filter runs after fallback providers", news.indexOf("// Apply freshness checks after every fallback too.") > news.indexOf("directNewsPageFallback(lang)") && news.indexOf("// Apply freshness checks after every fallback too.") < news.indexOf("all.sort(")],
@@ -25,7 +26,8 @@ const checks = [
   ["RSS image metadata includes embedded thumbnails", news.includes("item.match(/<img\\b[^>]+src=")],
   ["page view metrics exclude non-page events", read("src/db.ts").includes("event='page' AND created_at>=?")],
   ["admin has authenticated Telegram test route", api.includes('/api/admin/telegram-test') && api.includes("telegram_delivery_failed")],
-  ["news article evidence and generation have bounded fallbacks", api.includes("bounded(search(env,title,lang),7000)") && api.includes("bounded(ask(env,title,lang,found.results),8000)") && api.includes("if(!found.results.length&&(summary||storyUrl))") && api.includes("sourceDescription(storyUrl,lang)")]
+  ["news article evidence and generation have bounded fallbacks", api.includes("bounded(search(env,title,lang),7000)") && api.includes("bounded(ask(env,title,lang,found.results),8000)") && api.includes("if(!found.results.length&&(summary||storyUrl))") && api.includes("sourceDescription(storyUrl,lang)")],
+  ["search keeps correctly localized titles when provider summaries use another language", search.includes("const localizeCandidate") && search.includes("return language===\"ar\" ? hasArabic(title) : !hasArabic(title)") && search.includes(".map(x=>localizeCandidate(x,language))")]
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
