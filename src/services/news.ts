@@ -293,6 +293,14 @@ const gdeltFallback = async (lang: Locale): Promise<Story[]> => {
   } catch { return []; }
 };
 
+const bingNewsFallback = async (lang: Locale): Promise<Story[]> => {
+  const queries = lang === "ar"
+    ? [["Bing News عربية","https://www.bing.com/news/search?q=%D8%A3%D8%AD%D8%AF%D8%AB+%D8%A7%D9%84%D8%A3%D8%AE%D8%A8%D8%A7%D8%B1&format=rss&setlang=ar"],["Bing News مصر","https://www.bing.com/news/search?q=%D9%85%D8%B5%D8%B1&format=rss&setlang=ar"]]
+    : [["Bing News","https://www.bing.com/news/search?q=latest+news&format=rss&setlang=en-us"],["Bing World News","https://www.bing.com/news/search?q=world+news&format=rss&setlang=en-us"]];
+  const batches = await Promise.all(queries.map(([name,url]) => readFeed(name,url)));
+  return batches.flat().filter(x => lang === "ar" ? hasArabic(x.title) : !hasArabic(x.title));
+};
+
 const aiSearchNews = async (env: Env, lang: Locale): Promise<Story[]> => {
   try {
     if (!env.AI_SEARCH) return [];
@@ -352,6 +360,10 @@ export async function news(env: Env, lang: Locale) {
   }
   if (all.length < 3) {
     const fallback = await aiSearchNews(env, lang);
+    all = [...all, ...fallback];
+  }
+  if (all.length < 3) {
+    const fallback = await bingNewsFallback(lang);
     all = [...all, ...fallback];
   }
 
