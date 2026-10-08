@@ -506,11 +506,19 @@
     const content = document.querySelector("#section-content");
     if (!content) return;
 
-    api("/api/wisdom?section=" + encodeURIComponent(slug) + "&lang=" + lang, { timeoutMs: 5000 })
+    const refreshWisdom = () => api("/api/wisdom?section=" + encodeURIComponent(slug) + "&lang=" + lang, { timeoutMs: 5000 })
       .then((wd) => {
         const el = document.querySelector("#wisdom-text");
         if (el && wd?.wisdom) el.textContent = wd.wisdom;
       }).catch(() => {});
+    refreshWisdom();
+    const wisdomTimer = setInterval(() => {
+      if (!document.querySelector("#wisdom-text")) {
+        clearInterval(wisdomTimer);
+        return;
+      }
+      refreshWisdom();
+    }, 30000);
 
     const loadContent = async () => {
       let data;
