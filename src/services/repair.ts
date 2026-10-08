@@ -56,6 +56,7 @@ async function repairRuntime(env:Env,failures:string[]){
     actions.push("admin settings verified")
   }catch{}
   actions.push(...await repairTaxonomy(env));
+  if(failures.includes("search"))actions.push("Recent search API failures detected; provider diagnosis and manual/deployment review required. Search is not marked repaired by database checks.");
   if(failures.includes("articles"))try{
     const row=await env.DB.prepare("SELECT COUNT(*) count FROM articles WHERE status='PUBLISHED'").first<any>();
     if(Number(row?.count||0)===0)actions.push("no published articles; deployment/content seed review required");
@@ -88,7 +89,8 @@ export async function selfHeal(env:Env){
     ["sections",async()=>{return (await sectionHealth(env)).length===0}],
     ["contributions",async()=>{await env.DB.prepare("SELECT 1 FROM contributions LIMIT 1").first();return true}],
     ["repair_state",async()=>{await env.DB.prepare("SELECT 1 FROM repair_jobs LIMIT 1").first();return true}],
-    ["settings",async()=>{await env.DB.prepare("SELECT key FROM admin_settings LIMIT 1").first();return true}]
+    ["settings",async()=>{await env.DB.prepare("SELECT key FROM admin_settings LIMIT 1").first();return true}],
+    ["search",async()=>{const row=await env.DB.prepare("SELECT COUNT(*) count FROM runtime_events WHERE kind='search_api_failed' AND created_at>=?").bind(new Date(Date.now()-60*60*1000).toISOString()).first<any>();return Number(row?.count||0)===0}]
   ];
   const failures:string[]=[];
   for(const[c,fn]of checks)try{if(!(await fn())){failures.push(c);await record(env,"error","health",c+" check failed")}}catch(e){failures.push(c);await record(env,"error","health",c+" failed: "+String(e))}
@@ -100,7 +102,7 @@ export async function selfHeal(env:Env){
     const db=await env.DB.prepare("SELECT 1").first();
     const article=await env.DB.prepare("SELECT COUNT(*) count FROM articles WHERE status='PUBLISHED'").first<any>();
     const missing=await sectionHealth(env);
-    verification=db&&Number(article?.count||0)>0&&missing.length===0?"verified_runtime":"needs_deployment_or_manual_review";
+    verification=db&&Number(article?.count||0)>0&&missing.length===0&&!failures.includes("search")?"verified_runtime":"needs_deployment_or_manual_review";
   }catch{verification="verification_failed"}
   const signature=failures.join(",");
   try{await env.DB.prepare("INSERT INTO repair_jobs(signature,status,diagnosis,action,verification,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(signature) DO UPDATE SET status=excluded.status,diagnosis=excluded.diagnosis,action=excluded.action,verification=excluded.verification,updated_at=excluded.updated_at").bind(signature,verification==="verified_runtime"?"REPAIRED":"REVIEW",diagnosis,actions.join("; ")||"No safe runtime action available",verification,now(),now()).run()}catch{}
