@@ -68,11 +68,11 @@ async function bingNewsSearch(q:string,language:Locale):Promise<Candidate[]>{
     const url="https://www.bing.com/news/search?q="+encodeURIComponent(q)+"&format=rss&setlang="+setlang;
     const response=await timeout(url,4500);if(!response.ok)return[];
     const xml=await response.text();const out:Candidate[]=[];
-    for(const match of xml.matchAll(/<item\\b[^>]*>([\\s\\S]*?)<\\/item>/gi)){
+    for(const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
       const block=match[1];
-      const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\\\b[^>]*>([\\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
+      const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
       const title=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1200);
-      if(!title||!/^https:\\/\\//i.test(url))continue;
+      if(!title||!/^https:\/\//i.test(url))continue;
       const publisher=cleanText(field("source")||"Bing News");
       out.push({title,summary,section:"news",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+3,provider:"Bing News RSS"});
       if(out.length>=8)break;
