@@ -15,7 +15,7 @@ try{
   const h=await get("/?lang=en");
   if(!/<html[^>]+lang="en"/.test(h.text))throw new Error("english_lang_missing");
   if(!h.text.includes("app-20261008-01.js"))throw new Error("current_bundle_missing");
-  if(!h.text.includes("app-20261008-01.js?v=2026.10.08.05"))throw new Error("current_shell_bundle_version_missing");
+  if(!h.text.includes("app-20261008-01.js?v=2026.10.08.06"))throw new Error("current_shell_bundle_version_missing");
   if(!h.text.includes("fallback-home")||!h.text.includes("Start searching")||h.text.includes("ابدأ البحث")||h.text.includes("??lang="))throw new Error("english_shell_fallback_not_localized");
 }catch(e){console.error("SHELL",e);bad++}
 try{
