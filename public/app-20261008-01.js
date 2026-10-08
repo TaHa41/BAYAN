@@ -310,7 +310,11 @@
         output.className = "results";
         try {
           const articleData = await api("/api/news/article?title=" + encodeURIComponent(story.title) +
-            "&image=" + encodeURIComponent(story.imageUrl || "") + "&lang=" + lang);
+            "&image=" + encodeURIComponent(story.imageUrl || "") +
+            "&summary=" + encodeURIComponent(story.summary || "") +
+            "&url=" + encodeURIComponent(story.url || "") +
+            "&publisher=" + encodeURIComponent(story.publisher || "") +
+            "&publishedAt=" + encodeURIComponent(story.publishedAt || "") + "&lang=" + lang);
           const article = articleData.article;
           output.innerHTML =
             '<article class="article-full">' + (article.image ?
