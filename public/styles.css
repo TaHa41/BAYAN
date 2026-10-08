@@ -25,3 +25,23 @@ body.drawer-open{overflow:hidden}
 .section-grid .section-card{min-height:158px}
 .article-grid .article-card{min-width:0}
 @media(max-width:560px){.home-content{margin-top:48px}.live-card{min-height:190px;padding:22px}.page-head>p{font-size:16px}}
+
+/* BAYAN Control Center: clearer hierarchy, quick navigation and usable content filtering */
+.admin-page{max-width:1240px;margin-inline:auto}
+.admin-login{display:grid;grid-template-columns:minmax(180px,1fr) auto auto;gap:12px;align-items:center}
+.admin-login textarea{grid-column:1/-1;min-height:96px}
+.admin-shortcuts{position:sticky;top:78px;z-index:20;display:flex;gap:8px;overflow:auto;padding:12px;margin:18px 0;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 8px 28px #102a4310}
+.admin-shortcuts a{white-space:nowrap;text-decoration:none;font-weight:800;padding:9px 13px;border-radius:10px;background:var(--soft);color:var(--accent)}
+.admin-panel{scroll-margin-top:150px;margin-block:18px}
+.admin-grid .admin-card{min-width:0}
+.admin-filter{width:100%;margin:12px 0 16px}
+.admin-article-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:8px;padding:13px;border-bottom:1px solid var(--line)}
+.admin-article-row b{overflow-wrap:anywhere}
+.admin-article-row small{color:var(--muted)}
+.admin-article-row[hidden]{display:none}
+.admin-list>div{padding:10px 12px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.admin-list>div:last-child{border-bottom:0}
+.admin-page .admin-card{padding:clamp(16px,2.5vw,28px);margin-block:16px}
+.admin-page h2{margin-top:0}
+#closeDrawer{min-width:42px;min-height:42px;display:grid;place-items:center;font-size:24px;cursor:pointer;position:relative;z-index:2}
+@media(max-width:680px){.admin-login{grid-template-columns:1fr 1fr}.admin-login input,.admin-login textarea{grid-column:1/-1}.admin-login button{min-height:44px}.admin-article-row{grid-template-columns:1fr 1fr}.admin-article-row b,.admin-article-row small{grid-column:1/-1}.admin-shortcuts{top:64px}}
