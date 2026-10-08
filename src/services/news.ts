@@ -307,7 +307,7 @@ const directNewsPageFallback = async (lang: Locale): Promise<Story[]> => {
       for (const m of html.matchAll(re)) {
         const title = esc(m[2]);
         const href = String(m[1]||"").startsWith("http") ? String(m[1]) : new URL(String(m[1]),url).toString();
-        if (!title || title.length < 20 || title.length > 220 || !href.includes("/news/")) continue;
+        if (!title || title.length < 20 || title.length > 220 || !/\/news\/20\d{2}\//.test(href)) continue;
         if (lang === "ar" ? !hasArabic(title) : hasArabic(title)) continue;
         if (out.some(x => x.title.toLowerCase() === title.toLowerCase())) continue;
         out.push({title,summary:"",url:href,publisher:name,publishedAt:new Date().toISOString(),imageAlt:title});
