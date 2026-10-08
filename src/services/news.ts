@@ -266,6 +266,291 @@ const googleArabicFallback = async (): Promise<Story[]> => {
   return batches.flat().filter(x => hasArabic(x.title));
 };
 
+const aiSearchNews = async (env: Env, lang: Locale): Promise<Story[]> => {
+  try {
+    if (!env.AI_SEARCH) return [];
+    const instance = env.AI_SEARCH.get(env.BAYAN_AI_SEARCH_INSTANCE || "default");
+    const query = lang === "ar" ? "أحدث الأخبار اليوم الآن أخبار عاجلة" : "latest breaking news today current events";
+    const r = await instance.search({messages:[{role:"user",content:query}]});
+    const chunks = Array.isArray((r as any)?.chunks) ? (r as any).chunks : [];
+    return chunks.slice(0,12).map((x:any) => ({
+      title: esc(String(x.title || x.filename || "")),
+      summary: esc(String(x.content || x.text || "")).slice(0,1000),
+      url: String(x.url || ""),
+      publisher: esc(String(x.metadata?.publisher || x.metadata?.source || "BAYAN AI Search")),
+      publishedAt: String(x.metadata?.publishedAt || x.metadata?.published_at || ""),
+      imageUrl: String(x.metadata?.imageUrl || x.metadata?.image_url || "") || undefined,
+      imageAlt: esc(String(x.title || "")),
+    })).filter((x:any) => x.title && x.url && (lang === "ar" ? hasArabic(x.title) : !hasArabic(x.title)));
+  } catch { return []; }
+};ort type { Env, Locale, Source } from "../types";
+
+type Story = {
+  title: string;
+  summary: string;
+  url: string;
+  publisher: string;
+  publishedAt?: string;
+  imageUrl?: string;
+  imageAlt?: string;
+};
+
+const feeds = (lang: Locale) =>
+  lang === "ar"
+    ? [
+        ["بي بي سي عربي", "https://feeds.bbci.co.uk/arabic/rss.xml"],
+        ["الجزيرة", "https://www.aljazeera.net/aljazeera/rss"],
+        ["DW عربية", "https://rss.dw.com/rdf/rss-ar-all"],
+        ["فرانس 24 عربي", "https://www.france24.com/ar/rss"],
+        ["سكاي نيوز عربية", "https://www.skynewsarabia.com/rss"],
+        ["اندبندنت عربية", "https://www.independentarabia.com/rss.xml"],
+        ["الشرق الأوسط", "https://aawsat.com/rss.xml"],
+        ["أخبار Google عربية", "https://news.google.com/rss?hl=ar&gl=EG&ceid=EG:ar"],
+        ["أخبار مصر", "https://news.google.com/rss/search?q=مصر&hl=ar&gl=EG&ceid=EG:ar"],
+        ["أخبار عربية", "https://news.google.com/rss/search?q=العالم%20العربي&hl=ar&gl=EG&ceid=EG:ar"],
+      ]
+    : [
+        ["BBC News", "https://feeds.bbci.co.uk/news/rss.xml"],
+        ["Reuters", "https://www.reuters.com/world/rss"],
+        ["Associated Press", "https://feeds.apnews.com/rss/apf-topnews"],
+        ["Al Jazeera English", "https://www.aljazeera.com/xml/rss/all.xml"],
+        ["DW English", "https://rss.dw.com/rdf/rss-en-all"],
+        ["France 24 English", "https://www.france24.com/en/rss"],
+        ["The Guardian", "https://www.theguardian.com/world/rss"],
+      ];
+
+const esc = (s: string) =>
+  s
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const readFeed = async (name: string, url: string): Promise<Story[]> => {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { accept: "application/rss+xml, application/xml, text/xml, */*", "user-agent": "BAYAN/1.1 (+https://bayan.tahaomar411.workers.dev)" },
+    });
+    clearTimeout(timer);
+    if (!response.ok) return [];
+
+    const xml = await response.text();
+    return [...xml.matchAll(/<item[\s\S]*?<\/item>/gi)]
+      .slice(0, 12)
+      .map((match) => {
+        const item = match[0];
+        const tag = (name: string) =>
+          esc(
+            item.match(
+              new RegExp("<" + name + "[^>]*>([\s\S]*?)</" + name + ">", "i"),
+            )?.[1] || "",
+          );
+        const imageUrl = item.match(
+          /<(?:media:content|media:thumbnail|enclosure)[^>]+url=["']([^"']+)["']/i,
+        )?.[1];
+
+        return {
+          title: tag("title"),
+          summary: tag("description").slice(0, 1000),
+          url: tag("link"),
+          publisher: tag("source") || name,
+          publishedAt: tag("pubDate"),
+          imageUrl,
+          imageAlt: tag("title"),
+        };
+      })
+      .filter((story) => story.title && story.url);
+  } catch {
+    return [];
+  }
+};
+
+const sourceImage = async (url: string): Promise<string | undefined> => {
+  try {
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(2500),
+      headers: { accept: "text/html" },
+    });
+    if (!response.ok) return;
+    const html = await response.text();
+
+    return (
+      html.match(
+        /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+      )?.[1] ||
+      html.match(
+        /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+      )?.[1]
+    );
+  } catch {
+    return;
+  }
+};
+
+const terms = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .split(/\s+/)
+    .filter((term) => term.length > 2);
+
+const wikidataImage = async (query: string): Promise<string | undefined> => {
+  try {
+    for (const language of ["ar", "en"]) {
+      const searchUrl =
+        "https://www.wikidata.org/w/api.php?action=wbsearchentities&search=" +
+        encodeURIComponent(query) +
+        "&language=" +
+        language +
+        "&limit=3&format=json&origin=*";
+      const searchResponse = await fetch(searchUrl, {
+        signal: AbortSignal.timeout(2500),
+        headers: { accept: "application/json" },
+      });
+      if (!searchResponse.ok) continue;
+      const searchData = await searchResponse.json<any>();
+      const ids = (searchData.search || []).map((x: any) => x.id).filter(Boolean).slice(0, 3);
+      if (!ids.length) continue;
+
+      const entityUrl =
+        "https://www.wikidata.org/w/api.php?action=wbgetentities&ids=" +
+        ids.join("|") +
+        "&props=claims&format=json&origin=*";
+      const entityResponse = await fetch(entityUrl, {
+        signal: AbortSignal.timeout(2500),
+        headers: { accept: "application/json" },
+      });
+      if (!entityResponse.ok) continue;
+      const entityData = await entityResponse.json<any>();
+
+      for (const id of ids) {
+        const filename =
+          entityData.entities?.[id]?.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
+        if (filename) {
+          return "https://commons.wikimedia.org/wiki/Special:Redirect/file/" + encodeURIComponent(filename);
+        }
+      }
+    }
+  } catch {}
+  return;
+};
+
+const wikipediaSummaryImage = async (query: string): Promise<string | undefined> => {
+  try {
+    const title = query.trim().replace(/\s+/g, "_");
+    const url = "https://ar.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(title);
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(2500),
+      headers: { accept: "application/json" },
+    });
+    if (!response.ok) return;
+    const data = await response.json<any>();
+    return data.thumbnail?.source || data.originalimage?.source;
+  } catch {
+    return;
+  }
+};
+
+const wikipediaImage = async (query: string): Promise<string | undefined> => {
+  try {
+    const url =
+      "https://ar.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=" +
+      encodeURIComponent(query) +
+      "&gsrlimit=2&prop=pageimages&piprop=thumbnail&pithumbsize=1200&format=json&origin=*";
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(2500),
+      headers: { accept: "application/json" },
+    });
+    if (!response.ok) return;
+    const data = await response.json<any>();
+    const pages = Object.values(data.query?.pages || {}) as any[];
+    return pages.find((page) => page.thumbnail?.source)?.thumbnail?.source;
+  } catch {
+    return;
+  }
+};
+
+const wikipediaExactImage=async(query:string):Promise<string|undefined>=>{
+  for(const lang of ["ar","en"]){
+    try{
+      const u="https://"+lang+".wikipedia.org/w/api.php?action=query&prop=pageimages&piprop=thumbnail&titles="+encodeURIComponent(query)+"&format=json&origin=*";
+      const r=await fetch(u,{signal:AbortSignal.timeout(2500),headers:{accept:"application/json"}});
+      if(!r.ok) continue;
+      const d=await r.json<any>();
+      const p=Object.values(d.query?.pages||{})[0] as any;
+      if(p?.thumbnail?.source) return p.thumbnail.source;
+    }catch{}
+  }
+};
+
+export async function findRelatedImage(query: string): Promise<string | undefined> {
+  try {
+    if(/نجيب محفوظ|naguib mahfouz/i.test(query)){
+      return "https://commons.wikimedia.org/wiki/Special:FilePath/Naguib%20Mahfouz%20HR.jpg?width=1200";
+    }
+    const exact = await wikipediaExactImage(query);
+    if (exact) return exact;
+    const firstVariant = query.trim().split(/[،,:-]/)[0].split(/\s+/).slice(0,6).join(" ").trim();
+    if (firstVariant && firstVariant !== query.trim()) {
+      const image = await wikipediaImage(firstVariant);
+      if (image) return image;
+    }
+    return await wikipediaImage(query);
+  } catch {
+    return;
+  }
+}
+
+const hasArabic = (value: string) => /[\u0600-\u06ff]/.test(String(value || ""));
+const languageSafeText = (value: string, lang: Locale) => !value || (lang === "ar" ? hasArabic(value) : !hasArabic(value));
+
+const readNewsCache = async (env: Env, lang: Locale): Promise<{items: Story[]; updatedAt?: string} | null> => {
+  try {
+    const row = await env.DB.prepare("SELECT payload,updated_at FROM news_cache WHERE language=? LIMIT 1").bind(lang).first<any>();
+    if (!row?.payload) return null;
+    const updatedAt = String(row.updated_at || "");
+    const age = updatedAt ? Date.now() - Date.parse(updatedAt) : Number.POSITIVE_INFINITY;
+    if (!Number.isFinite(age) || age > 72 * 60 * 60 * 1000) return null;
+    const items = JSON.parse(String(row.payload));
+    return Array.isArray(items) ? {items, updatedAt} : null;
+  } catch (error) {
+    try {
+      await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)")
+        .bind("WARN", "news_cache_read", String(error).slice(0, 500), new Date().toISOString()).run();
+    } catch {}
+    return null;
+  }
+};
+
+const writeNewsCache = async (env: Env, lang: Locale, items: Story[]) => {
+  try {
+    await env.DB.prepare(
+      "INSERT INTO news_cache(language,payload,updated_at) VALUES(?,?,?) ON CONFLICT(language) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at"
+    ).bind(lang, JSON.stringify(items.slice(0, 40)), new Date().toISOString()).run();
+  } catch (error) {
+    try {
+      await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)")
+        .bind("WARN", "news_cache_write", String(error).slice(0, 500), new Date().toISOString()).run();
+    } catch {}
+  }
+};
+const googleArabicFallback = async (): Promise<Story[]> => {
+  const feeds = [
+    ["أخبار Google عربية", "https://news.google.com/rss?hl=ar&gl=EG&ceid=EG:ar"],
+    ["أخبار مصر", "https://news.google.com/rss/search?q=مصر&hl=ar&gl=EG&ceid=EG:ar"],
+    ["أخبار عربية", "https://news.google.com/rss/search?q=العالم%20العربي&hl=ar&gl=EG&ceid=EG:ar"],
+  ] as [string,string][];
+  const batches = await Promise.all(feeds.map(([name,url]) => readFeed(name,url)));
+  return batches.flat().filter(x => hasArabic(x.title));
+};
+
 const googleEnglishFallback = async (): Promise<Story[]> => {
   const feeds = [
     ["Google News English", "https://news.google.com/rss?hl=en&gl=US&ceid=US:en"],
@@ -330,7 +615,7 @@ export async function news(env: Env, lang: Locale) {
   if (all.length < 3) {
     const fallback = (lang === "ar" ? await googleArabicFallback() : await googleEnglishFallback()).filter((story) => { if (!story.publishedAt) return true; const timestamp = Date.parse(story.publishedAt); return !Number.isFinite(timestamp) || Date.now() - timestamp <= 72 * 60 * 60 * 1000; });
     all = [...all, ...fallback];
-  }
+  }\n  if (all.length < 3) {\n    const fallback = (await aiSearchNews(env, lang)).filter((story) => { if (!story.publishedAt) return true; const timestamp = Date.parse(story.publishedAt); return !Number.isFinite(timestamp) || Date.now() - timestamp <= 72 * 60 * 60 * 1000; });\n    all = [...all, ...fallback];\n  }
 
   all.sort((a,b) => {
     const at = a.publishedAt ? Date.parse(a.publishedAt) : 0;
