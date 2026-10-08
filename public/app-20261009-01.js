@@ -512,6 +512,28 @@
     };
   }
 
+  async function renderPrayer() {
+    const requestedCity=new URLSearchParams(location.search).get("city")||"Hurghada";
+    const requestedCountry=new URLSearchParams(location.search).get("country")||"Egypt";
+    app.innerHTML='<section class="page narrow"><div class="page-head"><span class="eyebrow">'+t("العبادات والتقويم","Prayer & Islamic calendar")+'</span><h1>'+t("مواقيت الصلاة والمناسبات الإسلامية","Prayer times & Islamic occasions")+'</h1><p>'+t("مواقيت الصلاة حسب المدينة، مع التاريخ الهجري وتقديرات المناسبات القادمة. قد تختلف المواعيد حسب الجهة الرسمية والرؤية الشرعية.","Prayer times by city, Hijri date and estimated upcoming occasions. Official announcements and moon sighting may change dates.")+'</p></div><form id="prayerCityForm" class="weather-city-form"><label for="prayerCity">'+t("المدينة","City")+'</label><div class="weather-city-row"><input id="prayerCity" name="city" maxlength="100" value="'+escapeHtml(requestedCity)+'" required><input id="prayerCountry" name="country" maxlength="100" value="'+escapeHtml(requestedCountry)+'" placeholder="'+t("الدولة","Country")+'" required><button type="submit" class="btn primary">'+t("عرض المواقيت","Show times")+'</button></div><div class="weather-presets">'+[["الغردقة","Egypt"],["القاهرة","Egypt"],["الإسكندرية","Egypt"],["الأقصر","Egypt"],["الرياض","Saudi Arabia"],["مكة","Saudi Arabia"],["دبي","United Arab Emirates"]].map(x=>'<button type="button" class="weather-preset" data-prayer-city="'+escapeHtml(x[0])+'" data-prayer-country="'+escapeHtml(x[1])+'">'+escapeHtml(x[0])+'</button>').join("")+'</div></form><div id="prayerPanel"><div class="notice loading">'+t("جاري تحميل مواقيت الصلاة…","Loading prayer times…")+'</div></div><p class="muted">'+t("المصدر: AlAdhan. المواعيد المحسوبة تقديرية وقد تختلف باختلاف طريقة الحساب والجهة المحلية.","Source: AlAdhan. Calculated times are estimates and may vary by calculation method and local authority.")+'</p></section>';
+    const cityInput=document.querySelector("#prayerCity"),countryInput=document.querySelector("#prayerCountry");
+    async function loadPrayer(city,country){
+      const panel=document.querySelector("#prayerPanel");panel.innerHTML='<div class="notice loading">'+t("جاري تحميل مواقيت الصلاة…","Loading prayer times…")+'</div>';
+      try{
+        const d=await api("/api/live/prayer?city="+encodeURIComponent(city)+"&country="+encodeURIComponent(country));
+        if(!d.ok)throw new Error("unavailable");
+        const labels=[["Fajr",t("الفجر","Fajr")],["Sunrise",t("الشروق","Sunrise")],["Dhuhr",t("الظهر","Dhuhr")],["Asr",t("العصر","Asr")],["Maghrib",t("المغرب","Maghrib")],["Isha",t("العشاء","Isha")]];
+        const events=d.events||{};
+        const eventCard=(title,event,notice)=>'<article class="live live-card"><span class="kicker">'+title+'</span><h3>'+escapeHtml(event?.date||t("جارٍ الحساب","Calculating"))+'</h3><p>'+notice+'</p></article>';
+        panel.innerHTML='<div class="prayer-date"><span class="kicker">'+t("التاريخ الهجري","Hijri date")+'</span><h2>'+escapeHtml([d.hijri?.day,d.hijri?.monthAr||d.hijri?.month,d.hijri?.year].filter(Boolean).join(" "))+'</h2><p>'+escapeHtml([d.city,d.country,d.gregorian?.date].filter(Boolean).join(" · "))+'</p></div><div class="live-grid prayer-grid">'+labels.map(([key,label])=>'<article class="live live-card"><span class="kicker">'+label+'</span><h2>'+escapeHtml(d.timings?.[key]||"—")+'</h2></article>').join("")+'</div><h2 class="prayer-subtitle">'+t("المناسبات القادمة (تقديرية)","Upcoming occasions (estimated)")+'</h2><div class="live-grid">'+eventCard(t("بداية رمضان","Ramadan begins"),events.ramadan,t("موعد محسوب مبدئيًا؛ ينتظر الإعلان الرسمي.","Calculated estimate; awaiting official announcement."))+eventCard(t("عيد الفطر","Eid al-Fitr"),events.eidFitr,t("موعد العيد يتأكد بالرؤية والإعلان الرسمي.","Confirmed by moon sighting and official announcement."))+eventCard(t("عيد الأضحى","Eid al-Adha"),events.eidAdha,t("موعد العيد يتأكد بالرؤية والإعلان الرسمي.","Confirmed by moon sighting and official announcement."))+'</div><div class="notice">'+t("موعد صلاة العيد يعلنه محليًا المسجد أو الجهة الدينية المختصة؛ لا يعرض بيان ساعة غير مؤكدة.","Eid prayer time is announced locally by the mosque or religious authority; BAYAN does not display an unverified time.")+'</div>';
+        const url=new URL(location.href);url.searchParams.set("city",city);url.searchParams.set("country",country);history.replaceState(null,"",url.pathname+url.search);
+      }catch{panel.innerHTML='<div class="notice">'+t("تعذر تحميل المواقيت لهذه المدينة الآن. راجع كتابة المدينة والدولة وحاول مرة أخرى.","Could not load times for this city. Check the city and country and try again.")+'</div>'}
+    }
+    document.querySelector("#prayerCityForm").addEventListener("submit",e=>{e.preventDefault();if(cityInput.value.trim()&&countryInput.value.trim())loadPrayer(cityInput.value.trim(),countryInput.value.trim())});
+    document.querySelectorAll("[data-prayer-city]").forEach(button=>button.addEventListener("click",()=>{cityInput.value=button.getAttribute("data-prayer-city")||"";countryInput.value=button.getAttribute("data-prayer-country")||"Egypt";loadPrayer(cityInput.value,countryInput.value)}));
+    loadPrayer(requestedCity,requestedCountry);
+  }
+
   async function renderWeather() {
     const requestedCity=new URLSearchParams(location.search).get("city")||"Hurghada";
     app.innerHTML = '<section class="page narrow"><div class="page-head"><span class="eyebrow">'+t("بيانات مناخية مباشرة","Live weather data")+'</span><h1>'+t("الطقس","Weather")+'</h1><p>'+t("اختر أي مدينة لمشاهدة الطقس فيها؛ لا يقتصر بيان على القاهرة.","Choose a city to view its weather. BAYAN is not limited to Cairo.")+'</p></div><form id="weatherCityForm" class="weather-city-form"><label for="weatherCity">'+t("المدينة أو المنطقة","City or region")+'</label><div class="weather-city-row"><input id="weatherCity" name="city" maxlength="100" value="'+escapeHtml(requestedCity)+'" placeholder="'+t("مثال: الغردقة أو القاهرة أو London","e.g. Hurghada, Cairo or London")+'" required><button type="submit" class="btn primary">'+t("عرض الطقس","Show weather")+'</button></div><div class="weather-presets">'+["الغردقة","القاهرة","الإسكندرية","الأقصر","أسوان","الرياض","دبي","London","New York"].map((city)=>'<button type="button" class="weather-preset" data-city="'+escapeHtml(city)+'">'+escapeHtml(city)+'</button>').join("")+'</div></form><div id="weatherPanel" class="live-grid"><div class="notice loading">'+t("جاري تحديث الطقس…","Loading weather…")+'</div></div><p class="muted">'+t("المصدر: Open-Meteo. قد تتأخر البيانات أو تتعذر عند توقف المزود.","Source: Open-Meteo. Data may be delayed or unavailable if the provider is down.")+'</p><a class="navbtn" href="/prices?lang='+lang+'">'+t("العودة إلى الأسعار","Back to prices")+'</a></section>';
@@ -675,6 +697,7 @@
       ["/search?lang="+lang,t("البحث","Search"),t("ابحث في المعرفة والمصادر.","Search knowledge and sources.")],
       ["/ask?lang="+lang,t("اسأل بيان","Ask BAYAN"),t("اسأل سؤالًا واجمع الأدلة.","Ask a question and gather evidence.")],
       ["/prices?lang="+lang,t("البيانات الحية","Live Data"),t("الطقس والعملات والذهب.","Weather, FX and gold.")],
+      ["/prayer?lang="+lang,t("مواقيت الصلاة","Prayer Times"),t("مواقيت حسب المدينة والتقويم الهجري والمناسبات الإسلامية.","City-based prayer times, Hijri calendar and Islamic occasions.")],
       ["/contribute?lang="+lang,t("المساهمة","Contribute"),t("أرسل معلومة للمراجعة.","Submit information for review.")]
     ].map(x=>'<a class="section-card" href="'+x[0]+'"><div><h2>'+x[1]+'</h2><p>'+x[2]+'</p></div><b>↗</b></a>').join("")+'</div></section>';
   }
@@ -767,6 +790,7 @@
     if (path === "contribute") return renderContribute();
     if (path === "prices") return renderPrices();
     if (path === "weather") return renderWeather();
+    if (path === "prayer") return renderPrayer();
     if (path === "saved") return renderSaved();
     if (path === "tools") return renderTools();
     if (["about","methodology","privacy","terms"].includes(path)) return renderStatic(path);
