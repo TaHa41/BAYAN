@@ -629,11 +629,18 @@
       return;
     }
     if(action==="like"){
-      const likes=readList(LIKES_KEY),at=likes.findIndex(x=>x.key===key);
-      if(at>=0){likes[at].count=Math.max(0,Number(likes[at].count||0)-1);likes[at].liked=false;if(!likes[at].count)likes.splice(at,1);}
-      else likes.unshift({key,count:1,liked:true});
+      let likes=readList(LIKES_KEY),liked=false,count=0;
+      try {
+        const result=await api("/api/like",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({key})});
+        liked=!!result.liked;count=Number(result.count||0);
+      } catch {
+        const at=likes.findIndex(x=>x.key===key);liked=at<0;
+        if(liked){count=1;likes.unshift({key,count,liked:true});}else{likes=likes.filter(x=>x.key!==key);count=0;}
+      }
+      likes=likes.filter(x=>x.key!==key);
+      if(liked)likes.unshift({key,count,liked:true});
       safeStorage.set(LIKES_KEY,JSON.stringify(likes.slice(0,500)));
-      button.setAttribute("aria-pressed",String(at<0));button.innerHTML=(at<0?"♥":"♡")+' '+t("إعجاب","Like")+' <span class="like-count">'+(at<0?1:0)+'</span>';
+      button.setAttribute("aria-pressed",String(liked));button.innerHTML=(liked?"♥":"♡")+' '+t("إعجاب","Like")+' <span class="like-count">'+count+'</span>';
       return;
     }
     if(action==="share"){
