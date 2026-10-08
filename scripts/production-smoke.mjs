@@ -4,7 +4,7 @@ const sections=["science","technology","economy","politics","health","history","
 let bad=0;
 let bundleText="";
 async function get(path){
-  const r=await fetch(origin+path,{redirect:"manual",headers:{accept:"application/json,text/plain,*/*"}});
+  const r=await fetch(origin+path,{redirect:"manual",headers:{accept:"application/json,text/plain,*/*"},signal:AbortSignal.timeout(25000)});
   const text=await r.text();
   console.log(path,r.status,text.slice(0,220));
   if(!r.ok)throw new Error(path+" status "+r.status);
