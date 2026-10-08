@@ -59,8 +59,10 @@
     '" onerror="this.onerror=null;this.style.display=\'none\';this.insertAdjacentHTML(\'afterend\',\'<div class=&quot;image-placeholder&quot;>BAYAN</div>\')">';
 
   const articleCard = (item) => {
+    const sectionMeta = sections.find((section) => section[0] === item.section);
+    const sectionLabel = sectionMeta ? (ar ? sectionMeta[1] : sectionMeta[2]) : t("مادة معرفية","Knowledge item");
     const body = imageHtml(item) +
-      '<div class="article-card-body"><span class="kicker">' + escapeHtml(item.section || t("مادة","Content")) + "</span>" +
+      '<div class="article-card-body"><span class="kicker">' + escapeHtml(sectionLabel) + "</span>" +
       "<h3>" + escapeHtml(item.title) + "</h3><p>" + escapeHtml(item.summary || "") + '</p><span class="read">' +
       t(item.slug ? "اقرأ الملف" : "مصدر موثق", item.slug ? "Read the file" : "Verified source") + " →</span></div>";
     return item.slug ? '<a class="article-card" href="/article/' + encodeURIComponent(item.slug) + '?lang=' + lang + '">' + body + "</a>" : '<article class="article-card evidence-card">' + body + "</article>";
