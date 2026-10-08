@@ -17,7 +17,7 @@ export async function sitemap(env:Env){
     }));
   }catch{}
   const publicPaths=["/","/news","/about","/methodology","/privacy","/terms",...SECTIONS.map(x=>"/"+x[0])];
-  const localizedUrls=publicPaths.flatMap((path)=>["ar","en"].map((language)=>({url:ORIGIN+path+"?lang="+language})));
+  const localizedUrls:Array<{url:string;lastmod?:string}>=publicPaths.flatMap((path)=>["ar","en"].map((language)=>({url:ORIGIN+path+"?lang="+language})));
   const urls=[...new Map([...localizedUrls,...articleUrls].map((item)=>[item.url,item])).values()];
   return text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+urls.map((item)=>{
     const date=Date.parse(String(item.lastmod||""));
