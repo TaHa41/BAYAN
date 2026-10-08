@@ -243,7 +243,13 @@ export async function findRelatedImage(query: string): Promise<string | undefine
 }
 
 const hasArabic = (value: string) => /[\u0600-\u06ff]/.test(String(value || ""));
-const languageSafeText = (value: string, lang: Locale) => !value || (lang === "ar" ? hasArabic(value) : !hasArabic(value));
+const languageSafeText = (value: string, lang: Locale) => {
+  if (!value) return true;
+  if (lang === "en") return !hasArabic(value);
+  if (!hasArabic(value)) return false;
+  const sentences = value.split(/[\n.!؟?]+/).map((part) => part.trim()).filter(Boolean);
+  return sentences.every((part) => hasArabic(part) || !/[A-Za-z]{5,}/.test(part));
+};
 const localizedPublisher = (value: string, lang: Locale) => {
   const name = String(value || "").trim();
   const lower = name.toLowerCase();
