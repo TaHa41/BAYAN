@@ -9,7 +9,7 @@ const index = read("src/index.ts");
 const api = read("src/routes/api.ts");
 const checks = [
   ["news fallback does not invent publication time", !news.includes("publishedAt:new Date().toISOString()") && news.includes("const publishedAt = dateMatch")],
-  ["freshness filter runs after fallback providers", news.indexOf("// Apply freshness checks after every fallback too.") > news.indexOf("directNewsPageFallback(lang)") && news.indexOf("// Apply freshness checks after every fallback too.") < news.indexOf("all.sort(")],
+  ["news fallbacks run concurrently and freshness is rechecked", news.includes("const [google, gdelt, aiSearch, bing, direct] = await Promise.all") && news.lastIndexOf("all = all.filter(isFreshNews)") > news.indexOf("const [google, gdelt, aiSearch, bing, direct]")],
   ["wisdom endpoint rotates every 30 seconds", wisdom.includes("Date.now()/1000/30")],
   ["wisdom has dedicated news and arts entries", /news:\{ar:/.test(wisdom) && /art:\{ar:/.test(wisdom)],
   ["browser refreshes wisdom every 30 seconds", app.includes("const wisdomTimer = setInterval") && app.includes("}, 30000)")],
