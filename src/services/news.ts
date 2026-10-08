@@ -512,7 +512,7 @@ export async function news(env: Env, lang: Locale) {
   } else if (cached?.items?.length) {
     const seenTitles = new Set(finalStories.map((story) => story.title.trim().toLowerCase()));
     const languageSafeCache = cached.items.filter((story) =>
-      lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title)
+      (lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title)) && isFreshNews(story)
     ).map((story) => ({ ...story, publisher: localizedPublisher(story.publisher, lang), summary: languageSafeText(story.summary, lang) ? story.summary : "" }));
     const merged = [
       ...finalStories,
