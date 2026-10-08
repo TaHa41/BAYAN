@@ -67,9 +67,13 @@ const readFeed = async (name: string, url: string): Promise<Story[]> => {
               new RegExp("<" + name + "[^>]*>([\s\S]*?)</" + name + ">", "i"),
             )?.[1] || "",
           );
-        const imageUrl = item.match(
-          /<(?:media:content|media:thumbnail|enclosure)[^>]+url=["']([^"']+)["']/i,
-        )?.[1];
+        // RSS providers vary: some expose media:content/enclosure, while others
+        // embed the thumbnail only as an <img> inside description/content:encoded.
+        const imageUrl = (
+          item.match(/<(?:media:content|media:thumbnail|enclosure)[^>]+url=["']([^"']+)["']/i)?.[1] ||
+          item.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1] ||
+          item.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1]
+        )?.replace(/&amp;/g, "&");
 
         return {
           title: tag("title"),
@@ -446,9 +450,9 @@ export async function news(env: Env, lang: Locale) {
 
   const enriched = await Promise.all(unique.map(async (story, index) => {
     // Keep news requests safely below the Workers Free subrequest budget.
-    // RSS already supplies images for many publishers; only enrich the first
-    // four image-less stories and use a bounded Wikipedia lookup as fallback.
-    if (story.imageUrl || index >= 4) return story;
+    // Prioritize imagery for the stories visitors actually see first. RSS images
+    // are preferred; use the publisher's OpenGraph image, then a Wikimedia image.
+    if (story.imageUrl || index >= 6) return story;
     const direct = await sourceImage(story.url);
     if (direct) return { ...story, imageUrl: direct };
     const image = await wikipediaExactImage(story.title);
