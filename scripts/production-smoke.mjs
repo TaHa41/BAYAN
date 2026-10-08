@@ -21,6 +21,7 @@ try{
   bundlePath=bundleMatch[1].split("?")[0];
   bundleVersion=new URL(bundleMatch[1],"https://bayan.invalid").searchParams.get("v")||"";
   if(!bundleVersion)throw new Error("current_shell_bundle_version_missing");
+  if(bundleVersion!=="2026.10.09.11")throw new Error("stale_shell_bundle_version");
   if(!h.text.includes("fallback-home")||!h.text.includes("Start searching")||h.text.includes("ابدأ البحث")||h.text.includes("??lang="))throw new Error("english_shell_fallback_not_localized");
 }catch(e){console.error("SHELL",e);bad++}
 try{
@@ -33,7 +34,7 @@ try{
   if(!js.text.includes("async function renderNews()"))throw new Error("news_renderer_async_missing");
   if(!js.text.includes("search-answer"))throw new Error("search_answer_ui_missing");
   if(!js.text.includes("Match each image placeholder to its own card by title"))throw new Error("image_hydration_card_matching_missing");
-  if(!js.text.includes('onerror="this.onerror=null'))throw new Error("image_load_fallback_missing");
+  if(!js.text.includes('onerror="window.BAYAN_IMAGE_RETRY(this)"')||!js.text.includes("window.BAYAN_IMAGE_RETRY"))throw new Error("image_retry_fallback_missing");
   if(!bundleText.includes("const wisdomTimer = setInterval")||!js.text.includes("}, 30000)"))throw new Error("wisdom_rotation_not_30_seconds");
 }catch(e){console.error("BUNDLE",e);bad++}
 try{
@@ -91,7 +92,13 @@ try{
 try{
   const x=await fetch(origin+"/api/admin/ai-repair",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({problem:"production smoke authorization test"})});
   if(x.status!==401)throw new Error("ai_repair_auth_not_enforced");
-}catch(e){console.error("AI_REPAIR_AUTH",e);bad++}
+  const telegram=await fetch(origin+"/api/admin/telegram-test",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({})});
+  if(telegram.status!==401)throw new Error("telegram_test_auth_not_enforced");
+}catch(e){console.error("ADMIN_AUTH",e);bad++}
+try{
+  const health=await get("/api/health"); const d=JSON.parse(health.text);
+  if(d.version!=="1.2.0")throw new Error("stale_api_version");
+}catch(e){console.error("API_VERSION",e);bad++}
 try{
   const a=await get("/api/article?slug=who-is-naguib-mahfouz-ar&lang=ar"); const ad=JSON.parse(a.text);
   if(!ad.title||!ad.body)throw new Error("article_incomplete");
