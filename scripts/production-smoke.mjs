@@ -27,7 +27,7 @@ try{
   bundlePath=bundleMatch[1].split("?")[0];
   bundleVersion=new URL(bundleMatch[1],"https://bayan.invalid").searchParams.get("v")||"";
   if(!bundleVersion)throw new Error("current_shell_bundle_version_missing");
-  if(bundleVersion!=="2026.10.09.13")throw new Error("stale_shell_bundle_version");
+  if(bundleVersion!=="2026.10.09.14")throw new Error("stale_shell_bundle_version");
   if(!h.text.includes("fallback-home")||!h.text.includes("Start searching")||h.text.includes("ابدأ البحث")||h.text.includes("??lang="))throw new Error("english_shell_fallback_not_localized");
 }catch(e){console.error("SHELL",e);bad++}
 try{
