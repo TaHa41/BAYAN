@@ -8,15 +8,22 @@ export function robots(){
 }
 const xml=(s:string)=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
 export async function sitemap(env:Env){
-  let articleUrls:string[]=[];
+  let articleUrls:Array<{url:string;lastmod?:string}>=[];
   try{
-    const r=await env.DB.prepare("SELECT slug,language FROM articles WHERE status='PUBLISHED' ORDER BY updated_at DESC LIMIT 1000").all<any>();
-    articleUrls=(r.results||[]).map((x:any)=>ORIGIN+"/article/"+encodeURIComponent(x.slug)+"?lang="+encodeURIComponent(x.language));
+    const r=await env.DB.prepare("SELECT slug,language,updated_at FROM articles WHERE status='PUBLISHED' ORDER BY updated_at DESC LIMIT 1000").all<any>();
+    articleUrls=(r.results||[]).map((x:any)=>({
+      url:ORIGIN+"/article/"+encodeURIComponent(x.slug)+"?lang="+encodeURIComponent(x.language),
+      lastmod:String(x.updated_at||"")
+    }));
   }catch{}
   const publicPaths=["/","/news","/about","/methodology","/privacy","/terms",...SECTIONS.map(x=>"/"+x[0])];
-  const localizedUrls=publicPaths.flatMap((path)=>["ar","en"].map((language)=>ORIGIN+path+"?lang="+language));
-  const urls=[...new Set([...localizedUrls,...articleUrls])];
-  return text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+urls.map(url=>'<url><loc>'+xml(url)+'</loc></url>').join("")+"</urlset>","application/xml;charset=utf-8");
+  const localizedUrls=publicPaths.flatMap((path)=>["ar","en"].map((language)=>({url:ORIGIN+path+"?lang="+language})));
+  const urls=[...new Map([...localizedUrls,...articleUrls].map((item)=>[item.url,item])).values()];
+  return text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+urls.map((item)=>{
+    const date=Date.parse(String(item.lastmod||""));
+    const lastmod=Number.isFinite(date)?'<lastmod>'+xml(new Date(date).toISOString())+'</lastmod>':"";
+    return '<url><loc>'+xml(item.url)+'</loc>'+lastmod+'</url>';
+  }).join("")+"</urlset>","application/xml;charset=utf-8");
 }
 export async function newsSitemap(_env:Env){
   let items:Array<any>=[];
