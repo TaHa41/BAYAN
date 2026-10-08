@@ -15,9 +15,10 @@ export async function analyticsStats(env:Env){
     env.DB.prepare("SELECT language,COUNT(*) AS count FROM analytics WHERE created_at>=? GROUP BY language ORDER BY count DESC").bind(month),
     env.DB.prepare("SELECT query,COUNT(*) AS count,MAX(created_at) AS last_seen FROM searches GROUP BY query ORDER BY count DESC,last_seen DESC LIMIT 15"),
     env.DB.prepare("SELECT status,COUNT(*) AS count FROM articles GROUP BY status"),
-    env.DB.prepare("SELECT section,language,COUNT(*) AS count FROM articles WHERE status='PUBLISHED' GROUP BY section,language ORDER BY count DESC")
+    env.DB.prepare("SELECT section,language,COUNT(*) AS count FROM articles WHERE status='PUBLISHED' GROUP BY section,language ORDER BY count DESC"),
+    env.DB.prepare("SELECT COUNT(*) AS published,SUM(CASE WHEN length(trim(body))<500 THEN 1 ELSE 0 END) AS short_bodies,SUM(CASE WHEN image_url IS NULL OR trim(image_url)='' THEN 1 ELSE 0 END) AS missing_images,SUM(CASE WHEN sources_json IS NULL OR sources_json='[]' THEN 1 ELSE 0 END) AS missing_sources FROM articles WHERE status='PUBLISHED'")
   ]);
   const v=(i:number)=>r[i]?.results||[];
   const one=(i:number,key:string)=>Number((v(i)[0] as any)?.[key]||0);
-  return {totalViews:one(0,"total"),uniqueVisitors:one(1,"unique_visitors"),periods:{day:{views:one(2,"total"),uniqueVisitors:one(3,"unique_visitors")},week:{views:one(4,"total"),uniqueVisitors:one(5,"unique_visitors")},month:{views:one(6,"total"),uniqueVisitors:one(7,"unique_visitors")}},topPages:v(8),events:v(9),languages:v(10),topSearches:v(11),articleStatuses:v(12),contentBySection:v(13)};
+  return {totalViews:one(0,"total"),uniqueVisitors:one(1,"unique_visitors"),periods:{day:{views:one(2,"total"),uniqueVisitors:one(3,"unique_visitors")},week:{views:one(4,"total"),uniqueVisitors:one(5,"unique_visitors")},month:{views:one(6,"total"),uniqueVisitors:one(7,"unique_visitors")}},topPages:v(8),events:v(9),languages:v(10),topSearches:v(11),articleStatuses:v(12),contentBySection:v(13),contentQuality:(v(14)[0]||{published:0,short_bodies:0,missing_images:0,missing_sources:0})};
 }
