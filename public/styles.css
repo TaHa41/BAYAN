@@ -218,3 +218,12 @@ html[dir="rtl"] .section-card:before{inset:0 0 0 auto;border-radius:0 18px 18px 
 .weather-location{grid-column:1/-1;padding:4px 0}
 .weather-location h2{margin:5px 0;font-size:1.35rem}
 @media(max-width:520px){.weather-city-row{flex-direction:column}.weather-city-row button{width:100%}.weather-city-form{padding:12px}}
+
+/* Prayer times and Islamic calendar */
+.prayer-date{margin:16px 0;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.prayer-date h2{margin:6px 0;font-size:1.4rem}
+.prayer-grid{margin:12px 0 24px}
+.prayer-subtitle{margin:24px 0 12px;font-size:1.15rem}
+.search-log-row{padding:12px 0;border-bottom:1px solid var(--line)}
+.search-log-row small{display:block;color:var(--muted);margin:5px 0 8px}
+.search-log-row p{margin:8px 0;font-size:.92rem}
