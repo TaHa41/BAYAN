@@ -207,7 +207,7 @@
         "</div>");
     }
     const newsItems = (newsData.items || [])
-      .filter((item) => !ar || /[\u0600-\u06ff]/.test(String(item.title || "")))
+      .filter((item) => ar ? /[\u0600-\u06ff]/.test(String(item.title || "")) : !/[\u0600-\u06ff]/.test(String(item.title || "")))
       .slice(0, 6);
     newsOut.innerHTML = newsItems.length
       ? newsItems.map((item) => '<a class="article-card" href="/news?story=' + encodeURIComponent(item.title) + '&lang=' + lang + '">' + imageHtml(item) + '<div class="article-card-body"><span class="kicker">' + escapeHtml(item.publisher || t("الأخبار","News")) + '</span><h3>' + escapeHtml(item.title) + '</h3><p>' + escapeHtml(item.summary || "") + '</p><div class="source-line">' + escapeHtml(item.publishedAt || "") + '</div><span class="read">' + t("اقرأ داخل بيان","Read inside BAYAN") + " →</span></div></a>").join("")
@@ -215,7 +215,7 @@
 
     const featured = sectionData
       .flatMap((x) => x.items || [])
-      .filter((item) => !ar || /[\u0600-\u06ff]/.test(String(item.title || "")))
+      .filter((item) => ar ? /[\u0600-\u06ff]/.test(String(item.title || "")) : !/[\u0600-\u06ff]/.test(String(item.title || "")))
       .slice(0, 9);
     const featuredOut = document.querySelector("#home-featured");
     featuredOut.innerHTML = featured.length
