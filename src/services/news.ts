@@ -229,7 +229,19 @@ const wikipediaExactImage=async(query:string):Promise<string|undefined>=>{
   return images.find((image)=>Boolean(image));
 };
 
-export async function findRelatedImage(query: string): Promise<string | undefined> {
+export async function findRelatedImage(query: string, sourceUrl?: string): Promise<string | undefined> {
+  // Prefer the publisher article image when the URL is a normal public HTTPS host.
+  if (sourceUrl) {
+    try {
+      const parsed = new URL(sourceUrl);
+      const host = parsed.hostname.toLowerCase();
+      const looksPrivate = !host.includes(".") || host === "localhost" || host.endsWith(".local") || host.endsWith(".internal") || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) || host.startsWith("[");
+      if (parsed.protocol === "https:" && !looksPrivate) {
+        const publisherImage = await sourceImage(parsed.toString());
+        if (publisherImage && /^https:\/\//i.test(publisherImage)) return publisherImage;
+      }
+    } catch {}
+  }
   const cleanQuery = String(query || "").replace(/https?:\/\/\S+/g, " ").replace(/\s+/g, " ").trim().slice(0, 220);
   if (!cleanQuery) return undefined;
   if (/نجيب محفوظ|naguib mahfouz/i.test(cleanQuery)) {
