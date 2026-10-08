@@ -11,7 +11,7 @@ export async function ask(env:Env,question:string,locale:Locale,evidence:SearchR
     const instance=env.AI_SEARCH.get(env.BAYAN_AI_SEARCH_INSTANCE||"default");
     const r=await instance.chatCompletions({messages:[{role:"user",content:(locale==="ar"?"أجب بالعربية الفصحى فقط. ":"Answer in English only. ")+question}],model:"@cf/meta/llama-3.3-70b-instruct-fp8-fast",ai_search_options:{retrieval:{max_num_results:8}}});
     const answer=String((r as any)?.choices?.[0]?.message?.content||(r as any)?.response||"").trim();
-    if(answer)return{status:publishers.size>=2?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(x=>x.sources)}
+    if(answer && (locale==="ar" ? /[\u0600-\u06ff]/.test(answer) : !/[\u0600-\u06ff]/.test(answer)))return{status:publishers.size>=2?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(x=>x.sources)}
   }catch{}
   return{status:publishers.size>=2?"verified" as const:"mixed" as const,answer:locale==="ar"?"وجدت أدلة يمكن الرجوع إليها، لكن تعذر تشغيل صياغة BAYAN الذكية الآن. راجع الأدلة الظاهرة قبل اتخاذ قرار.":"Relevant evidence was found, but BAYAN's drafting model is temporarily unavailable. Review the evidence before acting.",sources:evidence.flatMap(x=>x.sources)}
 }
