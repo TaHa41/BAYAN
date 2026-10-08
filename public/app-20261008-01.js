@@ -230,7 +230,7 @@
       '</span><h1>' + t("ابحث عن أي شيء","Search for anything") + '</h1><p>' +
       t("الشخصيات والموضوعات والأخبار والقصص والأسئلة والحلول والبيانات الحية في مسار واحد.",
         "People, topics, news, stories, questions, solutions and live data in one search.") +
-      '</p></div>' + searchBox(query) + '<div id="out" class="results"></div></section>';
+      '</p></div>' + searchBox(query) + '<div class="wisdom-card search-wisdom"><span class="kicker">' + t("حكمة بيان","BAYAN Insight") + '</span><p>' + t("المعلومة تصبح أقوى عندما نعرف مصدرها وزمنها وسياقها.","Information becomes stronger when its source, timing and context are clear.") + '</p></div><div id="out" class="results"></div></section>';
     bindSearch();
     if (!query) return;
     try {
