@@ -133,7 +133,7 @@ if(!local.length && !wiki.length && !wd.length && !gd.length && !oa.length && !r
     try{const drafted=await ask(env,q,language,results);if(drafted.answer){answer=drafted.answer;answerStatus=drafted.status;}if(options.publish!==false&&drafted.answer && drafted.status==="verified") publishedSlug=await publishVerifiedResearch(env,{title:results[0].title,summary:results[0].summary||q,body:drafted.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[])});}catch{}
   }
   const message=results.length?undefined:(language==="ar"?"تعذر العثور على نتيجة من مصادر البحث المتاحة حاليًا. يمكن توسيع البحث لاحقًا عند توفر مزودات إضافية.":"No result was returned by the available search providers right now. The search can be expanded when additional providers are available.");
-  try{await saveSearch(env,q,language,intent(q),status,results.length)}catch{}
+  try{await saveSearch(env,q,language,intent(q),status,results.length,classifySection(q,results,language),results)}catch{}
   return {query:q,locale:language,results,providers,providerAttempted,status,message,answer,answerStatus,articleSlug:publishedSlug};
 }
 function intent(q:string){
