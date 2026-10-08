@@ -132,11 +132,11 @@ async function openAiWebSearch(env:Env,q:string,language:Locale):Promise<Candida
     }
     if(!cited.size)return[];
     let parsed:any;
-    try{parsed=JSON.parse(output)}catch{return Array.from(cited.entries()).slice(0,5).map(([url,title])=>({title:cleanText(title||q),summary:cleanText(output).slice(0,1200),section:"world",kind:"web",evidence:"mixed",sources:[source(cleanText(title||q),"OpenAI Web Search",url)],url,score:66,provider:"OpenAI Web Search"})).filter(x=>x.title&&x.summary&&languageSafe(x,language));}
+    try{parsed=JSON.parse(output)}catch{return Array.from(cited.entries()).slice(0,5).map(([url,title])=>({title:cleanText(title||q),summary:cleanText(output).slice(0,1200),section:"world",kind:"web",evidence:"mixed",sources:[source(cleanText(title||q),new URL(url).hostname.replace(/^www\\./i,""),url)],url,score:66,provider:"OpenAI Web Search"})).filter(x=>x.title&&x.summary&&languageSafe(x,language));}
     const rows=Array.isArray(parsed?.results)?parsed.results:[];
     return rows.filter((x:any)=>x&&cited.has(String(x.url||""))).slice(0,6).map((x:any)=>{
       const url=String(x.url),title=cleanText(x.title||cited.get(url)||q),summary=cleanText(x.summary||"").slice(0,1500);
-      return {title,summary,section:"world",kind:"web",evidence:"mixed",sources:[source(title,"OpenAI Web Search",url)],url,score:scoreSource("OpenAI Web Search",title,q)+8,provider:"OpenAI Web Search"};
+      return {title,summary,section:"world",kind:"web",evidence:"mixed",sources:[source(title,new URL(url).hostname.replace(/^www\\./i,""),url)],url,score:scoreSource("OpenAI Web Search",title,q)+8,provider:"OpenAI Web Search"};
     }).filter((x:Candidate)=>x.title&&x.summary&&languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary));
   }catch{return[]}
 }
@@ -234,7 +234,7 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};let [local, wiki, wd, gd, oa, remote, dd, google, bing, crossref, pubmed] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe(s.source_openalex==="0"?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[]),safe(googleNewsSearch(q,language),[]),safe(bingNewsSearch(q,language),[]),safe(crossrefSearch(q),[]),safe(pubmedSearch(q,language),[])]);
 if(!local.length && !wiki.length && !wd.length && !gd.length && !oa.length && !remote.length && !dd.length && !google.length && !bing.length && !crossref.length && !pubmed.length) gd=await broadGdelt(q);
-  const providerAttempted=["BAYAN Knowledge Base","Wikipedia","Wikidata","GDELT","OpenAlex","Crossref","PubMed / NCBI","Cloudflare AI Search","DuckDuckGo","Google News Search","Bing News RSS"];const candidates:Candidate[]=[
+  const providerAttempted=["BAYAN Knowledge Base","Wikipedia","Wikidata","GDELT","OpenAlex","Crossref","PubMed / NCBI","Cloudflare AI Search","DuckDuckGo","Google News Search","Bing News RSS","OpenAI Web Search (fallback)"];const candidates:Candidate[]=[
     ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...google,...bing
   ];
   // A provider can return results that are unusable for the requested language.
