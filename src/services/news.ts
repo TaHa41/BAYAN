@@ -266,6 +266,16 @@ const googleArabicFallback = async (): Promise<Story[]> => {
   return batches.flat().filter(x => hasArabic(x.title));
 };
 
+const googleEnglishFallback = async (): Promise<Story[]> => {
+  const feeds = [
+    ["Google News English", "https://news.google.com/rss?hl=en&gl=US&ceid=US:en"],
+    ["Google News World", "https://news.google.com/rss/search?q=world&hl=en&gl=US&ceid=US:en"],
+    ["Google News Technology", "https://news.google.com/rss/search?q=technology&hl=en&gl=US&ceid=US:en"],
+  ] as [string,string][];
+  const batches = await Promise.all(feeds.map(([name,url]) => readFeed(name,url)));
+  return batches.flat().filter(x => !hasArabic(x.title));
+};
+
 const gdeltFallback = async (lang: Locale): Promise<Story[]> => {
   try {
     const query = lang === "ar" ? "أخبار" : "news";
@@ -316,6 +326,11 @@ export async function news(env: Env, lang: Locale) {
     if (!Number.isFinite(timestamp)) return true;
     return Date.now() - timestamp <= 72 * 60 * 60 * 1000;
   });
+
+  if (all.length < 3) {
+    const fallback = lang === "ar" ? await googleArabicFallback() : await googleEnglishFallback();
+    all = [...all, ...fallback];
+  }
 
   all.sort((a,b) => {
     const at = a.publishedAt ? Date.parse(a.publishedAt) : 0;
