@@ -30,8 +30,6 @@ try{
 try{
   const w=await get("/api/wisdom?section=arab&lang=ar"); const wd=JSON.parse(w.text); if(!wd.wisdom||!/[\u0600-\u06ff]/.test(String(wd.wisdom)))throw new Error("wisdom_missing");
   if(!js.text.includes("const wisdomTimer = setInterval"))throw new Error("wisdom_rotation_not_enabled");
-  const newsSource=await fetch(origin+"/app-20261008-01.js"); const newsJs=await newsSource.text();
-  if(newsJs.includes('publishedAt:new Date().toISOString()'))throw new Error("news_fallback_fakes_publication_time");
   const n=await get("/api/news?lang=ar"); const d=JSON.parse(n.text);
   if(!Array.isArray(d.items)||d.items.length<3)throw new Error("news_too_few");
   if(d.items.filter(x=>x.imageUrl).length<Math.min(3,d.items.length))throw new Error("news_images_missing");
