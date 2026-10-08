@@ -13,8 +13,10 @@ export async function sitemap(env:Env){
     const r=await env.DB.prepare("SELECT slug,language FROM articles WHERE status='PUBLISHED' ORDER BY updated_at DESC LIMIT 1000").all<any>();
     articleUrls=(r.results||[]).map((x:any)=>ORIGIN+"/article/"+encodeURIComponent(x.slug)+"?lang="+encodeURIComponent(x.language));
   }catch{}
-  const paths=["/","/search","/news","/ask","/contribute","/tools",...SECTIONS.map(x=>"/"+x[0]),...articleUrls];
-  return text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+paths.map(p=>'<url><loc>'+xml(p.startsWith("http")?p:ORIGIN+p)+'</loc></url>').join("")+"</urlset>","application/xml;charset=utf-8");
+  const publicPaths=["/","/news","/about","/methodology","/privacy","/terms",...SECTIONS.map(x=>"/"+x[0])];
+  const localizedUrls=publicPaths.flatMap((path)=>["ar","en"].map((language)=>ORIGIN+path+"?lang="+language));
+  const urls=[...new Set([...localizedUrls,...articleUrls])];
+  return text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+urls.map(url=>'<url><loc>'+xml(url)+'</loc></url>').join("")+"</urlset>","application/xml;charset=utf-8");
 }
 export async function newsSitemap(_env:Env){
   let items:Array<any>=[];
