@@ -52,13 +52,13 @@ try{
   const im=await get("/api/image?q=%D9%86%D8%AC%D9%8A%D8%A8%20%D9%85%D8%AD%D9%81%D9%88%D8%B8"); if(!JSON.parse(im.text).imageUrl)throw new Error("content_image_missing");
 }catch(e){console.error("IMAGE",e);bad++}
 try{
-  const r=await fetch(origin+"/api/section?section=world&lang=ar",{headers:{"accept-language":"en-US,en;q=0.9","accept":"application/json"}});
+  const r=await fetch(origin+"/api/section?section=world&lang=ar",{headers:{"accept-language":"en-US,en;q=0.9","accept":"application/json"},signal:AbortSignal.timeout(10000)});
   const d=await r.json();
   if(!r.ok||!Array.isArray(d.items)||!d.items.length)throw new Error("explicit_arabic_locale_failed");
   if(d.items.some(x=>!/[\u0600-\u06ff]/.test(String(x.title||""))))throw new Error("explicit_arabic_locale_contains_english");
 }catch(e){console.error("LOCALE_AR_OVERRIDE",e);bad++}
 try{
-  const r=await fetch(origin+"/api/section?section=world&lang=en",{headers:{"accept-language":"ar-EG,ar;q=0.9","accept":"application/json"}});
+  const r=await fetch(origin+"/api/section?section=world&lang=en",{headers:{"accept-language":"ar-EG,ar;q=0.9","accept":"application/json"},signal:AbortSignal.timeout(10000)});
   const d=await r.json();
   if(!r.ok||!Array.isArray(d.items)||!d.items.length)throw new Error("explicit_english_locale_failed");
   if(d.items.some(x=>/[\u0600-\u06ff]/.test(String(x.title||""))))throw new Error("explicit_english_locale_contains_arabic");
@@ -68,12 +68,12 @@ try{
   if(!ad.title||!ad.body||/[\u0600-\u06ff]/.test(String(ad.title))||/[\u0600-\u06ff]/.test(String(ad.body)))throw new Error("english_article_language_mismatch");
 }catch(e){console.error("ARTICLE_EN",e);bad++}
 try{
-  const ar=await fetch(origin+"/api/ask?lang=ar",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:"من هو نجيب محفوظ؟"})});
+  const ar=await fetch(origin+"/api/ask?lang=ar",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:"من هو نجيب محفوظ؟"}),signal:AbortSignal.timeout(30000)});
   const d=await ar.json(); if(!ar.ok||!d.status||!d.answer)throw new Error("ask_ar_unavailable");
   if(/[A-Za-z]{8,}/.test(String(d.answer))&&!/[\u0600-\u06ff]/.test(String(d.answer)))throw new Error("ask_ar_language_mismatch");
 }catch(e){console.error("ASK_AR",e);bad++}
 try{
-  const en=await fetch(origin+"/api/ask?lang=en",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:"Who was Naguib Mahfouz?"})});
+  const en=await fetch(origin+"/api/ask?lang=en",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:"Who was Naguib Mahfouz?"}),signal:AbortSignal.timeout(30000)});
   const d=await en.json(); if(!en.ok||!d.status||!d.answer)throw new Error("ask_en_unavailable");
   if(/[\u0600-\u06ff]/.test(String(d.answer)))throw new Error("ask_en_language_mismatch");
 }catch(e){console.error("ASK_EN",e);bad++}
