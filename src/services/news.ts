@@ -363,7 +363,7 @@ export async function news(env: Env, lang: Locale) {
     return image ? { ...story, imageUrl: image } : story;
   }));
   // Image lookup is enrichment only: an image-provider outage must never hide a valid story.
-  const finalStories = enriched;
+  const finalStories = enriched.map((story) => ({ ...story, summary: languageSafeText(story.summary, lang) ? story.summary : "" }));
 
   const cached = await readNewsCache(env, lang);
   // Keep a healthy cache behind the live providers. If providers return nothing
@@ -375,7 +375,7 @@ export async function news(env: Env, lang: Locale) {
     const seenTitles = new Set(finalStories.map((story) => story.title.trim().toLowerCase()));
     const languageSafeCache = cached.items.filter((story) =>
       lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title)
-    );
+    ).map((story) => ({ ...story, summary: languageSafeText(story.summary, lang) ? story.summary : "" }));
     const merged = [
       ...finalStories,
       ...languageSafeCache.filter((story) => !seenTitles.has(story.title.trim().toLowerCase())),
