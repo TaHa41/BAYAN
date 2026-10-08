@@ -310,7 +310,13 @@ const directNewsPageFallback = async (lang: Locale): Promise<Story[]> => {
         if (!title || title.length < 20 || title.length > 220 || !/\/news\/20\d{2}\//.test(href)) continue;
         if (lang === "ar" ? !hasArabic(title) : hasArabic(title)) continue;
         if (out.some(x => x.title.toLowerCase() === title.toLowerCase())) continue;
-        out.push({title,summary:"",url:href,publisher:name,publishedAt:new Date().toISOString(),imageAlt:title});
+        // Never stamp a scraped headline with the current time: that would make an old story look new.
+        const dateMatch = href.match(/\/news\/(20\d{2})\/(\d{1,2})\/(\d{1,2})(?:\/|$)/);
+        const publishedAt = dateMatch
+          ? new Date(Date.UTC(Number(dateMatch[1]), Number(dateMatch[2]) - 1, Number(dateMatch[3]))).toISOString()
+          : undefined;
+        if (publishedAt && Date.now() - Date.parse(publishedAt) > 72 * 60 * 60 * 1000) continue;
+        out.push({title,summary:"",url:href,publisher:name,publishedAt,imageAlt:title});
         if (out.length >= 8) break;
       }
     } catch {}
@@ -396,6 +402,13 @@ export async function news(env: Env, lang: Locale) {
     all = [...all, ...fallback];
   }
 
+  // Apply freshness checks after every fallback too. Previously, the final HTML fallback
+  // was appended after the freshness filter and could bypass it.
+  all = all.filter((story) => {
+    if (!story.publishedAt) return true; // unknown date is not falsely presented as current
+    const timestamp = Date.parse(story.publishedAt);
+    return !Number.isFinite(timestamp) || (timestamp <= Date.now() + 5 * 60 * 1000 && Date.now() - timestamp <= 72 * 60 * 60 * 1000);
+  });
   all.sort((a,b) => {
     const at = a.publishedAt ? Date.parse(a.publishedAt) : 0;
     const bt = b.publishedAt ? Date.parse(b.publishedAt) : 0;
