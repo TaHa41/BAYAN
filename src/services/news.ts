@@ -293,6 +293,31 @@ const gdeltFallback = async (lang: Locale): Promise<Story[]> => {
   } catch { return []; }
 };
 
+const directNewsPageFallback = async (lang: Locale): Promise<Story[]> => {
+  const pages = lang === "ar"
+    ? [["الجزيرة", "https://www.aljazeera.net/news/"]]
+    : [["Al Jazeera English", "https://www.aljazeera.com/news/"]];
+  const out: Story[] = [];
+  for (const [name,url] of pages) {
+    try {
+      const r = await fetch(url,{signal:AbortSignal.timeout(5000),headers:{accept:"text/html,*/*","user-agent":"BAYAN/1.1 (+https://bayan.tahaomar411.workers.dev)"}});
+      if (!r.ok) continue;
+      const html = await r.text();
+      const re = /<a[^>]+href=["'](https?:\\/\\/[^"']+|\\/[^"']*\\/news\\/[^"']+)["'][^>]*>([\\s\\S]*?)<\\/a>/gi;
+      for (const m of html.matchAll(re)) {
+        const title = esc(m[2]);
+        const href = String(m[1]||"").startsWith("http") ? String(m[1]) : new URL(String(m[1]),url).toString();
+        if (!title || title.length < 20 || title.length > 220 || !href.includes("/news/")) continue;
+        if (lang === "ar" ? !hasArabic(title) : hasArabic(title)) continue;
+        if (out.some(x => x.title.toLowerCase() === title.toLowerCase())) continue;
+        out.push({title,summary:"",url:href,publisher:name,publishedAt:new Date().toISOString(),imageAlt:title});
+        if (out.length >= 8) break;
+      }
+    } catch {}
+  }
+  return out;
+};
+
 const bingNewsFallback = async (lang: Locale): Promise<Story[]> => {
   const queries = lang === "ar"
     ? [["Bing News عربية","https://www.bing.com/news/search?q=%D8%A3%D8%AD%D8%AF%D8%AB+%D8%A7%D9%84%D8%A3%D8%AE%D8%A8%D8%A7%D8%B1&format=rss&setlang=ar"],["Bing News مصر","https://www.bing.com/news/search?q=%D9%85%D8%B5%D8%B1&format=rss&setlang=ar"]]
@@ -364,6 +389,10 @@ export async function news(env: Env, lang: Locale) {
   }
   if (all.length < 3) {
     const fallback = await bingNewsFallback(lang);
+    all = [...all, ...fallback];
+  }
+  if (all.length < 3) {
+    const fallback = await directNewsPageFallback(lang);
     all = [...all, ...fallback];
   }
 
