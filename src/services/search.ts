@@ -51,10 +51,10 @@ async function googleNewsSearch(q:string,language:Locale):Promise<Candidate[]>{
     const url="https://news.google.com/rss/search?q="+encodeURIComponent(q)+"&hl="+hl+"&gl="+gl+"&ceid="+ceid;
     const response=await timeout(url,4500);if(!response.ok)return[];
     const xml=await response.text();const out:Candidate[]=[];
-    for(const match of xml.matchAll(/<item\\b[^>]*>([\\s\\S]*?)<\\/item>/gi)){
-      const block=match[1];const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\\\b[^>]*>([\\s\\S]*?)<\\/"+name+">","i"))?.[1]||"").trim();
+    for(const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
+      const block=match[1];const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
       const title=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1400),publisher=cleanText(field("source")||"Google News");
-      if(!title||!/^https:\\/\\//i.test(url))continue;
+      if(!title||!/^https:\/\//i.test(url))continue;
       out.push({title,summary,section:"news",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+4,provider:"Google News Search"});
       if(out.length>=8)break;
     }
