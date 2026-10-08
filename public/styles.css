@@ -101,3 +101,9 @@ html[dir="rtl"] .section-card:before{inset:0 0 0 auto;border-radius:0 18px 18px 
 .notice{border-radius:16px;border:1px solid var(--line);background:var(--surface);padding:22px}
 @media(max-width:760px){.section-grid,.article-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.admin-article-row{grid-template-columns:1fr 1fr}.admin-article-row b,.admin-article-row small{grid-column:1/-1}.admin-shortcuts{top:64px}}
 @media(max-width:520px){.section-grid,.article-grid{grid-template-columns:1fr}.section-card{min-height:120px;padding:18px}.admin-login{padding:14px}.admin-page .page-head{padding:20px 18px}.admin-panel{padding:16px}.admin-article-row{gap:6px}.admin-article-row button{font-size:12px}}
+
+
+/* BAYAN image reliability: reserve space and keep graceful placeholders visible */
+.article-card-image{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:var(--soft);border-radius:14px 14px 0 0}
+.article-hero-image{display:block;width:100%;max-height:560px;aspect-ratio:16/9;object-fit:cover;background:var(--soft);border-radius:20px;margin:0 0 24px}
+.image-placeholder{display:grid;place-items:center;width:100%;min-height:180px;aspect-ratio:16/9;background:linear-gradient(135deg,var(--soft),var(--surface));color:var(--accent);font-weight:900;letter-spacing:.12em;border-radius:14px 14px 0 0}
