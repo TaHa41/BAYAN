@@ -61,7 +61,7 @@
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 9000));
     try {
-      const response = await fetch(url + separator + "_b=20261009.22", {
+      const response = await fetch(url + separator + "_b=20261009.23", {
         ...options,
         cache: "no-store",
         signal: controller.signal
