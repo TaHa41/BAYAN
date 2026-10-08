@@ -119,7 +119,7 @@ const localeSafeText=(value:string,language:Locale)=>{
   const sentences=value.split(/[\n.!؟?]+/).map(part=>part.trim()).filter(Boolean);
   return sentences.every(part=>hasArabic(part)||!/[A-Za-z]{5,}/.test(part));
 };
-const languageSafe=(x:Candidate,language:Locale)=>{
+const languageSafe=(x:SearchResult,language:Locale)=>{
   const title=String(x.title||"");
   return language==="ar" ? hasArabic(title) : !hasArabic(title);
 };
