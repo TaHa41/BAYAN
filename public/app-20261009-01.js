@@ -164,6 +164,7 @@
       link("/ask?lang=" + lang, t("اسأل بيان","Ask BAYAN")) +
       link("/prices?lang=" + lang, t("الأسعار والأسواق","Prices & Markets")) +
       link("/weather?lang=" + lang, t("الطقس","Weather")) +
+      link("/prayer?lang=" + lang, t("مواقيت الصلاة","Prayer Times")) +
       link("/contribute?lang=" + lang, t("ساهم بمعلومة","Contribute")) +
       link("/saved?lang=" + lang, t("المحفوظات","Saved")) +
       link("/tools?lang=" + lang, t("الأدوات","Tools")) +
