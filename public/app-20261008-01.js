@@ -246,7 +246,7 @@
               escapeHtml(item.title) + "</a>" : escapeHtml(item.title)) +
             "</h2><p>" + escapeHtml(item.summary) + '</p><div class="source-line">' +
             (item.sources || []).slice(0, 3).map((source) => escapeHtml(source.publisher)).join(" · ") +
-            "</div></article>").join("")
+            "</div></article>").join(""))
         : '<div class="notice"><h2>' + t("لم تُرجع محركات البحث نتيجة الآن","Search providers returned no result right now") +
           '</h2><p>' + t("سيحاول بيان توسيع مسارات البحث بدل اختلاق معلومة.","BAYAN will expand its search paths rather than invent information.") + "</p></div>";
     } catch {
