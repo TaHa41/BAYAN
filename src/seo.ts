@@ -4,7 +4,7 @@ import {text}from"./http";
 import {latestNewsForSitemap} from "./services/news";
 
 export function robots(){
-  return text("User-agent: *\nAllow: /\nDisallow: /api/admin/\nSitemap: "+ORIGIN+"/sitemap.xml\nSitemap: "+ORIGIN+"/news-sitemap.xml\n");
+  return text("User-agent: *\nAllow: /\nDisallow: /api/admin/\nDisallow: /admin\nDisallow: /saved\nSitemap: "+ORIGIN+"/sitemap.xml\nSitemap: "+ORIGIN+"/news-sitemap.xml\n");
 }
 const xml=(s:string)=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
 export async function sitemap(env:Env){
