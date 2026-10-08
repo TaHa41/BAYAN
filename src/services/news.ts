@@ -372,9 +372,12 @@ export async function news(env: Env, lang: Locale) {
     await writeNewsCache(env, lang, finalStories);
   } else if (cached?.items?.length) {
     const seenTitles = new Set(finalStories.map((story) => story.title.trim().toLowerCase()));
+    const languageSafeCache = cached.items.filter((story) =>
+      lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title)
+    );
     const merged = [
       ...finalStories,
-      ...cached.items.filter((story) => !seenTitles.has(story.title.trim().toLowerCase())),
+      ...languageSafeCache.filter((story) => !seenTitles.has(story.title.trim().toLowerCase())),
     ].slice(0, Math.max(6, Math.min(40, limit)));
     if (merged.length >= 3) {
       return {
@@ -433,6 +436,7 @@ export async function latestNewsForSitemap(lang: Locale) {
   const batches = await Promise.all(feeds(lang).map(([name, url]) => readFeed(name, url)));
   const seen = new Set<string>();
   return batches.flat().filter((story) => {
+    if (lang === "ar" ? !hasArabic(story.title) : hasArabic(story.title)) return false;
     if (story.publishedAt) { const timestamp = Date.parse(story.publishedAt); if (Number.isFinite(timestamp) && Date.now() - timestamp > 72 * 60 * 60 * 1000) return false; }
     const key = story.title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
     if (seen.has(key)) return false; seen.add(key); return true;
