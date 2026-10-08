@@ -182,7 +182,7 @@
             const fallback = document.createElement("div");
             fallback.className = "image-placeholder";
             fallback.textContent = "BAYAN";
-            placeholder.replaceWith(fallback);
+            img.replaceWith(fallback);
           };
           img.src = data.imageUrl;
           placeholder.replaceWith(img);
