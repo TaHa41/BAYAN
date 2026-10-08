@@ -56,9 +56,9 @@ const checks = [
   ["image health verifies article images and both localized news caches", repair.includes("async function imageHealth(env:Env)") && repair.includes("for(const language of [\"ar\",\"en\"] as const)") && repair.includes('["images",async()=>await imageHealth(env)]') && repair.includes("remainingFailures.push(name)")],
   ["image repair prefers the related publisher image before Wikimedia fallbacks", news.includes("findRelatedImage(query: string, sourceUrl?: string)") && news.includes("const publisherImage = await sourceImage(parsed.toString())") && repair.includes("sources_json FROM articles WHERE status='PUBLISHED'") && repair.includes('findRelatedImage(String(item.title||""),String(item.url||""))')],
   ["admin repair monitor exposes review states and verification details", app.includes('"REVIEW","REPAIRED"') && app.includes("x.verification") && app.includes("x.action||x.diagnosis")],
-  ["admin layout and icon containers have responsive design refinements", read("public/styles.css").includes(".admin-shortcuts{position:sticky") && read("public/styles.css").includes(".section-icon,.drawer-icon") && read("public/styles.css").includes("@media(max-width:700px)")]
+  ["admin layout and icon containers have responsive design refinements", read("public/styles.css").includes(".admin-shortcuts{position:sticky") && read("public/styles.css").includes(".section-icon,.drawer-icon") && read("public/styles.css").includes("@media(max-width:700px)")],
+["sparse searches expand across alternate queries and use citation-validated OpenAI web search", search.includes("async function expandedSearch") && search.includes("q+\" official source\"") && search.includes("async function openAiWebSearch") && search.includes("tools:[{type:\"web_search\"}]") && search.includes("cited.has(String(x.url||\"\"))") && search.includes("length<2")]
 ];
-  ["sparse searches expand across alternate queries and use citation-validated OpenAI web search", search.includes("async function expandedSearch") && search.includes("q+\" official source\"") && search.includes("async function openAiWebSearch") && search.includes("tools:[{type:\"web_search\"}]") && search.includes("cited.has(String(x.url||\"\"))") && search.includes("length<2")],
 let failed = 0;
 for (const [name, ok] of checks) {
   console.log((ok ? "PASS " : "FAIL ") + name);
