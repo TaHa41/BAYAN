@@ -27,7 +27,7 @@ try{
   bundlePath=bundleMatch[1].split("?")[0];
   bundleVersion=new URL(bundleMatch[1],"https://bayan.invalid").searchParams.get("v")||"";
   if(!bundleVersion)throw new Error("current_shell_bundle_version_missing");
-  if(bundleVersion!=="2026.10.09.12")throw new Error("stale_shell_bundle_version");
+  if(bundleVersion!=="2026.10.09.13")throw new Error("stale_shell_bundle_version");
   if(!h.text.includes("fallback-home")||!h.text.includes("Start searching")||h.text.includes("ابدأ البحث")||h.text.includes("??lang="))throw new Error("english_shell_fallback_not_localized");
 }catch(e){console.error("SHELL",e);bad++}
 try{
@@ -102,6 +102,8 @@ try{
   if(x.status!==401)throw new Error("ai_repair_auth_not_enforced");
   const telegram=await fetch(origin+"/api/admin/telegram-test",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({})});
   if(telegram.status!==401)throw new Error("telegram_test_auth_not_enforced");
+  const expand=await fetch(origin+"/api/admin/article/expand",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({slug:"smoke-test",language:"ar"})});
+  if(expand.status!==401)throw new Error("article_expand_auth_not_enforced");
 }catch(e){console.error("ADMIN_AUTH",e);bad++}
 try{
   const health=await get("/api/health"); const d=JSON.parse(health.text);
