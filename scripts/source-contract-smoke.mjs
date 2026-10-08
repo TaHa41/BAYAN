@@ -8,7 +8,7 @@ const app = read("public/app-20261009-01.js");
 const index = read("src/index.ts");
 const api = read("src/routes/api.ts");
 const checks = [
-  ["news fallback does not invent publication time", !news.includes("publishedAt:new Date().toISOString()") && news.includes("const publishedAt = dateMatch")],
+  ["news never invents dates or serves expired cached stories as current", !news.includes("publishedAt:new Date().toISOString()") && news.includes("const publishedAt = dateMatch") && news.includes("&& isFreshNews(story)")],
   ["news fallbacks run concurrently and freshness is rechecked", news.includes("const [google, gdelt, aiSearch, bing, direct] = await Promise.all") && news.lastIndexOf("all = all.filter(isFreshNews)") > news.indexOf("const [google, gdelt, aiSearch, bing, direct]")],
   ["wisdom endpoint rotates every 30 seconds", wisdom.includes("Date.now()/1000/30")],
   ["wisdom has dedicated news and arts entries", /news:\{ar:/.test(wisdom) && /art:\{ar:/.test(wisdom)],
