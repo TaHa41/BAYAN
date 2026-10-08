@@ -15,7 +15,7 @@ try{
   const h=await get("/?lang=en");
   if(!/<html[^>]+lang="en"/.test(h.text))throw new Error("english_lang_missing");
   if(!h.text.includes("app-20261008-01.js"))throw new Error("current_bundle_missing");
-  if(!h.text.includes("app-20261008-01.js?v=2026.10.08.06"))throw new Error("current_shell_bundle_version_missing");
+  if(!h.text.includes("app-20261008-01.js?v=2026.10.08.07"))throw new Error("current_shell_bundle_version_missing");
   if(!h.text.includes("fallback-home")||!h.text.includes("Start searching")||h.text.includes("ابدأ البحث")||h.text.includes("??lang="))throw new Error("english_shell_fallback_not_localized");
 }catch(e){console.error("SHELL",e);bad++}
 try{
@@ -38,7 +38,7 @@ try{
   const dates=d.items.map(x=>Date.parse(x.publishedAt||"")).filter(Number.isFinite);
   if(dates.length&&Math.max(...dates)<Date.now()-72*60*60*1000)throw new Error("news_is_stale");
   const first=d.items[0];
-  const a=await get("/api/news/article?title="+encodeURIComponent(first.title)+"&image="+encodeURIComponent(first.imageUrl||"")+"&lang=ar");
+  const a=await get("/api/news/article?title="+encodeURIComponent(first.title)+"&image="+encodeURIComponent(first.imageUrl||"")+"&summary="+encodeURIComponent(first.summary||"")+"&url="+encodeURIComponent(first.url||"")+"&publisher="+encodeURIComponent(first.publisher||"")+"&publishedAt="+encodeURIComponent(first.publishedAt||"")+"&lang=ar");
   const ad=JSON.parse(a.text); if(!ad.ok||!ad.article?.title||!ad.article?.body)throw new Error("news_article_incomplete");
   if(/[A-Za-z]{5,}/.test(String(first.title))&&!/[\u0600-\u06ff]/.test(String(first.title)))throw new Error("arabic_news_title_missing");
 }catch(e){console.error("NEWS",e);bad++}
