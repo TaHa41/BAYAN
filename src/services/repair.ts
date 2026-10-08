@@ -12,7 +12,7 @@ async function newsCacheHealthy(env:Env){
       const localeMatch=language==="ar"?/[\u0600-\u06ff]/.test(title):!/[\u0600-\u06ff]/.test(title);
       return localeMatch&&Number.isFinite(date)&&date<=Date.now()+5*60*1000&&Date.now()-date<=72*60*60*1000;
     });
-    if(fresh.length<3)return false;
+    if(fresh.length<3||fresh.filter((item:any)=>Boolean(item.imageUrl)).length<3)return false;
   }
   return true;
 }
