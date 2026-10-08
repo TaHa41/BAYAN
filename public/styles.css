@@ -205,3 +205,16 @@ html[dir="rtl"] .section-card:before{inset:0 0 0 auto;border-radius:0 18px 18px 
 .social-btn[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);background:var(--soft)}
 .like-count{font-variant-numeric:tabular-nums}
 @media(max-width:640px){.social-actions{gap:6px;padding:0 12px 14px}.social-btn{font-size:12px;padding:6px 10px}.article-card-link .article-card-body{padding:14px}.search-result .social-actions,.article-full>.social-actions{padding-top:12px}}
+
+/* City-selectable weather */
+.weather-city-form{display:grid;gap:10px;margin:18px 0 22px;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.weather-city-form label{font-weight:800}
+.weather-city-row{display:flex;gap:8px;align-items:stretch}
+.weather-city-row input{flex:1;min-width:0;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit}
+.weather-city-row button{white-space:nowrap}
+.weather-presets{display:flex;gap:7px;flex-wrap:wrap}
+.weather-preset{border:1px solid var(--line);border-radius:999px;padding:6px 10px;background:var(--bg);color:var(--ink);font:inherit;font-size:13px;cursor:pointer}
+.weather-preset:hover{border-color:var(--accent);color:var(--accent)}
+.weather-location{grid-column:1/-1;padding:4px 0}
+.weather-location h2{margin:5px 0;font-size:1.35rem}
+@media(max-width:520px){.weather-city-row{flex-direction:column}.weather-city-row button{width:100%}.weather-city-form{padding:12px}}
