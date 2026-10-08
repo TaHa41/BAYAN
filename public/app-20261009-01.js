@@ -54,6 +54,10 @@
       ? '<img loading="lazy" class="' + className + '" src="' + escapeHtml(item.imageUrl) + '" alt="' + escapeHtml(item.imageAlt || item.title || "") + '" onerror="this.onerror=null;this.style.display=\'none\';this.insertAdjacentHTML(\'afterend\',\'<div class=&quot;image-placeholder&quot;>BAYAN</div>\')">'
       : '<div class="image-placeholder">BAYAN</div>';
 
+  const heroImageHtml = (url, alt) =>
+    '<img class="article-hero-image" src="' + escapeHtml(url) + '" alt="' + escapeHtml(alt || "") +
+    '" onerror="this.onerror=null;this.style.display=\'none\';this.insertAdjacentHTML(\'afterend\',\'<div class=&quot;image-placeholder&quot;>BAYAN</div>\')">';
+
   const articleCard = (item) => {
     const body = imageHtml(item) +
       '<div class="article-card-body"><span class="kicker">' + escapeHtml(item.section || t("مادة","Content")) + "</span>" +
@@ -283,8 +287,7 @@
       const data = await api("/api/article?slug=" + encodeURIComponent(slug) + "&lang=" + lang);
       const output = document.querySelector("#article");
       output.innerHTML =
-        '<article class="article-full">' + (data.imageUrl ?
-        '<img class="article-hero-image" src="' + escapeHtml(data.imageUrl) + '" alt="' + escapeHtml(data.imageAlt || data.title) + '">' : "") +
+        '<article class="article-full">' + (data.imageUrl ? heroImageHtml(data.imageUrl, data.imageAlt || data.title) : "") +
         '<span class="eyebrow">' + escapeHtml(data.section || "BAYAN") + "</span><h1>" +
         escapeHtml(data.title) + '</h1><p class="lead">' + escapeHtml(data.summary || "") +
         '</p><div class="article-body">' + String(data.body || "").split(String.fromCharCode(10)).map((line) =>
@@ -297,8 +300,7 @@
         try {
           const image = await api("/api/image?q=" + encodeURIComponent(data.title + " " + (data.summary || "")));
           if (image.imageUrl) document.querySelector(".article-full")?.insertAdjacentHTML(
-            "afterbegin", '<img class="article-hero-image" src="' + escapeHtml(image.imageUrl) + '" alt="' +
-            escapeHtml(data.title) + '">');
+            "afterbegin", heroImageHtml(image.imageUrl, data.title));
         } catch {}
       }
     } catch {
@@ -338,8 +340,7 @@
             "&publishedAt=" + encodeURIComponent(story.publishedAt || "") + "&lang=" + lang);
           const article = articleData.article;
           output.innerHTML =
-            '<article class="article-full">' + (article.image ?
-            '<img class="article-hero-image" src="' + escapeHtml(article.image) + '" alt="' + escapeHtml(article.title) + '">' : "") +
+            '<article class="article-full">' + (article.image ? heroImageHtml(article.image, article.title) : "") +
             '<span class="eyebrow">' + escapeHtml(story.publisher || "News") + "</span><h1>" +
             escapeHtml(article.title) + '</h1><p class="lead">' + escapeHtml(article.summary || story.summary || "") +
             '</p><div class="article-body">' + String(article.body || "").split(String.fromCharCode(10)).map((line) =>
