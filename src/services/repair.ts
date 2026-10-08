@@ -56,6 +56,7 @@ async function repairRuntime(env:Env,failures:string[]){
     actions.push("admin settings verified")
   }catch{}
   actions.push(...await repairTaxonomy(env));
+  if(failures.includes("search"))actions.push("Recent search API failures detected in runtime_events; provider diagnosis and manual review required, automatic code mutation blocked");
   if(failures.includes("articles"))try{
     const row=await env.DB.prepare("SELECT COUNT(*) count FROM articles WHERE status='PUBLISHED'").first<any>();
     if(Number(row?.count||0)===0)actions.push("no published articles; deployment/content seed review required");
@@ -88,7 +89,8 @@ export async function selfHeal(env:Env){
     ["sections",async()=>{return (await sectionHealth(env)).length===0}],
     ["contributions",async()=>{await env.DB.prepare("SELECT 1 FROM contributions LIMIT 1").first();return true}],
     ["repair_state",async()=>{await env.DB.prepare("SELECT 1 FROM repair_jobs LIMIT 1").first();return true}],
-    ["settings",async()=>{await env.DB.prepare("SELECT key FROM admin_settings LIMIT 1").first();return true}]
+    ["settings",async()=>{await env.DB.prepare("SELECT key FROM admin_settings LIMIT 1").first();return true}],
+    ["search",async()=>{const row=await env.DB.prepare("SELECT COUNT(*) count FROM runtime_events WHERE kind='search_api_failed' AND created_at>=?").bind(new Date(Date.now()-60*60*1000).toISOString()).first<any>();return Number(row?.count||0)===0}]
   ];
   const failures:string[]=[];
   for(const[c,fn]of checks)try{if(!(await fn())){failures.push(c);await record(env,"error","health",c+" check failed")}}catch(e){failures.push(c);await record(env,"error","health",c+" failed: "+String(e))}
