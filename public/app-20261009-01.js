@@ -306,9 +306,19 @@
             "</div></article>").join(""))
         : '<div class="notice"><h2>' + t("لم تُرجع محركات البحث نتيجة الآن","Search providers returned no result right now") +
           '</h2><p>' + t("سيحاول بيان توسيع مسارات البحث بدل اختلاق معلومة.","BAYAN will expand its search paths rather than invent information.") + "</p></div>";
-    } catch {
-      document.querySelector("#out").innerHTML =
-        '<div class="notice">' + t("حدث خطأ مؤقت في البحث. حاول مرة أخرى.","Search is temporarily unavailable. Please try again.") + "</div>";
+    } catch (error) {
+      const output = document.querySelector("#out");
+      if (output) output.innerHTML =
+        '<div class="notice search-failure"><h2>' + t("تعذّر إكمال البحث","Search could not be completed") + '</h2><p>' +
+        t("قد يكون أحد مزودات البحث متوقفًا أو حدث خطأ في الخادم. تم تسجيل العطل للمراجعة؛ أعد المحاولة أو افتح الإدارة للتحقق من الحالة.","A search provider or the server may have failed. The incident was logged for review; retry or open admin to inspect the status.") +
+        '</p><p class="source-line">' + escapeHtml(String(error && error.message || "search_failed").slice(0, 180)) + '</p><button type="button" class="primary" id="retrySearch">' +
+        t("إعادة المحاولة","Retry search") + '</button> <a class="navbtn" href="/admin?lang=' + lang + '">' +
+        t("فتح الإدارة","Open admin") + '</a></div>';
+      document.querySelector("#retrySearch")?.addEventListener("click", () => {
+        const button = document.querySelector("#retrySearch");
+        if (button) { button.disabled = true; button.textContent = t("جارٍ إعادة المحاولة…","Retrying…"); }
+        renderSearch();
+      });
     }
   }
 
