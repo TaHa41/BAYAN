@@ -329,7 +329,7 @@
       '<div class="result-meta">' + escapeHtml((data.providers || []).join(" · ") || "BAYAN") + "</div>" +
       results.map((item) => {
         const key = item.slug || item.url || item.title;
-        return '<article class="search-result"><span class="kicker">' + escapeHtml(item.section || t("نتيجة بحث","Search result")) + " · " +
+        const sectionMeta=sections.find(section=>section[0]===item.section); const sectionLabel=sectionMeta?(ar?sectionMeta[1]:sectionMeta[2]):t("نتيجة بحث","Search result"); return '<article class="search-result"><span class="kicker">' + escapeHtml(sectionLabel) + " · " +
           escapeHtml(item.evidence || "mixed") + "</span><h2>" +
           (item.slug ? '<a href="/article/' + encodeURIComponent(item.slug) + '?lang=' + lang + '">' + escapeHtml(item.title) + "</a>" : escapeHtml(item.title)) +
           "</h2><p>" + escapeHtml(item.summary || "") + '</p><div class="source-line">' +
@@ -655,7 +655,7 @@
     jobs.push((async()=>{const url="https://"+wikiHost+"/w/api.php?action=query&generator=search&gsrsearch="+encodeURIComponent(query)+"&gsrlimit=8&prop=extracts|pageimages&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=900&format=json&origin=*";const r=await fetch(url,{signal:AbortSignal.timeout(6500),headers:{accept:"application/json"}});if(!r.ok)throw new Error("wiki");const d=await r.json();return Object.values(d.query?.pages||{}).map(x=>({title:String(x.title||""),summary:String(x.extract||"").slice(0,1400),section:"world",kind:"web",evidence:"mixed",sources:[{publisher:t("ويكيبيديا","Wikipedia"),title:String(x.title||""),url:"https://"+wikiHost+"/wiki/"+encodeURIComponent(String(x.title||"").replace(/ /g,"_"))}],url:"https://"+wikiHost+"/wiki/"+encodeURIComponent(String(x.title||"").replace(/ /g,"_"))}));})());
     jobs.push((async()=>{const url="https://www.wikidata.org/w/api.php?action=wbsearchentities&search="+encodeURIComponent(query)+"&language="+lang+"&limit=6&format=json&origin=*";const r=await fetch(url,{signal:AbortSignal.timeout(6000),headers:{accept:"application/json"}});if(!r.ok)throw new Error("wikidata");const d=await r.json();return(d.search||[]).map(x=>({title:String(x.label||""),summary:String(x.description||""),section:"people",kind:"web",evidence:"mixed",sources:[{publisher:t("ويكي بيانات","Wikidata"),title:String(x.label||""),url:"https://www.wikidata.org/wiki/"+x.id}],url:"https://www.wikidata.org/wiki/"+x.id}));})());
     const settled=await Promise.allSettled(jobs),items=settled.flatMap(x=>x.status==="fulfilled"?x.value:[]);
-    const seen=new Set();return items.filter(x=>x.title&&(/\u0600-\u06ff/.test("")?true:(ar?/[؀-ۿ]/.test(x.title):!(/[؀-ۿ]/.test(x.title))))).filter(x=>{const k=x.title.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;}).slice(0,12);
+    const seen=new Set();return items.filter(x=>x.title&&(ar?/\u0600-\u06ff/.test(x.title):!/\u0600-\u06ff/.test(x.title))).filter(x=>{const k=x.title.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;}).slice(0,12);
   }
 
   async function renderTools() {
