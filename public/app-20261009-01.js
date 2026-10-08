@@ -513,19 +513,31 @@
   }
 
   async function renderWeather() {
-    app.innerHTML = '<section class="page narrow"><div class="page-head"><span class="eyebrow">'+t("بيانات مناخية مباشرة","Live weather data")+'</span><h1>'+t("الطقس","Weather")+'</h1><p>'+t("حالة الطقس ودرجة الحرارة والرطوبة والرياح في صفحة مستقلة عن أسعار الأسواق.","Weather conditions, temperature, humidity and wind, separate from market prices.")+'</p></div><div id="weatherPanel" class="live-grid"><div class="notice loading">'+t("جاري تحديث الطقس…","Loading weather…")+'</div></div><p class="muted">'+t("المصدر: Open-Meteo. قد تتأخر البيانات أو تتعذر عند توقف المزود.","Source: Open-Meteo. Data may be delayed or unavailable if the provider is down.")+'</p><a class="navbtn" href="/prices?lang='+lang+'">'+t("العودة إلى الأسعار","Back to prices")+'</a></section>';
-    try {
-      const weather = await api("/api/live/weather");
-      const c = weather.current || {};
-      document.querySelector("#weatherPanel").innerHTML =
-        '<article class="live live-card"><span class="kicker">'+t("درجة الحرارة","Temperature")+'</span><h2>'+escapeHtml(c.temperature_2m ?? "—")+' °C</h2><p>'+t("الطقس الحالي","Current conditions")+'</p><span class="source-line">'+escapeHtml(weather.provider||"Open-Meteo")+'</span></article>'+
-        '<article class="live live-card"><span class="kicker">'+t("الرطوبة","Humidity")+'</span><h2>'+escapeHtml(c.relative_humidity_2m ?? "—")+'%</h2></article>'+
-        '<article class="live live-card"><span class="kicker">'+t("سرعة الرياح","Wind speed")+'</span><h2>'+escapeHtml(c.wind_speed_10m ?? "—")+' km/h</h2></article>';
-    } catch {
-      document.querySelector("#weatherPanel").innerHTML='<div class="notice">'+t("تعذر تحديث بيانات الطقس الآن.","Weather data is temporarily unavailable.")+'</div>';
+    const requestedCity=new URLSearchParams(location.search).get("city")||"Hurghada";
+    app.innerHTML = '<section class="page narrow"><div class="page-head"><span class="eyebrow">'+t("بيانات مناخية مباشرة","Live weather data")+'</span><h1>'+t("الطقس","Weather")+'</h1><p>'+t("اختر أي مدينة لمشاهدة الطقس فيها؛ لا يقتصر بيان على القاهرة.","Choose a city to view its weather. BAYAN is not limited to Cairo.")+'</p></div><form id="weatherCityForm" class="weather-city-form"><label for="weatherCity">'+t("المدينة أو المنطقة","City or region")+'</label><div class="weather-city-row"><input id="weatherCity" name="city" maxlength="100" value="'+escapeHtml(requestedCity)+'" placeholder="'+t("مثال: الغردقة أو القاهرة أو London","e.g. Hurghada, Cairo or London")+'" required><button type="submit" class="btn primary">'+t("عرض الطقس","Show weather")+'</button></div><div class="weather-presets">'+["الغردقة","القاهرة","الإسكندرية","الأقصر","أسوان","الرياض","دبي","London","New York"].map((city)=>'<button type="button" class="weather-preset" data-city="'+escapeHtml(city)+'">'+escapeHtml(city)+'</button>').join("")+'</div></form><div id="weatherPanel" class="live-grid"><div class="notice loading">'+t("جاري تحديث الطقس…","Loading weather…")+'</div></div><p class="muted">'+t("المصدر: Open-Meteo. قد تتأخر البيانات أو تتعذر عند توقف المزود.","Source: Open-Meteo. Data may be delayed or unavailable if the provider is down.")+'</p><a class="navbtn" href="/prices?lang='+lang+'">'+t("العودة إلى الأسعار","Back to prices")+'</a></section>';
+    const form=document.querySelector("#weatherCityForm");
+    const cityInput=document.querySelector("#weatherCity");
+    async function loadWeather(city){
+      const panel=document.querySelector("#weatherPanel");
+      if(!panel)return;
+      panel.innerHTML='<div class="notice loading">'+t("جاري تحديث الطقس…","Loading weather…")+'</div>';
+      try {
+        const weather=await api("/api/live/weather?city="+encodeURIComponent(city));
+        if(!weather.ok)throw new Error(weather.message||"weather_unavailable");
+        const c=weather.current||{},place=[weather.city,weather.region,weather.country].filter(Boolean).join("، ");
+        panel.innerHTML='<div class="weather-location"><span class="kicker">'+t("الطقس في","Weather in")+'</span><h2>'+escapeHtml(place||city)+'</h2></div>'+
+          '<article class="live live-card"><span class="kicker">'+t("درجة الحرارة","Temperature")+'</span><h2>'+escapeHtml(c.temperature_2m??"—")+' °C</h2><p>'+t("الطقس الحالي","Current conditions")+'</p><span class="source-line">'+escapeHtml(weather.provider||"Open-Meteo")+'</span></article>'+
+          '<article class="live live-card"><span class="kicker">'+t("الرطوبة","Humidity")+'</span><h2>'+escapeHtml(c.relative_humidity_2m??"—")+'%</h2></article>'+
+          '<article class="live live-card"><span class="kicker">'+t("سرعة الرياح","Wind speed")+'</span><h2>'+escapeHtml(c.wind_speed_10m??"—")+' km/h</h2></article>';
+        const url=new URL(location.href);url.searchParams.set("city",city);history.replaceState(null,"",url.pathname+url.search);
+      } catch {
+        panel.innerHTML='<div class="notice">'+t("لم نعثر على المدينة أو تعذر تحديث الطقس. جرّب كتابة اسم المدينة بالإنجليزية أو اختَر مدينة مقترحة.","City not found or weather unavailable. Try the city name in English or choose a suggested city.")+'</div>';
+      }
     }
+    form.addEventListener("submit",event=>{event.preventDefault();const city=String(cityInput.value||"").trim();if(city)loadWeather(city)});
+    document.querySelectorAll("[data-city]").forEach(button=>button.addEventListener("click",()=>{cityInput.value=button.getAttribute("data-city")||"";loadWeather(cityInput.value)}));
+    loadWeather(requestedCity);
   }
-
   async function renderPrices() {
     app.innerHTML =
       '<section class="page"><div class="page-head"><span class="eyebrow">' +
