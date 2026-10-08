@@ -43,7 +43,7 @@ if(u.pathname==="/api/admin/article/expand"&&request.method==="POST"){
   if(!row)return json({error:"article_not_found"},404);
   let sources:any[]=[];try{sources=JSON.parse(String(row.sources_json||"[]"))}catch{}
   sources=sources.filter((source:any)=>String(source.url||"").startsWith("https://")).slice(0,5);
-  const domains=new Set(sources.map((source:any)=>{try{return new URL(source.url).hostname.replace(/^www\\./,"")}catch{return ""}}).filter(Boolean));
+  const domains=new Set(sources.map((source:any)=>{try{return new URL(source.url).hostname.replace(/^www\./,"")}catch{return ""}}).filter(Boolean));
   if(sources.length<2||domains.size<2)return json({ok:false,error:"insufficient_sources",message:language==="ar"?"المقال لا يحتوي على مصدرين مستقلين صالحين للتوسيع. أضف مصادر موثوقة أولًا.":"This article lacks two independent valid sources. Add reliable sources before expanding it."},422);
   const evidence=await Promise.all(sources.map(async(source:any)=>{
     const url=String(source.url||"");
