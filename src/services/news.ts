@@ -64,7 +64,7 @@ const readFeed = async (name: string, url: string): Promise<Story[]> => {
         const tag = (name: string) =>
           esc(
             item.match(
-              new RegExp("<" + name + "[^>]*>([\\s\\S]*?)</" + name + ">", "i"),
+              new RegExp("<" + name + "[^>]*>([\s\S]*?)</" + name + ">", "i"),
             )?.[1] || "",
           );
         const imageUrl = item.match(
@@ -212,7 +212,7 @@ export async function findRelatedImage(query: string): Promise<string | undefine
     }
     const exact = await wikipediaExactImage(query);
     if (exact) return exact;
-    const firstVariant = query.trim().split(/[،,:-]/)[0].split(/\\s+/).slice(0,6).join(" ").trim();
+    const firstVariant = query.trim().split(/[،,:-]/)[0].split(/\s+/).slice(0,6).join(" ").trim();
     if (firstVariant && firstVariant !== query.trim()) {
       const image = await wikipediaImage(firstVariant);
       if (image) return image;
@@ -223,7 +223,8 @@ export async function findRelatedImage(query: string): Promise<string | undefine
   }
 }
 
-const hasArabic = (value: string) => /[\u0600-\u06ff]/.test(value);
+const hasArabic = (value: string) => /[\u0600-\u06ff]/.test(String(value || ""));
+const languageSafeText = (value: string, lang: Locale) => !value || (lang === "ar" ? hasArabic(value) : !hasArabic(value));
 
 const readNewsCache = async (env: Env, lang: Locale): Promise<{items: Story[]; updatedAt?: string} | null> => {
   try {
@@ -291,7 +292,7 @@ export async function news(env: Env, lang: Locale) {
   if (lang === "ar") {
     // A publisher may return an Arabic headline with an English or empty description.
     // The headline is the authoritative language signal; never discard a valid Arabic story because of metadata language.
-    all = all.filter((story) => hasArabic(story.title));
+    all = all.filter((story) => hasArabic(story.title)).map((story) => ({ ...story, summary: languageSafeText(story.summary, "ar") ? story.summary : "" }));
     // Do not wait for a total provider outage before falling back: a partial RSS
     // batch is common and must not produce an almost-empty BAYAN news page.
     if (all.length < 3) {
@@ -304,7 +305,7 @@ export async function news(env: Env, lang: Locale) {
     }
   } else {
     // English mode must never surface Arabic headlines, including from fallback providers.
-    all = all.filter((story) => !hasArabic(story.title));
+    all = all.filter((story) => !hasArabic(story.title)).map((story) => ({ ...story, summary: languageSafeText(story.summary, "en") ? story.summary : "" }));
     if (all.length < 3) {
       all = [...all, ...(await gdeltFallback(lang)).filter((story) => !hasArabic(story.title))];
     }
