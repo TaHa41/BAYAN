@@ -3,6 +3,8 @@ const checks=["/","/saved?lang=ar","/tools?lang=ar","/about?lang=ar","/methodolo
 const sections=["science","technology","economy","politics","health","history","people","sports","travel","art","news","trends","prices","egypt","arab","world"];
 let bad=0;
 let bundleText="";
+let bundlePath="";
+let bundleVersion="";
 async function get(path){
   const r=await fetch(origin+path,{redirect:"manual",headers:{accept:"application/json,text/plain,*/*"},signal:AbortSignal.timeout(25000)});
   const text=await r.text();
@@ -16,8 +18,8 @@ try{
   if(!/<html[^>]+lang="en"/.test(h.text))throw new Error("english_lang_missing");
   const bundleMatch=h.text.match(/<script src="(\/app-[^"]+\.js\?v=[^"]+)"/);
   if(!bundleMatch)throw new Error("current_bundle_missing");
-  const bundlePath=bundleMatch[1].split("?")[0];
-  const bundleVersion=new URL(bundleMatch[1],"https://bayan.invalid").searchParams.get("v");
+  bundlePath=bundleMatch[1].split("?")[0];
+  bundleVersion=new URL(bundleMatch[1],"https://bayan.invalid").searchParams.get("v")||"";
   if(!bundleVersion)throw new Error("current_shell_bundle_version_missing");
   if(!h.text.includes("fallback-home")||!h.text.includes("Start searching")||h.text.includes("ابدأ البحث")||h.text.includes("??lang="))throw new Error("english_shell_fallback_not_localized");
 }catch(e){console.error("SHELL",e);bad++}
