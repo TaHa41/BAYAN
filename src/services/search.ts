@@ -108,7 +108,7 @@ const localeSafeText=(value:string,language:Locale)=>{
 const languageSafe=(x:Candidate,language:Locale)=>{
   const title=String(x.title||""),summary=String(x.summary||"");
   return language==="ar" ? hasArabic(title) && localeSafeText(summary,language) : !hasArabic(title) && localeSafeText(summary,language);
-};export async function search(env:Env,q:string,language:Locale):Promise<SearchResponse>{
+};export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean}={}):Promise<SearchResponse>{
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};let [local, wiki, wd, gd, oa, remote, dd] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe(s.source_openalex==="0"?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[])]);
 if(!local.length && !wiki.length && !wd.length && !gd.length && !oa.length && !remote.length && !dd.length) gd=await broadGdelt(q);
   const providerAttempted=["BAYAN Knowledge Base","Wikipedia","Wikidata","GDELT","OpenAlex","Cloudflare AI Search","DuckDuckGo"];const candidates:Candidate[]=[
@@ -127,7 +127,7 @@ if(!local.length && !wiki.length && !wd.length && !gd.length && !oa.length && !r
   let answer:string|undefined;
   let answerStatus:SearchResponse["status"]|undefined;
   if(status==="verified" && results.length){
-    try{const drafted=await ask(env,q,language,results);if(drafted.answer){answer=drafted.answer;answerStatus=drafted.status;}if(drafted.answer && drafted.status==="verified") publishedSlug=await publishVerifiedResearch(env,{title:results[0].title,summary:results[0].summary||q,body:drafted.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[])});}catch{}
+    try{const drafted=await ask(env,q,language,results);if(drafted.answer){answer=drafted.answer;answerStatus=drafted.status;}if(options.publish!==false&&drafted.answer && drafted.status==="verified") publishedSlug=await publishVerifiedResearch(env,{title:results[0].title,summary:results[0].summary||q,body:drafted.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[])});}catch{}
   }
   const message=results.length?undefined:(language==="ar"?"تعذر العثور على نتيجة من مصادر البحث المتاحة حاليًا. يمكن توسيع البحث لاحقًا عند توفر مزودات إضافية.":"No result was returned by the available search providers right now. The search can be expanded when additional providers are available.");
   try{await saveSearch(env,q,language,intent(q),status,results.length)}catch{}
