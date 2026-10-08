@@ -18,15 +18,19 @@ const feeds = (lang: Locale) =>
         ["DW عربية", "https://rss.dw.com/rdf/rss-ar-all"],
         ["فرانس 24 عربي", "https://www.france24.com/ar/rss"],
         ["سكاي نيوز عربية", "https://www.skynewsarabia.com/rss"],
+        ["اندبندنت عربية", "https://www.independentarabia.com/rss.xml"],
+        ["الشرق الأوسط", "https://aawsat.com/rss.xml"],
         ["أخبار Google عربية", "https://news.google.com/rss?hl=ar&gl=EG&ceid=EG:ar"],
         ["أخبار مصر", "https://news.google.com/rss/search?q=مصر&hl=ar&gl=EG&ceid=EG:ar"],
         ["أخبار عربية", "https://news.google.com/rss/search?q=العالم%20العربي&hl=ar&gl=EG&ceid=EG:ar"],
       ]
     : [
-        ["BBC", "https://feeds.bbci.co.uk/news/rss.xml"],
-        ["Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml"],
-        ["DW", "https://rss.dw.com/rdf/rss-en-all"],
-        ["France 24", "https://www.france24.com/en/rss"],
+        ["BBC News", "https://feeds.bbci.co.uk/news/rss.xml"],
+        ["Reuters", "https://www.reuters.com/world/rss"],
+        ["Associated Press", "https://feeds.apnews.com/rss/apf-topnews"],
+        ["Al Jazeera English", "https://www.aljazeera.com/xml/rss/all.xml"],
+        ["DW English", "https://rss.dw.com/rdf/rss-en-all"],
+        ["France 24 English", "https://www.france24.com/en/rss"],
         ["The Guardian", "https://www.theguardian.com/world/rss"],
       ];
 
