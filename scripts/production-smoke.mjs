@@ -82,7 +82,7 @@ for(const section of sections.filter(section=>section!=="prices")){
       const x=await get("/api/section?section="+section+"&lang="+language); const d=JSON.parse(x.text);
       if(!Array.isArray(d.items)||d.items.length<2)throw new Error(section+"_"+language+"_needs_at_least_two_articles");
       const badLanguage=language==="ar"?d.items.filter(x=>!/[\u0600-\u06ff]/.test(String(x.title))).length:0;
-      const languageMismatch=language==="ar"?d.items.filter(x=>!/[؀-ۿ]/.test(String(x.title))).length:d.items.filter(x=>/[؀-ۿ]/.test(String(x.title))).length; if(languageMismatch>d.items.length/2)throw new Error(section+"_"+language+"_content_language_mismatch");
+      const languageMismatch=language==="ar"?d.items.filter(x=>!/[؀-ۿ]/.test(String(x.title))).length:d.items.filter(x=>/[؀-ۿ]/.test(String(x.title))).length; if(languageMismatch>d.items.length/2)throw new Error(section+"_"+language+"_content_language_mismatch"); const bodies=d.items.map(x=>String(x.body||x.summary||"")); if(language==="ar" && bodies.length && bodies.filter(x=>x && /[؀-ۿ]/.test(x)).length < Math.ceil(bodies.length/2)) throw new Error(section+"_"+language+"_body_language_mismatch"); if(language==="en" && bodies.length && bodies.filter(x=>x && !/[؀-ۿ]/.test(x)).length < Math.ceil(bodies.length/2)) throw new Error(section+"_"+language+"_body_language_mismatch");
     }catch(e){console.error("SECTION",section,language,e);bad++}
   }
 }
