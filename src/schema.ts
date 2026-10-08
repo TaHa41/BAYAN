@@ -2,11 +2,14 @@ import type{Env}from"./types";let ready:Promise<void>|undefined;const statements
   try{
     const columns=await env.DB.prepare("PRAGMA table_info(saved_articles)").all<any>();
     const names=(columns.results||[]).map((column:any)=>String(column.name));
-    if(names.length&&!names.includes("slug")){
-      await env.DB.prepare("ALTER TABLE saved_articles ADD COLUMN slug TEXT NOT NULL DEFAULT ''").run();
-      const source=["article_slug","saved_slug","article_id","article_url","url"].find((name)=>names.includes(name));
-      if(source)await env.DB.prepare("UPDATE saved_articles SET slug=CAST("+source+" AS TEXT) WHERE slug=''").run();
+    const legacy=["article_slug","saved_slug","article_id","article_url","url"].find((name)=>names.includes(name));
+    if(names.length&&names.includes("visitor_id")&&names.includes("created_at")&&(!names.includes("slug")||legacy)){
+      const source=legacy||"slug";
+      await env.DB.prepare("CREATE TABLE IF NOT EXISTS saved_articles_compat(visitor_id TEXT NOT NULL,slug TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(visitor_id,slug))").run();
+      await env.DB.prepare("INSERT OR IGNORE INTO saved_articles_compat(visitor_id,slug,created_at) SELECT CAST(visitor_id AS TEXT),COALESCE(CAST("+source+" AS TEXT),''),CAST(created_at AS TEXT) FROM saved_articles WHERE "+source+" IS NOT NULL AND trim(CAST("+source+" AS TEXT))<>''").run();
+      await env.DB.prepare("DROP TABLE saved_articles").run();
+      await env.DB.prepare("ALTER TABLE saved_articles_compat RENAME TO saved_articles").run();
     }
-    if(names.length)await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_saved_articles_visitor_created ON saved_articles(visitor_id,created_at)").run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_saved_articles_visitor_created ON saved_articles(visitor_id,created_at)").run();
   }catch{}
   try{await env.DB.prepare("CREATE TABLE IF NOT EXISTS repair_attempts(id INTEGER PRIMARY KEY AUTOINCREMENT,signature TEXT NOT NULL,attempt_no INTEGER NOT NULL,diagnosis TEXT,action TEXT,verification TEXT NOT NULL,created_at TEXT NOT NULL,UNIQUE(signature,attempt_no))").run()}catch{}try{const columns=await env.DB.prepare("PRAGMA table_info(news_cache)").all<any>();if(!(columns.results||[]).some((column:any)=>column.name==="payload"))await env.DB.prepare("ALTER TABLE news_cache ADD COLUMN payload TEXT").run();await env.DB.prepare("UPDATE runtime_events SET level='INFO',message='Resolved by schema compatibility migration: '||message WHERE kind IN ('news_cache_read','news_cache_write') AND level='WARN' AND message LIKE '%payload%'").run()}catch{} }).catch(e=>{ready=undefined;throw e});return ready}
