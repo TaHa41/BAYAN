@@ -238,7 +238,7 @@
       const data = await api("/api/search?q=" + encodeURIComponent(query) + "&lang=" + lang);
       const output = document.querySelector("#out");
       output.innerHTML = data.results?.length
-        ? ((data.answer ? '<article class="answer search-answer"><span class="eyebrow">' + t("إجابة بيان","BAYAN answer") + '</span><div class="article-body">' + String(data.answer).split(/\\n+/).map((line) => "<p>" + escapeHtml(line) + "</p>").join("") + '</div>' + (data.articleSlug ? '<a class="read" href="/article/' + encodeURIComponent(data.articleSlug) + "?lang=" + lang + '">' + t("فتح الملف الكامل داخل بيان","Open the full BAYAN file") + " →</a>" : "") + "</article>" : "") + '<div class="result-meta">' + escapeHtml((data.providers || []).join(" · ") || "BAYAN") + "</div>" +
+        ? ((data.answer ? '<article class="answer search-answer"><span class="eyebrow">' + t("إجابة بيان","BAYAN answer") + '</span><div class="article-body">' + String(data.answer).split(String.fromCharCode(10)).map((line) => "<p>" + escapeHtml(line) + "</p>").join("") + '</div>' + (data.articleSlug ? '<a class="read" href="/article/' + encodeURIComponent(data.articleSlug) + "?lang=" + lang + '">' + t("فتح الملف الكامل داخل بيان","Open the full BAYAN file") + " →</a>" : "") + "</article>" : "") + '<div class="result-meta">' + escapeHtml((data.providers || []).join(" · ") || "BAYAN") + "</div>" +
           data.results.map((item) =>
             '<article class="search-result"><span class="kicker">' + escapeHtml(item.section) + " · " +
             escapeHtml(item.evidence) + "</span><h2>" +
@@ -267,8 +267,7 @@
         '<img class="article-hero-image" src="' + escapeHtml(data.imageUrl) + '" alt="' + escapeHtml(data.imageAlt || data.title) + '">' : "") +
         '<span class="eyebrow">' + escapeHtml(data.section || "BAYAN") + "</span><h1>" +
         escapeHtml(data.title) + '</h1><p class="lead">' + escapeHtml(data.summary || "") +
-        '</p><div class="article-body">' + String(data.body || "").split(/
-+/).map((line) =>
+        '</p><div class="article-body">' + String(data.body || "").split(String.fromCharCode(10)).map((line) =>
         "<p>" + escapeHtml(line) + "</p>").join("") +
         '</div><div class="sources-box"><h2>' + t("الأدلة والمصادر","Evidence & sources") + "</h2>" +
         (data.sources || []).map((source) =>
@@ -319,8 +318,7 @@
             '<img class="article-hero-image" src="' + escapeHtml(article.image) + '" alt="' + escapeHtml(article.title) + '">' : "") +
             '<span class="eyebrow">' + escapeHtml(story.publisher || "News") + "</span><h1>" +
             escapeHtml(article.title) + '</h1><p class="lead">' + escapeHtml(article.summary || story.summary || "") +
-            '</p><div class="article-body">' + String(article.body || "").split(/
-+/).map((line) =>
+            '</p><div class="article-body">' + String(article.body || "").split(String.fromCharCode(10)).map((line) =>
             "<p>" + escapeHtml(line) + "</p>").join("") +
             '</div><div class="sources-box"><h2>' + t("الأدلة والمصادر","Evidence & sources") + "</h2>" +
             (article.sources || []).map((source) =>
