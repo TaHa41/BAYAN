@@ -90,8 +90,8 @@ async function repairRuntime(env:Env,failures:string[]){
     const missing=CONTENT_SECTIONS.flatMap(section=>["ar","en"].filter(language=>!Number((rows.results||[]).find((r:any)=>r.section===section&&r.language===language)?.count||0)).map(language=>section+"_"+language));
     if(missing.length)actions.push("missing section content: "+missing.join(", "));
   }catch{}
-  if(failures.includes("images"))try{
-    const rows=await env.DB.prepare("SELECT id,title,summary FROM articles WHERE status='PUBLISHED' AND (image_url IS NULL OR trim(image_url)='') ORDER BY updated_at DESC LIMIT 12").all<any>();
+  if(failures.includes("images")&&failures.includes("news_cache")){actions.push("image repair deferred until the next run to preserve Worker subrequest budget after news refresh")}else if(failures.includes("images"))try{
+    const rows=await env.DB.prepare("SELECT id,title,summary FROM articles WHERE status='PUBLISHED' AND (image_url IS NULL OR trim(image_url)='') ORDER BY updated_at DESC LIMIT 4").all<any>();
     let filledArticles=0;
     for(const row of rows.results||[])try{const url=await findRelatedImage(String(row.title)+" "+String(row.summary||""));if(url){await env.DB.prepare("UPDATE articles SET image_url=?,updated_at=? WHERE id=? AND (image_url IS NULL OR trim(image_url)='')").bind(url,now(),row.id).run();filledArticles++}}catch{}
     let filledNews=0;
@@ -101,14 +101,14 @@ async function repairRuntime(env:Env,failures:string[]){
       const parsed=JSON.parse(String(row.payload));
       const items:any[]=Array.isArray(parsed)?parsed:(Array.isArray(parsed?.items)?parsed.items:[]);
       let changed=false;
-      for(const item of items.filter((entry:any)=>!entry.imageUrl).slice(0,4)){
+      for(const item of items.filter((entry:any)=>!entry.imageUrl).slice(0,3)){
         const url=await findRelatedImage(String(item.title||"")+" "+String(item.summary||""));
         if(url){item.imageUrl=url;item.imageAlt=String(item.title||"");filledNews++;changed=true}
       }
       if(changed&&Array.isArray(parsed))await env.DB.prepare("UPDATE news_cache SET payload=?,updated_at=? WHERE language=?").bind(JSON.stringify(items.slice(0,40)),now(),language).run();
       else if(changed&&parsed&&Array.isArray(parsed.items))await env.DB.prepare("UPDATE news_cache SET payload=?,updated_at=? WHERE language=?").bind(JSON.stringify({...parsed,items:items.slice(0,40)}),now(),language).run();
     }catch{}
-    actions.push("image repair filled "+filledArticles+" article(s) and "+filledNews+" cached news image(s); attempted up to 12 articles and 4 stories per locale");
+    actions.push("image repair filled "+filledArticles+" article(s) and "+filledNews+" cached news image(s); attempted up to 4 articles and 3 stories per locale");
   }catch{actions.push("image repair failed before completion; inspect runtime_events for database or image-provider errors")}
   return actions;
 }
@@ -155,14 +155,12 @@ export async function selfHeal(env:Env){
   const diagnosis=await diagnose(env,failures);
   const actions=await repairRuntime(env,failures);
   let verification="repair_attempted";
-  try{
-    const db=await env.DB.prepare("SELECT 1").first();
-    const article=await env.DB.prepare("SELECT COUNT(*) count FROM articles WHERE status='PUBLISHED'").first<any>();
-    const missing=await sectionHealth(env);
-    const newsHealthy=await newsCacheHealthy(env);
-    const imagesHealthy=await imageHealth(env);
-    verification=db&&Number(article?.count||0)>0&&missing.length===0&&newsHealthy&&imagesHealthy?"verified_runtime":"needs_deployment_or_manual_review";
-  }catch{verification="verification_failed"}
+  const remainingFailures:string[]=[];
+  for(const [name,check] of checks){
+    try{if(!(await check()))remainingFailures.push(name)}
+    catch{remainingFailures.push(name)}
+  }
+  verification=remainingFailures.length===0?"verified_runtime":"needs_deployment_or_manual_review";
   const signature=failures.join(",");
   const nextStatus=verification==="verified_runtime"?"REPAIRED":"REVIEW";
   let shouldNotify=true;
@@ -172,9 +170,9 @@ export async function selfHeal(env:Env){
     if(previous&&previous.status===nextStatus&&Number.isFinite(previousTime)&&Date.now()-previousTime<30*60*1000)shouldNotify=false;
   }catch{}
   try{await env.DB.prepare("INSERT INTO repair_jobs(signature,status,diagnosis,action,verification,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(signature) DO UPDATE SET status=excluded.status,diagnosis=excluded.diagnosis,action=excluded.action,verification=excluded.verification,updated_at=excluded.updated_at").bind(signature,nextStatus,diagnosis,actions.join("; ")||"No safe runtime action available",verification,now(),now()).run()}catch{}
-  await record(env,verification==="verified_runtime"?"info":"error","self_heal",JSON.stringify({failures,actions,verification}).slice(0,3800));
-  if(shouldNotify)await notify(env,"BAYAN AI Self-Healing\nFailures: "+failures.join(", ")+"\nAction: "+(actions.join("; ")||"none")+"\nVerification: "+verification);
-  return{ok:verification==="verified_runtime",failures,diagnosis,actions,verification};
+  await record(env,verification==="verified_runtime"?"info":"error","self_heal",JSON.stringify({initialFailures:failures,remainingFailures,actions,verification}).slice(0,3800));
+  if(shouldNotify)await notify(env,"BAYAN AI Self-Healing\nInitial failures: "+failures.join(", ")+"\nRemaining failures: "+(remainingFailures.join(", ")||"none")+"\nAction: "+(actions.join("; ")||"none")+"\nVerification: "+verification);
+  return{ok:verification==="verified_runtime",failures:remainingFailures,initialFailures:failures,diagnosis,actions,verification};
 }
 
 export async function aiRepairRequest(env:Env,problem:string){
