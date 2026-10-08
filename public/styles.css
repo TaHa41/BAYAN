@@ -178,3 +178,19 @@ html[dir="rtl"] .section-card:before{inset:0 0 0 auto;border-radius:0 18px 18px 
 .section-title{margin:1.6rem 0 .8rem;font-size:1.2rem}
 .muted{opacity:.76;font-size:.85rem;line-height:1.65}
 @media(max-width:680px){.market-row{gap:.5rem}.market-row span{font-size:.82rem}.market-row small{font-size:.68rem}.market-row strong{font-size:.9rem}}
+
+
+/* Compact, section-driven administration */
+[hidden]{display:none!important}
+.admin-login-compact{display:grid;gap:12px}
+.admin-auth-row,.admin-action-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.admin-auth-row .field{flex:1;min-width:180px}
+.admin-maintenance{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:12px 14px}
+.admin-maintenance summary{cursor:pointer;font-weight:800;color:var(--accent);padding:3px}
+.admin-maintenance-body{display:grid;gap:12px;padding-top:14px}
+.admin-shortcuts{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 20px}
+.admin-shortcuts a{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:10px;padding:9px 13px;text-decoration:none;background:var(--surface);font-weight:750}
+.admin-shortcuts a.active,.admin-shortcuts a[aria-expanded="true"]{background:var(--soft);border-color:var(--accent);color:var(--accent)}
+.admin-panel{scroll-margin-top:92px}
+.admin-panel[hidden]{display:none!important}
+@media(max-width:640px){.admin-auth-row>*{width:100%}.admin-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.admin-shortcuts a{justify-content:center;text-align:center}.admin-maintenance-body .admin-action-row>*{flex:1}}
