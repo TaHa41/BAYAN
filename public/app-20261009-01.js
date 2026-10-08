@@ -12,10 +12,7 @@
     ["art","فن وترفيه","Arts & Entertainment","الفن والترفيه والثقافة الشعبية.","Arts, entertainment and popular culture.","✦"],
     ["news","أخبار موثقة","Verified News","أخبار حديثة تُعرض بعد التحقق من مصادرها.","Current news presented after source verification.","◉"],
     ["trends","اهتمام واتجاهات","Interest & Trends","ما يلفت اهتمام الناس واتجاهات النقاش، مع فصلها عن الأخبار الموثقة.","What captures attention and discussion trends, kept separate from verified news.","↗"],
-    ["prices","أسعار وبيانات مباشرة","Prices & Live Data","الأسعار والطقس والعملات والبيانات الحية.","Prices, weather, currencies and live data.","◌"],
-    ["egypt","مصر","Egypt","المعرفة والأخبار والبيانات المتعلقة بمصر.","Knowledge, news and data about Egypt.","🇪🇬"],
-    ["arab","العالم العربي","Arab World","المعرفة والأخبار والسياق في العالم العربي.","Knowledge, news and context across the Arab world.","◇"],
-    ["world","العالم","World","المعرفة والأخبار والسياق من أنحاء العالم.","Knowledge, news and context from around the world.","◆"]
+    ["prices","أسعار وبيانات مباشرة","Prices & Live Data","الأسعار والطقس والعملات والبيانات الحية.","Prices, weather, currencies and live data.","◌"]
   ];
   const primarySections = sections.filter((section) => !["egypt","arab","world"].includes(section[0]));
   const params = new URLSearchParams(location.search);
