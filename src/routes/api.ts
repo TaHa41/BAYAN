@@ -41,19 +41,28 @@ if(u.pathname==="/api/admin/article/expand"&&request.method==="POST"){
   if(!slug)return json({error:"invalid_article"},400);
   const row=await env.DB.prepare("SELECT slug,language,title,summary,body,section,sources_json FROM articles WHERE slug=? AND language=? LIMIT 1").bind(slug,language).first<any>();
   if(!row)return json({error:"article_not_found"},404);
-  let sources:any[]=[];try{sources=JSON.parse(String(row.sources_json||"[]"))}catch{}
-  sources=sources.filter((source:any)=>String(source.url||"").startsWith("https://")).slice(0,5);
+  let storedSources:any[]=[];try{storedSources=JSON.parse(String(row.sources_json||"[]"))}catch{}
+  const discovery=await bounded(search(env,String(row.title),language,{publish:false}),7000).catch(()=>({results:[] as any[]}));
+  const discovered=Array.isArray(discovery.results)?discovery.results.slice(0,5):[];
+  const combinedSources=[...storedSources,...discovered.flatMap((item:any)=>item.sources||[])];
+  const seenUrls=new Set<string>();
+  const sources=combinedSources.filter((source:any)=>{
+    const url=String(source.url||"");
+    if(!url.startsWith("https://")||seenUrls.has(url))return false;
+    seenUrls.add(url);return true;
+  }).slice(0,5);
   const domains=new Set(sources.map((source:any)=>{try{return new URL(source.url).hostname.replace(/^www\./,"")}catch{return ""}}).filter(Boolean));
-  if(sources.length<2||domains.size<2)return json({ok:false,error:"insufficient_sources",message:language==="ar"?"المقال لا يحتوي على مصدرين مستقلين صالحين للتوسيع. أضف مصادر موثوقة أولًا.":"This article lacks two independent valid sources. Add reliable sources before expanding it."},422);
-  const evidence=await Promise.all(sources.map(async(source:any)=>{
+  if(sources.length<2||domains.size<2)return json({ok:false,error:"insufficient_sources",message:language==="ar"?"تعذر العثور على مصدرين مستقلين صالحين لهذا المقال. لم يتم تغيير المحتوى.":"Could not find two independent valid sources for this article. No content was changed."},422);
+  const sourceEvidence=await Promise.all(sources.map(async(source:any)=>{
     const url=String(source.url||"");
     const extracted=await bounded(sourceArticleText(url,language),4500).catch(()=>"");
     const description=String(source.summary||"")||await bounded(sourceDescription(url,language),2500).catch(()=>"");
-    const summary=extracted||description;
+    const summary=extracted||(language==="ar"?/[\u0600-\u06ff]/.test(description):! /[\u0600-\u06ff]/.test(description)?description:"");
     return {title:String(source.title||row.title),summary,section:String(row.section||"world"),kind:"web",evidence:"mixed",sources:[source]} as any;
   }));
-  const useful=evidence.filter((item:any)=>String(item.summary||"").trim().length>=120);
-  if(useful.length<2)return json({ok:false,error:"insufficient_source_text",message:language==="ar"?"تعذر استخراج نص كافٍ من مصدرين. لم يتم تغيير المقال.":"Could not extract enough text from two sources. The article was not changed."},422);
+  const searchEvidence=discovered.filter((item:any)=>String(item.summary||"").trim().length>=120);
+  const useful=[...searchEvidence,...sourceEvidence].filter((item:any)=>String(item.summary||"").trim().length>=120).slice(0,8);
+  if(useful.length<2)return json({ok:false,error:"insufficient_source_text",message:language==="ar"?"تعذر استخراج نص كافٍ من مصدرين؛ لم يتغير المقال.":"Could not extract enough text from two sources; the article was not changed."},422);
   const generated=await bounded(ask(env,String(row.title),language,useful),10000).catch(()=>({answer:"",status:"insufficient",sources:[]}));
   const draft=String(generated.answer||"").trim();
   if(draft.length<700||generated.status==="insufficient")return json({ok:false,error:"draft_not_substantial",message:language==="ar"?"لم ينتج الذكاء الاصطناعي مسودة كاملة موثقة. لم يتم تغيير المقال.":"The AI did not produce a substantial evidence-based draft. The article was not changed."},502);
