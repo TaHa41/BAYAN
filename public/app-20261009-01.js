@@ -396,7 +396,7 @@
         ? items.map((item) =>
           '<a class="article-card" href="/news?story=' + encodeURIComponent(item.title) + '&lang=' + lang + '">' +
           imageHtml(item) + '<div class="article-card-body"><span class="kicker">' +
-          escapeHtml(item.publisher || "News") + "</span><h2>" + escapeHtml(item.title) +
+          escapeHtml(item.publisher || t("مصدر إخباري","News")) + "</span><h2>" + escapeHtml(item.title) +
           "</h2><p>" + escapeHtml(item.summary) + '</p><div class="source-line">' +
           escapeHtml(formatDate(item.publishedAt)) + '</div><span class="read">' +
           t("اقرأ داخل بيان","Read inside BAYAN") + " →</span></div></a>").join("")
