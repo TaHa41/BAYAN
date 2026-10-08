@@ -13,9 +13,9 @@
     ["news","أخبار موثقة","Verified News","أخبار حديثة تُعرض بعد التحقق من مصادرها.","Current news presented after source verification.","◉"],
     ["trends","اهتمام واتجاهات","Interest & Trends","ما يلفت اهتمام الناس واتجاهات النقاش، مع فصلها عن الأخبار الموثقة.","What captures attention and discussion trends, kept separate from verified news.","↗"],
     ["prices","أسعار وبيانات مباشرة","Prices & Live Data","الأسعار والطقس والعملات والبيانات الحية.","Prices, weather, currencies and live data.","◌"],
-    ["egypt","مصر","Egypt","المعرفة والأخبار والبيانات المتعلقة بمصر.","Knowledge, news and data about Egypt.","🇪🇬"],
-    ["arab","العالم العربي","Arab World","المعرفة والأخبار والسياق في العالم العربي.","Knowledge, news and context across the Arab world.","◇"],
-    ["world","العالم","World","المعرفة والأخبار والسياق من أنحاء العالم.","Knowledge, news and context from around the world.","◆"]
+    ["egypt","حياة ومجتمعات","People & Communities","قضايا الحياة اليومية والمجتمع والخدمات وتجارب الناس، بمعلومات موثقة.","Everyday life, communities, public services and human experiences, grounded in evidence.","⌂"],
+    ["arab","أفكار ونقاشات","Ideas & Debate","وجهات نظر وحوارات وقضايا فكرية تُعرض بسياق ومصادر واضحة.","Ideas, viewpoints and public debates presented with context and clear sourcing.","☷"],
+    ["world","تحولات كبرى","Global Shifts","التغيرات العابرة للحدود وتأثيراتها في الاقتصاد والتقنية والمجتمعات.","Cross-border changes and their impact on economies, technology and societies.","◎"]
   ];
   const iconSvg = (key) => {
     const paths = {
@@ -32,9 +32,9 @@
       news:'<path d="M5 4h14v17H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M8 8h8m-8 4h8m-8 4h5"/>',
       trends:'<path d="M3 17 9 11l4 4 8-9"/><path d="M15 6h6v6"/>',
       prices:'<path d="M3 12h4l3-8 4 16 3-8h4"/>',
-      egypt:'<path d="m12 3 8 5-2 9-6 4-6-4-2-9z"/><path d="m8 10 4 2 4-2m-4 2v5"/>',
-      arab:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
-      world:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'
+      egypt:'<circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2"/><path d="M16 11h5m-2.5-2.5v5"/>',
+      arab:'<path d="M4 5h16M4 12h10M4 19h16"/><circle cx="18" cy="12" r="2"/>',
+      world:'<circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/><path d="m6 6 12 12m0-12L6 18"/>'
     };
     return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+(paths[key]||paths.world)+'</svg>';
   };
