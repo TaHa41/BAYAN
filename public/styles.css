@@ -194,3 +194,14 @@ html[dir="rtl"] .section-card:before{inset:0 0 0 auto;border-radius:0 18px 18px 
 .admin-panel{scroll-margin-top:92px}
 .admin-panel[hidden]{display:none!important}
 @media(max-width:640px){.admin-auth-row>*{width:100%}.admin-shortcuts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.admin-shortcuts a{justify-content:center;text-align:center}.admin-maintenance-body .admin-action-row>*{flex:1}}
+
+/* BAYAN share/save/like controls */
+.article-card-link{display:block;color:inherit;text-decoration:none}
+.article-card-link:hover .article-card-body h3{color:var(--accent)}
+.social-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:0 18px 18px}
+.search-result .social-actions,.article-full>.social-actions{padding:14px 0 0}
+.social-btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:36px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);font:inherit;font-size:13px;font-weight:800;cursor:pointer;transition:background .15s,border-color .15s,transform .15s}
+.social-btn:hover{background:var(--soft);border-color:var(--accent);transform:translateY(-1px)}
+.social-btn[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);background:var(--soft)}
+.like-count{font-variant-numeric:tabular-nums}
+@media(max-width:640px){.social-actions{gap:6px;padding:0 12px 14px}.social-btn{font-size:12px;padding:6px 10px}.article-card-link .article-card-body{padding:14px}.search-result .social-actions,.article-full>.social-actions{padding-top:12px}}
