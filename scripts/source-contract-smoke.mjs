@@ -31,7 +31,9 @@ const checks = [
   ["RSS and Atom feeds are both parsed", news.includes('matchAll(/<(item|entry)\\b')],
   ["search headlines and summaries must match the requested locale", search.includes("hasArabic(title) && (!summary||hasArabic(summary))") && search.includes("!hasArabic(title) && !hasArabic(summary)")],
   ["AI rejects English-only sentences in Arabic answers", ai.includes("const languageConsistent") && ai.includes("sentences.every")],
-  ["short news drafts are not marked as complete analysis", api.includes("generatedBody.length>=500") && api.includes('status:hasFullAnalysis?generated.status:"source_only"')]
+  ["short news drafts are not marked as complete analysis", api.includes("generatedBody.length>=500") && api.includes('status:hasFullAnalysis?generated.status:"source_only"')],
+  ["admin exposes content quality metrics", read("src/db.ts").includes("length(trim(body))<500") && app.includes("analytics.contentQuality?.short_bodies")],
+  ["top searches are isolated by language", read("src/db.ts").includes("FROM searches WHERE language=?") && api.includes("analyticsStats(env,lang)")]
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
