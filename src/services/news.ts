@@ -51,7 +51,7 @@ const readFeed = async (name: string, url: string): Promise<Story[]> => {
     const timer = setTimeout(() => controller.abort(), 5000);
     const response = await fetch(url, {
       signal: controller.signal,
-      headers: { accept: "application/rss+xml, application/xml, text/xml" },
+      headers: { accept: "application/rss+xml, application/xml, text/xml, */*", "user-agent": "BAYAN/1.1 (+https://bayan.tahaomar411.workers.dev)" },
     });
     clearTimeout(timer);
     if (!response.ok) return [];
