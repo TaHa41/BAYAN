@@ -5,10 +5,10 @@ export async function ask(env:Env,question:string,locale:Locale,evidence:SearchR
   const evidenceText=JSON.stringify(evidence).slice(0,18000);
   if(env.OPENAI_API_KEY)try{
     const r=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",messages:[{role:"system",content:locale==="ar"?"أنت BAYAN. أجب بالعربية الفصحى الواضحة، ومن الأدلة فقط، رتب الإجابة بوضوح، اذكر المصادر وعدم اليقين ولا تخترع معلومة.":"You are BAYAN. Answer in clear English only, using only the supplied evidence, organize the response clearly, cite sources through the supplied evidence and never invent facts."},{role:"user",content:"Question: "+question+"\nEvidence: "+evidenceText}],temperature:.1})});
-    if(r.ok){const d=await r.json<any>();const answer=String(d.choices?.[0]?.message?.content||"").trim();if(answer)return{status:publishers.size>=2?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(x=>x.sources)}}
+    if(r.ok){const d=await r.json<any>();const answer=String(d.choices?.[0]?.message?.content||"").trim();if(answer && (locale==="ar" ? /[\u0600-\u06ff]/.test(answer) : !/[\u0600-\u06ff]/.test(answer)) )return{status:publishers.size>=2?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(x=>x.sources)}}
   }catch{}
   if(env.AI_SEARCH)try{
-    const instance=env.AI_SEARCH.get(env.BAYAN_AI_SEARCH_INSTANCE||"bayan");
+    const instance=env.AI_SEARCH.get(env.BAYAN_AI_SEARCH_INSTANCE||"default");
     const r=await instance.chatCompletions({messages:[{role:"user",content:(locale==="ar"?"أجب بالعربية الفصحى فقط. ":"Answer in English only. ")+question}],model:"@cf/meta/llama-3.3-70b-instruct-fp8-fast",ai_search_options:{retrieval:{max_num_results:8}}});
     const answer=String((r as any)?.choices?.[0]?.message?.content||(r as any)?.response||"").trim();
     if(answer)return{status:publishers.size>=2?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(x=>x.sources)}
