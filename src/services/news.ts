@@ -302,8 +302,12 @@ export async function news(env: Env, lang: Locale) {
       const fallback = (await gdeltFallback(lang)).filter((story) => hasArabic(story.title));
       all = [...all, ...fallback];
     }
-  } else if (all.length < 3) {
-    all = [...all, ...(await gdeltFallback(lang))];
+  } else {
+    // English mode must never surface Arabic headlines, including from fallback providers.
+    all = all.filter((story) => !hasArabic(story.title));
+    if (all.length < 3) {
+      all = [...all, ...(await gdeltFallback(lang)).filter((story) => !hasArabic(story.title))];
+    }
   }
   all = all.filter((story) => {
     if (!story.publishedAt) return true;
