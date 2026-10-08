@@ -58,6 +58,7 @@ const checks = [
   ["admin repair monitor exposes review states and verification details", app.includes('"REVIEW","REPAIRED"') && app.includes("x.verification") && app.includes("x.action||x.diagnosis")],
   ["admin layout and icon containers have responsive design refinements", read("public/styles.css").includes(".admin-shortcuts{position:sticky") && read("public/styles.css").includes(".section-icon,.drawer-icon") && read("public/styles.css").includes("@media(max-width:700px)")]
 ];
+  ["sparse searches expand across alternate queries and use citation-validated OpenAI web search", search.includes("async function expandedSearch") && search.includes("q+\" official source\"") && search.includes("async function openAiWebSearch") && search.includes("tools:[{type:\"web_search\"}]") && search.includes("cited.has(String(x.url||\"\"))") && search.includes("length<2")],
 let failed = 0;
 for (const [name, ok] of checks) {
   console.log((ok ? "PASS " : "FAIL ") + name);
