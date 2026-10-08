@@ -38,7 +38,7 @@ const checks = [
   ["self-healing checks news and image health before reporting success", repair.includes('["news_cache",async()=>await newsCacheHealthy(env)]') && repair.includes('["images",async()=>') && repair.includes("newsHealthy&&imagesHealthy")],
   ["self-healing alerts are deduplicated", repair.includes("Date.now()-previousTime<30*60*1000") && repair.includes("if(shouldNotify)await notify")],
   ["obsolete repair jobs resolve when core runtime checks pass", repair.includes('if(!failures.some((failure)=>["database","articles","sections"].includes(failure)))await resolveVerifiedLegacyJobs(env)')],
-  ["article expansion is evidence-gated and review-only", api.includes('/api/admin/article/expand') && api.includes("DRAFT_REVIEW_REQUIRED") && app.includes('id="edExpand"') && app.includes("draft.draft")]
+  ["article expansion is evidence-gated and review-only", api.includes('/api/admin/article/expand') && api.includes("DRAFT_REVIEW_REQUIRED") && api.includes('search(env,String(row.title),language,{publish:false})') && app.includes('id="edExpand"') && app.includes("draft.draft")]
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
