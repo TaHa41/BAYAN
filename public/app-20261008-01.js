@@ -238,7 +238,7 @@
       const data = await api("/api/search?q=" + encodeURIComponent(query) + "&lang=" + lang);
       const output = document.querySelector("#out");
       output.innerHTML = data.results?.length
-        ? ((data.answer ? '<article class="answer search-answer"><span class="eyebrow">' + t("إجابة بيان","BAYAN answer") + '</span><div class="article-body">' + String(data.answer).split(/\\n+/).map((line) => "<p>" + escapeHtml(line) + "</p>").join("") + '</div>' ++ (data.articleSlug ? '<a class="read" href="/article/' + encodeURIComponent(data.articleSlug) + "?lang=" + lang + '">' + t("فتح الملف الكامل داخل بيان","Open the full BAYAN file") + " →</a>" : "") + "</article>" : "") + '<div class="result-meta">' + escapeHtml((data.providers || []).join(" · ") || "BAYAN") + "</div>" +
+        ? ((data.answer ? '<article class="answer search-answer"><span class="eyebrow">' + t("إجابة بيان","BAYAN answer") + '</span><div class="article-body">' + String(data.answer).split(/\\n+/).map((line) => "<p>" + escapeHtml(line) + "</p>").join("") + '</div>' + (data.articleSlug ? '<a class="read" href="/article/' + encodeURIComponent(data.articleSlug) + "?lang=" + lang + '">' + t("فتح الملف الكامل داخل بيان","Open the full BAYAN file") + " →</a>" : "") + "</article>" : "") + '<div class="result-meta">' + escapeHtml((data.providers || []).join(" · ") || "BAYAN") + "</div>" +
           data.results.map((item) =>
             '<article class="search-result"><span class="kicker">' + escapeHtml(item.section) + " · " +
             escapeHtml(item.evidence) + "</span><h2>" +
