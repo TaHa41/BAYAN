@@ -14,19 +14,23 @@ async function page(request:Request,env:Env){
   }
   let asset:Response;if(u.pathname==="/"||u.pathname==="/index.html"){asset=new Response(SHELL,{status:200,headers:{"content-type":"text/html;charset=UTF-8"}})}else if(/^\/app(?:-[^/]+)?\.js$/.test(u.pathname)){asset=await env.ASSETS.fetch(new Request(new URL("/app-20261009-01.js",request.url),request));}else if(u.pathname==="/styles.css"){asset=await env.ASSETS.fetch(new Request(new URL("/styles.css",request.url),request));}else{asset=await env.ASSETS.fetch(request);if(!asset.ok)asset=new Response(SHELL,{status:200,headers:{"content-type":"text/html;charset=UTF-8"}})}const lang=u.searchParams.get("lang")==="en"?"en":"ar";if((u.pathname==="/"||u.pathname==="/index.html")&&lang==="en")asset=new Response(SHELL_EN,{status:200,headers:{"content-type":"text/html;charset=UTF-8"}});let html=await asset.text();try{await track(env,await visitorId(request),"page",u.pathname,lang)}catch{}let title=lang==="en"?"BAYAN | Knowledge, Evidence & Context":"BAYAN | بيان — المعلومة أولًا. الدليل قبل الادعاء.";let description=lang==="en"?"BAYAN — evidence-first knowledge, news and live data.":"BAYAN | بيان — المعلومة أولًا. الدليل قبل الادعاء.";const path=u.pathname.replace(/\/$/,"");const section=SECTIONS.find(x=>x[0]===path.slice(1));if(path==="/news")title=lang==="en"?"BAYAN News":"أخبار بيان";else if(path==="/search")title=lang==="en"?"BAYAN Search":"بحث بيان";else if(path==="/ask")title=lang==="en"?"Ask BAYAN":"اسأل بيان";else if(section)title=(lang==="en"?section[2]:section[1])+" | BAYAN";else if(path.startsWith("/article/")){const slug=decodeURIComponent(path.slice(9));try{const row=await env.DB.prepare("SELECT title,summary FROM articles WHERE slug=? AND language=? AND status='PUBLISHED' LIMIT 1").bind(slug,lang).first<any>();if(row?.title){title=String(row.title)+" | BAYAN";description=String(row.summary||description)}}catch{}}let headExtras="";
 if(path==="/news"&&u.searchParams.has("story")){
+  const requestedStory=String(u.searchParams.get("story")||"").trim();
+  let story:any=null;
   try{
     const row=await env.DB.prepare("SELECT payload FROM news_cache WHERE language=? LIMIT 1").bind(lang).first<any>();
     const cached=JSON.parse(String(row?.payload||"[]"));
     const items=Array.isArray(cached)?cached:(Array.isArray(cached.items)?cached.items:[]);
-    const story=items.find((item:any)=>String(item.title||"")===String(u.searchParams.get("story")||""));
-    if(story){
-      title=String(story.title||title)+" | BAYAN";
-      description=String(story.summary||description);
-      const safeAttr=(value:string)=>String(value||"").replace(/[<>&"]/g,"");
-      const structured={"@context":"https://schema.org","@type":"NewsArticle","headline":String(story.title||""),"description":String(story.summary||""),"datePublished":story.publishedAt,"image":story.imageUrl?[story.imageUrl]:undefined,"publisher":{"@type":"Organization","name":"BAYAN"},"inLanguage":lang};
-      headExtras='<meta property="og:type" content="article"><meta property="og:title" content="'+safeAttr(story.title)+'"><meta property="og:description" content="'+safeAttr(story.summary)+'">'+(story.imageUrl?'<meta property="og:image" content="'+safeAttr(story.imageUrl)+'">':"")+'<script type="application/ld+json">'+JSON.stringify(structured).replace(/</g,"\\u003c")+'</script>';
-    }
+    story=items.find((item:any)=>String(item.title||"")===requestedStory)||null;
   }catch{}
+  if(requestedStory){
+    const headline=String(story?.title||requestedStory);
+    const storyDescription=String(story?.summary||headline);
+    title=headline+" | BAYAN";
+    description=storyDescription;
+    const safeAttr=(value:string)=>String(value||"").replace(/[<>&"]/g,"");
+    const structured={"@context":"https://schema.org","@type":"NewsArticle","headline":headline,"description":storyDescription,"datePublished":story?.publishedAt,"image":story?.imageUrl?[story.imageUrl]:undefined,"publisher":{"@type":"Organization","name":"BAYAN"},"inLanguage":lang};
+    headExtras='<meta property="og:type" content="article"><meta property="og:title" content="'+safeAttr(headline)+'"><meta property="og:description" content="'+safeAttr(storyDescription)+'">'+(story?.imageUrl?'<meta property="og:image" content="'+safeAttr(story.imageUrl)+'">':"")+'<script type="application/ld+json">'+JSON.stringify(structured).replace(/</g,"\\u003c")+'</script>';
+  }
 }
 let canonical=ORIGIN+u.pathname+(u.searchParams.has("lang")?"?lang="+encodeURIComponent(lang):"");if(path==="/news"&&u.searchParams.has("story"))canonical=ORIGIN+"/news?story="+encodeURIComponent(u.searchParams.get("story")||"")+"&lang="+lang;const hasNewsStory=path==="/news"&&u.searchParams.has("story");const alternateLinks=(!path.startsWith("/article/")&&!hasNewsStory)?'<link rel="alternate" hreflang="ar" href="'+ORIGIN+u.pathname+'?lang=ar"><link rel="alternate" hreflang="en" href="'+ORIGIN+u.pathname+'?lang=en"><link rel="alternate" hreflang="x-default" href="'+ORIGIN+u.pathname+'?lang=ar">':"";html=html.replace(/<html[^>]*>/i,'<html lang="'+lang+'" dir="'+(lang==="en"?"ltr":"rtl")+'">').replace(/<title>[^<]*<\/title>/i,"<title>"+title.replace(/[<>&"]/g,"")+"</title>").replace(/<meta name="description" content="[^"]*">/i,'<meta name="description" content="'+description.replace(/[<>&"]/g,"")+'">').replace(/<link rel="canonical" href="[^"]*">/i,'<link rel="canonical" href="'+canonical+'">'+alternateLinks);if(headExtras)html=html.replace("</head>",headExtras+"</head>");const headers=new Headers(asset.headers);headers.set("Cache-Control","no-store");
 headers.set("CDN-Cache-Control","no-store");headers.set("X-BAYAN-Build",BUILD);return new Response(html,{status:asset.status,headers});}
