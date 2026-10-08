@@ -1,4 +1,22 @@
 import type{Env}from"../types";import{now}from"../config";import{notify}from"./telegram";import{findRelatedImage}from"./news";
+async function newsCacheHealthy(env:Env){
+  const rows=await env.DB.prepare("SELECT language,payload FROM news_cache WHERE language IN ('ar','en')").all<any>();
+  const cache=rows.results||[];
+  for(const language of ["ar","en"]){
+    const row=cache.find((item:any)=>item.language===language);
+    if(!row?.payload)return false;
+    let items:any[]=[];
+    try{items=JSON.parse(String(row.payload)).items||[]}catch{return false}
+    const fresh=items.filter((item:any)=>{
+      const title=String(item.title||""),date=Date.parse(String(item.publishedAt||""));
+      const localeMatch=language==="ar"?/[\\u0600-\\u06ff]/.test(title):!/[\\u0600-\\u06ff]/.test(title);
+      return localeMatch&&Number.isFinite(date)&&date<=Date.now()+5*60*1000&&Date.now()-date<=72*60*60*1000;
+    });
+    if(fresh.length<3)return false;
+  }
+  return true;
+}
+
 
 const CANONICAL_SECTIONS=["science","technology","economy","politics","health","history","people","sports","travel","art","news","trends","prices","egypt","arab","world"] as const;
 const CONTENT_SECTIONS=["science","technology","economy","politics","health","history","people","sports","travel","art","trends","egypt","arab","world"] as const;
@@ -56,7 +74,8 @@ async function repairRuntime(env:Env,failures:string[]){
     actions.push("admin settings verified")
   }catch{}
   actions.push(...await repairTaxonomy(env));
-  if(failures.includes("articles"))try{
+  if(failures.includes("news_cache"))actions.push("no healthy Arabic and English news cache; live news is refreshed through /api/news and will not be fabricated");
+    if(failures.includes("articles"))try{
     const row=await env.DB.prepare("SELECT COUNT(*) count FROM articles WHERE status='PUBLISHED'").first<any>();
     if(Number(row?.count||0)===0)actions.push("no published articles; deployment/content seed review required");
   }catch{}
@@ -66,7 +85,7 @@ async function repairRuntime(env:Env,failures:string[]){
     if(missing.length)actions.push("missing section content: "+missing.join(", "));
   }catch{}
   if(failures.includes("images"))try{
-    const rows=await env.DB.prepare("SELECT id,title,summary FROM articles WHERE status='PUBLISHED' AND (image_url IS NULL OR image_url='') LIMIT 6").all<any>();
+    const rows=await env.DB.prepare("SELECT id,title,summary FROM articles WHERE status='PUBLISHED' AND (image_url IS NULL OR trim(image_url)='') ORDER BY updated_at DESC LIMIT 2").all<any>();
     let filled=0;
     for(const row of rows.results||[])try{const url=await findRelatedImage(String(row.title)+" "+String(row.summary||""));if(url){await env.DB.prepare("UPDATE articles SET image_url=?,updated_at=? WHERE id=?").bind(url,now(),row.id).run();filled++}}catch{}
     actions.push("image repair attempted for "+filled+" article(s)");
@@ -79,13 +98,15 @@ async function sectionHealth(env:Env){
   return CONTENT_SECTIONS.flatMap(section=>["ar","en"].filter(language=>!Number((rows.results||[]).find((r:any)=>r.section===section&&r.language===language)?.count||0)).map(language=>section+"_"+language));
 }
 
-async function resolveVerifiedLegacyJobs(env:Env){try{await env.DB.prepare("UPDATE repair_jobs SET status='RESOLVED',diagnosis=COALESCE(diagnosis,'')||' | Closed as historical after current-release production verification',action='No runtime mutation required; current implementation and production checks verified',verification='verified_in_current_release',updated_at=? WHERE status='WAITING_AI' AND (signature LIKE '%generated is not defined%' OR signature LIKE '%resolveWikimediaEditorialImage is not defined%' OR signature LIKE '%manual Telegram diagnostic report%' OR signature LIKE '%predictive runtime degradation: /search%')").bind(now()).run()}catch{}}
+async function resolveVerifiedLegacyJobs(env:Env){try{await env.DB.prepare("UPDATE repair_jobs SET status='RESOLVED',diagnosis=COALESCE(diagnosis,'')||' | Closed as historical after current runtime checks passed',action='No runtime mutation required; current runtime checks passed; historical signature not reproduced',verification='verified_in_current_release',updated_at=? WHERE status='WAITING_AI' AND (signature LIKE '%generated is not defined%' OR signature LIKE '%resolveWikimediaEditorialImage is not defined%' OR signature LIKE '%manual Telegram diagnostic report%' OR signature LIKE '%predictive runtime degradation: /search%')").bind(now()).run()}catch{}}
 
 export async function selfHeal(env:Env){
   const checks:[string,()=>Promise<boolean>][]=[
     ["database",async()=>{await env.DB.prepare("SELECT 1").first();return true}],
     ["articles",async()=>{const r=await env.DB.prepare("SELECT COUNT(*) count FROM articles WHERE status='PUBLISHED'").first<any>();return Number(r?.count||0)>0}],
     ["sections",async()=>{return (await sectionHealth(env)).length===0}],
+    ["news_cache",async()=>await newsCacheHealthy(env)],
+    ["images",async()=>{const row=await env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN image_url IS NULL OR trim(image_url)='' THEN 1 ELSE 0 END) AS missing FROM (SELECT image_url FROM articles WHERE status='PUBLISHED' ORDER BY updated_at DESC LIMIT 12)").first<any>();return Number(row?.total||0)>0&&Number(row?.missing||0)<=3}],
     ["contributions",async()=>{await env.DB.prepare("SELECT 1 FROM contributions LIMIT 1").first();return true}],
     ["repair_state",async()=>{await env.DB.prepare("SELECT 1 FROM repair_jobs LIMIT 1").first();return true}],
     ["settings",async()=>{await env.DB.prepare("SELECT key FROM admin_settings LIMIT 1").first();return true}]
@@ -103,9 +124,16 @@ export async function selfHeal(env:Env){
     verification=db&&Number(article?.count||0)>0&&missing.length===0?"verified_runtime":"needs_deployment_or_manual_review";
   }catch{verification="verification_failed"}
   const signature=failures.join(",");
-  try{await env.DB.prepare("INSERT INTO repair_jobs(signature,status,diagnosis,action,verification,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(signature) DO UPDATE SET status=excluded.status,diagnosis=excluded.diagnosis,action=excluded.action,verification=excluded.verification,updated_at=excluded.updated_at").bind(signature,verification==="verified_runtime"?"REPAIRED":"REVIEW",diagnosis,actions.join("; ")||"No safe runtime action available",verification,now(),now()).run()}catch{}
+  const nextStatus=verification==="verified_runtime"?"REPAIRED":"REVIEW";
+  let shouldNotify=true;
+  try{
+    const previous=await env.DB.prepare("SELECT status,updated_at FROM repair_jobs WHERE signature=?").bind(signature).first<any>();
+    const previousTime=Date.parse(String(previous?.updated_at||""));
+    if(previous&&previous.status===nextStatus&&Number.isFinite(previousTime)&&Date.now()-previousTime<30*60*1000)shouldNotify=false;
+  }catch{}
+  try{await env.DB.prepare("INSERT INTO repair_jobs(signature,status,diagnosis,action,verification,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(signature) DO UPDATE SET status=excluded.status,diagnosis=excluded.diagnosis,action=excluded.action,verification=excluded.verification,updated_at=excluded.updated_at").bind(signature,nextStatus,diagnosis,actions.join("; ")||"No safe runtime action available",verification,now(),now()).run()}catch{}
   await record(env,verification==="verified_runtime"?"info":"error","self_heal",JSON.stringify({failures,actions,verification}).slice(0,3800));
-  await notify(env,"BAYAN AI Self-Healing\nFailures: "+failures.join(", ")+"\nAction: "+(actions.join("; ")||"none")+"\nVerification: "+verification);
+  if(shouldNotify)await notify(env,"BAYAN AI Self-Healing\nFailures: "+failures.join(", ")+"\nAction: "+(actions.join("; ")||"none")+"\nVerification: "+verification);
   return{ok:verification==="verified_runtime",failures,diagnosis,actions,verification};
 }
 
