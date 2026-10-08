@@ -113,6 +113,23 @@ async function repairRuntime(env:Env,failures:string[]){
   return actions;
 }
 
+async function imageHealth(env:Env){
+  const articleRow=await env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN image_url IS NULL OR trim(image_url)='' THEN 1 ELSE 0 END) AS missing FROM (SELECT image_url FROM articles WHERE status='PUBLISHED' ORDER BY updated_at DESC LIMIT 12)").first<any>();
+  const total=Number(articleRow?.total||0),missing=Number(articleRow?.missing||0);
+  if(total===0||missing>3)return false;
+  for(const language of ["ar","en"] as const){
+    const row=await env.DB.prepare("SELECT payload FROM news_cache WHERE language=? LIMIT 1").bind(language).first<any>();
+    if(!row?.payload)return false;
+    try{
+      const parsed=JSON.parse(String(row.payload));
+      const items:any[]=Array.isArray(parsed)?parsed:(Array.isArray(parsed?.items)?parsed.items:[]);
+      const eligible=items.filter((item:any)=>item&&String(item.title||"").trim()).slice(0,6);
+      if(eligible.length>=3&&eligible.filter((item:any)=>Boolean(String(item.imageUrl||"").trim())).length<Math.min(3,eligible.length))return false;
+    }catch{return false}
+  }
+  return true;
+}
+
 async function sectionHealth(env:Env){
   const rows=await env.DB.prepare("SELECT section,language,COUNT(*) count FROM articles WHERE status='PUBLISHED' GROUP BY section,language").all<any>();
   return CONTENT_SECTIONS.flatMap(section=>["ar","en"].filter(language=>!Number((rows.results||[]).find((r:any)=>r.section===section&&r.language===language)?.count||0)).map(language=>section+"_"+language));
@@ -126,7 +143,7 @@ export async function selfHeal(env:Env){
     ["articles",async()=>{const r=await env.DB.prepare("SELECT COUNT(*) count FROM articles WHERE status='PUBLISHED'").first<any>();return Number(r?.count||0)>0}],
     ["sections",async()=>{return (await sectionHealth(env)).length===0}],
     ["news_cache",async()=>await newsCacheHealthy(env)],
-    ["images",async()=>{const row=await env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN image_url IS NULL OR trim(image_url)='' THEN 1 ELSE 0 END) AS missing FROM (SELECT image_url FROM articles WHERE status='PUBLISHED' ORDER BY updated_at DESC LIMIT 12)").first<any>();return Number(row?.total||0)>0&&Number(row?.missing||0)<=3}],
+    ["images",async()=>await imageHealth(env)],
     ["contributions",async()=>{await env.DB.prepare("SELECT 1 FROM contributions LIMIT 1").first();return true}],
     ["repair_state",async()=>{await env.DB.prepare("SELECT 1 FROM repair_jobs LIMIT 1").first();return true}],
     ["settings",async()=>{await env.DB.prepare("SELECT key FROM admin_settings LIMIT 1").first();return true}]
@@ -143,8 +160,7 @@ export async function selfHeal(env:Env){
     const article=await env.DB.prepare("SELECT COUNT(*) count FROM articles WHERE status='PUBLISHED'").first<any>();
     const missing=await sectionHealth(env);
     const newsHealthy=await newsCacheHealthy(env);
-    const imageRow=await env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN image_url IS NULL OR trim(image_url)='' THEN 1 ELSE 0 END) AS missing FROM (SELECT image_url FROM articles WHERE status='PUBLISHED' ORDER BY updated_at DESC LIMIT 12)").first<any>();
-    const imagesHealthy=Number(imageRow?.total||0)>0&&Number(imageRow?.missing||0)<=3;
+    const imagesHealthy=await imageHealth(env);
     verification=db&&Number(article?.count||0)>0&&missing.length===0&&newsHealthy&&imagesHealthy?"verified_runtime":"needs_deployment_or_manual_review";
   }catch{verification="verification_failed"}
   const signature=failures.join(",");
