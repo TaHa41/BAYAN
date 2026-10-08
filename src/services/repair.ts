@@ -114,7 +114,7 @@ export async function selfHeal(env:Env){
   const failures:string[]=[];
   for(const[c,fn]of checks)try{if(!(await fn())){failures.push(c);await record(env,"error","health",c+" check failed")}}catch(e){failures.push(c);await record(env,"error","health",c+" failed: "+String(e))}
   if(!failures.some((failure)=>["database","articles","sections"].includes(failure)))await resolveVerifiedLegacyJobs(env);
-  if(!failures.length){await record(env,"info","health","AI self-healing checks passed");return{ok:true,failures:[],actions:[],verification:"healthy",message:"All runtime checks passed; no repair was necessary."}}
+  if(!failures.length){try{await env.DB.prepare("UPDATE repair_jobs SET status='RESOLVED',verification='verified_runtime',diagnosis=COALESCE(diagnosis,'')||' | News cache and image health now pass',updated_at=? WHERE status IN ('REVIEW','REPAIRED') AND (signature LIKE '%news_cache%' OR signature LIKE '%images%')").bind(now()).run()}catch{}await record(env,"info","health","AI self-healing checks passed");return{ok:true,failures:[],actions:[],verification:"healthy",message:"All runtime checks passed; no repair was necessary."}}
   const diagnosis=await diagnose(env,failures);
   const actions=await repairRuntime(env,failures);
   let verification="repair_attempted";
