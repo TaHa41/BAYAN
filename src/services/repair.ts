@@ -26,7 +26,9 @@ export async function record(env:Env,level:string,kind:string,message:string){
 }
 
 async function diagnose(env:Env,failures:string[]){
-  const prompt="BAYAN self-healing diagnostic. Confirmed failing checks: "+failures.join(", ")+". Return evidence, likely cause, and one safest reversible action. Never propose destructive SQL, authentication changes, secret exposure, or unverified code mutation.";
+  let history="No recorded repair history for this failure signature.";
+  try{const rows=await env.DB.prepare("SELECT attempt_no,diagnosis,action,verification,created_at FROM repair_attempts WHERE signature=? ORDER BY attempt_no DESC LIMIT 5").bind(failures.join(",")).all<any>();if((rows.results||[]).length)history=(rows.results||[]).map((row:any)=>"Attempt "+row.attempt_no+"; verification="+row.verification+"; action="+String(row.action||"").slice(0,700)+"; diagnosis="+String(row.diagnosis||"").slice(0,500)).join("\n")}catch{}
+  const prompt="BAYAN self-healing diagnostic. Confirmed failing checks: "+failures.join(", ")+".\nPrevious attempts (do not repeat a failed action unchanged):\n"+history+"\nReturn evidence, likely cause, and one safest reversible action that improves on prior attempts. Never propose destructive SQL, authentication changes, secret exposure, or unverified code mutation.";
   if(env.OPENAI_API_KEY)try{
     const r=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(12000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",instructions:"You are a conservative reliability engineer. Separate evidence from hypothesis.",input:prompt,store:false})});
     if(r.ok){const d=await r.json<any>();return String(d.output_text||"").slice(0,3000)}
@@ -179,6 +181,7 @@ export async function selfHeal(env:Env){
     if(previous&&previous.status===nextStatus&&Number.isFinite(previousTime)&&Date.now()-previousTime<30*60*1000)shouldNotify=false;
   }catch{}
   try{await env.DB.prepare("INSERT INTO repair_jobs(signature,status,diagnosis,action,verification,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(signature) DO UPDATE SET status=excluded.status,diagnosis=excluded.diagnosis,action=excluded.action,verification=excluded.verification,updated_at=excluded.updated_at").bind(signature,nextStatus,diagnosis,actions.join("; ")||"No safe runtime action available",verification,now(),now()).run()}catch{}
+  try{const count=await env.DB.prepare("SELECT COALESCE(MAX(attempt_no),0) AS n FROM repair_attempts WHERE signature=?").bind(signature).first<any>();const attemptNo=Number(count?.n||0)+1;await env.DB.prepare("INSERT INTO repair_attempts(signature,attempt_no,diagnosis,action,verification,created_at) VALUES(?,?,?,?,?,?)").bind(signature,attemptNo,diagnosis,actions.join("; ")||"No safe runtime action available",verification,now()).run()}catch{}
   await record(env,verification==="verified_runtime"?"info":"error","self_heal",JSON.stringify({initialFailures:failures,remainingFailures,actions,verification}).slice(0,3800));
   if(shouldNotify)await notify(env,"BAYAN AI Self-Healing\nInitial failures: "+failures.join(", ")+"\nRemaining failures: "+(remainingFailures.join(", ")||"none")+"\nAction: "+(actions.join("; ")||"none")+"\nVerification: "+verification);
   return{ok:verification==="verified_runtime",failures:remainingFailures,initialFailures:failures,diagnosis,actions,verification};
