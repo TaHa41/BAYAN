@@ -65,6 +65,20 @@ async function duck(q:string,language:Locale):Promise<Candidate[]>{
     return out;
   }catch{return[]}
 }
+async function googleNews(q:string,language:Locale):Promise<Candidate[]>{
+  try{
+    const hl=language==="ar"?"ar":"en",gl=language==="ar"?"EG":"US",ceid=language==="ar"?"EG:ar":"US:en";
+    const u="https://news.google.com/rss/search?q="+encodeURIComponent(q)+"&hl="+hl+"&gl="+gl+"&ceid="+ceid;
+    const r=await timeout(u,4500);if(!r.ok)return[];
+    const xml=await r.text();
+    const decode=(v:string)=>cleanText(v.replace(/<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>/g,"$1").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'"));
+    const field=(item:string,name:string)=>decode(item.match(new RegExp("<"+name+"(?:\\s[^>]*)?>([\\s\\S]*?)</"+name+">","i"))?.[1]||"");
+    return [...xml.matchAll(/<item(?:\\s[^>]*)?>([\\s\\S]*?)<\\/item>/gi)].slice(0,10).map((m:any)=>{
+      const title=field(m[1],"title"),url=field(m[1],"link"),publisher=field(m[1],"source")||"Google News";
+      return {title,summary:field(m[1],"description").slice(0,1200),section:"news",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+4,provider:"Google News RSS"} as Candidate;
+    }).filter((x:any)=>x.title&&x.url&&languageSafe(x,language));
+  }catch{return[]}
+}
 async function broadGdelt(q:string):Promise<Candidate[]>{
   const variants=[q,q.split(/\s+/).slice(0,6).join(" "),q.split(/\s+/).slice(0,3).join(" ")].filter(Boolean);
   const all:Candidate[]=[];
@@ -106,16 +120,27 @@ const localeSafeText=(value:string,language:Locale)=>{
   return sentences.every(part=>hasArabic(part)||!/[A-Za-z]{5,}/.test(part));
 };
 const languageSafe=(x:Candidate,language:Locale)=>{
-  const title=String(x.title||""),summary=String(x.summary||"");
-  return language==="ar" ? hasArabic(title) && localeSafeText(summary,language) : !hasArabic(title) && localeSafeText(summary,language);
+  const title=String(x.title||"");
+  return language==="ar" ? hasArabic(title) : !hasArabic(title);
+};
+const localizeCandidate=(x:Candidate,language:Locale):Candidate=>{
+  const summary=String(x.summary||"");
+  const summaryMatches=localeSafeText(summary,language);
+  return {...x,summary:summaryMatches?summary:""};
 };export async function search(env:Env,q:string,language:Locale):Promise<SearchResponse>{
-  const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};let [local, wiki, wd, gd, oa, remote, dd] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe(s.source_openalex==="0"?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[])]);
-if(!local.length && !wiki.length && !wd.length && !gd.length && !oa.length && !remote.length && !dd.length) gd=await broadGdelt(q);
-  const providerAttempted=["BAYAN Knowledge Base","Wikipedia","Wikidata","GDELT","OpenAlex","Cloudflare AI Search","DuckDuckGo"];const candidates:Candidate[]=[
-    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wd,...gd,...oa,...remote,...dd
+  const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};let [local, wiki, wd, gd, oa, remote, dd, gn] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe(s.source_openalex==="0"?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[]),safe(googleNews(q,language),[])]);
+  const hasLocaleResults=()=>[...local,...wiki,...wd,...gd,...oa,...remote,...dd,...gn].some(x=>languageSafe(x,language));
+  if(!hasLocaleResults()){
+    const variants=[q,q.split(/\\s+/).slice(0,7).join(" "),q.split(/\\s+/).slice(0,4).join(" ")].filter((v,i,a)=>v&&a.indexOf(v)===i);
+    const retries=await Promise.all(variants.map(v=>safe(googleNews(v,language),[])));
+    gn=[...gn,...retries.flat()].slice(0,30);
+    if(!hasLocaleResults())gd=[...gd,...await broadGdelt(q)];
+  }
+  const providerAttempted=["BAYAN Knowledge Base","Wikipedia","Wikidata","GDELT","OpenAlex","Cloudflare AI Search","DuckDuckGo","Google News RSS"];const candidates:Candidate[]=[
+    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wd,...gd,...oa,...remote,...dd,...gn
   ];
   const seen=new Set<string>();
-  const results=candidates.filter(x=>languageSafe(x,language)).sort((a,b)=>b.score-a.score).filter(x=>{
+  const results=candidates.filter(x=>languageSafe(x,language)).map(x=>localizeCandidate(x,language)).sort((a,b)=>b.score-a.score).filter(x=>{
     const k=x.title.toLowerCase().replace(/\W+/g," ")+"|"+x.summary.toLowerCase().slice(0,160);
     if(seen.has(k))return false; seen.add(k); return true;
   }).slice(0,max).map(({score,provider,...x})=>({...x,sources:(x.sources||[]).map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}));
@@ -129,7 +154,7 @@ if(!local.length && !wiki.length && !wd.length && !gd.length && !oa.length && !r
   if(status==="verified" && results.length){
     try{const drafted=await ask(env,q,language,results);if(drafted.answer){answer=drafted.answer;answerStatus=drafted.status;}if(drafted.answer && drafted.status==="verified") publishedSlug=await publishVerifiedResearch(env,{title:results[0].title,summary:results[0].summary||q,body:drafted.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[])});}catch{}
   }
-  const message=results.length?undefined:(language==="ar"?"تعذر العثور على نتيجة من مصادر البحث المتاحة حاليًا. يمكن توسيع البحث لاحقًا عند توفر مزودات إضافية.":"No result was returned by the available search providers right now. The search can be expanded when additional providers are available.");
+  const message=results.length?undefined:(language==="ar"?"لم تُرجع مصادر البحث نتيجة مطابقة للغة المطلوبة. سُجلت محاولة البحث ويمكن مراجعة حالة المصادر من الإدارة.":"Search providers returned no locale-matching results. The attempt was recorded; provider status can be reviewed in admin.");
   try{await saveSearch(env,q,language,intent(q),status,results.length)}catch{}
   return {query:q,locale:language,results,providers,providerAttempted,status,message,answer,answerStatus,articleSlug:publishedSlug};
 }
