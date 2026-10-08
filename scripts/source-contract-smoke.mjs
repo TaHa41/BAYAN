@@ -22,7 +22,7 @@ const checks = [
   ["news rejects missing and future publication dates", news.includes("const isFreshNews") && news.includes("all = all.filter(isFreshNews)") && news.includes("timestamp <= Date.now() + 5 * 60 * 1000")],
   ["legacy news cache payload column is migrated", read("src/schema.ts").includes("ALTER TABLE news_cache ADD COLUMN payload TEXT")],
   ["image placeholders hydrate by card title, not global index", read("public/app-20261009-01.js").includes("Match each image placeholder to its own card by title") && read("public/app-20261009-01.js").includes('candidate.querySelector("h2,h3")')],
-  ["image failures retain a visible fallback", read("public/app-20261009-01.js").includes("this.insertAdjacentHTML") && read("public/app-20261009-01.js").includes("img.replaceWith(fallback)")],
+  ["image failures retry a topic-matched image and retain a visible fallback", read("public/app-20261009-01.js").includes("window.BAYAN_IMAGE_RETRY") && read("public/app-20261009-01.js").includes('img.insertAdjacentElement("afterend", fallback)') && read("public/app-20261009-01.js").includes("img.replaceWith(fallback)")],
   ["hero images retain visible fallbacks", read("public/app-20261009-01.js").includes("const heroImageHtml") && read("public/app-20261009-01.js").includes("heroImageHtml(article.image, article.title)")],
   ["RSS image metadata includes embedded thumbnails", /item\.match\(\/\<img\\b\[\^>\]\+src=/.test(news)],
   ["page view metrics exclude non-page events", read("src/db.ts").includes("event='page' AND created_at>=?")],
