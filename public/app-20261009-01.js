@@ -108,11 +108,12 @@
   const articleCard = (item) => {
     const sectionMeta = sections.find((section) => section[0] === item.section);
     const sectionLabel = sectionMeta ? (ar ? sectionMeta[1] : sectionMeta[2]) : t("مادة معرفية","Knowledge item");
+    const href = item.slug ? "/article/" + encodeURIComponent(item.slug) + "?lang=" + lang : "/search?q=" + encodeURIComponent(item.title || "") + "&lang=" + lang;
     const body = imageHtml(item) +
       '<div class="article-card-body"><span class="kicker">' + escapeHtml(sectionLabel) + "</span>" +
       "<h3>" + escapeHtml(item.title) + "</h3><p>" + escapeHtml(item.summary || "") + '</p><span class="read">' +
-      t(item.slug ? "اقرأ الملف" : "مصدر موثق", item.slug ? "Read the file" : "Verified source") + " →</span></div>";
-    return item.slug ? '<a class="article-card" href="/article/' + encodeURIComponent(item.slug) + '?lang=' + lang + '">' + body + "</a>" : '<article class="article-card evidence-card">' + body + "</article>";
+      t(item.slug ? "اقرأ الملف" : "اعرض الموضوع", item.slug ? "Read the file" : "Explore topic") + " →</span></div>";
+    return '<article class="article-card' + (item.slug ? "" : " evidence-card") + '"><a class="article-card-link" href="' + href + '">' + body + "</a>" + socialActions(item) + "</article>";
   };
 
   function searchBox(value = "") {
@@ -313,25 +314,32 @@
       '</p></div>' + searchBox(query) + '<div id="out" class="results"></div></section>';
     bindSearch();
     if (!query) return;
-    try {
-      const data = await api("/api/search?q=" + encodeURIComponent(query) + "&lang=" + lang);
-      const output = document.querySelector("#out");
-      output.innerHTML = data.results?.length
-        ? ((data.answer ? '<article class="answer search-answer"><span class="eyebrow">' + t("إجابة بيان","BAYAN answer") + '</span><div class="article-body">' + String(data.answer).split(String.fromCharCode(10)).map((line) => "<p>" + escapeHtml(line) + "</p>").join("") + '</div>' + (data.articleSlug ? '<a class="read" href="/article/' + encodeURIComponent(data.articleSlug) + "?lang=" + lang + '">' + t("فتح الملف الكامل داخل بيان","Open the full BAYAN file") + " →</a>" : "") + "</article>" : "") + '<div class="result-meta">' + escapeHtml((data.providers || []).join(" · ") || "BAYAN") + "</div>" +
-          data.results.map((item) =>
-            '<article class="search-result"><span class="kicker">' + escapeHtml(item.section) + " · " +
-            escapeHtml(item.evidence) + "</span><h2>" +
-            (item.slug ? '<a href="/article/' + encodeURIComponent(item.slug) + '?lang=' + lang + '">' +
-              escapeHtml(item.title) + "</a>" : escapeHtml(item.title)) +
-            "</h2><p>" + escapeHtml(item.summary) + '</p><div class="source-line">' +
-            (item.sources || []).slice(0, 3).map((source) => escapeHtml(source.publisher)).join(" · ") +
-            "</div></article>").join(""))
-        : '<div class="notice"><h2>' + t("لم تُرجع محركات البحث نتيجة الآن","Search providers returned no result right now") +
-          '</h2><p>' + t("سيحاول بيان توسيع مسارات البحث بدل اختلاق معلومة.","BAYAN will expand its search paths rather than invent information.") + "</p></div>";
-    } catch {
-      document.querySelector("#out").innerHTML =
-        '<div class="notice">' + t("حدث خطأ مؤقت في البحث. حاول مرة أخرى.","Search is temporarily unavailable. Please try again.") + "</div>";
+    const output = document.querySelector("#out");
+    output.innerHTML = '<div class="notice loading">' + t("جاري البحث في مصادر متعددة…","Searching multiple sources…") + "</div>";
+    let data = null, fallbackUsed = false;
+    try { data = await api("/api/search?q=" + encodeURIComponent(query) + "&lang=" + lang, {timeoutMs:18000}); } catch {}
+    if (!data?.results?.length) {
+      fallbackUsed = true;
+      try { data = {results: await browserSearchFallback(query), providers:[t("مسار بحث احتياطي","Fallback search")], status:"mixed"}; } catch { data = {results:[]}; }
     }
+    const results = Array.isArray(data.results) ? data.results : [];
+    output.innerHTML = results.length
+      ? ((data.answer ? '<article class="answer search-answer"><span class="eyebrow">' + t("إجابة بيان","BAYAN answer") + '</span><div class="article-body">' + String(data.answer).split(String.fromCharCode(10)).map((line) => "<p>" + escapeHtml(line) + "</p>").join("") + '</div>' + (data.articleSlug ? '<a class="read" href="/article/' + encodeURIComponent(data.articleSlug) + "?lang=" + lang + '">' + t("فتح الملف الكامل داخل بيان","Open the full BAYAN file") + " →</a>" : "") + "</article>" : "") +
+      (fallbackUsed ? '<div class="notice">' + t("عرض بيان نتائج من مسار احتياطي؛ يجري توسيع البحث دون اختلاق نتائج.","BAYAN is showing fallback-source results while expanding search without inventing results.") + "</div>" : "") +
+      '<div class="result-meta">' + escapeHtml((data.providers || []).join(" · ") || "BAYAN") + "</div>" +
+      results.map((item) => {
+        const key = item.slug || item.url || item.title;
+        return '<article class="search-result"><span class="kicker">' + escapeHtml(item.section || t("نتيجة بحث","Search result")) + " · " +
+          escapeHtml(item.evidence || "mixed") + "</span><h2>" +
+          (item.slug ? '<a href="/article/' + encodeURIComponent(item.slug) + '?lang=' + lang + '">' + escapeHtml(item.title) + "</a>" : escapeHtml(item.title)) +
+          "</h2><p>" + escapeHtml(item.summary || "") + '</p><div class="source-line">' +
+          (item.sources || []).slice(0, 3).map((source) => escapeHtml(source.publisher)).join(" · ") +
+          "</div>" + socialActions({...item, _key:key}) + "</article>";
+      }).join(""))
+      : '<div class="notice"><h2>' + t("لم نعثر على نتيجة مناسبة في المسارات المتاحة الآن.","No suitable result was found in the available search paths.") +
+        '</h2><p>' + t("جرّب اسمًا أدق أو كلمات بديلة؛ لا يعرض بيان معلومات مختلقة.","Try a more specific name or alternate keywords; BAYAN will not fabricate information.") + "</p>" +
+        '<button class="primary" id="search-retry">' + t("إعادة البحث","Search again") + "</button></div>";
+    document.querySelector("#search-retry")?.addEventListener("click", () => renderSearch());
   }
 
   async function renderArticle() {
@@ -350,7 +358,7 @@
         '</div><div class="sources-box"><h2>' + t("الأدلة والمصادر","Evidence & sources") + "</h2>" +
         (data.sources || []).map((source) =>
           '<div class="source-line">' + escapeHtml(source.publisher || "") + " · " + escapeHtml(source.title || "") +
-          "</div>").join("") + "</div></article>";
+          "</div>").join("") + "</div>" + socialActions({...data, _key:data.slug || slug, slug}) + "</article>";
       if (!data.imageUrl) {
         try {
           const image = await api("/api/image?q=" + encodeURIComponent(data.title + " " + (data.summary || "")));
@@ -580,8 +588,65 @@
   }
 
   async function renderSaved() {
-    app.innerHTML='<section class="page"><div class="page-head"><span class="eyebrow">'+t("مكتبتك","Your library")+'</span><h1>'+t("المحفوظات","Saved")+'</h1><p>'+t("المقالات التي حفظتها على هذا الجهاز.","Articles saved on this device.")+'</p></div><div id="saved-content" class="article-grid"><div class="notice loading">'+t("جاري التحميل…","Loading…")+'</div></div></section>';
-    try{const data=await api("/api/saved"),items=[];for(const row of data.items||[]){try{const a=await api("/api/article?slug="+encodeURIComponent(row.slug)+"&lang="+lang);if(a)items.push(a)}catch{}}const out=document.querySelector("#saved-content");out.innerHTML=items.length?items.map(articleCard).join(""):'<div class="notice">'+t("لا توجد مقالات محفوظة بعد.","No saved articles yet.")+"</div>";hydrateSectionImages(items);}catch{document.querySelector("#saved-content").innerHTML='<div class="notice">'+t("تعذر تحميل المحفوظات الآن.","Saved items could not be loaded right now.")+"</div>"}
+    app.innerHTML='<section class="page"><div class="page-head"><span class="eyebrow">'+t("مكتبتك","Your library")+'</span><h1>'+t("المحفوظات","Saved")+'</h1><p>'+t("كل ما حفظته للرجوع إليه لاحقًا، على هذا الجهاز وحساب الزيارة.","Everything saved for later on this device and this visit.")+'</p></div><div id="saved-content" class="article-grid"><div class="notice loading">'+t("جاري التحميل…","Loading…")+'</div></div></section>';
+    const localItems=getSavedItems().filter(item=>!item._removed);
+    let remoteItems=[];
+    try { const data=await api("/api/saved"); for(const row of data.items||[]){try{const a=await api("/api/article?slug="+encodeURIComponent(row.slug)+"&lang="+lang);if(a)remoteItems.push(a)}catch{}} } catch {}
+    const seen=new Set(localItems.map(x=>String(x.slug||x._key||x.title)));
+    const items=[...localItems,...remoteItems.filter(x=>!seen.has(String(x.slug||x.title)))];
+    const out=document.querySelector("#saved-content");
+    out.innerHTML=items.length?items.map(articleCard).join(""):'<div class="notice">'+t("لا توجد عناصر محفوظة بعد. اضغط حفظ على أي نتيجة أو مقال.","Nothing saved yet. Tap Save on any result or article.")+"</div>";
+    hydrateSectionImages(items);
+  }
+
+
+  const SAVED_KEY = "bayan-saved-items-v1";
+  const LIKES_KEY = "bayan-likes-v1";
+  function readList(key) { try { const value=JSON.parse(safeStorage.get(key,"[]")); return Array.isArray(value)?value:[]; } catch { return []; } }
+  function itemKey(item) { return String(item?._key || item?.slug || item?.url || item?.title || "").trim().slice(0,500); }
+  function getSavedItems() { return readList(SAVED_KEY); }
+  function socialActions(item) {
+    const key=itemKey(item), saved=getSavedItems().some(x=>itemKey(x)===key), likes=readList(LIKES_KEY), liked=likes.some(x=>x.key===key), count=Number((likes.find(x=>x.key===key)||{}).count||0);
+    const payload={title:String(item.title||""),summary:String(item.summary||""),section:String(item.section||"world"),slug:String(item.slug||""),sources:Array.isArray(item.sources)?item.sources:[],url:String(item.url||""),imageUrl:String(item.imageUrl||""),_key:key,_lang:lang};
+    const encoded=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+    return '<div class="social-actions" data-item="'+encoded+'"><button type="button" class="social-btn" data-social="save" aria-pressed="'+saved+'">'+(saved?"✓ ":"＋ ")+t("حفظ","Save")+'</button><button type="button" class="social-btn" data-social="share">↗ '+t("مشاركة","Share")+'</button><button type="button" class="social-btn" data-social="like" aria-pressed="'+liked+'">'+(liked?"♥":"♡")+' '+t("إعجاب","Like")+' <span class="like-count">'+count+'</span></button></div>';
+  }
+  document.addEventListener("click", async (event) => {
+    const button=event.target instanceof Element?event.target.closest("[data-social]"):null;
+    if(!button)return;
+    const wrapper=button.closest(".social-actions");
+    let item;
+    try{item=JSON.parse(decodeURIComponent(escape(atob(wrapper.dataset.item||""))));}catch{return;}
+    const key=itemKey(item),action=button.dataset.social;
+    if(action==="save"){
+      let items=getSavedItems(),exists=items.some(x=>itemKey(x)===key);
+      if(exists)items=items.filter(x=>itemKey(x)!==key);else items.unshift(item);
+      safeStorage.set(SAVED_KEY,JSON.stringify(items.slice(0,200)));
+      if(item.slug&&!exists){try{await api("/api/save",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({slug:item.slug})});}catch{}}
+      button.setAttribute("aria-pressed",String(!exists));button.innerHTML=(exists?"＋ ":"✓ ")+t("حفظ","Save");
+      return;
+    }
+    if(action==="like"){
+      const likes=readList(LIKES_KEY),at=likes.findIndex(x=>x.key===key);
+      if(at>=0){likes[at].count=Math.max(0,Number(likes[at].count||0)-1);likes[at].liked=false;if(!likes[at].count)likes.splice(at,1);}
+      else likes.unshift({key,count:1,liked:true});
+      safeStorage.set(LIKES_KEY,JSON.stringify(likes.slice(0,500)));
+      button.setAttribute("aria-pressed",String(at<0));button.innerHTML=(at<0?"♥":"♡")+' '+t("إعجاب","Like")+' <span class="like-count">'+(at<0?1:0)+'</span>';
+      return;
+    }
+    if(action==="share"){
+      const shareUrl=item.slug?new URL("/article/"+encodeURIComponent(item.slug)+"?lang="+lang,location.origin).href:new URL("/search?q="+encodeURIComponent(item.title||params.get("q")||"")+"&lang="+lang,location.origin).href;
+      const shareData={title:item.title||"BAYAN | بيان",text:item.summary||item.title||"",url:shareUrl};
+      try{if(navigator.share)await navigator.share(shareData);else if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(shareUrl);button.textContent=t("تم نسخ الرابط","Link copied");}else{window.prompt(t("انسخ رابط المشاركة","Copy share link"),shareUrl);}}catch{}
+    }
+  });
+  async function browserSearchFallback(query) {
+    const jobs=[];
+    const wikiHost=ar?"ar.wikipedia.org":"en.wikipedia.org";
+    jobs.push((async()=>{const url="https://"+wikiHost+"/w/api.php?action=query&generator=search&gsrsearch="+encodeURIComponent(query)+"&gsrlimit=8&prop=extracts|pageimages&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=900&format=json&origin=*";const r=await fetch(url,{signal:AbortSignal.timeout(6500),headers:{accept:"application/json"}});if(!r.ok)throw new Error("wiki");const d=await r.json();return Object.values(d.query?.pages||{}).map(x=>({title:String(x.title||""),summary:String(x.extract||"").slice(0,1400),section:"world",kind:"web",evidence:"mixed",sources:[{publisher:"Wikipedia",title:String(x.title||""),url:"https://"+wikiHost+"/wiki/"+encodeURIComponent(String(x.title||"").replace(/ /g,"_"))}],url:"https://"+wikiHost+"/wiki/"+encodeURIComponent(String(x.title||"").replace(/ /g,"_"))}));})());
+    jobs.push((async()=>{const url="https://www.wikidata.org/w/api.php?action=wbsearchentities&search="+encodeURIComponent(query)+"&language="+lang+"&limit=6&format=json&origin=*";const r=await fetch(url,{signal:AbortSignal.timeout(6000),headers:{accept:"application/json"}});if(!r.ok)throw new Error("wikidata");const d=await r.json();return(d.search||[]).map(x=>({title:String(x.label||""),summary:String(x.description||""),section:"people",kind:"web",evidence:"mixed",sources:[{publisher:"Wikidata",title:String(x.label||""),url:"https://www.wikidata.org/wiki/"+x.id}],url:"https://www.wikidata.org/wiki/"+x.id}));})());
+    const settled=await Promise.allSettled(jobs),items=settled.flatMap(x=>x.status==="fulfilled"?x.value:[]);
+    const seen=new Set();return items.filter(x=>x.title&&(/\u0600-\u06ff/.test("")?true:(ar?/[؀-ۿ]/.test(x.title):!(/[؀-ۿ]/.test(x.title))))).filter(x=>{const k=x.title.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;}).slice(0,12);
   }
 
   async function renderTools() {
