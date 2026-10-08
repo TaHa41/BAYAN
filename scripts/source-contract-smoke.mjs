@@ -11,9 +11,13 @@ const checks = [
   ["wisdom endpoint rotates every 30 seconds", wisdom.includes("Date.now()/1000/30")],
   ["wisdom has dedicated news and arts entries", /news:\{ar:/.test(wisdom) && /art:\{ar:/.test(wisdom)],
   ["browser refreshes wisdom every 30 seconds", app.includes("const wisdomTimer = setInterval") && app.includes("}, 30000)")],
-  ["asset build version matches production smoke contract", index.includes('const BUILD="2026.10.08.05";')],
+  ["asset build version matches production smoke contract", index.includes('const BUILD="2026.10.08.06";')],
   ["evidence-only article body uses real line breaks", !/x\.title\+"\\\\n"\+x\.summary/.test(api) && /x\.title\+"\\n"\+x\.summary/.test(api)],
-  ["Telegram contribution notification uses real line break", !/BAYAN: مساهمة جديدة للمراجعة\\\\n/.test(api) && /BAYAN: مساهمة جديدة للمراجعة\\n/.test(api)]
+  ["Telegram contribution notification uses real line break", !/BAYAN: مساهمة جديدة للمراجعة\\\\n/.test(api) && /BAYAN: مساهمة جديدة للمراجعة\\n/.test(api)],
+  ["explicit lang query overrides browser language", read("src/http.ts").includes('if(requested==="ar")return"ar"')],
+  ["legacy news cache payload column is migrated", read("src/schema.ts").includes("ALTER TABLE news_cache ADD COLUMN payload TEXT")],
+  ["page view metrics exclude non-page events", read("src/db.ts").includes("event=\\'page\\' AND created_at>=?")],
+  ["admin has authenticated Telegram test route", api.includes('/api/admin/telegram-test') && api.includes("telegram_delivery_failed")]
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
