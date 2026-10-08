@@ -55,13 +55,13 @@ try{
   const r=await fetch(origin+"/api/section?section=world&lang=ar",{headers:{"accept-language":"en-US,en;q=0.9","accept":"application/json"}});
   const d=await r.json();
   if(!r.ok||!Array.isArray(d.items)||!d.items.length)throw new Error("explicit_arabic_locale_failed");
-  if(d.items.some(x=>!/[\\u0600-\\u06ff]/.test(String(x.title||""))))throw new Error("explicit_arabic_locale_contains_english");
+  if(d.items.some(x=>!/[\u0600-\u06ff]/.test(String(x.title||""))))throw new Error("explicit_arabic_locale_contains_english");
 }catch(e){console.error("LOCALE_AR_OVERRIDE",e);bad++}
 try{
   const r=await fetch(origin+"/api/section?section=world&lang=en",{headers:{"accept-language":"ar-EG,ar;q=0.9","accept":"application/json"}});
   const d=await r.json();
   if(!r.ok||!Array.isArray(d.items)||!d.items.length)throw new Error("explicit_english_locale_failed");
-  if(d.items.some(x=>/[\\u0600-\\u06ff]/.test(String(x.title||""))))throw new Error("explicit_english_locale_contains_arabic");
+  if(d.items.some(x=>/[\u0600-\u06ff]/.test(String(x.title||""))))throw new Error("explicit_english_locale_contains_arabic");
 }catch(e){console.error("LOCALE_EN_OVERRIDE",e);bad++}
 try{
   const a=await get("/api/article?slug=who-is-naguib-mahfouz-en&lang=en"); const ad=JSON.parse(a.text);
