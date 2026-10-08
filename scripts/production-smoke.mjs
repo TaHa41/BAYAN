@@ -14,7 +14,7 @@ try{
   const h=await get("/?lang=en");
   if(!/<html[^>]+lang="en"/.test(h.text))throw new Error("english_lang_missing");
   if(!h.text.includes("app-20261008-01.js"))throw new Error("current_bundle_missing");
-  if(!h.text.includes("app-20261008-01.js?v=2026.10.08.04"))throw new Error("current_shell_bundle_version_missing");
+  if(!h.text.includes("app-20261008-01.js?v=2026.10.08.05"))throw new Error("current_shell_bundle_version_missing");
   if(!h.text.includes("fallback-home")||!h.text.includes("Start searching")||h.text.includes("ابدأ البحث")||h.text.includes("??lang="))throw new Error("english_shell_fallback_not_localized");
 }catch(e){console.error("SHELL",e);bad++}
 try{
@@ -25,9 +25,13 @@ try{
   if(!js.text.includes("section-retry")||!js.text.includes("timeoutMs: 8000"))throw new Error("section_resilience_missing");
   if(!js.text.includes("async function renderNews()"))throw new Error("news_renderer_async_missing");
   if(!js.text.includes("search-answer"))throw new Error("search_answer_ui_missing");
+  if(!js.text.includes("const wisdomTimer = setInterval")||!js.text.includes("}, 30000)"))throw new Error("wisdom_rotation_not_30_seconds");
 }catch(e){console.error("BUNDLE",e);bad++}
 try{
   const w=await get("/api/wisdom?section=arab&lang=ar"); const wd=JSON.parse(w.text); if(!wd.wisdom||!/[\u0600-\u06ff]/.test(String(wd.wisdom)))throw new Error("wisdom_missing");
+  if(!js.text.includes("const wisdomTimer = setInterval"))throw new Error("wisdom_rotation_not_enabled");
+  const newsSource=await fetch(origin+"/app-20261008-01.js"); const newsJs=await newsSource.text();
+  if(newsJs.includes('publishedAt:new Date().toISOString()'))throw new Error("news_fallback_fakes_publication_time");
   const n=await get("/api/news?lang=ar"); const d=JSON.parse(n.text);
   if(!Array.isArray(d.items)||d.items.length<3)throw new Error("news_too_few");
   if(d.items.filter(x=>x.imageUrl).length<Math.min(3,d.items.length))throw new Error("news_images_missing");
