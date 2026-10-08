@@ -4,6 +4,8 @@ const wisdom:Record<string,{ar:string[];en:string[]}>={
   egypt:{ar:["المعلومة المحلية تصبح أقوى حين نعرف مصدرها وزمنها.","ما يهم الناس يبدأ من تفاصيل الحياة اليومية.","الخبر المفيد لا يكتفي بما حدث؛ يوضح لماذا يهم."],en:["Local knowledge gets stronger when its source and timing are clear.","What matters to people often starts with everyday details.","Useful news does more than say what happened; it explains why it matters."]},
   arab:{ar:["فهم المنطقة يحتاج إلى أكثر من عنوان واحد.","السياق يغيّر معنى الخبر.","مقارنة الروايات تكشف ما تثبته الأدلة وما لا تثبته."],en:["Understanding a region takes more than one headline.","Context can change the meaning of a story.","Comparing accounts shows what the evidence does and does not establish."]},
   world:{ar:["العالم مترابط؛ خبر بعيد قد يصنع أثرًا قريبًا.","السرعة لا تعني دائمًا الدقة.","كل حدث كبير يحتاج إلى سياق قبل الحكم عليه."],en:["The world is connected; a distant event can create a local effect.","Speed does not always mean accuracy.","Every major event needs context before judgment."]},
+  news:{ar:["عنوان الخبر بداية الفحص وليس نهايته.","تاريخ النشر جزء من صدق الخبر.","قارن المصادر قبل أن تعتمد رواية واحدة."],en:["A headline begins verification; it does not finish it.","Publication time is part of a story’s credibility.","Compare sources before relying on a single account."]},
+  art:{ar:["الفن يُفهم بسياقه كما يُفهم بأثره.","الذوق يختلف، لكن نسبة العمل إلى صاحبه حقيقة قابلة للتحقق.","قراءة العمل تبدأ بمعرفة زمنه وظروفه."],en:["Art is understood through context as well as impact.","Taste differs, but authorship is a verifiable fact.","Understanding a work begins with its time and circumstances."]},
   science:{ar:["السؤال الجيد بداية المعرفة، والدليل هو ما يختبرها.","الاكتشاف لا يصبح حقيقة لمجرد انتشاره.","النتيجة العلمية أقوى عندما يمكن فحص طريقتها ومصدرها."],en:["A good question starts knowledge; evidence tests it.","A discovery is not a fact simply because it spreads.","Scientific findings are stronger when their method and source can be examined."]},
   economy:{ar:["الرقم بلا تاريخ ووحدة وسياق قد يضلل.","الأسعار تتغير، لذلك الزمن جزء من المعلومة.","فهم الاقتصاد يبدأ بتمييز الخبر عن التوقع."],en:["A number without a date, unit and context can mislead.","Prices change, so time is part of the information.","Understanding economics starts by separating news from forecasts."]},
   politics:{ar:["الادعاء السياسي يحتاج إلى مصدر مستقل قبل أن يصبح حقيقة.","القرار أهم حين نفهم نصه وأثره لا عنوانه فقط.","الخلاف في السياسة لا يلغي ضرورة التحقق من الوقائع."],en:["A political claim needs independent evidence before it becomes a fact.","A decision matters more when its text and impact are understood, not just its headline.","Political disagreement does not remove the need to verify facts."]},
@@ -20,6 +22,6 @@ const wisdom:Record<string,{ar:string[];en:string[]}>={
 export function wisdomFor(section:string,language:Locale){
   const set=wisdom[section]||wisdom.world;
   const items=set[language]||set.ar;
-  const index=Math.floor(Date.now()/1000/60/60)%items.length;
+  const index=Math.floor(Date.now()/1000/30)%items.length;
   return items[index];
 }
