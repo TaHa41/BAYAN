@@ -303,7 +303,7 @@ const directNewsPageFallback = async (lang: Locale): Promise<Story[]> => {
       const r = await fetch(url,{signal:AbortSignal.timeout(5000),headers:{accept:"text/html,*/*","user-agent":"BAYAN/1.1 (+https://bayan.tahaomar411.workers.dev)"}});
       if (!r.ok) continue;
       const html = await r.text();
-      const re = /<a[^>]+href=["'](https?:\\/\\/[^"']+|\\/[^"']*\\/news\\/[^"']+)["'][^>]*>([\\s\\S]*?)<\\/a>/gi;
+      const re = /<a[^>]+href=["\']([^"\']+)["\'][^>]*>([\s\S]*?)<\/a>/gi;
       for (const m of html.matchAll(re)) {
         const title = esc(m[2]);
         const href = String(m[1]||"").startsWith("http") ? String(m[1]) : new URL(String(m[1]),url).toString();
