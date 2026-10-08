@@ -319,7 +319,7 @@
     output.innerHTML = '<div class="notice loading">' + t("جاري البحث في مصادر متعددة…","Searching multiple sources…") + "</div>";
     let data = null, fallbackUsed = false;
     try { data = await api("/api/search?q=" + encodeURIComponent(query) + "&lang=" + lang, {timeoutMs:18000}); } catch {}
-    if (!data?.results?.length) {
+    if (!data?.results?.length && !((data?.providers||[]).includes("BAYAN content safety"))) {
       fallbackUsed = true;
       try { data = {results: await browserSearchFallback(query), providers:[t("مسار بحث احتياطي","Fallback search")], status:"mixed"}; } catch { data = {results:[]}; }
     }
@@ -337,8 +337,8 @@
           (item.sources || []).slice(0, 3).map((source) => escapeHtml(source.publisher)).join(" · ") +
           "</div>" + socialActions({...item, _key:key}) + "</article>";
       }).join(""))
-      : '<div class="notice"><h2>' + t("لم نعثر على نتيجة مناسبة في المسارات المتاحة الآن.","No suitable result was found in the available search paths.") +
-        '</h2><p>' + t("جرّب اسمًا أدق أو كلمات بديلة؛ لا يعرض بيان معلومات مختلقة.","Try a more specific name or alternate keywords; BAYAN will not fabricate information.") + "</p>" +
+      : '<div class="notice"><h2>' + escapeHtml(data?.message || t("لم نعثر على نتيجة مناسبة في المسارات المتاحة الآن.","No suitable result was found in the available search paths.")) +
+        '</h2><p>' + t("يمكنك تجربة صياغة أخرى؛ يوسّع بيان البحث عبر المصادر المتاحة دون اختلاق معلومات.","Try another phrasing; BAYAN searches available sources without fabricating information.") + "</p>" +
         '<button class="primary" id="search-retry">' + t("إعادة البحث","Search again") + "</button></div>";
     document.querySelector("#search-retry")?.addEventListener("click", () => renderSearch());
   }
