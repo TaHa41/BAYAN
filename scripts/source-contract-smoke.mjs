@@ -3,6 +3,7 @@ const read = (path) => readFileSync(new URL("../" + path, import.meta.url), "utf
 const news = read("src/services/news.ts");
 const search = read("src/services/search.ts");
 const ai = read("src/services/ai.ts");
+const repair = read("src/services/repair.ts");
 const wisdom = read("src/wisdom.ts");
 const app = read("public/app-20261009-01.js");
 const index = read("src/index.ts");
@@ -33,7 +34,9 @@ const checks = [
   ["AI rejects English-only sentences in Arabic answers", ai.includes("const languageConsistent") && ai.includes("sentences.every")],
   ["short news drafts are not marked as complete analysis", api.includes("generatedBody.length>=500") && api.includes('status:hasFullAnalysis?generated.status:"source_only"')],
   ["admin exposes content quality metrics", read("src/db.ts").includes("length(trim(body))<500") && app.includes("analytics.contentQuality?.short_bodies")],
-  ["top searches are isolated by language", read("src/db.ts").includes("FROM searches WHERE language=?") && api.includes("analyticsStats(env,lang)")]
+  ["top searches are isolated by language", read("src/db.ts").includes("FROM searches WHERE language=?") && api.includes("analyticsStats(env,lang)")],
+  ["self-healing checks news and image health before reporting success", repair.includes('["news_cache",async()=>await newsCacheHealthy(env)]') && repair.includes('["images",async()=>') && repair.includes("newsHealthy&&imagesHealthy")],
+  ["self-healing alerts are deduplicated", repair.includes("Date.now()-previousTime<30*60*1000") && repair.includes("if(shouldNotify)await notify")]
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
