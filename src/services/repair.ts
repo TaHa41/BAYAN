@@ -121,7 +121,10 @@ export async function selfHeal(env:Env){
     const db=await env.DB.prepare("SELECT 1").first();
     const article=await env.DB.prepare("SELECT COUNT(*) count FROM articles WHERE status='PUBLISHED'").first<any>();
     const missing=await sectionHealth(env);
-    verification=db&&Number(article?.count||0)>0&&missing.length===0?"verified_runtime":"needs_deployment_or_manual_review";
+    const newsHealthy=await newsCacheHealthy(env);
+    const imageRow=await env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN image_url IS NULL OR trim(image_url)='' THEN 1 ELSE 0 END) AS missing FROM (SELECT image_url FROM articles WHERE status='PUBLISHED' ORDER BY updated_at DESC LIMIT 12)").first<any>();
+    const imagesHealthy=Number(imageRow?.total||0)>0&&Number(imageRow?.missing||0)<=3;
+    verification=db&&Number(article?.count||0)>0&&missing.length===0&&newsHealthy&&imagesHealthy?"verified_runtime":"needs_deployment_or_manual_review";
   }catch{verification="verification_failed"}
   const signature=failures.join(",");
   const nextStatus=verification==="verified_runtime"?"REPAIRED":"REVIEW";
