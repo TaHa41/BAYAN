@@ -33,7 +33,7 @@ try{
   if(!js.text.includes("async function renderNews()"))throw new Error("news_renderer_async_missing");
   if(!js.text.includes("search-answer"))throw new Error("search_answer_ui_missing");
   if(!js.text.includes("Match each image placeholder to its own card by title"))throw new Error("image_hydration_card_matching_missing");
-  if(!js.text.includes("onerror=\\"this.onerror=null"))throw new Error("image_load_fallback_missing");
+  if(!js.text.includes('onerror="this.onerror=null'))throw new Error("image_load_fallback_missing");
   if(!bundleText.includes("const wisdomTimer = setInterval")||!js.text.includes("}, 30000)"))throw new Error("wisdom_rotation_not_30_seconds");
 }catch(e){console.error("BUNDLE",e);bad++}
 try{
