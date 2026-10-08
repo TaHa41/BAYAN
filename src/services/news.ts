@@ -426,7 +426,7 @@ export async function latestNewsForSitemap(lang: Locale) {
   const seen = new Set<string>();
   return batches.flat().filter((story) => {
     if (story.publishedAt) { const timestamp = Date.parse(story.publishedAt); if (Number.isFinite(timestamp) && Date.now() - timestamp > 72 * 60 * 60 * 1000) return false; }
-    const key = story.title.toLowerCase().replace(/[^\\p{L}\\p{N}]+/gu, " ").trim();
+    const key = story.title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
     if (seen.has(key)) return false; seen.add(key); return true;
   }).sort((a,b) => { const at=a.publishedAt?Date.parse(a.publishedAt):0; const bt=b.publishedAt?Date.parse(b.publishedAt):0; return (Number.isFinite(bt)?bt:0)-(Number.isFinite(at)?at:0); }).slice(0,40);
 }
