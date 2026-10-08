@@ -14,8 +14,8 @@ export const sections:Section[]=[
 {slug:"news",ar:"أخبار موثقة",en:"Verified News",descriptionAr:"أخبار حديثة تُعرض بعد التحقق من مصادرها.",descriptionEn:"Current news presented after source verification.",icon:"◉"},
 {slug:"trends",ar:"اهتمام واتجاهات",en:"Interest & Trends",descriptionAr:"ما يلفت اهتمام الناس واتجاهات النقاش، مع فصلها عن الأخبار الموثقة.",descriptionEn:"What captures attention and discussion trends, kept separate from verified news.",icon:"↗"},
 {slug:"prices",ar:"أسعار وبيانات مباشرة",en:"Prices & Live Data",descriptionAr:"الأسعار والطقس والعملات والبيانات الحية.",descriptionEn:"Prices, weather, currencies and live data.",icon:"◌"},
-{slug:"egypt",ar:"مصر",en:"Egypt",descriptionAr:"المعرفة والأخبار والبيانات المتعلقة بمصر.",descriptionEn:"Knowledge, news and data about Egypt.",icon:"🇪🇬"},
-{slug:"arab",ar:"العالم العربي",en:"Arab World",descriptionAr:"المعرفة والأخبار والسياق في العالم العربي.",descriptionEn:"Knowledge, news and context across the Arab world.",icon:"◇"},
-{slug:"world",ar:"العالم",en:"World",descriptionAr:"المعرفة والأخبار والسياق من أنحاء العالم.",descriptionEn:"Knowledge, news and context from around the world.",icon:"◆"}
+{slug:"egypt",ar:"حياة ومجتمعات",en:"People & Communities",descriptionAr:"قضايا الحياة اليومية والمجتمع والخدمات وتجارب الناس، بمعلومات موثقة.",descriptionEn:"Everyday life, communities, public services and human experiences, grounded in evidence.",icon:"⌂"},
+{slug:"arab",ar:"أفكار ونقاشات",en:"Ideas & Debate",descriptionAr:"وجهات نظر وحوارات وقضايا فكرية تُعرض بسياق ومصادر واضحة.",descriptionEn:"Ideas, viewpoints and public debates presented with context and clear sourcing.",icon:"☷"},
+{slug:"world",ar:"تحولات كبرى",en:"Global Shifts",descriptionAr:"التغيرات العابرة للحدود وتأثيراتها في الاقتصاد والتقنية والمجتمعات.",descriptionEn:"Cross-border changes and their impact on economies, technology and societies.",icon:"◎"}
 ];
 export const sectionBySlug=(slug:string)=>sections.find(s=>s.slug===slug);
