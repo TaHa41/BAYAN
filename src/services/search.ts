@@ -65,6 +65,19 @@ async function duck(q:string,language:Locale):Promise<Candidate[]>{
     return out;
   }catch{return[]}
 }
+async function googleNews(q:string,language:Locale):Promise<Candidate[]>{
+  try{
+    const hl=language==="ar"?"ar":"en",gl=language==="ar"?"EG":"US",ceid=language==="ar"?"EG:ar":"US:en";
+    const u="https://news.google.com/rss/search?q="+encodeURIComponent(q)+"&hl="+hl+"&gl="+gl+"&ceid="+ceid;
+    const r=await timeout(u,4500);if(!r.ok)return[];const xml=await r.text();
+    const decode=(v:string)=>cleanText(v.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,"$1").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'"));
+    return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)].slice(0,10).map((m:any)=>{
+      const field=(name:string)=>decode(m[1].match(new RegExp("<"+name+"[^>]*>([\\s\\S]*?)<\/"+name+">","i"))?.[1]||"");
+      const title=field("title"),url=field("link"),pub=field("source")||"Google News";
+      return {title,summary:field("description").slice(0,1200),section:"news",kind:"web",evidence:"mixed",sources:[source(title,pub,url)],url,score:scoreSource(pub,title,q)+4,provider:"Google News RSS"} as Candidate;
+    }).filter((x:any)=>x.title&&x.url&&languageSafe(x,language));
+  }catch{return[]}
+}
 async function broadGdelt(q:string):Promise<Candidate[]>{
   const variants=[q,q.split(/\s+/).slice(0,6).join(" "),q.split(/\s+/).slice(0,3).join(" ")].filter(Boolean);
   const all:Candidate[]=[];
@@ -79,10 +92,10 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   const title=String(x.title||""),summary=String(x.summary||"");
   return language==="ar" ? hasArabic(title) && (!summary||hasArabic(summary)) : !hasArabic(title) && !hasArabic(summary);
 };export async function search(env:Env,q:string,language:Locale):Promise<SearchResponse>{
-  const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};let [local, wiki, wd, gd, oa, remote, dd] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe(s.source_openalex==="0"?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[])]);
-if(!local.length && !wiki.length && !wd.length && !gd.length && !oa.length && !remote.length && !dd.length) gd=await broadGdelt(q);
-  const providerAttempted=["BAYAN Knowledge Base","Wikipedia","Wikidata","GDELT","OpenAlex","Cloudflare AI Search","DuckDuckGo"];const candidates:Candidate[]=[
-    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wd,...gd,...oa,...remote,...dd
+  const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};let [local, wiki, wd, gd, oa, remote, dd, gn] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe(s.source_openalex==="0"?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[]),safe(googleNews(q,language),[])]);
+if(!local.length && !wiki.length && !wd.length && !gd.length && !oa.length && !remote.length && !dd.length && !gn.length){const variants=[q,q.split(/\\s+/).slice(0,7).join(" "),q.split(/\\s+/).slice(0,4).join(" ")].filter((v,i,a)=>v&&a.indexOf(v)===i);const retries=await Promise.all(variants.map(v=>safe(googleNews(v,language),[])));gn=retries.flat().slice(0,20);if(!gn.length)gd=await broadGdelt(q);}
+  const providerAttempted=["BAYAN Knowledge Base","Wikipedia","Wikidata","GDELT","OpenAlex","Cloudflare AI Search","DuckDuckGo","Google News RSS"];const candidates:Candidate[]=[
+    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wd,...gd,...oa,...remote,...dd,...gn
   ];
   const seen=new Set<string>();
   const results=candidates.filter(x=>languageSafe(x,language)).sort((a,b)=>b.score-a.score).filter(x=>{
