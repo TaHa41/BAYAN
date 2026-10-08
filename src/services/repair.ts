@@ -1,4 +1,4 @@
-import type{Env}from"../types";import{now}from"../config";import{notify}from"./telegram";import{findRelatedImage}from"./news";
+import type{Env}from"../types";import{now}from"../config";import{notify}from"./telegram";import{findRelatedImage,news}from"./news";
 async function newsCacheHealthy(env:Env){
   const rows=await env.DB.prepare("SELECT language,payload FROM news_cache WHERE language IN ('ar','en')").all<any>();
   const cache=rows.results||[];
@@ -74,7 +74,13 @@ async function repairRuntime(env:Env,failures:string[]){
     actions.push("admin settings verified")
   }catch{}
   actions.push(...await repairTaxonomy(env));
-  if(failures.includes("news_cache"))actions.push("no healthy Arabic and English news cache; live news is refreshed through /api/news and will not be fabricated");
+  if(failures.includes("news_cache")){
+    const refreshed:string[]=[];
+    for(const language of ["ar","en"] as const){
+      try{const result=await news(env,language);refreshed.push(language+":"+result.items.length)}catch(error){refreshed.push(language+":failed");await record(env,"warn","self_heal_news_refresh",language+" "+String(error).slice(0,300))}
+    }
+    actions.push("live news refresh attempted for both locales ("+refreshed.join(", ")+"); no news content fabricated");
+  }
     if(failures.includes("articles"))try{
     const row=await env.DB.prepare("SELECT COUNT(*) count FROM articles WHERE status='PUBLISHED'").first<any>();
     if(Number(row?.count||0)===0)actions.push("no published articles; deployment/content seed review required");
@@ -85,7 +91,7 @@ async function repairRuntime(env:Env,failures:string[]){
     if(missing.length)actions.push("missing section content: "+missing.join(", "));
   }catch{}
   if(failures.includes("images"))try{
-    const rows=await env.DB.prepare("SELECT id,title,summary FROM articles WHERE status='PUBLISHED' AND (image_url IS NULL OR trim(image_url)='') ORDER BY updated_at DESC LIMIT 2").all<any>();
+    const rows=await env.DB.prepare("SELECT id,title,summary FROM articles WHERE status='PUBLISHED' AND (image_url IS NULL OR trim(image_url)='') undefined").all<any>();
     let filled=0;
     for(const row of rows.results||[])try{const url=await findRelatedImage(String(row.title)+" "+String(row.summary||""));if(url){await env.DB.prepare("UPDATE articles SET image_url=?,updated_at=? WHERE id=?").bind(url,now(),row.id).run();filled++}}catch{}
     actions.push("image repair attempted for "+filled+" article(s)");
