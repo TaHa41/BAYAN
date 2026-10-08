@@ -112,13 +112,28 @@
       link("/admin?lang=" + lang, t("الإدارة","Admin")) +
       "</div>";
 
-    document.querySelector("#menu")?.addEventListener("click", () => drawer.classList.toggle("open"));
-    document.querySelector("#closeDrawer")?.addEventListener("click", () => drawer.classList.remove("open"));
-    drawer.querySelectorAll("a").forEach((item) => {
-      item.addEventListener("click", () => drawer.classList.remove("open"));
+    const closeDrawer = () => {
+      drawer.classList.remove("open");
+      document.body.classList.remove("drawer-open");
+    };
+    const openDrawer = () => {
+      drawer.classList.add("open");
+      document.body.classList.add("drawer-open");
+    };
+    document.querySelector("#menu")?.addEventListener("click", () => {
+      drawer.classList.contains("open") ? closeDrawer() : openDrawer();
     });
+    document.querySelector("#closeDrawer")?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      closeDrawer();
+    });
+    drawer.querySelectorAll("a").forEach((item) => item.addEventListener("click", closeDrawer));
     drawer.addEventListener("click", (event) => {
-      if (event.target === drawer) drawer.classList.remove("open");
+      if (event.target === drawer) closeDrawer();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeDrawer();
     });
     document.querySelector("#lang")?.addEventListener("click", () => {
       const url = new URL(location.href);
