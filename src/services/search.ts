@@ -98,9 +98,16 @@ const localizedSource=(value:string,language:Locale)=>{
   if(/قاعدة الأخبار العالمية/.test(name))return "GDELT";
   return /[\u0600-\u06ff]/.test(name)?"Research source":name;
 };
+const localeSafeText=(value:string,language:Locale)=>{
+  if(!value)return true;
+  if(language==="en")return !hasArabic(value);
+  if(!hasArabic(value))return false;
+  const sentences=value.split(/[\n.!؟?]+/).map(part=>part.trim()).filter(Boolean);
+  return sentences.every(part=>hasArabic(part)||!/[A-Za-z]{5,}/.test(part));
+};
 const languageSafe=(x:Candidate,language:Locale)=>{
   const title=String(x.title||""),summary=String(x.summary||"");
-  return language==="ar" ? hasArabic(title) && (!summary||hasArabic(summary)) : !hasArabic(title) && !hasArabic(summary);
+  return language==="ar" ? hasArabic(title) && localeSafeText(summary,language) : !hasArabic(title) && localeSafeText(summary,language);
 };export async function search(env:Env,q:string,language:Locale):Promise<SearchResponse>{
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};let [local, wiki, wd, gd, oa, remote, dd] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe(s.source_openalex==="0"?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[])]);
 if(!local.length && !wiki.length && !wd.length && !gd.length && !oa.length && !remote.length && !dd.length) gd=await broadGdelt(q);
