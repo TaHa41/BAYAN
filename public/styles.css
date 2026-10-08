@@ -7,3 +7,21 @@
 .drawer{isolation:isolate}
 body.drawer-open{overflow:hidden}
 @media(max-width:560px){.drawer{width:100%;padding:16px}.drawer-head{position:sticky;top:-16px;background:var(--surface);z-index:2;padding:8px 0 14px}.drawer-link{min-height:48px}.drawer-tools a{min-height:46px;display:flex;align-items:center}}
+
+/* BAYAN UI 2026.10.08.02 — structured content cards */
+.page-head>p{max-width:820px;line-height:1.9}
+.home-content{margin-top:72px}
+.home-feed-head{margin-bottom:18px}
+.home-feed-head h2{font-size:clamp(28px,4vw,46px);margin:8px 0}
+.live-grid{align-items:stretch}
+.live-card{position:relative;min-height:220px;padding:26px;display:flex;flex-direction:column;justify-content:center;overflow:hidden}
+.live-card:after{content:"";position:absolute;inset:auto -40px -60px auto;width:150px;height:150px;border-radius:50%;background:var(--soft);opacity:.8;pointer-events:none}
+.live-card>*{position:relative;z-index:1}
+.live-card h2{font-size:clamp(34px,4vw,48px);letter-spacing:-.03em}
+.live-card p{font-size:15px;color:var(--muted);line-height:1.8}
+.live-card .source-line{margin-top:auto;padding-top:16px;border-top:1px solid var(--line)}
+.evidence-card{cursor:default}
+.evidence-card .read{color:var(--accent)}
+.section-grid .section-card{min-height:158px}
+.article-grid .article-card{min-width:0}
+@media(max-width:560px){.home-content{margin-top:48px}.live-card{min-height:190px;padding:22px}.page-head>p{font-size:16px}}
