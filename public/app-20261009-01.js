@@ -431,7 +431,9 @@
         });
         document.querySelector("#msg").innerHTML =
           '<div class="notice">' + (data.ok
-            ? t("وصلت مساهمتك إلى المراجعة.","Your contribution is now in review.")
+            ? (data.notification === "sent"
+              ? t("وصلت مساهمتك إلى المراجعة وتم إرسال إشعار تيليجرام.","Your contribution is in review and a Telegram notification was sent.")
+              : t("وصلت مساهمتك إلى المراجعة، لكن تعذر إرسال إشعار تيليجرام. تحقق من إعدادات البوت.","Your contribution is in review, but Telegram notification delivery failed. Check the bot configuration."))
             : t("تعذر إرسال المساهمة.","Submission failed.")) + "</div>";
       } catch {
         document.querySelector("#msg").innerHTML =
