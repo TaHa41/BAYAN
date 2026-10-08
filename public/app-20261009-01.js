@@ -51,7 +51,7 @@
 
   const imageHtml = (item, className = "article-card-image") =>
     item.imageUrl
-      ? '<img loading="lazy" class="' + className + '" src="' + escapeHtml(item.imageUrl) + '" alt="' + escapeHtml(item.imageAlt || item.title || "") + '">'
+      ? '<img loading="lazy" class="' + className + '" src="' + escapeHtml(item.imageUrl) + '" alt="' + escapeHtml(item.imageAlt || item.title || "") + '" onerror="this.onerror=null;this.style.display=\'none\';this.insertAdjacentHTML(\'afterend\',\'<div class=&quot;image-placeholder&quot;>BAYAN</div>\')">'
       : '<div class="image-placeholder">BAYAN</div>';
 
   const articleCard = (item) => {
@@ -160,14 +160,32 @@
   }
 
   async function hydrateSectionImages(items) {
-    await Promise.all((items || []).map(async (item, index) => {
-      if (item.imageUrl) return;
+    // Match each image placeholder to its own card by title. Indexing into a global
+    // placeholder list was incorrect whenever some cards already had images.
+    const pending = (items || []).filter((item) => !item.imageUrl).slice(0, 4);
+    await Promise.all(pending.map(async (item) => {
       try {
-        const data = await api("/api/image?q=" + encodeURIComponent(item.title + " " + (item.summary || "")));
-        const placeholders = document.querySelectorAll(".image-placeholder");
-        if (data.imageUrl && placeholders[index]) {
-          placeholders[index].outerHTML = '<img loading="lazy" class="article-card-image" src="' +
-            escapeHtml(data.imageUrl) + '" alt="' + escapeHtml(item.title) + '">';
+        const data = await api("/api/image?q=" + encodeURIComponent(item.title + " " + (item.summary || "")), {timeoutMs: 6000});
+        const cards = Array.from(document.querySelectorAll(".article-card, .evidence-card"));
+        const card = cards.find((candidate) => {
+          const heading = candidate.querySelector("h2,h3");
+          return heading && heading.textContent.trim() === String(item.title || "").trim();
+        });
+        const placeholder = card?.querySelector(".image-placeholder");
+        if (data.imageUrl && placeholder) {
+          const img = document.createElement("img");
+          img.loading = "lazy";
+          img.className = "article-card-image";
+          img.alt = String(item.imageAlt || item.title || "");
+          img.onerror = () => {
+            img.remove();
+            const fallback = document.createElement("div");
+            fallback.className = "image-placeholder";
+            fallback.textContent = "BAYAN";
+            placeholder.replaceWith(fallback);
+          };
+          img.src = data.imageUrl;
+          placeholder.replaceWith(img);
         }
       } catch {}
     }));
@@ -213,6 +231,7 @@
     newsOut.innerHTML = newsItems.length
       ? newsItems.map((item) => '<a class="article-card" href="/news?story=' + encodeURIComponent(item.title) + '&lang=' + lang + '">' + imageHtml(item) + '<div class="article-card-body"><span class="kicker">' + escapeHtml(item.publisher || t("الأخبار","News")) + '</span><h3>' + escapeHtml(item.title) + '</h3><p>' + escapeHtml(item.summary || "") + '</p><div class="source-line">' + escapeHtml(item.publishedAt || "") + '</div><span class="read">' + t("اقرأ داخل بيان","Read inside BAYAN") + " →</span></div></a>").join("")
       : '<div class="notice">' + t("لا توجد أخبار حديثة متاحة الآن؛ لن نعرض خبرًا مختلقًا.","No current news is available right now; BAYAN will not invent a story.") + "</div>";
+    if (newsItems.length) hydrateSectionImages(newsItems);
 
     const featured = sectionData
       .flatMap((x) => x.items || [])
@@ -345,6 +364,7 @@
           t("اقرأ داخل بيان","Read inside BAYAN") + " →</span></div></a>").join("")
         : '<div class="notice">' + t("لم يرجع أي مزود أخبار مادة الآن. لن نعرض أخبارًا مختلقة.",
           "No news provider returned a story right now. BAYAN will not invent news.") + "</div>";
+      if (items.length) hydrateSectionImages(items);
     } catch {
       document.querySelector("#news").innerHTML =
         '<div class="notice">' + t("تعذر تحديث الأخبار الآن.","News could not be refreshed right now.") + "</div>";
