@@ -9,7 +9,7 @@ async function newsCacheHealthy(env:Env){
     try{items=JSON.parse(String(row.payload)).items||[]}catch{return false}
     const fresh=items.filter((item:any)=>{
       const title=String(item.title||""),date=Date.parse(String(item.publishedAt||""));
-      const localeMatch=language==="ar"?/[\\u0600-\\u06ff]/.test(title):!/[\\u0600-\\u06ff]/.test(title);
+      const localeMatch=language==="ar"?/[\u0600-\u06ff]/.test(title):!/[\u0600-\u06ff]/.test(title);
       return localeMatch&&Number.isFinite(date)&&date<=Date.now()+5*60*1000&&Date.now()-date<=72*60*60*1000;
     });
     if(fresh.length<3)return false;
