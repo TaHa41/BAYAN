@@ -231,12 +231,16 @@ export async function findRelatedImage(query: string): Promise<string | undefine
     }
     const exact = await wikipediaExactImage(query);
     if (exact) return exact;
+    const summaryImage = await wikipediaSummaryImage(query);
+    if (summaryImage) return summaryImage;
     const firstVariant = query.trim().split(/[،,:-]/)[0].split(/\s+/).slice(0,6).join(" ").trim();
     if (firstVariant && firstVariant !== query.trim()) {
       const image = await wikipediaImage(firstVariant);
       if (image) return image;
     }
-    return await wikipediaImage(query);
+    const searched = await wikipediaImage(query);
+    if (searched) return searched;
+    return await wikidataImage(query);
   } catch {
     return;
   }
