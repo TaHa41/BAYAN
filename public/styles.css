@@ -55,10 +55,8 @@ body{background:#f8f7f3}
 .icon{display:grid;place-items:center;min-width:44px;min-height:44px;border:1px solid var(--line);background:var(--surface)}
 .icon:hover,.navbtn:hover{transform:translateY(-1px)}
 .drawer{inset-inline-start:auto;inset-inline-end:0;transform:translateX(110%);border-inline-start:1px solid var(--line);border-inline-end:0;border-radius:0 0 0 22px}
-html[dir="rtl"] .drawer{transform:translateX(-110%)}
-html[dir="rtl"] .drawer.open{transform:translateX(0)}
-html[dir="ltr"] .drawer{transform:translateX(110%)}
-html[dir="ltr"] .drawer.open{transform:translateX(0)}
+html[dir="rtl"] .drawer,html[dir="ltr"] .drawer{transform:translateX(110%)}
+html[dir="rtl"] .drawer.open,html[dir="ltr"] .drawer.open{transform:translateX(0)}
 body.drawer-open:after{content:"";position:fixed;inset:74px 0 0;background:#10283c70;backdrop-filter:blur(2px);z-index:45}
 .drawer{z-index:50}
 .drawer-head{gap:12px}
