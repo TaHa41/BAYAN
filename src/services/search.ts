@@ -135,6 +135,21 @@ async function broadGdelt(q:string):Promise<Candidate[]>{
   for(const v of variants){const x=await gdelt(v);all.push(...x);if(all.length>=8)break}
   return all;
 }
+async function expandedSearch(env:Env,q:string,language:Locale):Promise<Candidate[]>{
+  const variants=[q+" official source",q+" overview"];
+  const batches=await Promise.all(variants.map(async variant=>{
+    const results=await Promise.all([
+      wikipedia(env,variant,language).catch(()=>[]),
+      wikidata(variant,language).catch(()=>[]),
+      gdelt(variant).catch(()=>[]),
+      googleNewsSearch(variant,language).catch(()=>[]),
+      bingNewsSearch(variant,language).catch(()=>[]),
+      duck(variant,language).catch(()=>[])
+    ]);
+    return results.flat();
+  }));
+  return batches.flat();
+}
 async function settings(env:Env){try{const r=await env.DB.prepare("SELECT key,value FROM admin_settings").all<any>();return Object.fromEntries((r.results||[]).map((x:any)=>[x.key,x.value]))}catch{return{}}}
 const hasArabic=(value:string)=>/[\u0600-\u06ff]/.test(String(value||""));
 const disallowedContent=(value:string)=>{
@@ -192,6 +207,9 @@ if(!local.length && !wiki.length && !wd.length && !gd.length && !oa.length && !r
   // A provider can return results that are unusable for the requested language.
   // Retry broad GDELT variants when that happens instead of stopping because raw candidates existed.
   if(candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)).length<2){const broadened=await safe(broadGdelt(q),[]);candidates.push(...broadened);}
+  if(candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)).length<2){
+    candidates.push(...await safe(expandedSearch(env,q,language),[]));
+  }
   const seen=new Set<string>();
   const results=candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)).sort((a,b)=>b.score-a.score).filter(x=>{
     const k=x.title.toLowerCase().replace(/\W+/g," ")+"|"+x.summary.toLowerCase().slice(0,160);
