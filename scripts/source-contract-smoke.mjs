@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 const read = (path) => readFileSync(new URL("../" + path, import.meta.url), "utf8");
 const news = read("src/services/news.ts");
+const search = read("src/services/search.ts");
+const ai = read("src/services/ai.ts");
 const wisdom = read("src/wisdom.ts");
 const app = read("public/app-20261009-01.js");
 const index = read("src/index.ts");
@@ -25,7 +27,11 @@ const checks = [
   ["RSS image metadata includes embedded thumbnails", /item\.match\(\/\<img\\b\[\^>\]\+src=/.test(news)],
   ["page view metrics exclude non-page events", read("src/db.ts").includes("event='page' AND created_at>=?")],
   ["admin has authenticated Telegram test route", api.includes('/api/admin/telegram-test') && api.includes("telegram_delivery_failed")],
-  ["news article evidence and generation have bounded fallbacks", api.includes("bounded(search(env,title,lang),7000)") && api.includes("bounded(ask(env,title,lang,found.results),8000)") && api.includes("if(!found.results.length&&(summary||storyUrl))") && api.includes("sourceDescription(storyUrl,lang)")]
+  ["news article evidence and generation have bounded fallbacks", api.includes("bounded(search(env,title,lang),7000)") && api.includes("bounded(ask(env,title,lang,found.results),8000)") && api.includes("if(!found.results.length&&(summary||storyUrl))") && api.includes("sourceDescription(storyUrl,lang)")],
+  ["RSS and Atom feeds are both parsed", news.includes('matchAll(/<(item|entry)\\\\b')],
+  ["search headlines and summaries must match the requested locale", search.includes("hasArabic(title) && (!summary||hasArabic(summary))") && search.includes("!hasArabic(title) && !hasArabic(summary)")],
+  ["AI rejects English-only sentences in Arabic answers", ai.includes("const languageConsistent") && ai.includes("sentences.every")],
+  ["short news drafts are not marked as complete analysis", api.includes("generatedBody.length>=500") && api.includes('status:hasFullAnalysis?generated.status:"source_only"')]
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
