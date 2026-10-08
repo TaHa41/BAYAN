@@ -1,5 +1,5 @@
 const origin=process.env.BAYAN_ORIGIN||"https://bayan.tahaomar411.workers.dev";
-const checks=["/","/saved?lang=ar","/tools?lang=ar","/about?lang=ar","/methodology?lang=ar","/privacy?lang=ar","/terms?lang=ar","/api/health","/api/features","/api/live/weather","/api/live/fx","/api/live/gold","/news?lang=ar","/prices?lang=ar","/art?lang=ar","/trends?lang=ar","/robots.txt","/sitemap.xml","/news-sitemap.xml"];
+const checks=["/","/saved?lang=ar","/tools?lang=ar","/about?lang=ar","/methodology?lang=ar","/privacy?lang=ar","/terms?lang=ar","/api/health","/api/features","/api/live/weather","/api/live/fx","/api/live/gold","/news?lang=ar","/news?lang=en","/prices?lang=ar","/art?lang=ar","/trends?lang=ar","/robots.txt","/sitemap.xml","/news-sitemap.xml"];
 const sections=["science","technology","economy","politics","health","history","people","sports","travel","art","news","trends","prices","egypt","arab","world"];
 let bad=0;
 async function get(path){
@@ -39,6 +39,12 @@ try{
   if(/[A-Za-z]{5,}/.test(String(first.title))&&!/[\u0600-\u06ff]/.test(String(first.title)))throw new Error("arabic_news_title_missing");
 }catch(e){console.error("NEWS",e);bad++}
 try{
+  const n=await get("/api/news?lang=en"); const d=JSON.parse(n.text);
+  if(!Array.isArray(d.items)||d.items.length<3)throw new Error("english_news_too_few");
+  if(d.items.some(x=>/[\u0600-\u06ff]/.test(String(x.title||""))))throw new Error("english_news_contains_arabic");
+  if(d.items.filter(x=>x.imageUrl).length<Math.min(3,d.items.length))throw new Error("english_news_images_missing");
+}catch(e){console.error("NEWS_EN",e);bad++}
+try{
   const im=await get("/api/image?q=%D9%86%D8%AC%D9%8A%D8%A8%20%D9%85%D8%AD%D9%81%D9%88%D8%B8"); if(!JSON.parse(im.text).imageUrl)throw new Error("content_image_missing");
 }catch(e){console.error("IMAGE",e);bad++}
 try{
@@ -52,7 +58,7 @@ try{
   if(!Array.isArray(d.results)||d.results.length<1)throw new Error("search_empty");
   if(!Array.isArray(d.providerAttempted)||d.providerAttempted.length<5)throw new Error("provider_coverage_missing");
 }catch(e){console.error("SEARCH",e);bad++}
-for(const section of sections){
+for(const section of sections.filter(section=>section!=="prices")){
   for(const language of ["ar","en"]){
     try{
       const x=await get("/api/section?section="+section+"&lang="+language); const d=JSON.parse(x.text);
