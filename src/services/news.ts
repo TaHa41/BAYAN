@@ -244,6 +244,36 @@ export async function findRelatedImage(query: string): Promise<string | undefine
 
 const hasArabic = (value: string) => /[\u0600-\u06ff]/.test(String(value || ""));
 const languageSafeText = (value: string, lang: Locale) => !value || (lang === "ar" ? hasArabic(value) : !hasArabic(value));
+const localizedPublisher = (value: string, lang: Locale) => {
+  const name = String(value || "").trim();
+  const lower = name.toLowerCase();
+  if (lang === "ar") {
+    if (/bbc|بي بي سي/.test(lower)) return "بي بي سي";
+    if (/al.?jazeera|الجزيرة/.test(lower)) return "الجزيرة";
+    if (/\bdw\b|دويتشه فيله/.test(lower)) return "دويتشه فيله";
+    if (/france.?24|فرانس 24/.test(lower)) return "فرانس 24";
+    if (/reuters|رويترز/.test(lower)) return "رويترز";
+    if (/associated press|ap news|أسوشيتد برس/.test(lower)) return "أسوشيتد برس";
+    if (/guardian|الغارديان/.test(lower)) return "الغارديان";
+    if (/sky news|سكاي نيوز/.test(lower)) return "سكاي نيوز عربية";
+    if (/google news|أخبار google|أخبار جوجل/.test(lower)) return "أخبار جوجل";
+    if (/independent arabia|اندبندنت/.test(lower)) return "اندبندنت عربية";
+    if (/aawsat|الشرق الأوسط/.test(lower)) return "الشرق الأوسط";
+    return hasArabic(name) ? name : "مصدر إخباري";
+  }
+  if (/بي بي سي/.test(name)) return "BBC News";
+  if (/الجزيرة/.test(name)) return "Al Jazeera";
+  if (/دويتشه فيله/.test(name)) return "DW News";
+  if (/فرانس 24/.test(name)) return "France 24";
+  if (/رويترز/.test(name)) return "Reuters";
+  if (/أسوشيتد برس/.test(name)) return "Associated Press";
+  if (/الغارديان/.test(name)) return "The Guardian";
+  if (/سكاي نيوز/.test(name)) return "Sky News";
+  if (/جوجل|Google/.test(name)) return "Google News";
+  if (/اندبندنت عربية/.test(name)) return "Independent Arabia";
+  if (/الشرق الأوسط/.test(name)) return "Asharq Al-Awsat";
+  return hasArabic(name) ? "News source" : name;
+};
 
 const readNewsCache = async (env: Env, lang: Locale): Promise<{items: Story[]; updatedAt?: string} | null> => {
   try {
@@ -474,7 +504,7 @@ export async function news(env: Env, lang: Locale) {
     return image ? { ...story, imageUrl: image } : story;
   }));
   // Image lookup is enrichment only: an image-provider outage must never hide a valid story.
-  const finalStories = enriched.map((story) => ({ ...story, summary: languageSafeText(story.summary, lang) ? story.summary : "" }));
+  const finalStories = enriched.map((story) => ({ ...story, publisher: localizedPublisher(story.publisher, lang), summary: languageSafeText(story.summary, lang) ? story.summary : "" }));
 
   const cached = await readNewsCache(env, lang);
   // Keep a healthy cache behind the live providers. If providers return nothing
