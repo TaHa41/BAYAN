@@ -15,7 +15,7 @@ try{
   const h=await get("/?lang=en");
   if(!/<html[^>]+lang="en"/.test(h.text))throw new Error("english_lang_missing");
   if(!h.text.includes("app-20261009-01.js"))throw new Error("current_bundle_missing");
-  if(!h.text.includes("app-20261009-01.js?v=2026.10.09.01"))throw new Error("current_shell_bundle_version_missing");
+  if(!h.text.includes("app-20261009-01.js?v=2026.10.09.02"))throw new Error("current_shell_bundle_version_missing");
   if(!h.text.includes("fallback-home")||!h.text.includes("Start searching")||h.text.includes("ابدأ البحث")||h.text.includes("??lang="))throw new Error("english_shell_fallback_not_localized");
 }catch(e){console.error("SHELL",e);bad++}
 try{
@@ -27,6 +27,8 @@ try{
   if(!js.text.includes("section-retry")||!js.text.includes("timeoutMs: 8000"))throw new Error("section_resilience_missing");
   if(!js.text.includes("async function renderNews()"))throw new Error("news_renderer_async_missing");
   if(!js.text.includes("search-answer"))throw new Error("search_answer_ui_missing");
+  if(!js.text.includes("Match each image placeholder to its own card by title"))throw new Error("image_hydration_card_matching_missing");
+  if(!js.text.includes("onerror=\\"this.onerror=null"))throw new Error("image_load_fallback_missing");
   if(!bundleText.includes("const wisdomTimer = setInterval")||!js.text.includes("}, 30000)"))throw new Error("wisdom_rotation_not_30_seconds");
 }catch(e){console.error("BUNDLE",e);bad++}
 try{
