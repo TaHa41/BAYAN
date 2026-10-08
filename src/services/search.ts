@@ -107,6 +107,39 @@ async function pubmedSearch(q:string,language:Locale):Promise<Candidate[]>{
   }catch{return[]}
 }
 
+async function openAiWebSearch(env:Env,q:string,language:Locale):Promise<Candidate[]>{
+  if(!env.OPENAI_API_KEY)return[];
+  try{
+    const response=await fetch("https://api.openai.com/v1/responses",{
+      method:"POST",
+      headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},
+      signal:AbortSignal.timeout(18000),
+      body:JSON.stringify({
+        model:env.OPENAI_MODEL||"gpt-5-mini",
+        tools:[{type:"web_search"}],
+        instructions:language==="ar"
+          ?"ابحث على الويب عن مصادر حقيقية. أعد JSON فقط بالشكل {\"results\":[{\"title\":\"...\",\"summary\":\"...\",\"url\":\"...\"}]}. أجب بالعربية، ولا تخترع روابط. استخدم فقط روابط وجدتها أداة البحث، وفضّل الجهات الرسمية والجامعات والأبحاث ووكالات الأنباء المعروفة."
+          :"Search the web for real sources. Return JSON only in the shape {\"results\":[{\"title\":\"...\",\"summary\":\"...\",\"url\":\"...\"}]}. Use English and never invent URLs. Use only pages found by the web-search tool, preferring official institutions, universities, research, and reputable newsrooms.",
+        input:"Search query: "+q+". Return up to six distinct useful sources with concise source-specific summaries."
+      })
+    });
+    if(!response.ok)return[];
+    const data=await response.json<any>();
+    const output=String(data.output_text||"").trim();
+    const cited=new Map<string,string>();
+    for(const item of data.output||[])for(const part of item.content||[])for(const ann of part.annotations||[]){
+      if(ann.type==="url_citation"&&/^https:\/\//i.test(String(ann.url||"")))cited.set(String(ann.url),String(ann.title||""));
+    }
+    if(!cited.size)return[];
+    let parsed:any;
+    try{parsed=JSON.parse(output)}catch{return Array.from(cited.entries()).slice(0,5).map(([url,title])=>({title:cleanText(title||q),summary:cleanText(output).slice(0,1200),section:"world",kind:"web" as const,evidence:"mixed" as const,sources:[source(cleanText(title||q),new URL(url).hostname.replace(/^www\./i,""),url)],url,score:66,provider:"OpenAI Web Search"})).filter(x=>x.title&&x.summary&&languageSafe(x,language));}
+    const rows=Array.isArray(parsed?.results)?parsed.results:[];
+    return rows.filter((x:any)=>x&&cited.has(String(x.url||""))).slice(0,6).map((x:any)=>{
+      const url=String(x.url),title=cleanText(x.title||cited.get(url)||q),summary=cleanText(x.summary||"").slice(0,1500);
+      return {title,summary,section:"world",kind:"web",evidence:"mixed",sources:[source(title,new URL(url).hostname.replace(/^www\./i,""),url)],url,score:scoreSource("OpenAI Web Search",title,q)+8,provider:"OpenAI Web Search"};
+    }).filter((x:Candidate)=>x.title&&x.summary&&languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary));
+  }catch{return[]}
+}
 async function openAlex(q:string):Promise<Candidate[]>{
  try{const u="https://api.openalex.org/works?search="+encodeURIComponent(q)+"&per-page=5";const r=await timeout(u,4000);if(!r.ok)return[];const d=await r.json<any>();return(d.results||[]).map((x:any)=>({title:cleanText(x.title||""),summary:cleanText(x.abstract_inverted_index?Object.keys(x.abstract_inverted_index).slice(0,80).join(" "):x.primary_location?.source?.display_name||"Research work"),section:"science",kind:"web",evidence:"mixed",sources:[source(x.title||"Research work","OpenAlex",x.id)],url:x.id,score:64,provider:"OpenAlex"})).filter((x:any)=>x.title)}catch{return[]}
 }
@@ -134,6 +167,21 @@ async function broadGdelt(q:string):Promise<Candidate[]>{
   const all:Candidate[]=[];
   for(const v of variants){const x=await gdelt(v);all.push(...x);if(all.length>=8)break}
   return all;
+}
+async function expandedSearch(env:Env,q:string,language:Locale):Promise<Candidate[]>{
+  const variants=[q+" official source",q+" overview"];
+  const batches=await Promise.all(variants.map(async variant=>{
+    const results=await Promise.all([
+      wikipedia(env,variant,language).catch(()=>[]),
+      wikidata(variant,language).catch(()=>[]),
+      gdelt(variant).catch(()=>[]),
+      googleNewsSearch(variant,language).catch(()=>[]),
+      bingNewsSearch(variant,language).catch(()=>[]),
+      duck(variant,language).catch(()=>[])
+    ]);
+    return results.flat();
+  }));
+  return batches.flat();
 }
 async function settings(env:Env){try{const r=await env.DB.prepare("SELECT key,value FROM admin_settings").all<any>();return Object.fromEntries((r.results||[]).map((x:any)=>[x.key,x.value]))}catch{return{}}}
 const hasArabic=(value:string)=>/[\u0600-\u06ff]/.test(String(value||""));
@@ -186,12 +234,18 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};let [local, wiki, wd, gd, oa, remote, dd, google, bing, crossref, pubmed] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe(s.source_openalex==="0"?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[]),safe(googleNewsSearch(q,language),[]),safe(bingNewsSearch(q,language),[]),safe(crossrefSearch(q),[]),safe(pubmedSearch(q,language),[])]);
 if(!local.length && !wiki.length && !wd.length && !gd.length && !oa.length && !remote.length && !dd.length && !google.length && !bing.length && !crossref.length && !pubmed.length) gd=await broadGdelt(q);
-  const providerAttempted=["BAYAN Knowledge Base","Wikipedia","Wikidata","GDELT","OpenAlex","Crossref","PubMed / NCBI","Cloudflare AI Search","DuckDuckGo","Google News Search","Bing News RSS"];const candidates:Candidate[]=[
+  const providerAttempted=["BAYAN Knowledge Base","Wikipedia","Wikidata","GDELT","OpenAlex","Crossref","PubMed / NCBI","Cloudflare AI Search","DuckDuckGo","Google News Search","Bing News RSS","OpenAI Web Search (fallback)"];const candidates:Candidate[]=[
     ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...google,...bing
   ];
   // A provider can return results that are unusable for the requested language.
   // Retry broad GDELT variants when that happens instead of stopping because raw candidates existed.
-  if(!candidates.some(x=>languageSafe(x,language))){const broadened=await safe(broadGdelt(q),[]);candidates.push(...broadened);}
+  if(candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)).length<2){const broadened=await safe(broadGdelt(q),[]);candidates.push(...broadened);}
+  if(candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)).length<2){
+    candidates.push(...await safe(expandedSearch(env,q,language),[]));
+  }
+  if(candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)).length<2){
+    candidates.push(...await safe(openAiWebSearch(env,q,language),[]));
+  }
   const seen=new Set<string>();
   const results=candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)).sort((a,b)=>b.score-a.score).filter(x=>{
     const k=x.title.toLowerCase().replace(/\W+/g," ")+"|"+x.summary.toLowerCase().slice(0,160);
