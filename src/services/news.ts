@@ -177,21 +177,24 @@ const wikidataImage = async (query: string): Promise<string | undefined> => {
 };
 
 const wikipediaSummaryImage = async (query: string): Promise<string | undefined> => {
-  try {
-    const title = query.trim().replace(/\s+/g, "_");
-    const url = "https://ar.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(title);
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(2500),
-      headers: { accept: "application/json" },
-    });
-    if (!response.ok) return;
-    const data = await response.json<any>();
-    return data.thumbnail?.source || data.originalimage?.source;
-  } catch {
-    return;
-  }
+  const lookup = async (language: string) => {
+    try {
+      const title = query.trim().replace(/\s+/g, "_");
+      const url = "https://" + language + ".wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(title);
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(2500),
+        headers: { accept: "application/json" },
+      });
+      if (!response.ok) return undefined;
+      const data = await response.json<any>();
+      return data.thumbnail?.source || data.originalimage?.source;
+    } catch {
+      return undefined;
+    }
+  };
+  const images = await Promise.all([lookup("ar"), lookup("en")]);
+  return images.find((image) => Boolean(image));
 };
-
 const wikipediaImage = async (query: string): Promise<string | undefined> => {
   try {
     const url =
@@ -212,16 +215,18 @@ const wikipediaImage = async (query: string): Promise<string | undefined> => {
 };
 
 const wikipediaExactImage=async(query:string):Promise<string|undefined>=>{
-  for(const lang of ["ar","en"]){
-    try{
+  const lookup = async (lang:string) => {
+    try {
       const u="https://"+lang+".wikipedia.org/w/api.php?action=query&prop=pageimages&piprop=thumbnail&titles="+encodeURIComponent(query)+"&format=json&origin=*";
       const r=await fetch(u,{signal:AbortSignal.timeout(2500),headers:{accept:"application/json"}});
-      if(!r.ok) continue;
+      if(!r.ok) return undefined;
       const d=await r.json<any>();
       const p=Object.values(d.query?.pages||{})[0] as any;
-      if(p?.thumbnail?.source) return p.thumbnail.source;
-    }catch{}
-  }
+      return p?.thumbnail?.source as string|undefined;
+    } catch { return undefined; }
+  };
+  const images=await Promise.all([lookup("ar"),lookup("en")]);
+  return images.find((image)=>Boolean(image));
 };
 
 export async function findRelatedImage(query: string): Promise<string | undefined> {
