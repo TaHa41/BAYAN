@@ -541,7 +541,10 @@ export async function news(env: Env, lang: Locale) {
     }
   }
 
-  if (finalStories.length) {
+  // Do not poison a healthy cache with a thin live-provider response. If a recent
+  // cache exists but the merged live/cache set is still below the minimum, keep
+  // the last stored payload intact; only seed an empty cache with available stories.
+  if (finalStories.length && !cached?.items?.length) {
     await writeNewsCache(env, lang, finalStories);
   }
 
