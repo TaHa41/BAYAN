@@ -22,7 +22,7 @@ const checks = [
   ["image placeholders hydrate by card title, not global index", read("public/app-20261009-01.js").includes("Match each image placeholder to its own card by title") && read("public/app-20261009-01.js").includes('candidate.querySelector("h2,h3")')],
   ["image failures retain a visible fallback", read("public/app-20261009-01.js").includes("this.insertAdjacentHTML") && read("public/app-20261009-01.js").includes("img.replaceWith(fallback)")],
   ["hero images retain visible fallbacks", read("public/app-20261009-01.js").includes("const heroImageHtml") && read("public/app-20261009-01.js").includes("heroImageHtml(article.image, article.title)")],
-  ["RSS image metadata includes embedded thumbnails", news.includes("item.match(/<img[^>]+src=")],
+  ["RSS image metadata includes embedded thumbnails", /item\.match\(\/\<img\\b\[\^>\]\+src=/.test(news)],
   ["page view metrics exclude non-page events", read("src/db.ts").includes("event='page' AND created_at>=?")],
   ["admin has authenticated Telegram test route", api.includes('/api/admin/telegram-test') && api.includes("telegram_delivery_failed")],
   ["news article evidence and generation have bounded fallbacks", api.includes("bounded(search(env,title,lang),7000)") && api.includes("bounded(ask(env,title,lang,found.results),8000)") && api.includes("if(!found.results.length&&(summary||storyUrl))") && api.includes("sourceDescription(storyUrl,lang)")]
