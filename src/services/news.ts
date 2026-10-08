@@ -51,7 +51,7 @@ const readFeed = async (name: string, url: string): Promise<Story[]> => {
     const timer = setTimeout(() => controller.abort(), 5000);
     const response = await fetch(url, {
       signal: controller.signal,
-      headers: { accept: "application/rss+xml, application/xml, text/xml" },
+      headers: { accept: "application/rss+xml, application/xml, text/xml, */*", "user-agent": "BAYAN/1.2 (+https://bayan.tahaomar411.workers.dev)" },
     });
     clearTimeout(timer);
     if (!response.ok) return [];
@@ -288,7 +288,7 @@ const gdeltFallback = async (lang: Locale): Promise<Story[]> => {
       summary: esc(String(x.seendate || "") + " " + String(x.domain || "")),
       url: String(x.url || ""),
       publisher: String(x.domain || "GDELT"),
-      publishedAt: String(x.seendate || "")
+      publishedAt: (() => { const raw=String(x.seendate||""); const m=raw.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?$/); return m ? new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6])).toISOString() : raw; })()
     })).filter((x:Story) => x.title && x.url);
   } catch { return []; }
 };
@@ -378,15 +378,19 @@ export async function news(env: Env, lang: Locale) {
       all = [...all, ...(await gdeltFallback(lang)).filter((story) => !hasArabic(story.title))];
     }
   }
-  all = all.filter((story) => {
-    if (!story.publishedAt) return true;
+  const isFreshNews = (story: Story) => {
+    // "Latest news" must have a verifiable publication/observation time.
+    // Unknown or malformed dates are not silently promoted to current news.
+    if (!story.publishedAt) return false;
     const timestamp = Date.parse(story.publishedAt);
-    if (!Number.isFinite(timestamp)) return true;
-    return Date.now() - timestamp <= 72 * 60 * 60 * 1000;
-  });
+    return Number.isFinite(timestamp) &&
+      timestamp <= Date.now() + 5 * 60 * 1000 &&
+      Date.now() - timestamp <= 72 * 60 * 60 * 1000;
+  };
+  all = all.filter(isFreshNews);
 
   if (all.length < 3) {
-    const fallback = (lang === "ar" ? await googleArabicFallback() : await googleEnglishFallback()).filter((story) => { if (!story.publishedAt) return true; const timestamp = Date.parse(story.publishedAt); return !Number.isFinite(timestamp) || Date.now() - timestamp <= 72 * 60 * 60 * 1000; });
+    const fallback = (lang === "ar" ? await googleArabicFallback() : await googleEnglishFallback()).filter(isFreshNews);
     all = [...all, ...fallback];
   }
   if (all.length < 3) {
@@ -404,11 +408,7 @@ export async function news(env: Env, lang: Locale) {
 
   // Apply freshness checks after every fallback too. Previously, the final HTML fallback
   // was appended after the freshness filter and could bypass it.
-  all = all.filter((story) => {
-    if (!story.publishedAt) return true; // unknown date is not falsely presented as current
-    const timestamp = Date.parse(story.publishedAt);
-    return !Number.isFinite(timestamp) || (timestamp <= Date.now() + 5 * 60 * 1000 && Date.now() - timestamp <= 72 * 60 * 60 * 1000);
-  });
+  all = all.filter(isFreshNews);
   all.sort((a,b) => {
     const at = a.publishedAt ? Date.parse(a.publishedAt) : 0;
     const bt = b.publishedAt ? Date.parse(b.publishedAt) : 0;
@@ -530,7 +530,9 @@ export async function latestNewsForSitemap(lang: Locale) {
   const seen = new Set<string>();
   return batches.flat().filter((story) => {
     if (lang === "ar" ? !hasArabic(story.title) : hasArabic(story.title)) return false;
-    if (story.publishedAt) { const timestamp = Date.parse(story.publishedAt); if (Number.isFinite(timestamp) && Date.now() - timestamp > 72 * 60 * 60 * 1000) return false; }
+    if (!story.publishedAt) return false;
+    const timestamp = Date.parse(story.publishedAt);
+    if (!Number.isFinite(timestamp) || timestamp > Date.now() + 5 * 60 * 1000 || Date.now() - timestamp > 72 * 60 * 60 * 1000) return false;
     const key = story.title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
     if (seen.has(key)) return false; seen.add(key); return true;
   }).sort((a,b) => { const at=a.publishedAt?Date.parse(a.publishedAt):0; const bt=b.publishedAt?Date.parse(b.publishedAt):0; return (Number.isFinite(bt)?bt:0)-(Number.isFinite(at)?at:0); }).slice(0,40);
