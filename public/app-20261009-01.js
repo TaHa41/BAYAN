@@ -231,7 +231,10 @@
         "</div>");
     }
     const newsItems = (newsData.items || [])
-      .filter((item) => ar ? /[\u0600-\u06ff]/.test(String(item.title || "")) : !/[\u0600-\u06ff]/.test(String(item.title || "")))
+      .filter((item) => {
+        const title = String(item.title || ""), summary = String(item.summary || "");
+        return ar ? /[\u0600-\u06ff]/.test(title) && (!summary || /[\u0600-\u06ff]/.test(summary)) : !/[\u0600-\u06ff]/.test(title) && !/[\u0600-\u06ff]/.test(summary);
+      })
       .slice(0, 6);
     newsOut.innerHTML = newsItems.length
       ? newsItems.map((item) => '<a class="article-card" href="/news?story=' + encodeURIComponent(item.title) + '&lang=' + lang + '">' + imageHtml(item) + '<div class="article-card-body"><span class="kicker">' + escapeHtml(item.publisher || t("الأخبار","News")) + '</span><h3>' + escapeHtml(item.title) + '</h3><p>' + escapeHtml(item.summary || "") + '</p><div class="source-line">' + escapeHtml(item.publishedAt || "") + '</div><span class="read">' + t("اقرأ داخل بيان","Read inside BAYAN") + " →</span></div></a>").join("")
@@ -240,7 +243,10 @@
 
     const featured = sectionData
       .flatMap((x) => x.items || [])
-      .filter((item) => ar ? /[\u0600-\u06ff]/.test(String(item.title || "")) : !/[\u0600-\u06ff]/.test(String(item.title || "")))
+      .filter((item) => {
+        const title = String(item.title || ""), summary = String(item.summary || ""), body = String(item.body || "");
+        return ar ? /[\u0600-\u06ff]/.test(title) && (!summary || /[\u0600-\u06ff]/.test(summary)) && (!body || /[\u0600-\u06ff]/.test(body)) : !/[\u0600-\u06ff]/.test(title) && !/[\u0600-\u06ff]/.test(summary) && !/[\u0600-\u06ff]/.test(body);
+      })
       .slice(0, 9);
     const featuredOut = document.querySelector("#home-featured");
     featuredOut.innerHTML = featured.length
@@ -321,7 +327,10 @@
 
     try {
       const data = await api("/api/news?lang=" + lang);
-      const items = data.items || [];
+      const items = (data.items || []).filter((item) => {
+        const title = String(item.title || ""), summary = String(item.summary || "");
+        return ar ? /[\u0600-\u06ff]/.test(title) && (!summary || /[\u0600-\u06ff]/.test(summary)) : !/[\u0600-\u06ff]/.test(title) && !/[\u0600-\u06ff]/.test(summary);
+      });
       const output = document.querySelector("#news");
       if (data.stale && output) {
         output.insertAdjacentHTML("beforebegin", '<div class="notice">' +
