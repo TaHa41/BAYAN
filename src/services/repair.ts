@@ -102,7 +102,7 @@ async function repairRuntime(env:Env,failures:string[]){
   if(failures.includes("images")&&failures.includes("news_cache")&&!imageOnlyPass){actions.push("image repair deferred until the next run to preserve Worker subrequest budget after news refresh")}else if(failures.includes("images"))try{
     const rows=await env.DB.prepare("SELECT id,title,summary FROM articles WHERE status='PUBLISHED' AND (image_url IS NULL OR trim(image_url)='') ORDER BY updated_at DESC LIMIT 4").all<any>();
     let filledArticles=0;
-    for(const row of rows.results||[])try{const url=await findRelatedImage(String(row.title)+" "+String(row.summary||""));if(url){await env.DB.prepare("UPDATE articles SET image_url=?,updated_at=? WHERE id=? AND (image_url IS NULL OR trim(image_url)='')").bind(url,now(),row.id).run();filledArticles++}}catch{}
+    for(const row of rows.results||[])try{const url=await findRelatedImage(String(row.title||""));if(url){await env.DB.prepare("UPDATE articles SET image_url=?,updated_at=? WHERE id=? AND (image_url IS NULL OR trim(image_url)='')").bind(url,now(),row.id).run();filledArticles++}}catch{}
     let filledNews=0;
     for(const language of ["ar","en"] as const)try{
       const row=await env.DB.prepare("SELECT payload FROM news_cache WHERE language=? LIMIT 1").bind(language).first<any>();
@@ -111,7 +111,7 @@ async function repairRuntime(env:Env,failures:string[]){
       const items:any[]=Array.isArray(parsed)?parsed:(Array.isArray(parsed?.items)?parsed.items:[]);
       let changed=false;
       for(const item of items.filter((entry:any)=>!entry.imageUrl).slice(0,3)){
-        const url=await findRelatedImage(String(item.title||"")+" "+String(item.summary||""));
+        const url=await findRelatedImage(String(item.title||""));
         if(url){item.imageUrl=url;item.imageAlt=String(item.title||"");filledNews++;changed=true}
       }
       if(changed&&Array.isArray(parsed))await env.DB.prepare("UPDATE news_cache SET payload=?,updated_at=? WHERE language=?").bind(JSON.stringify(items.slice(0,40)),now(),language).run();
