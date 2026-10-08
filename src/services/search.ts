@@ -75,6 +75,29 @@ async function settings(env:Env){try{const r=await env.DB.prepare("SELECT key,va
 const hasArabic=(value:string)=>/[\u0600-\u06ff]/.test(String(value||""));
 // The headline is the strongest locale signal. A translated summary must not make
 // an English headline appear in Arabic mode (or vice versa).
+const localizedSource=(value:string,language:Locale)=>{
+  const name=String(value||"").trim(),lower=name.toLowerCase();
+  if(language==="ar"){
+    if(/wikipedia/.test(lower))return "ويكيبيديا";
+    if(/wikidata/.test(lower))return "ويكي بيانات";
+    if(/openalex/.test(lower))return "أوبن أليكس للأبحاث";
+    if(/cloudflare ai search/.test(lower))return "بحث كلاودفلير";
+    if(/duckduckgo/.test(lower))return "داك داك جو";
+    if(/gdelt/.test(lower))return "قاعدة الأخبار العالمية";
+    if(/bbc/.test(lower))return "بي بي سي";
+    if(/reuters/.test(lower))return "رويترز";
+    if(/associated press|ap news/.test(lower))return "أسوشيتد برس";
+    if(/al.?jazeera/.test(lower))return "الجزيرة";
+    return /[\u0600-\u06ff]/.test(name)?name:"مصدر بحث";
+  }
+  if(/ويكيبيديا/.test(name))return "Wikipedia";
+  if(/ويكي بيانات/.test(name))return "Wikidata";
+  if(/أوبن أليكس/.test(name))return "OpenAlex";
+  if(/بحث كلاودفلير/.test(name))return "Cloudflare AI Search";
+  if(/داك داك جو/.test(name))return "DuckDuckGo";
+  if(/قاعدة الأخبار العالمية/.test(name))return "GDELT";
+  return /[\u0600-\u06ff]/.test(name)?"Research source":name;
+};
 const languageSafe=(x:Candidate,language:Locale)=>{
   const title=String(x.title||""),summary=String(x.summary||"");
   return language==="ar" ? hasArabic(title) && (!summary||hasArabic(summary)) : !hasArabic(title) && !hasArabic(summary);
@@ -88,7 +111,7 @@ if(!local.length && !wiki.length && !wd.length && !gd.length && !oa.length && !r
   const results=candidates.filter(x=>languageSafe(x,language)).sort((a,b)=>b.score-a.score).filter(x=>{
     const k=x.title.toLowerCase().replace(/\W+/g," ")+"|"+x.summary.toLowerCase().slice(0,160);
     if(seen.has(k))return false; seen.add(k); return true;
-  }).slice(0,max).map(({score,provider,...x})=>x);
+  }).slice(0,max).map(({score,provider,...x})=>({...x,sources:(x.sources||[]).map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}));
   const providers=[...new Set(candidates.map(x=>x.provider))];
   const publishers=[...new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean))];
   const configuredMin=Math.max(2,Math.min(5,Number(s.min_sources||3)));
