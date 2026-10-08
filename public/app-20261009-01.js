@@ -415,7 +415,7 @@
             '</div><div class="sources-box"><h2>' + t("الأدلة والمصادر","Evidence & sources") + "</h2>" +
             (article.sources || []).map((source) =>
               '<div class="source-line">' + escapeHtml(source.publisher || "") + " · " + escapeHtml(source.title || "") +
-              "</div>").join("") + "</div></article>";
+              "</div>").join("") + "</div>" + socialActions({...article, title:article.title||story.title, summary:article.summary||story.summary, _key:"news:"+story.title}) + "</article>";
         } catch {
           output.innerHTML = '<div class="notice">' +
             t("تعذر تجهيز المقال الكامل من الأدلة الآن.","The full evidence-based article could not be prepared right now.") + "</div>";
@@ -622,7 +622,7 @@
       let items=getSavedItems(),exists=items.some(x=>itemKey(x)===key);
       if(exists)items=items.filter(x=>itemKey(x)!==key);else items.unshift(item);
       safeStorage.set(SAVED_KEY,JSON.stringify(items.slice(0,200)));
-      if(item.slug&&!exists){try{await api("/api/save",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({slug:item.slug})});}catch{}}
+      if(item.slug){try{await api("/api/save",{method:exists?"DELETE":"POST",headers:{"content-type":"application/json"},body:JSON.stringify({slug:item.slug})});}catch{}}
       button.setAttribute("aria-pressed",String(!exists));button.innerHTML=(exists?"＋ ":"✓ ")+t("حفظ","Save");
       return;
     }
