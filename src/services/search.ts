@@ -114,7 +114,10 @@ if(!local.length && !wiki.length && !wd.length && !gd.length && !oa.length && !r
   const providerAttempted=["BAYAN Knowledge Base","Wikipedia","Wikidata","GDELT","OpenAlex","Cloudflare AI Search","DuckDuckGo"];const candidates:Candidate[]=[
     ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wd,...gd,...oa,...remote,...dd
   ];
-  // A provider can return results that are unusable for the requested language.\n  // Retry broad GDELT variants when that happens instead of stopping because raw candidates existed.\n  if(!candidates.some(x=>languageSafe(x,language))){const broadened=await safe(broadGdelt(q),[]);candidates.push(...broadened);}\n  const seen=new Set<string>();
+  // A provider can return results that are unusable for the requested language.
+  // Retry broad GDELT variants when that happens instead of stopping because raw candidates existed.
+  if(!candidates.some(x=>languageSafe(x,language))){const broadened=await safe(broadGdelt(q),[]);candidates.push(...broadened);}
+  const seen=new Set<string>();
   const results=candidates.filter(x=>languageSafe(x,language)).sort((a,b)=>b.score-a.score).filter(x=>{
     const k=x.title.toLowerCase().replace(/\W+/g," ")+"|"+x.summary.toLowerCase().slice(0,160);
     if(seen.has(k))return false; seen.add(k); return true;
