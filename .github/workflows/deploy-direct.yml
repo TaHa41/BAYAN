@@ -4,6 +4,9 @@ on:
     branches: [main]
 permissions:
   contents: read
+concurrency:
+  group: bayan-production-deploy
+  cancel-in-progress: true
 jobs:
   deploy:
     runs-on: ubuntu-latest
