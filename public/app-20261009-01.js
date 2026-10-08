@@ -61,7 +61,7 @@
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 9000));
     try {
-      const response = await fetch(url + separator + "_b=20261009.21", {
+      const response = await fetch(url + separator + "_b=20261009.22", {
         ...options,
         cache: "no-store",
         signal: controller.signal
@@ -415,7 +415,7 @@
             '</div><div class="sources-box"><h2>' + t("الأدلة والمصادر","Evidence & sources") + "</h2>" +
             (article.sources || []).map((source) =>
               '<div class="source-line">' + escapeHtml(source.publisher || "") + " · " + escapeHtml(source.title || "") +
-              "</div>").join("") + "</div>" + socialActions({...article, title:article.title||story.title, summary:article.summary||story.summary, _key:"news:"+story.title}) + "</article>";
+              "</div>").join("") + "</div>" + socialActions({...article, title:article.title||story.title, summary:article.summary||story.summary, href:"/news?story="+encodeURIComponent(story.title)+"&lang="+lang, _key:"news:"+story.title}) + "</article>";
         } catch {
           output.innerHTML = '<div class="notice">' +
             t("تعذر تجهيز المقال الكامل من الأدلة الآن.","The full evidence-based article could not be prepared right now.") + "</div>";
