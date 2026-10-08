@@ -1,5 +1,5 @@
 User-agent: *
 Allow: /
-Disallow: /api/admin/
+Disallow: /api/
 Sitemap: https://bayan.tahaomar411.workers.dev/news-sitemap.xml
 Sitemap: https://bayan.tahaomar411.workers.dev/sitemap.xml
