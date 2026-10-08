@@ -66,7 +66,7 @@
     img.dataset.retrying = "1";
     try {
       const query = img.dataset.imageQuery || img.alt || "";
-      const data = await api("/api/image?q=" + encodeURIComponent(query), {timeoutMs:12000});
+      const data = await api("/api/image?q=" + encodeURIComponent(query), {timeoutMs:18000});
       if (data?.imageUrl && data.imageUrl !== img.src) { img.src = data.imageUrl; return; }
     } catch {}
     showFallback();
@@ -197,7 +197,7 @@
     const pending = (items || []).filter((item) => !item.imageUrl).slice(0, 4);
     await Promise.all(pending.map(async (item) => {
       try {
-        const data = await api("/api/image?q=" + encodeURIComponent(item.title + " " + (item.summary || "")), {timeoutMs: 12000});
+        const data = await api("/api/image?q=" + encodeURIComponent(item.title + " " + (item.summary || "")), {timeoutMs: 18000});
         const cards = Array.from(document.querySelectorAll(".article-card, .evidence-card"));
         const card = cards.find((candidate) => {
           const heading = candidate.querySelector("h2,h3");
