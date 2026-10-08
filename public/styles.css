@@ -166,3 +166,15 @@ html[dir="rtl"] .section-card:before{inset:0 0 0 auto;border-radius:0 18px 18px 
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
 
 .section-icon svg,.drawer-icon svg{display:block;width:23px;height:23px;stroke:currentColor}.drawer-icon svg{width:21px;height:21px}.section-icon,.drawer-icon{line-height:1}.section-icon svg path,.section-icon svg circle,.section-icon svg rect,.drawer-icon svg path,.drawer-icon svg circle,.drawer-icon svg rect{vector-effect:non-scaling-stroke}
+
+/* Live market dashboard */
+.market-overview{align-items:start}
+.market-list{display:grid;gap:0;margin:.75rem 0;max-height:360px;overflow:auto}
+.market-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.65rem 0;border-bottom:1px solid var(--line,rgba(128,128,128,.2))}
+.market-row span{display:grid;gap:.15rem;font-size:.92rem}
+.market-row small{font-size:.74rem;opacity:.72}
+.market-row strong{font-variant-numeric:tabular-nums;white-space:nowrap}
+.market-card h2{font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.section-title{margin:1.6rem 0 .8rem;font-size:1.2rem}
+.muted{opacity:.76;font-size:.85rem;line-height:1.65}
+@media(max-width:680px){.market-row{gap:.5rem}.market-row span{font-size:.82rem}.market-row small{font-size:.68rem}.market-row strong{font-size:.9rem}}
