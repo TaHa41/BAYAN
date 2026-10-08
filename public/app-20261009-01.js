@@ -182,7 +182,6 @@
           img.className = "article-card-image";
           img.alt = String(item.imageAlt || item.title || "");
           img.onerror = () => {
-            img.remove();
             const fallback = document.createElement("div");
             fallback.className = "image-placeholder";
             fallback.textContent = "BAYAN";
