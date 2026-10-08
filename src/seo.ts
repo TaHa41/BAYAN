@@ -18,7 +18,9 @@ export async function sitemap(env:Env){
   }catch{}
   const publicPaths=["/","/news","/about","/methodology","/privacy","/terms",...SECTIONS.map(x=>"/"+x[0])];
   const localizedUrls=publicPaths.flatMap((path)=>["ar","en"].map((language)=>({url:ORIGIN+path+"?lang="+language})));
-  const urls=[...new Map([...localizedUrls,...articleUrls].map((item)=>[item.url,item])).values()];
+  const urlMap=new Map<string,{url:string;lastmod?:string}>();
+  for(const item of [...localizedUrls,...articleUrls])urlMap.set(item.url,item);
+  const urls:Array<{url:string;lastmod?:string}>=[...urlMap.values()];
   return text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+urls.map((item)=>{
     const date=Date.parse(String(item.lastmod||""));
     const lastmod=Number.isFinite(date)?'<lastmod>'+xml(new Date(date).toISOString())+'</lastmod>':"";
