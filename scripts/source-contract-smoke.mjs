@@ -34,6 +34,7 @@ const checks = [
   ["search has a localized Google News RSS fallback", search.includes("async function googleNews") && search.includes("Google News RSS") && search.includes("const hasLocaleResults")],
   ["search failures are logged and queued for review", api.includes("search_empty_results") && api.includes("search_api_failed") && api.includes("search_temporarily_unavailable") && api.includes("BAYAN SEARCH FAILURE")],
   ["self-healing detects search failures without claiming false success", read("src/services/repair.ts").includes("search_api_failed") && read("src/services/repair.ts").includes("Recent search API failures detected") && read("src/services/repair.ts").includes('!failures.includes("search")')],
+  ["legacy regional categories are not primary navigation items", !app.includes('["egypt","مصر"') && !app.includes('["arab","العالم العربي"') && !app.includes('["world","العالم"')],
   ["search failure UI offers retry and admin diagnostics", app.includes('id="retrySearch"') && app.includes("Open admin") && app.includes("renderSearch()")],
   ["AI rejects English-only sentences in Arabic answers", ai.includes("const languageConsistent") && ai.includes("sentences.every")],
   ["short news drafts are not marked as complete analysis", api.includes("generatedBody.length>=500") && api.includes('status:hasFullAnalysis?generated.status:"source_only"')],
