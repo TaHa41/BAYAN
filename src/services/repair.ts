@@ -6,7 +6,7 @@ async function newsCacheHealthy(env:Env){
     const row=cache.find((item:any)=>item.language===language);
     if(!row?.payload)return false;
     let items:any[]=[];
-    try{items=JSON.parse(String(row.payload)).items||[]}catch{return false}
+    try{const parsed=JSON.parse(String(row.payload));items=Array.isArray(parsed)?parsed:(Array.isArray(parsed?.items)?parsed.items:[])}catch{return false}
     const fresh=items.filter((item:any)=>{
       const title=String(item.title||""),date=Date.parse(String(item.publishedAt||""));
       const localeMatch=language==="ar"?/[\u0600-\u06ff]/.test(title):!/[\u0600-\u06ff]/.test(title);
