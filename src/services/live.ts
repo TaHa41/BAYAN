@@ -28,12 +28,12 @@ export async function prayerTimes(cityInput?:string,countryInput?:string){
     if(d?.code!==200||!data?.timings||!data?.date?.hijri)throw new Error("prayer_payload");
     const hijri=data.date.hijri;
     let ramadan:any=null,eidFitr:any=null,eidAdha:any=null;
-    const hijriYear=Number(hijri.year),hijriMonth=Number(hijri.month?.number||0),nextRamadanYear=hijriMonth>=9?hijriYear+1:hijriYear;
+    const hijriYear=Number(hijri.year),hijriMonth=Number(hijri.month?.number||0),hijriDay=Number(hijri.day||1),nextRamadanYear=hijriMonth>=9?hijriYear+1:hijriYear,nextEidYear=hijriMonth>=10?hijriYear+1:hijriYear,nextAdhaYear=hijriMonth===12&&hijriDay>10?hijriYear+1:hijriYear;
     const convert=async(date:string)=>{try{const response=await timeout("https://api.aladhan.com/v1/hToG/"+date,3500);if(!response.ok)return null;const payload=await response.json<any>();return payload?.code===200?payload.data?.gregorian:null}catch{return null}};
     const [rDate,fDate,aDate]=await Promise.all([
       convert("01-09-"+nextRamadanYear),
-      convert("01-10-"+nextRamadanYear),
-      convert("10-12-"+(hijriMonth>=12?hijriYear+1:hijriYear))
+      convert("01-10-"+nextEidYear),
+      convert("10-12-"+nextAdhaYear)
     ]);
     if(rDate)ramadan={date:rDate.date,readable:rDate.date, hijriYear:nextRamadanYear,certainty:"calculated_estimate"};
     if(fDate)eidFitr={date:fDate.date,readable:fDate.date,certainty:"calculated_estimate",prayerTime:null};
