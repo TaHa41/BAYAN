@@ -516,7 +516,7 @@ export async function news(env: Env, lang: Locale) {
     const seenTitles = new Set(finalStories.map((story) => story.title.trim().toLowerCase()));
     const languageSafeCache = cached.items.filter((story) =>
       lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title)
-    ).map((story) => ({ ...story, summary: languageSafeText(story.summary, lang) ? story.summary : "" }));
+    ).map((story) => ({ ...story, publisher: localizedPublisher(story.publisher, lang), summary: languageSafeText(story.summary, lang) ? story.summary : "" }));
     const merged = [
       ...finalStories,
       ...languageSafeCache.filter((story) => !seenTitles.has(story.title.trim().toLowerCase())),
