@@ -22,6 +22,12 @@
   const lang = params.get("lang") === "en" ? "en" : "ar";
   const ar = lang === "ar";
   const t = (a, e) => ar ? a : e;
+  const formatDate = (value) => {
+    const date = new Date(value || "");
+    if (!value || !Number.isFinite(date.getTime())) return "";
+    try { return new Intl.DateTimeFormat(ar ? "ar-EG" : "en-US", {dateStyle:"medium",timeStyle:"short"}).format(date); }
+    catch { return date.toISOString().slice(0,16).replace("T"," "); }
+  };
   const app = document.querySelector("#app");
   const nav = document.querySelector("#nav");
   const drawer = document.querySelector("#drawer");
@@ -34,7 +40,7 @@
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 9000));
     try {
-      const response = await fetch(url + separator + "_b=20261008.07", {
+      const response = await fetch(url + separator + "_b=20261009.06", {
         ...options,
         cache: "no-store",
         signal: controller.signal
@@ -237,7 +243,7 @@
       })
       .slice(0, 6);
     newsOut.innerHTML = newsItems.length
-      ? newsItems.map((item) => '<a class="article-card" href="/news?story=' + encodeURIComponent(item.title) + '&lang=' + lang + '">' + imageHtml(item) + '<div class="article-card-body"><span class="kicker">' + escapeHtml(item.publisher || t("الأخبار","News")) + '</span><h3>' + escapeHtml(item.title) + '</h3><p>' + escapeHtml(item.summary || "") + '</p><div class="source-line">' + escapeHtml(item.publishedAt || "") + '</div><span class="read">' + t("اقرأ داخل بيان","Read inside BAYAN") + " →</span></div></a>").join("")
+      ? newsItems.map((item) => '<a class="article-card" href="/news?story=' + encodeURIComponent(item.title) + '&lang=' + lang + '">' + imageHtml(item) + '<div class="article-card-body"><span class="kicker">' + escapeHtml(item.publisher || t("الأخبار","News")) + '</span><h3>' + escapeHtml(item.title) + '</h3><p>' + escapeHtml(item.summary || "") + '</p><div class="source-line">' + escapeHtml(formatDate(item.publishedAt)) + '</div><span class="read">' + t("اقرأ داخل بيان","Read inside BAYAN") + " →</span></div></a>").join("")
       : '<div class="notice">' + t("لا توجد أخبار حديثة متاحة الآن؛ لن نعرض خبرًا مختلقًا.","No current news is available right now; BAYAN will not invent a story.") + "</div>";
     if (newsItems.length) hydrateSectionImages(newsItems);
 
@@ -351,9 +357,10 @@
           const article = articleData.article;
           output.innerHTML =
             '<article class="article-full">' + (article.image ? heroImageHtml(article.image, article.title) : "") +
-            '<span class="eyebrow">' + escapeHtml(story.publisher || "News") + "</span><h1>" +
+            '<span class="eyebrow">' + escapeHtml(story.publisher || t("الأخبار","News")) + "</span><h1>" +
             escapeHtml(article.title) + '</h1><p class="lead">' + escapeHtml(article.summary || story.summary || "") +
-            '</p><div class="article-body">' + String(article.body || "").split(String.fromCharCode(10)).map((line) =>
+            '</p>' + (article.status === "source_only" ? '<div class="notice">' + t("هذا ملخص المصدر المتاح؛ لم تتوفر أدلة كافية لإعداد عرض تحليلي كامل بعد.","This is the available source summary; there is not enough evidence to prepare a full analysis yet.") + '</div>' : "") +
+            '<div class="article-body">' + String(article.body || "").split(String.fromCharCode(10)).map((line) =>
             "<p>" + escapeHtml(line) + "</p>").join("") +
             '</div><div class="sources-box"><h2>' + t("الأدلة والمصادر","Evidence & sources") + "</h2>" +
             (article.sources || []).map((source) =>
@@ -371,7 +378,7 @@
           imageHtml(item) + '<div class="article-card-body"><span class="kicker">' +
           escapeHtml(item.publisher || "News") + "</span><h2>" + escapeHtml(item.title) +
           "</h2><p>" + escapeHtml(item.summary) + '</p><div class="source-line">' +
-          escapeHtml(item.publishedAt || "") + '</div><span class="read">' +
+          escapeHtml(formatDate(item.publishedAt)) + '</div><span class="read">' +
           t("اقرأ داخل بيان","Read inside BAYAN") + " →</span></div></a>").join("")
         : '<div class="notice">' + t("لم يرجع أي مزود أخبار مادة الآن. لن نعرض أخبارًا مختلقة.",
           "No news provider returned a story right now. BAYAN will not invent news.") + "</div>";
