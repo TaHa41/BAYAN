@@ -276,3 +276,16 @@ html[dir="rtl"] .section-card:before{inset:0 0 0 auto;border-radius:0 18px 18px 
 .article-hero-placeholder{display:grid;place-items:center;min-height:clamp(190px,34vw,420px);width:100%;margin:0 0 1.25rem;border:1px solid var(--line,rgba(128,128,128,.22));border-radius:18px;background:linear-gradient(135deg,rgba(120,140,160,.12),rgba(120,140,160,.04));color:var(--muted,#718096);font-size:.95rem;text-align:center;padding:1rem;}
 .article-hero-placeholder.is-unavailable{min-height:100px;font-size:.9rem;}
 .article-full .article-hero-image{display:block;width:100%;max-height:560px;object-fit:cover;border-radius:18px;margin:0 0 1.25rem;}
+
+
+/* Refined currency quote tiles: consistent hierarchy on desktop and mobile. */
+.prices-page .fx-panel{padding:clamp(16px,2.5vw,24px);}
+.prices-page .fx-panel>h2{display:flex;align-items:center;gap:10px;}
+.prices-page .fx-panel>h2:before{content:"$";display:inline-grid;place-items:center;width:42px;height:42px;border-radius:13px;background:var(--soft);border:1px solid var(--line);font-size:22px;letter-spacing:0;}
+.prices-page .market-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.prices-page .market-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:12px 13px;min-height:68px;border-radius:14px;background:var(--surface);}
+.prices-page .currency-label{display:flex;align-items:center;gap:9px;min-width:0;}
+.prices-page .currency-label>b{display:inline-grid;place-items:center;flex:0 0 43px;min-width:43px;height:31px;padding:0 4px;border-radius:9px;background:var(--soft);border:1px solid var(--line);font-size:11px;letter-spacing:.01em;}
+.prices-page .currency-label small{margin:0;line-height:1.45;overflow-wrap:anywhere;}
+.prices-page .market-row strong{font-size:clamp(13px,1.2vw,16px);}
+@media(max-width:480px){.prices-page .market-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.prices-page .market-row{grid-template-columns:minmax(0,1fr);align-content:start;gap:8px;min-height:88px;padding:10px}.prices-page .currency-label{align-items:flex-start;flex-direction:column;gap:5px}.prices-page .currency-label>b{height:27px;flex-basis:27px}.prices-page .currency-label small{font-size:10px;min-height:29px}.prices-page .market-row strong{justify-self:start;font-size:15px}.prices-page .fx-panel>h2:before{width:36px;height:36px}}
