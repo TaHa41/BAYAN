@@ -1,12 +1,11 @@
 name: BAYAN production direct deploy
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: bayan-production-deploy
-  cancel-in-progress: true
+  group: bayan-production-manual-deploy
+  cancel-in-progress: false
 jobs:
   deploy:
     runs-on: ubuntu-latest
