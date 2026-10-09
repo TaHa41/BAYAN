@@ -15,7 +15,7 @@ const publicationQuality=(input:{title:string;summary:string;body:string;languag
  return title.length>=8&&summary.length>=40&&body.length>=1800&&headings>=4&&paragraphs.length>=5&&(input.language==="ar"?hasArabic:!hasArabic)&&hosts.size>=2&&/^https:\/\//i.test(String(input.imageUrl||""));
 };
 export async function publishVerifiedResearch(env:Env,input:{title:string;summary:string;body:string;section:string;language:Locale;sources:any[];imageUrl?:string;imageAlt?:string}){
- if(!publicationQuality(input))return null;
+ if(!publicationQuality(input))return undefined;
  const rows=await env.DB.prepare("SELECT slug,title,summary,body,section,sources_json,image_url FROM articles WHERE language=? AND status='PUBLISHED' ORDER BY updated_at DESC LIMIT 600").bind(input.language).all<any>();
  const candidates=(rows.results||[]).filter(row=>publicationTitleMatch(String(row.title||""),input.title));
  const existing=candidates.sort((a,b)=>Number(publicationTextKey(a.title)===publicationTextKey(input.title))-Number(publicationTextKey(b.title)===publicationTextKey(input.title))).at(-1);
