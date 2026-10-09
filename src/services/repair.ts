@@ -25,6 +25,23 @@ export async function record(env:Env,level:string,kind:string,message:string){
   try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind(level,kind,message.slice(0,4000),now()).run()}catch{}
 }
 
+const SELF_HEAL_LEASE_MS=4*60*1000;
+async function acquireSelfHealLease(env:Env):Promise<string|undefined>{
+  const stamp=now();
+  const lease=new Date(Date.now()+SELF_HEAL_LEASE_MS).toISOString();
+  try{
+    await env.DB.prepare("INSERT OR IGNORE INTO admin_settings(key,value,updated_at) VALUES('self_heal_lock','',?)").bind(stamp).run();
+    const result=await env.DB.prepare("UPDATE admin_settings SET value=?,updated_at=? WHERE key='self_heal_lock' AND (value='' OR value<?)").bind(lease,stamp,stamp).run();
+    return Number(result.meta?.changes||0)>0?lease:undefined;
+  }catch(error){
+    await record(env,"warn","self_heal_lock","Could not acquire repair lease: "+String(error).slice(0,250));
+    return undefined;
+  }
+}
+async function releaseSelfHealLease(env:Env,lease:string){
+  try{await env.DB.prepare("UPDATE admin_settings SET value='',updated_at=? WHERE key='self_heal_lock' AND value=?").bind(now(),lease).run()}catch{}
+}
+
 async function diagnose(env:Env,failures:string[]){
   let history="No recorded repair history for this failure signature.";
   try{const rows=await env.DB.prepare("SELECT attempt_no,diagnosis,action,verification,created_at FROM repair_attempts WHERE signature=? ORDER BY attempt_no DESC LIMIT 5").bind(failures.join(",")).all<any>();if((rows.results||[]).length)history=(rows.results||[]).map((row:any)=>"Attempt "+row.attempt_no+"; verification="+row.verification+"; action="+String(row.action||"").slice(0,700)+"; diagnosis="+String(row.diagnosis||"").slice(0,500)).join("\n")}catch{}
@@ -166,6 +183,12 @@ export async function selfHeal(env:Env){
   for(const[c,fn]of checks)try{if(!(await fn())){failures.push(c);await record(env,"error","health",c+" check failed")}}catch(e){failures.push(c);await record(env,"error","health",c+" failed: "+String(e))}
   if(!failures.some((failure)=>["database","articles","sections"].includes(failure)))await resolveVerifiedLegacyJobs(env);
   if(!failures.length){try{await env.DB.prepare("UPDATE repair_jobs SET status='RESOLVED',verification='verified_runtime',diagnosis=COALESCE(diagnosis,'')||' | News cache and image health now pass',updated_at=? WHERE status IN ('REVIEW','REPAIRED') AND (signature LIKE '%news_cache%' OR signature LIKE '%images%')").bind(now()).run()}catch{}await record(env,"info","health","AI self-healing checks passed");return{ok:true,failures:[],actions:[],verification:"healthy",message:"All runtime checks passed; no repair was necessary."}}
+  const lease=await acquireSelfHealLease(env);
+  if(!lease){
+    await record(env,"warn","self_heal_duplicate","Skipped overlapping self-healing run; another run owns the repair lease.");
+    return{ok:false,failures,initialFailures:failures,actions:["another self-healing run is active; skipped duplicate repair to preserve Worker subrequest budget"],verification:"repair_in_progress"};
+  }
+  try{
   const diagnosis=await diagnose(env,failures);
   const actions=await repairRuntime(env,failures);
   let verification="repair_attempted";
@@ -188,6 +211,7 @@ export async function selfHeal(env:Env){
   await record(env,verification==="verified_runtime"?"info":"error","self_heal",JSON.stringify({initialFailures:failures,remainingFailures,actions,verification}).slice(0,3800));
   if(shouldNotify)await notify(env,"BAYAN AI Self-Healing\nInitial failures: "+failures.join(", ")+"\nRemaining failures: "+(remainingFailures.join(", ")||"none")+"\nAction: "+(actions.join("; ")||"none")+"\nVerification: "+verification);
   return{ok:verification==="verified_runtime",failures:remainingFailures,initialFailures:failures,diagnosis,actions,verification};
+  }finally{await releaseSelfHealLease(env,lease)}
 }
 
 export async function aiRepairRequest(env:Env,problem:string){
