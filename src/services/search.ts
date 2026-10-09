@@ -252,8 +252,7 @@ if(!local.length && !wiki.length && !wd.length && !gd.length && !oa.length && !r
   const seen=new Set<string>();
   const safeCandidates=candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary));
   let ranked=safeCandidates.filter(x=>relevantCandidate(x,q)).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
-  // If strict matching removes everything, show the strongest language-safe source matches instead of a dead-end message.
-  if(!ranked.length)ranked=safeCandidates.sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q)).slice(0,5);
+  // Never pad the result list with unrelated items: expand providers first, then report honestly if relevance is still weak.
   const results=ranked.filter(x=>{
     const k=x.title.toLowerCase().replace(/\W+/g," ")+"|"+x.summary.toLowerCase().slice(0,160);
     if(seen.has(k))return false; seen.add(k); return true;
