@@ -282,16 +282,24 @@ export async function findRelatedImage(query: string, sourceUrl?: string): Promi
 
   try {
     const language = /[\u0600-\u06ff]/.test(headline) ? "ar" : "en";
-    const url = "https://" + language + ".wikipedia.org/w/api.php?action=query&prop=pageimages&piprop=thumbnail&pithumbsize=1200&titles=" +
-      encodeURIComponent(headline) + "&format=json&origin=*";
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(2000),
-      headers: { accept: "application/json" },
-    });
-    if (response.ok) {
-      const data = await response.json<any>();
+    const exactUrl = "https://" + language + ".wikipedia.org/w/api.php?action=query&prop=pageimages&piprop=thumbnail&pithumbsize=1200&titles=" + encodeURIComponent(headline) + "&format=json&origin=*";
+    const exact = await fetch(exactUrl, { signal: AbortSignal.timeout(1800), headers: { accept: "application/json" } });
+    if (exact.ok) {
+      const data = await exact.json<any>();
       const pages = Object.values(data.query?.pages || {}) as any[];
       const image = pages.find((page) => page.thumbnail?.source)?.thumbnail?.source;
+      if (typeof image === "string" && image.startsWith("https://")) return image;
+    }
+    // Headlines are rarely exact encyclopedia titles. Search relevant pages, then
+    // rank their thumbnails by overlap with the topic instead of requiring an exact title.
+    const searchUrl = "https://" + language + ".wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=" + encodeURIComponent(headline.split(/[,،:؛|—–]/)[0].slice(0,140)) + "&gsrlimit=5&prop=pageimages&piprop=thumbnail&pithumbsize=1200&format=json&origin=*";
+    const searched = await fetch(searchUrl, { signal: AbortSignal.timeout(2200), headers: { accept: "application/json" } });
+    if (searched.ok) {
+      const data = await searched.json<any>();
+      const pages = Object.values(data.query?.pages || {}) as any[];
+      const tokens = terms(headline).filter((term) => term.length >= 3);
+      const ranked = pages.map((page) => ({ page, score: tokens.filter((term) => String(page.title || "").toLowerCase().includes(term.toLowerCase())).length })).filter((entry) => entry.page.thumbnail?.source && entry.score > 0).sort((a,b) => b.score-a.score);
+      const image = ranked[0]?.page?.thumbnail?.source;
       if (typeof image === "string" && image.startsWith("https://")) return image;
     }
   } catch {}
