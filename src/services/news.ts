@@ -563,9 +563,11 @@ export async function news(env: Env, lang: Locale) {
     // Every visible news card must have an image. Prefer RSS/publisher metadata,
     // then search the publisher page and topic-specific image providers.
     if (story.imageUrl && /^https:\/\//i.test(story.imageUrl)) return story;
+    // Keep publisher-image fetches bounded so feed refresh stays within Worker limits.
+    if (index >= 6) return story;
     const direct = await sourceImage(story.url);
     if (direct && /^https:\/\//i.test(direct)) return { ...story, imageUrl: direct, imageAlt: story.imageAlt || story.title };
-    if (index < 8) {
+    if (index < 4) {
       const image = await findRelatedImage(story.title, story.url);
       if (image && /^https:\/\//i.test(image)) return { ...story, imageUrl: image, imageAlt: story.title };
     }
