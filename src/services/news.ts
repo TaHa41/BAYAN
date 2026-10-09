@@ -560,17 +560,23 @@ export async function news(env: Env, lang: Locale) {
     .slice(0, limit);
 
   const enriched = await Promise.all(unique.map(async (story, index) => {
-    // Keep news requests safely below the Workers Free subrequest budget.
-    // Prioritize imagery for the stories visitors actually see first. RSS images
-    // are preferred; use the publisher's OpenGraph image, then a Wikimedia image.
-    if (story.imageUrl || index >= 6) return story;
+    // Every visible news card must have an image. Prefer RSS/publisher metadata,
+    // then search the publisher page and topic-specific image providers.
+    if (story.imageUrl && /^https:\/\//i.test(story.imageUrl)) return story;
+    // Keep publisher-image fetches bounded so feed refresh stays within Worker limits.
+    if (index >= 6) return story;
     const direct = await sourceImage(story.url);
-    if (direct) return { ...story, imageUrl: direct };
-    const image = await findRelatedImage(story.title);
-    return image ? { ...story, imageUrl: image } : story;
+    if (direct && /^https:\/\//i.test(direct)) return { ...story, imageUrl: direct, imageAlt: story.imageAlt || story.title };
+    if (index < 4) {
+      const image = await findRelatedImage(story.title, story.url);
+      if (image && /^https:\/\//i.test(image)) return { ...story, imageUrl: image, imageAlt: story.title };
+    }
+    return story;
   }));
-  // Image lookup is enrichment only: an image-provider outage must never hide a valid story.
-  const finalStories = enriched.map((story) => ({ ...story, publisher: localizedPublisher(story.publisher, lang), summary: languageSafeText(story.summary, lang) ? story.summary : "" }));
+  // Fail closed: an item without a relevant HTTPS image is not rendered or cached.
+  const finalStories = enriched
+    .filter((story) => /^https:\/\//i.test(String(story.imageUrl || "")))
+    .map((story) => ({ ...story, publisher: localizedPublisher(story.publisher, lang), summary: languageSafeText(story.summary, lang) ? story.summary : "" }));
 
   const cached = await readNewsCache(env, lang);
   // Keep a healthy cache behind the live providers. If providers return nothing
@@ -581,7 +587,7 @@ export async function news(env: Env, lang: Locale) {
   } else if (cached?.items?.length) {
     const seenTitles = new Set(finalStories.map((story) => story.title.trim().toLowerCase()));
     const languageSafeCache = cached.items.filter((story) =>
-      (lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title)) && isFreshNews(story)
+      (lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title)) && isFreshNews(story) && /^https:\/\//i.test(String(story.imageUrl || ""))
     ).map((story) => ({ ...story, publisher: localizedPublisher(story.publisher, lang), summary: languageSafeText(story.summary, lang) ? story.summary : "" }));
     const merged = [
       ...finalStories,
