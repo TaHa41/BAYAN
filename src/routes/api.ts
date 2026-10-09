@@ -88,7 +88,8 @@ const persistOpenedNewsArticle=async(env:Env,article:{title:string;summary:strin
   const publishers=new Set(sources.map(s=>String(s.publisher||"").trim().toLowerCase()).filter(Boolean));
   if(hosts.size<2||publishers.size<2)return null;
   let image=String(article.image||"").trim();
-  if(!/^https:\/\//i.test(image)){
+  const imageFromEvidence=sources.some(s=>String(s.imageUrl||"").trim()===image);
+  if(!/^https:\/\//i.test(image)||!imageFromEvidence){
    const firstSource=sources.find(s=>/^https:\/\//i.test(String(s.url||"")));
    image=await bounded(findRelatedImage(title,firstSource?.url),3500).catch(()=>undefined)||"";
    if(!/^https:\/\//i.test(image))image=await bounded(findRelatedImage(title+" "+summary.slice(0,180)),3500).catch(()=>undefined)||"";
