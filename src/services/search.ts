@@ -38,22 +38,28 @@ async function wikipedia(env:Env,q:string,language:Locale):Promise<Candidate[]>{
   const stop=new Set(["في","من","على","عن","إلى","الى","ما","ماذا","كيف","لماذا","هل","هو","هي","هذا","هذه","التي","الذي","مع","the","and","for","with","from","about","what","when","where","who","how","why","is","are"]);
   const normalized=String(q||"").replace(/[؟?،,:;.!]+/g," ").split(/\s+/).filter((word)=>word.length>1&&!stop.has(word.toLowerCase())).join(" ");
   const queries=[...new Set([q,normalized].filter((value)=>value&&value.trim()))];
-  for(const query of queries){
+  // Search the original wording and normalized variant concurrently. Previously,
+  // a single weak result from the first query prevented the second query from running.
+  const batches=await Promise.all(queries.map(async query=>{
     try{
       const u=api+"?action=query&generator=search&gsrsearch="+encodeURIComponent(query)+"&gsrlimit=8&prop=extracts|pageimages&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=900&format=json&origin=*";
-      const r=await timeout(u,5000); if(!r.ok)continue;
+      const r=await timeout(u,3500); if(!r.ok)return [];
       const d=await r.json<any>();
       const pages=Object.values(d.query?.pages||{}) as any[];
-      const results=pages.map((x:any)=>({
+      return pages.map((x:any)=>({
         title:cleanText(x.title),summary:cleanText(x.extract).slice(0,1800),section:"world",kind:"web" as const,evidence:"mixed" as const,
         sources:[source(x.title,language==="ar"?"Wikipedia Arabic":"Wikipedia","https://"+(language==="ar"?"ar":"en")+".wikipedia.org/wiki/"+encodeURIComponent(String(x.title).replace(/ /g,"_")))],
         url:"https://"+(language==="ar"?"ar":"en")+".wikipedia.org/wiki/"+encodeURIComponent(String(x.title).replace(/ /g,"_")),
         score:scoreSource("Wikipedia",x.title,query)+8,provider:"Wikipedia"
       })).filter((x:any)=>x.title);
-      if(results.length)return results;
-    }catch{}
-  }
-  return[];
+    }catch{return []}
+  }));
+  const seen=new Set<string>();
+  return batches.flat().filter(item=>{
+    const key=String(item.title||"").toLocaleLowerCase();
+    if(!key||seen.has(key))return false;
+    seen.add(key);return true;
+  }).slice(0,10);
 }
 async function wikipediaRestSearch(q:string,language:Locale):Promise<Candidate[]>{
   // Independent Wikimedia REST search fallback: the Action API may be throttled
