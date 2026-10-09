@@ -257,6 +257,7 @@
           ${searchBox()}<div class="home-actions"><a class="primary" href="/ask?lang=${lang}">${t("اسأل بيان","Ask BAYAN")}</a></div>
           <div class="trust-row"><span>✓ ${t("أدلة ومصادر","Evidence & sources")}</span><span>◉ ${t("تحديث مستمر","Continuously updated")}</span><span>⌁ ${t("ذكاء يساعدك","AI assistance")}</span></div>
         </div>
+        <div class="wisdom-card home-wisdom"><p id="home-wisdom-text">${t("المعرفة تبدأ بسؤال جيد، وتكتمل بدليل موثوق.","Knowledge begins with a good question and grows stronger with reliable evidence.")}</p></div>
         <div class="section-intro"><span class="eyebrow">${t("استكشف الأقسام","Explore sections")}</span><div class="section-grid">${primarySections.map((s) => '<a class="section-card" href="/' + s[0] + '?lang=' + lang + '"><span class="section-icon">' + iconSvg(s[0]) + '</span><div><h2>' + escapeHtml(ar ? s[1] : s[2]) + '</h2><p>' + escapeHtml(ar ? s[3] : s[4]) + '</p></div><b>↗</b></a>').join("")}</div></div>
         <div class="home-content">
           <div class="page-head home-feed-head"><span class="eyebrow">${t("آخر ما نُشر","Latest published")}</span><h2>${t("أحدث المعرفة والأخبار","Latest knowledge and news")}</h2></div>
@@ -265,6 +266,19 @@
         </div>
       </section>`;
     bindSearch();
+    const refreshHomeWisdom = () => api("/api/wisdom?section=world&lang=" + lang, { timeoutMs: 5000 })
+      .then((wd) => {
+        const el = document.querySelector("#home-wisdom-text");
+        if (el && wd?.wisdom) el.textContent = wd.wisdom;
+      }).catch(() => {});
+    refreshHomeWisdom();
+    const homeWisdomTimer = setInterval(() => {
+      if (!document.querySelector("#home-wisdom-text")) {
+        clearInterval(homeWisdomTimer);
+        return;
+      }
+      refreshHomeWisdom();
+    }, 30000);
     const newsTask = api("/api/news?lang=" + lang).catch(() => ({items: []}));
     const sectionTasks = sections
       .filter((s) => !["news","prices","trends"].includes(s[0]))
@@ -404,8 +418,8 @@
     app.innerHTML =
       '<section class="page"><div class="page-head"><span class="eyebrow">' + t("محدث الآن","Updated now") +
       '</span><h1>' + t("الأخبار","News") + '</h1><p>' +
-      t("أخبار حديثة من أكثر من مزود، مع الصورة والوقت والمصدر، وتُفتح داخل بيان كصفحات خبر منظمة.",
-        "Current stories from multiple providers, with imagery, time and source metadata, opened inside BAYAN.") +
+      t("أبرز التطورات والأحداث التي تساعدك على فهم ما يحدث حولك.",
+        "Key developments and events to help you understand what is happening around you.") +
       '</p></div><div id="news" class="article-grid"><div class="notice">…</div></div></section>';
 
     try {
