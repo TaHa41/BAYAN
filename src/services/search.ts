@@ -24,7 +24,7 @@ const classifySection=(q:string,items:SearchResult[],language:Locale)=>{const s=
 
 const searchTerms=(q:string)=>{const stop=new Set(["the","and","for","with","from","about","what","when","where","who","how","why","are","was","is","من","في","عن","على","الى","إلى","ما","ماذا","كيف","لماذا","هل","هو","هي","هذا","هذه","التي","الذي","مع"]);return String(q||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter(x=>x.length>=2&&!stop.has(x)).slice(0,10)};
 const relevanceScore=(x:Candidate,q:string)=>{const terms=searchTerms(q);if(!terms.length)return 0;const normalize=(v:string)=>String(v||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"");const title=normalize(x.title),summary=normalize(x.summary),titleHits=terms.filter(t=>title.includes(t)).length,summaryHits=terms.filter(t=>summary.includes(t)).length,phrase=title.includes(normalize(q).trim());if(terms.length>=2&&titleHits===0)return 0;if(titleHits===0&&summaryHits===0)return 0;return(phrase?70:0)+titleHits*22+summaryHits*5+Math.min(10,Number(x.score||0)/10)};
-const relevantCandidate=(x:Candidate,q:string)=>relevanceScore(x,q)>=(searchTerms(q).length>=2?22:5)};
+const relevantCandidate=(x:Candidate,q:string)=>relevanceScore(x,q)>=(searchTerms(q).length>=2?22:5);
 async function wikipedia(env:Env,q:string,language:Locale):Promise<Candidate[]>{
   try{
     const api=language==="ar"?"https://ar.wikipedia.org/w/api.php":"https://en.wikipedia.org/w/api.php";
