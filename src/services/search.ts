@@ -323,6 +323,7 @@ const usefulDraft=(answer:string,language:Locale)=>{
 const localizedSource=(value:string,language:Locale)=>{
   const name=String(value||"").trim(),lower=name.toLowerCase();
   if(language==="ar"){
+    if(/youtube|youtu\\.be|vimeo/.test(lower))return "فيديو على YouTube";
     if(/wikipedia/.test(lower))return "ويكيبيديا";
     if(/wikidata/.test(lower))return "ويكي بيانات";
     if(/openalex/.test(lower))return "أوبن أليكس للأبحاث";
@@ -335,6 +336,8 @@ const localizedSource=(value:string,language:Locale)=>{
     if(/al.?jazeera/.test(lower))return "الجزيرة";
     return /[\u0600-\u06ff]/.test(name)?name:"مصدر بحث";
   }
+  if(/فيديو على youtube/i.test(name))return "YouTube video";
+  if(/youtube|youtu\\.be|vimeo/.test(lower))return "YouTube video";
   if(/ويكيبيديا/.test(name))return "Wikipedia";
   if(/ويكي بيانات/.test(name))return "Wikidata";
   if(/أوبن أليكس/.test(name))return "OpenAlex";
