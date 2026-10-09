@@ -53,6 +53,7 @@ try{
   if(d.items.some(x=>!/[\u0600-\u06ff]/.test(String(x.title||""))))throw new Error("arabic_news_contains_non_arabic_title");
   if(d.items.some(x=>/[A-Za-z]{5,}/.test(String(x.summary||""))&&!/[\u0600-\u06ff]/.test(String(x.summary||""))))throw new Error("arabic_news_contains_english_summary");
   if(d.items.some(x=>!Date.parse(String(x.publishedAt||""))))throw new Error("arabic_news_missing_publication_date");
+  if(new Set(d.items.map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean)).size<3)throw new Error("arabic_news_source_diversity_missing");
   if(d.items.filter(x=>x.imageUrl).length<Math.min(3,d.items.length))throw new Error("news_images_missing");
   const dates=d.items.map(x=>Date.parse(x.publishedAt||"")).filter(Number.isFinite);
   if(dates.length&&Math.max(...dates)<Date.now()-72*60*60*1000)throw new Error("news_is_stale");
@@ -68,6 +69,7 @@ try{
   if(!Array.isArray(d.items)||d.items.length<3)throw new Error("english_news_too_few");
   if(d.items.some(x=>/[\u0600-\u06ff]/.test(String(x.title||""))||/[\u0600-\u06ff]/.test(String(x.summary||""))))throw new Error("english_news_contains_arabic");
   if(d.items.some(x=>!Date.parse(String(x.publishedAt||""))))throw new Error("english_news_missing_publication_date");
+  if(new Set(d.items.map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean)).size<3)throw new Error("english_news_source_diversity_missing");
   if(d.items.filter(x=>x.imageUrl).length<Math.min(3,d.items.length))throw new Error("english_news_images_missing");
 }catch(e){console.error("NEWS_EN",e);bad++}
 try{
@@ -124,6 +126,10 @@ try{
   const topic=await get("/api/search?q=%D8%A7%D9%83%D8%AA%D8%B4%D8%A7%D9%81%D8%A7%D8%AA%20%D8%A7%D9%84%D9%81%D8%B6%D8%A7%D8%A1&lang=ar"); const td=JSON.parse(topic.text);
   if(!Array.isArray(td.results)||td.results.length<1)throw new Error("general_topic_search_empty");
   if(td.results.some(x=>!/[\u0600-\u06ff]/.test(String(x.title||""))))throw new Error("general_topic_result_language_mismatch");
+  const en=await get("/api/search?q=NASA%20Artemis%20mission&lang=en"); const ed=JSON.parse(en.text);
+  if(!Array.isArray(ed.results)||ed.results.length<1)throw new Error("english_topic_search_empty");
+  if(!Array.isArray(ed.providerAttempted)||ed.providerAttempted.length<5)throw new Error("english_provider_coverage_missing");
+  if(ed.results.some(x=>/[\\u0600-\\u06ff]/.test(String(x.title||""))))throw new Error("english_topic_result_language_mismatch");
 }catch(e){console.error("SEARCH",e);bad++}
 for(const section of sections.filter(section=>section!=="prices")){
   for(const language of ["ar","en"]){
