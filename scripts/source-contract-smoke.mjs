@@ -8,6 +8,7 @@ const wisdom = read("src/wisdom.ts");
 const app = read("public/app-20261009-01.js");
 const index = read("src/index.ts");
 const api = read("src/routes/api.ts");
+const http = read("src/http.ts");
 const checks = [
   ["news never invents dates or serves expired cached stories as current", !news.includes("publishedAt:new Date().toISOString()") && news.includes("const publishedAt = dateMatch") && news.includes("&& isFreshNews(story)")],
   ["news fallbacks run concurrently and freshness is rechecked", news.includes("const [google, gdelt, aiSearch, bing, direct] = await Promise.all") && news.lastIndexOf("all = all.filter(isFreshNews)") > news.indexOf("const [google, gdelt, aiSearch, bing, direct]")],
@@ -85,6 +86,9 @@ const checks = [
   ["live data providers use bounded fetch timeouts and resilient fallback sources", read("src/services/live.ts").includes("AbortController") && read("src/services/live.ts").includes("query2.finance.yahoo.com") && read("src/services/live.ts").includes("api.coingecko.com") && read("src/services/live.ts").includes("api.aladhan.com")],
   ["repair automation records attempts and alternates bounded news and image recovery work", read("src/services/repair.ts").includes("repair_attempts") && read("src/services/repair.ts").includes("image repair deferred until the next run") && read("src/services/repair.ts").includes("ORDER BY updated_at DESC LIMIT 4")],
   ["news refresh persists the merged healthy cache instead of repeatedly reporting stale cache health", read("src/services/news.ts").includes("writeNewsCache(env, lang, merged)")],
+  ["shared JSON and text responses include baseline browser security headers", http.includes('"x-content-type-options":"nosniff"') && http.includes('"referrer-policy":"strict-origin-when-cross-origin"') && http.includes('"x-frame-options":"DENY"') && http.includes('"permissions-policy":"camera=(), microphone=(), geolocation=()"')],
+  ["request JSON parsing rejects oversized bodies before processing user input", http.includes("declaredLength>65536") && http.includes("raw.length>65536")],
+  ["HTML pages, static assets, and API failure responses receive browser security headers", read("src/index.ts").includes('headers.set("X-Content-Type-Options","nosniff")') && read("src/index.ts").includes('"x-frame-options":"DENY"') && read("src/index.ts").includes('"permissions-policy":"camera=(), microphone=(), geolocation=()"')],
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
