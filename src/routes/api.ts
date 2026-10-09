@@ -30,16 +30,16 @@ const sourceArticleText=async(url:string,lang:"ar"|"en")=>{
   }catch{return ""}
 };;const sectionForOpenedStory=(title:string,summary:string)=>{
  const s=(title+" "+summary).toLowerCase();
- if(/\b(football|soccer|match|league|championship|tournament|goal|player|coach|رياضة|مباراة|الدوري|بطولة|منتخب|لاعب|مدرب|هدف)\b/i.test(s))return "sports";
- if(/\b(health|medical|medicine|hospital|disease|vaccine|doctor|صحة|طب|مستشفى|مرض|لقاح|طبيب|علاج)\b/i.test(s))return "health";
- if(/\b(technology|artificial intelligence|software|cyber|chip|robot|تقنية|ذكاء اصطناعي|برمجيات|رقائق|روبوت|سيبراني)\b/i.test(s))return "technology";
- if(/\b(economy|economic|market|stock|inflation|currency|bank|trade|اقتصاد|اقتصادي|سوق|أسهم|تضخم|عملة|بنك|تجارة|ذهب|دولار)\b/i.test(s))return "economy";
- if(/\b(election|president|parliament|government|minister|policy|politics|انتخابات|رئيس|برلمان|حكومة|وزير|سياسة|قرار حكومي)\b/i.test(s))return "politics";
- if(/\b(science|scientific|research|discovery|space|nasa|climate|environment|علم|بحث علمي|اكتشاف|فضاء|مناخ|بيئة)\b/i.test(s))return "science";
- if(/\b(history|historical|heritage|archaeology|تاريخ|تاريخي|تراث|آثار|حضارة)\b/i.test(s))return "history";
- if(/\b(film|movie|music|actor|actress|celebrity|artist|الفن|فيلم|سينما|موسيقى|ممثل|ممثلة|فنان|مشهور)\b/i.test(s))return "art";
- if(/\b(travel|tourism|airport|flight|hotel|destination|سفر|سياحة|مطار|رحلة|فندق|وجهة)\b/i.test(s))return "travel";
- if(/\b(people|biography|profile|born|career|من هو|من هي|سيرة|مسيرة|ولد|ولدت|شخصية)\b/i.test(s))return "people";
+ if(/football|soccer|match|league|championship|tournament|goal|player|coach|رياضة|مباراة|الدوري|بطولة|منتخب|لاعب|مدرب|هدف/i.test(s))return "sports";
+ if(/health|medical|medicine|hospital|disease|vaccine|doctor|صحة|طب|مستشفى|مرض|لقاح|طبيب|علاج/i.test(s))return "health";
+ if(/technology|artificial intelligence|software|cyber|chip|robot|تقنية|ذكاء اصطناعي|برمجيات|رقائق|روبوت|سيبراني/i.test(s))return "technology";
+ if(/economy|economic|market|stock|inflation|currency|bank|trade|اقتصاد|اقتصادي|سوق|أسهم|تضخم|عملة|بنك|تجارة|ذهب|دولار/i.test(s))return "economy";
+ if(/election|president|parliament|government|minister|policy|politics|انتخابات|رئيس|برلمان|حكومة|وزير|سياسة|قرار حكومي/i.test(s))return "politics";
+ if(/science|scientific|research|discovery|space|nasa|climate|environment|علم|بحث علمي|اكتشاف|فضاء|مناخ|بيئة/i.test(s))return "science";
+ if(/history|historical|heritage|archaeology|تاريخ|تاريخي|تراث|آثار|حضارة/i.test(s))return "history";
+ if(/film|movie|music|actor|actress|celebrity|artist|الفن|فيلم|سينما|موسيقى|ممثل|ممثلة|فنان|مشهور/i.test(s))return "art";
+ if(/travel|tourism|airport|flight|hotel|destination|سفر|سياحة|مطار|رحلة|فندق|وجهة/i.test(s))return "travel";
+ if(/people|biography|profile|born|career|من هو|من هي|سيرة|مسيرة|ولد|ولدت|شخصية/i.test(s))return "people";
  return "news";
 };
 const persistOpenedNewsArticle=async(env:Env,article:{title:string;summary:string;body:string;sources:Source[];image?:string|null;publishedAt?:string;status?:string},lang:Locale)=>{
