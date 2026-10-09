@@ -22,6 +22,9 @@ const scoreSource=(publisher:string, title:string, q:string) => {
 const source=(title:string,publisher:string,url:string):Source=>({title,publisher,url});
 const classifySection=(q:string,items:SearchResult[],language:Locale)=>{const s=(q+" "+items.slice(0,4).map(x=>x.title+" "+x.summary).join(" ")).toLowerCase();if(/\bscientist\b|\bchemist\b|\bwriter\b|\bauthor\b|\bpolitician\b|\bactor\b|\bathlete\b|\bbiography\b|\bnobel prize winner\b|\bphilosopher\b|\bphysicist\b|\bmathematician\b|عالم مصري|عالمة|كيميائي|سيرة ذاتية|شخصية عامة|كاتب|مؤلف|سياسي|ممثل|لاعب|باحث|رئيس سابق|من هو|من هي/.test(s))return"people";if(/gold|dollar|currency|price|inflation|سعر|ذهب|دولار|عملة|تضخم/.test(s))return"economy";if(/weather|طقس|حرارة|rain|temperature/.test(s))return"travel";if(/ai|artificial intelligence|technology|software|programming|ذكاء اصطناعي|تقنية|برمجة/.test(s))return"technology";if(/health|medicine|medical|nutrition|صحة|طب|دواء|تغذية/.test(s))return"health";if(/science|space|nasa|physics|biology|علم|فضاء|اكتشاف/.test(s))return"science";if(/history|historical|ancient|تاريخ|حضارة|قديم|culture|ثقافة/.test(s))return"history";if(/art|film|book|music|فن|سينما|كتاب|موسيقى|ترفيه/.test(s))return"art";if(/sports|football|soccer|basketball|رياضة|مباراة|لاعب/.test(s))return"sports";if(/travel|tourism|destination|سفر|سياحة|وجهة/.test(s))return"travel";if(/economy|business|market|اقتصاد|أعمال|سوق/.test(s))return"economy";if(/politic|government|election|president|سياسة|حكومة|انتخابات|رئيس/.test(s))return"politics";if(/biography|who is|من هو|من هي|سيرة|شخصية/.test(s))return"people";if(/trend|viral|popular|ترند|متداول|رائج/.test(s))return"trends";if(/egypt|مصر|القاهرة|الإسكندرية/.test(s))return"egypt";return"world"};
 
+const searchTerms=(q:string)=>{const stop=new Set(["the","and","for","with","from","about","what","when","where","who","how","why","are","was","is","من","في","عن","على","الى","إلى","ما","ماذا","كيف","لماذا","هل","هو","هي","هذا","هذه","التي","الذي","مع"]);return String(q||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter(x=>x.length>=2&&!stop.has(x)).slice(0,10)};
+const relevanceScore=(x:Candidate,q:string)=>{const terms=searchTerms(q);if(!terms.length)return 0;const normalize=(v:string)=>String(v||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"");const title=normalize(x.title),summary=normalize(x.summary),titleHits=terms.filter(t=>title.includes(t)).length,summaryHits=terms.filter(t=>summary.includes(t)).length,phrase=title.includes(normalize(q).trim());if(terms.length>=2&&titleHits===0)return 0;if(titleHits===0&&summaryHits===0)return 0;return(phrase?70:0)+titleHits*22+summaryHits*5+Math.min(10,Number(x.score||0)/10)};
+const relevantCandidate=(x:Candidate,q:string)=>relevanceScore(x,q)>=(searchTerms(q).length>=2?22:5)};
 async function wikipedia(env:Env,q:string,language:Locale):Promise<Candidate[]>{
   try{
     const api=language==="ar"?"https://ar.wikipedia.org/w/api.php":"https://en.wikipedia.org/w/api.php";
@@ -239,15 +242,15 @@ if(!local.length && !wiki.length && !wd.length && !gd.length && !oa.length && !r
   ];
   // A provider can return results that are unusable for the requested language.
   // Retry broad GDELT variants when that happens instead of stopping because raw candidates existed.
-  if(candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)).length<2){const broadened=await safe(broadGdelt(q),[]);candidates.push(...broadened);}
-  if(candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)).length<2){
+  if(candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q)).length<2){const broadened=await safe(broadGdelt(q),[]);candidates.push(...broadened);}
+  if(candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q)).length<2){
     candidates.push(...await safe(expandedSearch(env,q,language),[]));
   }
-  if(candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)).length<2){
+  if(candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q)).length<2){
     candidates.push(...await safe(openAiWebSearch(env,q,language),[]));
   }
   const seen=new Set<string>();
-  const results=candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)).sort((a,b)=>b.score-a.score).filter(x=>{
+  const results=candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q)).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q)).filter(x=>{
     const k=x.title.toLowerCase().replace(/\W+/g," ")+"|"+x.summary.toLowerCase().slice(0,160);
     if(seen.has(k))return false; seen.add(k); return true;
   }).slice(0,max).map(({score,provider,...x})=>({...x,sources:(x.sources||[]).map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}));
