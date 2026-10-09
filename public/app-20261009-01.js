@@ -107,7 +107,7 @@
   const imageHtml = (item, className = "article-card-image") => {
     const url = safeImageUrl(item.imageUrl);
     return url
-      ? '<img loading="lazy" class="' + className + '" src="' + escapeHtml(url) + '" alt="' + escapeHtml(item.imageAlt || item.title || "") + '" data-image-query="' + escapeHtml(String(item.title || "") + " " + String(item.summary || "")) + '" onerror="window.BAYAN_IMAGE_RETRY(this)">'
+      ? '<img loading="lazy" class="' + className + '" src="' + escapeHtml(url) + '" alt="' + escapeHtml(item.imageAlt || item.title || "") + '" data-image-query="' + escapeHtml(String(item.title || "")) + '" onerror="window.BAYAN_IMAGE_RETRY(this)">'
       : '<div class="image-placeholder">BAYAN</div>';
   };
 
@@ -126,7 +126,7 @@
     placeholder.textContent = t("جاري تجهيز صورة المقال…", "Loading article image…");
     container.insertBefore(placeholder, container.firstChild);
     try {
-      const data = await api("/api/image?q=" + encodeURIComponent(String(title || "") + " " + String(summary || "")), {timeoutMs: 18000});
+      const data = await api("/api/image?q=" + encodeURIComponent(String(title || "").trim() || String(summary || "").trim()), {timeoutMs: 18000});
       if (data?.imageUrl && /^https:\/\//i.test(data.imageUrl) && placeholder.isConnected) {
         const img = document.createElement("img");
         img.className = "article-hero-image";
@@ -135,17 +135,17 @@
         img.src = data.imageUrl;
         img.onerror = () => {
           img.remove();
-          placeholder.textContent = t("صورة المقال غير متاحة حاليًا", "Article image is temporarily unavailable");
+          placeholder.textContent = t("بيان · صورة توضيحية", "BAYAN · subject visual");
           placeholder.classList.add("is-unavailable");
         };
         placeholder.replaceWith(img);
       } else {
-        placeholder.textContent = t("صورة المقال غير متاحة حاليًا", "Article image is temporarily unavailable");
+        placeholder.textContent = t("بيان · صورة توضيحية", "BAYAN · subject visual");
         placeholder.classList.add("is-unavailable");
       }
     } catch {
       if (placeholder.isConnected) {
-        placeholder.textContent = t("صورة المقال غير متاحة حاليًا", "Article image is temporarily unavailable");
+        placeholder.textContent = t("بيان · صورة توضيحية", "BAYAN · subject visual");
         placeholder.classList.add("is-unavailable");
       }
     }
