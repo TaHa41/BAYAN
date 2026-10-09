@@ -2,6 +2,7 @@ import type {Env,Locale,SearchResponse,SearchResult,Source} from "../types";
 import {searchArticles,saveSearch,publishVerifiedResearch} from "../db";
 import {ask} from "./ai";
 import {findRelatedImage} from "./news";
+import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 
 type Candidate = SearchResult & {score:number; provider:string};
 const timeout = async (url:string, ms=2600) => {
@@ -291,6 +292,14 @@ let [local, wiki, wd, gd, oa, remote, dd, duckWeb, google, bing, crossref, pubme
 const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...(s.source_gdelt==="0"?[]:["GDELT"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers","DuckDuckGo Web Search","Google News Search","Bing News RSS"];const candidates:Candidate[]=[
     ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...duckWeb,...google,...bing
   ];
+  // Optional authenticated Enterprise enrichment: exact-title article lookups only.
+  // Public Wikipedia remains the discovery mechanism; Enterprise is supplemental.
+  if (env.WIKIMEDIA_ENTERPRISE_USERNAME && env.WIKIMEDIA_ENTERPRISE_REFRESH_TOKEN && wiki.length) {
+    const enterpriseRows = await safe(searchWikimediaEnterprise(env, wiki.slice(0, 2).map(x => x.title), language), []);
+    for (const row of enterpriseRows) {
+      candidates.push({ ...row, score: scoreSource("Wikimedia Enterprise", row.title, q) + 12, provider: "Wikimedia Enterprise" });
+    }
+  }
   // Person/name lookups should return a useful collection, not stop after the first matching page.
   const personQuery=personLookup(q);
   const firstPassCount=()=>candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q)).length;
