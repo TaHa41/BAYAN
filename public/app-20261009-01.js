@@ -204,6 +204,21 @@
     return out.join("");
   };
 
+  const articleLeadHtml = (summary, body) => {
+    const lead = String(summary || "").trim();
+    if (!lead) return "";
+    const normalize = value => String(value || "").normalize("NFKC").toLowerCase()
+      .replace(/[\u064B-\u065F\u0670]/g, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    const normalizedLead = normalize(lead);
+    const normalizedBody = normalize(body);
+    // Source-only responses can reuse extracted text as both summary and body.
+    if (normalizedLead && normalizedBody &&
+        (normalizedBody.startsWith(normalizedLead) ||
+         normalizedLead.startsWith(normalizedBody.slice(0, Math.min(160, normalizedBody.length))))) return "";
+    if (lead.length > 420) return "";
+    return '<p class="lead">' + escapeHtml(lead) + '</p>';
+  };
+
   const articleCard = (item) => {
     const sectionMeta = sections.find((section) => section[0] === item.section);
     const sectionLabel = sectionMeta ? (ar ? sectionMeta[1] : sectionMeta[2]) : t("مادة معرفية","Knowledge item");
@@ -451,7 +466,7 @@
     const answerText=String(data?.answer||"");
     const answerUsable=Boolean(answerText)&&!/(تعذر تشغيل صياغة BAYAN الذكية الآن|drafting model is temporarily unavailable)/i.test(answerText);
     output.innerHTML = results.length
-      ? ((answerUsable ? '<article class="answer search-answer"><span class="eyebrow">' + t("إجابة بيان","BAYAN answer") + '</span><div class="article-body">' + String(answerText).split(String.fromCharCode(10)).map((line) => "<p>" + escapeHtml(line) + "</p>").join("") + '</div>' + (data.articleSlug ? '<a class="read" href="/article/' + encodeURIComponent(data.articleSlug) + "?lang=" + lang + '">' + t("فتح الملف الكامل داخل بيان","Open the full BAYAN file") + " →</a>" : "") + "</article>" : "") +
+      ? ((answerUsable ? '<article class="answer search-answer"><span class="eyebrow">' + t("إجابة بيان","BAYAN answer") + '</span><div class="article-body">' + renderArticleBody(answerText) + '</div>' + (data.articleSlug ? '<a class="read" href="/article/' + encodeURIComponent(data.articleSlug) + "?lang=" + lang + '">' + t("فتح الملف الكامل داخل بيان","Open the full BAYAN file") + " →</a>" : "") + "</article>" : "") +
       (fallbackUsed ? '<div class="notice">' + t("عرض بيان نتائج من مسار احتياطي؛ يجري توسيع البحث دون اختلاق نتائج.","BAYAN is showing fallback-source results while expanding search without inventing results.") + "</div>" : "") +
       '<div class="result-meta">' + escapeHtml((data.providers || []).join(" · ") || "BAYAN") + "</div>" +
       results.map((item) => {
@@ -482,7 +497,7 @@
       if(!data.ok||!article.title)throw new Error("article_unavailable");
       output.innerHTML='<article class="article-full">'+(article.image?heroImageHtml(article.image,article.title):"")+
         '<span class="eyebrow">'+escapeHtml(article.sources?.[0]?.publisher||publisher||t("بحث موثق","Evidence search"))+'</span><h1>'+escapeHtml(article.title)+'</h1>'+
-        '<p class="lead">'+escapeHtml(article.summary||summary)+'</p>'+(article.savedSlug?'<div class="notice">'+t("تمت إضافة المقال تلقائيًا إلى قسم","Automatically added to section")+' <a href="/'+encodeURIComponent(article.section||"news")+'?lang='+lang+'">'+escapeHtml((sections.find(section=>section[0]===(article.section||"news"))||[])[ar?1:2]||article.section||"news")+'</a></div>':"")+
+        articleLeadHtml(article.summary||summary,article.body||summary)+(article.savedSlug?'<div class="notice">'+t("تمت إضافة المقال تلقائيًا إلى قسم","Automatically added to section")+' <a href="/'+encodeURIComponent(article.section||"news")+'?lang='+lang+'">'+escapeHtml((sections.find(section=>section[0]===(article.section||"news"))||[])[ar?1:2]||article.section||"news")+'</a></div>':"")+
         (article.status==="source_only"?'<div class="notice">'+t("يعرض بيان النص المتاح من المصدر مع الأدلة؛ لم تتوفر معلومات كافية لإعداد تحليل موسع موثوق.","BAYAN is showing the source text available with its evidence; there is not enough information for a reliable expanded analysis.")+'</div>':"")+
         '<div class="article-body">'+renderArticleBody(article.body||article.summary||summary)+'</div>'+
         '<div class="sources-box"><h2>'+t("الأدلة والمصادر","Evidence & sources")+'</h2>'+
@@ -504,9 +519,8 @@
       output.innerHTML =
         '<article class="article-full">' + (data.imageUrl ? heroImageHtml(data.imageUrl, data.imageAlt || data.title) : "") +
         '<span class="eyebrow">' + escapeHtml(data.section || "BAYAN") + "</span><h1>" +
-        escapeHtml(data.title) + '</h1><p class="lead">' + escapeHtml(data.summary || "") +
-        '</p><div class="article-body">' + String(data.body || "").split(String.fromCharCode(10)).map((line) =>
-        "<p>" + escapeHtml(line) + "</p>").join("") +
+        escapeHtml(data.title) + '</h1>' + articleLeadHtml(data.summary || "", data.body || "") +
+        '<div class="article-body">' + renderArticleBody(data.body || "") +
         '</div><div class="sources-box"><h2>' + t("الأدلة والمصادر","Evidence & sources") + "</h2>" +
         (data.sources || []).map((source) =>
           '<div class="source-line">' + escapeHtml(source.publisher || "") + " · " + escapeHtml(source.title || "") +
