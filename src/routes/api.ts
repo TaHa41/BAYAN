@@ -2,17 +2,17 @@ import type{Env,Locale,Source}from"../types";import{json,locale,body}from"../htt
 const articlePrompt=(title:string,lang:Locale)=>lang==="ar"?"اكتب مقالًا معرفيًا تحليليًا أصليًا وشاملًا باللغة العربية الفصحى عن الموضوع التالي: "+title+"\nاكتب مقالًا مترابطًا من 700 إلى 1000 كلمة عندما تسمح الأدلة، ولا تكرر الفكرة بصيغ مختلفة. قبل الكتابة رتّب الأدلة في مخطط، ثم اكتب مقدمة واحدة، وأقسامًا مستقلة لكل فكرة، وانتقالات منطقية بينها، وخاتمة لا تعيد المقدمة. استخدم عناوين Markdown واضحة (##) تشمل: خلاصة مركزة، الخلفية والسياق، شرح التفاصيل أو التسلسل الزمني عند ملاءمته، ما تؤكده المصادر، مقارنة نقاط الاتفاق والاختلاف بين المصادر، التأثيرات والأهمية، ما لا نعرفه أو ما يزال محل خلاف، وخلاصة عملية. اربط كل ادعاء مهم بالأدلة المقدمة ولا تعرض الاستنتاج كأنه حقيقة مؤكدة. لا تكرر الفكرة أو الجملة أو الفقرة بصياغة أخرى، ولا تخلط بين أشخاص أو أحداث متشابهة. لا تنسخ المصادر حرفيًا، ولا تخترع أرقامًا أو أسماء أو تواريخ أو اقتباسات أو روابط. إذا كانت الأدلة لا تدعم مقالًا طويلًا، اذكر النواقص بوضوح ولا تملأها بالتخمين.":"Write a comprehensive original knowledge article in English about: "+title+"\nAim for a coherent 700–1000-word article when evidence supports it. Plan the argument before writing. Use one introduction, distinct sections with logical transitions, and a conclusion that adds no repeated summary. Use Markdown (##) subheadings covering: concise overview, background and context, detailed explanation or timeline where appropriate, what sources confirm, agreement and disagreement across sources, implications and significance, what remains unknown or disputed, and a practical conclusion. Tie important claims to supplied evidence; never present inference as confirmed fact. Do not repeat the same claim in different wording, merge unrelated people/events, copy source text verbatim, or invent figures, names, dates, quotations, or links. If evidence cannot support a long article, state the gaps clearly instead of filling them with guesses.";
 const normalizeArticleBody=(value:string)=>{
  const seen=new Set<string>();
- const paragraphs=String(value||"").replace(/\\r/g,"").split(/\\n\\s*\\n/).map(p=>p.trim()).filter(Boolean);
+ const paragraphs=String(value||"").replace(/\r/g,"").split(/\n\s*\n/).map(p=>p.trim()).filter(Boolean);
  const output:string[]=[];
- const key=(s:string)=>s.normalize("NFKC").toLowerCase().replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/[^\\p{L}\\p{N}]+/gu," ").trim();
+ const key=(s:string)=>s.normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").trim();
  for(const paragraph of paragraphs){
-  if(/^#{1,4}\\s/.test(paragraph)||/^([-*+] |\\d+[.)] )/.test(paragraph)){output.push(paragraph);continue;}
+  if(/^#{1,4}\s/.test(paragraph)||/^([-*+] |\d+[.)] )/.test(paragraph)){output.push(paragraph);continue;}
   const normalized=key(paragraph);
   if(normalized.length<12||seen.has(normalized))continue;
-  const words=new Set(normalized.split(/\\s+/).filter(w=>w.length>2));
+  const words=new Set(normalized.split(/\s+/).filter(w=>w.length>2));
   const nearDuplicate=output.some(existing=>{
-   if(/^#{1,4}\\s/.test(existing)||/^([-*+] |\\d+[.)] )/.test(existing))return false;
-   const prior=key(existing),priorWords=new Set(prior.split(/\\s+/).filter(w=>w.length>2));
+   if(/^#{1,4}\s/.test(existing)||/^([-*+] |\d+[.)] )/.test(existing))return false;
+   const prior=key(existing),priorWords=new Set(prior.split(/\s+/).filter(w=>w.length>2));
    if(Math.min(words.size,priorWords.size)<8)return false;
    let overlap=0;for(const word of words)if(priorWords.has(word))overlap++;
    return overlap/Math.max(1,Math.min(words.size,priorWords.size))>=0.88;
@@ -20,17 +20,17 @@ const normalizeArticleBody=(value:string)=>{
   if(nearDuplicate)continue;
   seen.add(normalized);output.push(paragraph);
  }
- return output.join("\\n\\n").trim();
+ return output.join("\n\n").trim();
 };
 const articleBodyQuality=(value:string)=>{
  const body=normalizeArticleBody(value);
- const headings=(body.match(/^#{1,3}\\s+.+$/gm)||[]).length;
- const paragraphs=body.split(/\\n\\s*\\n/).map(p=>p.trim()).filter(p=>p.length>=65&&!/^#{1,4}\\s/.test(p)&&!/^([-*+] |\\d+[.)] )/.test(p));
- const unique=new Set(paragraphs.map(p=>p.normalize("NFKC").toLowerCase().replace(/[^\\p{L}\\p{N}]+/gu," ").trim()));
+ const headings=(body.match(/^#{1,3}\s+.+$/gm)||[]).length;
+ const paragraphs=body.split(/\n\s*\n/).map(p=>p.trim()).filter(p=>p.length>=65&&!/^#{1,4}\s/.test(p)&&!/^([-*+] |\d+[.)] )/.test(p));
+ const unique=new Set(paragraphs.map(p=>p.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu," ").trim()));
  return {body,ok:body.length>=1800&&headings>=4&&paragraphs.length>=5&&unique.size>=5};
 };
 const isVideoUrl=(value:string)=>{
- try{return /(^|\\.)((youtube\\.com)|(youtu\\.be)|(vimeo\\.com))$/i.test(new URL(value).hostname.replace(/^www\\./i,""))||/^(www\\.)?(youtube\\.com|youtu\\.be|vimeo\\.com)$/i.test(new URL(value).hostname)}catch{return false}
+ try{return /(^|\.)((youtube\.com)|(youtu\.be)|(vimeo\.com))$/i.test(new URL(value).hostname.replace(/^www\./i,""))||/^(www\.)?(youtube\.com|youtu\.be|vimeo\.com)$/i.test(new URL(value).hostname)}catch{return false}
 };
 
 const newsArticleEvidenceRelevant=(headline:string,candidate:any)=>{
@@ -101,7 +101,7 @@ export async function api(request:Request,env:Env){const u=new URL(request.url),
     let found:any={results:[],status:"insufficient"};
     try{found=await bounded(search(env,title,lang),7000)}catch{}
     found.results=(Array.isArray(found.results)?found.results:[]).filter((candidate:any)=>newsArticleEvidenceRelevant(title,candidate)&&!isVideoUrl(String(candidate.url||candidate.sources?.[0]?.url||"")));
-    if(!found.results.length&&(summary||storyUrl)){const extracted=storyUrl?await bounded(sourceArticleText(storyUrl,lang),5000).catch(()=> ""):"";const description=summary||await bounded(sourceDescription(storyUrl,lang),3500).catch(()=> "")||title;const articleSummary=(lang==="ar"?/[\u0600-\u06ff]/.test(description):!/[\u0600-\u06ff]/.test(description))?description:title;if(!image)image=await bounded(findRelatedImage(title),3500).catch(()=>undefined)||"";const evidenceText=(lang==="ar"?/[\u0600-\u06ff]/.test(extracted):!/[\u0600-\u06ff]/.test(extracted))?extracted:articleSummary;const safeUrl=storyUrl.startsWith("https://")?storyUrl:"";const sources=safeUrl?[{title,publisher:publisher||(lang==="ar"?"مصدر إخباري":"News source"),url:safeUrl,publishedAt,imageUrl:image||undefined} as Source]:[];let generated:any={};try{generated=await bounded(ask(env,articlePrompt(title,lang),lang,[{title,summary:evidenceText,section:"news",kind:"web",evidence:"mixed",sources} as any]),7500)}catch{}const rawGeneratedBody=String(generated.answer||"").trim();const quality=articleBodyQuality(rawGeneratedBody);let generatedBody=quality.body;let hasFullAnalysis=quality.ok&&generated.status!=="insufficient";if(!hasFullAnalysis&&generatedBody.length>0){try{const stricter=await bounded(ask(env,articlePrompt(title,lang)+"\\n\\n"+(lang==="ar"?"مراجعة تحريرية إلزامية: احذف التكرار، تأكد من ترابط الفقرات، واستخدم أربعة عناوين فرعية على الأقل.":"Mandatory editorial pass: remove repetition, ensure logical transitions, and use at least four subheadings."),lang,found.results),6500);const retry=articleBodyQuality(String(stricter.answer||""));if(retry.ok&&stricter.status!=="insufficient"){generatedBody=retry.body;hasFullAnalysis=true;generated= stricter as any;}}catch{}}const articleBody=hasFullAnalysis?generatedBody:evidenceBody;const article={title,summary:articleSummary,body:articleBody,sources,image:image||null,status:hasFullAnalysis?generated.status:"source_only",providerCount:sources.length?1:0,publishedAt};const savedSlug=await persistOpenedNewsArticle(env,article,lang);return json({ok:true,article:{...article,section:sectionForOpenedStory(title,articleSummary),savedSlug}})}
+    if(!found.results.length&&(summary||storyUrl)){const extracted=storyUrl?await bounded(sourceArticleText(storyUrl,lang),5000).catch(()=> ""):"";const description=summary||await bounded(sourceDescription(storyUrl,lang),3500).catch(()=> "")||title;const articleSummary=(lang==="ar"?/[\u0600-\u06ff]/.test(description):!/[\u0600-\u06ff]/.test(description))?description:title;if(!image)image=await bounded(findRelatedImage(title),3500).catch(()=>undefined)||"";const evidenceText=(lang==="ar"?/[\u0600-\u06ff]/.test(extracted):!/[\u0600-\u06ff]/.test(extracted))?extracted:articleSummary;const safeUrl=storyUrl.startsWith("https://")?storyUrl:"";const sources=safeUrl?[{title,publisher:publisher||(lang==="ar"?"مصدر إخباري":"News source"),url:safeUrl,publishedAt,imageUrl:image||undefined} as Source]:[];let generated:any={};try{generated=await bounded(ask(env,articlePrompt(title,lang),lang,[{title,summary:evidenceText,section:"news",kind:"web",evidence:"mixed",sources} as any]),7500)}catch{}const rawGeneratedBody=String(generated.answer||"").trim();const quality=articleBodyQuality(rawGeneratedBody);let generatedBody=quality.body;let hasFullAnalysis=quality.ok&&generated.status!=="insufficient";if(!hasFullAnalysis&&generatedBody.length>0){try{const stricter=await bounded(ask(env,articlePrompt(title,lang)+"\n\n"+(lang==="ar"?"مراجعة تحريرية إلزامية: احذف التكرار، تأكد من ترابط الفقرات، واستخدم أربعة عناوين فرعية على الأقل.":"Mandatory editorial pass: remove repetition, ensure logical transitions, and use at least four subheadings."),lang,found.results),6500);const retry=articleBodyQuality(String(stricter.answer||""));if(retry.ok&&stricter.status!=="insufficient"){generatedBody=retry.body;hasFullAnalysis=true;generated= stricter as any;}}catch{}}const articleBody=hasFullAnalysis?generatedBody:articleSummary;const article={title,summary:articleSummary,body:articleBody,sources,image:image||null,status:hasFullAnalysis?generated.status:"source_only",providerCount:sources.length?1:0,publishedAt};const savedSlug=await persistOpenedNewsArticle(env,article,lang);return json({ok:true,article:{...article,section:sectionForOpenedStory(title,articleSummary),savedSlug}})}
     if(!found.results.length){
       const live=await bounded(news(env,lang),7000);
       const story=live.items?.find((x:any)=>String(x.title).trim()===title.trim())||live.items?.find((x:any)=>String(x.title).includes(title.slice(0,80)));
@@ -116,7 +116,7 @@ export async function api(request:Request,env:Env){const u=new URL(request.url),
     const quality=articleBodyQuality(rawGeneratedBody);
     let generatedBody=quality.body;
     let hasFullAnalysis=quality.ok&&generated.status!=="insufficient";
-    if(!hasFullAnalysis&&generatedBody.length>0){try{const stricter=await bounded(ask(env,articlePrompt(title,lang)+"\\n\\n"+(lang==="ar"?"مراجعة تحريرية إلزامية: احذف التكرار، تأكد من ترابط الفقرات، واستخدم أربعة عناوين فرعية على الأقل.":"Mandatory editorial pass: remove repetition, ensure logical transitions, and use at least four subheadings."),lang,found.results),6500);const retry=articleBodyQuality(String(stricter.answer||""));if(retry.ok&&stricter.status!=="insufficient"){generatedBody=retry.body;hasFullAnalysis=true;generated=stricter as any;}}catch{}}
+    if(!hasFullAnalysis&&generatedBody.length>0){try{const stricter=await bounded(ask(env,articlePrompt(title,lang)+"\n\n"+(lang==="ar"?"مراجعة تحريرية إلزامية: احذف التكرار، تأكد من ترابط الفقرات، واستخدم أربعة عناوين فرعية على الأقل.":"Mandatory editorial pass: remove repetition, ensure logical transitions, and use at least four subheadings."),lang,found.results),6500);const retry=articleBodyQuality(String(stricter.answer||""));if(retry.ok&&stricter.status!=="insufficient"){generatedBody=retry.body;hasFullAnalysis=true;generated=stricter as any;}}catch{}}
     const articleBody=hasFullAnalysis?generatedBody:evidenceBody;
     const sources=found.results.flatMap((x:any)=>x.sources||[]).filter(Boolean).slice(0,12);if(!image)image=sources.find((source:any)=>source.imageUrl)?.imageUrl||await bounded(findRelatedImage(title),3500).catch(()=>undefined)||"";
     const article={title,summary:found.results[0]?.summary||"",body:articleBody,sources,image:image||null,status:hasFullAnalysis?generated.status:"source_only",providerCount:new Set(sources.map((s:any)=>s.publisher).filter(Boolean)).size};const savedSlug=await persistOpenedNewsArticle(env,article,lang);return json({ok:true,article:{...article,section:sectionForOpenedStory(title,article.summary),savedSlug}});
