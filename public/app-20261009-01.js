@@ -61,7 +61,7 @@
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 9000));
     try {
-      const response = await fetch(url + separator + "_b=20261009.27", {
+      const response = await fetch(url + separator + "_b=20261009.30", {
         ...options,
         cache: "no-store",
         signal: controller.signal
@@ -104,6 +104,38 @@
   const heroImageHtml = (url, alt) =>
     '<img class="article-hero-image" src="' + escapeHtml(url) + '" alt="' + escapeHtml(alt || "") +
     '" data-image-query="' + escapeHtml(alt || "") + '" onerror="window.BAYAN_IMAGE_RETRY(this)">';
+
+  async function ensureHeroImage(container, title, summary = "") {
+    if (!container || container.querySelector(".article-hero-image")) return;
+    const placeholder = document.createElement("div");
+    placeholder.className = "article-hero-placeholder";
+    placeholder.textContent = t("جاري تجهيز صورة المقال…", "Loading article image…");
+    container.insertBefore(placeholder, container.firstChild);
+    try {
+      const data = await api("/api/image?q=" + encodeURIComponent(String(title || "") + " " + String(summary || "")), {timeoutMs: 18000});
+      if (data?.imageUrl && /^https:\/\//i.test(data.imageUrl) && placeholder.isConnected) {
+        const img = document.createElement("img");
+        img.className = "article-hero-image";
+        img.alt = String(title || "BAYAN");
+        img.loading = "eager";
+        img.src = data.imageUrl;
+        img.onerror = () => {
+          img.remove();
+          placeholder.textContent = t("صورة المقال غير متاحة حاليًا", "Article image is temporarily unavailable");
+          placeholder.classList.add("is-unavailable");
+        };
+        placeholder.replaceWith(img);
+      } else {
+        placeholder.textContent = t("صورة المقال غير متاحة حاليًا", "Article image is temporarily unavailable");
+        placeholder.classList.add("is-unavailable");
+      }
+    } catch {
+      if (placeholder.isConnected) {
+        placeholder.textContent = t("صورة المقال غير متاحة حاليًا", "Article image is temporarily unavailable");
+        placeholder.classList.add("is-unavailable");
+      }
+    }
+  }
 
   const articleCard = (item) => {
     const sectionMeta = sections.find((section) => section[0] === item.section);
@@ -219,7 +251,7 @@
   async function hydrateSectionImages(items) {
     // Match each image placeholder to its own card by title. Indexing into a global
     // placeholder list was incorrect whenever some cards already had images.
-    const pending = (items || []).filter((item) => !item.imageUrl).slice(0, 4);
+    const pending = (items || []).filter((item) => !item.imageUrl).slice(0, 10);
     await Promise.all(pending.map(async (item) => {
       try {
         const data = await api("/api/image?q=" + encodeURIComponent(item.title + " " + (item.summary || "")), {timeoutMs: 18000});
@@ -378,6 +410,7 @@
         '<div class="sources-box"><h2>'+t("الأدلة والمصادر","Evidence & sources")+'</h2>'+
         (article.sources||[]).map(source=>'<div class="source-line">'+escapeHtml(source.publisher||"")+' · '+escapeHtml(source.title||"")+'</div>').join("")+
         '</div>'+socialActions({...article,title:article.title||title,summary:article.summary||summary,href:location.pathname+location.search,_key:"research:"+title})+'</article>';
+      if (!article.image) ensureHeroImage(output.querySelector(".article-full"), article.title || title, article.summary || summary);
     }catch{
       output.innerHTML='<div class="notice"><h2>'+t("تعذر تجهيز المقال من المصادر المتاحة الآن","Could not prepare the article from available sources")+'</h2><p>'+t("حاول إعادة البحث أو اختيار نتيجة أخرى. لن يعرض بيان نصًا مختلقًا على أنه مقال موثق.","Try searching again or choose another result. BAYAN will not present invented text as a sourced article.")+'</p><a class="read" href="/search?q='+encodeURIComponent(title)+'&lang='+lang+'">'+t("العودة إلى البحث","Back to search")+' →</a></div>';
     }
@@ -457,6 +490,7 @@
             (article.sources || []).map((source) =>
               '<div class="source-line">' + escapeHtml(source.publisher || "") + " · " + escapeHtml(source.title || "") +
               "</div>").join("") + "</div>" + socialActions({...article, title:article.title||story.title, summary:article.summary||story.summary, href:"/news?story="+encodeURIComponent(story.title)+"&lang="+lang, _key:"news:"+story.title}) + "</article>";
+          if (!article.image) ensureHeroImage(output.querySelector(".article-full"), article.title || story.title, article.summary || story.summary);
         } catch {
           output.innerHTML = '<div class="notice">' +
             t("تعذر تجهيز المقال الكامل من الأدلة الآن.","The full evidence-based article could not be prepared right now.") + "</div>";
