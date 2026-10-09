@@ -194,7 +194,11 @@ async function broadGdelt(q:string):Promise<Candidate[]>{
 const personLookup=(q:string)=>{
   const raw=String(q||"").trim();
   const words=raw.split(/\s+/).filter(Boolean);
-  const explicit=/(who is|who was|biography|profile|person|scientist|writer|author|politician|actor|athlete|من هو|من هي|سيرة|شخصية|عالم|عالمة|كاتب|مؤلف|ممثل|لاعب|رئيس)/i.test(raw);
+  // Treat a query as a person lookup only when the user explicitly asks for a
+  // biography/profile, or when an English proper name is detected below.
+  // Role words such as "scientist", "عالم", and "رئيس" also occur in ordinary
+  // topic searches and must not force the restrictive biography-only path.
+  const explicit=/^(?:who is|who was|biography(?: of)?|profile(?: of)?|tell me about|من هو|من هي|سيرة(?: ذاتية)?(?: عن)?|نبذة عن|معلومات عن)\s+/i.test(raw);
   if(explicit)return true;
   if(words.length<2||words.length>4)return false;
   // Topic phrases must not be mistaken for people merely because they contain
