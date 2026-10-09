@@ -182,11 +182,14 @@ const personLookup=(q:string)=>{
   return /[\u0600-\u06ff]/.test(raw) || words.length>=2;
 };
 async function expandedSearch(env:Env,q:string,language:Locale,person=false):Promise<Candidate[]>{
+  // Keep retries diverse but bounded: each variant fans out across independent providers.
   const variants=person
     ? (language==="ar"
-      ? [q+" سيرة ذاتية",q+" آخر الأخبار",q+" إنجازات",q+" مقابلة",q+" تصريحات"]
-      : [q+" biography",q+" latest news",q+" achievements",q+" interview",q+" statements"])
-    : [q+" official source",q+" overview"];
+      ? [q+" سيرة ذاتية",q+" آخر الأخبار",q+" مصدر رسمي"]
+      : [q+" biography",q+" latest news",q+" official profile"])
+    : (language==="ar"
+      ? [q+" شرح",q+" معلومات موثوقة",q+" آخر الأخبار"]
+      : [q+" explanation",q+" reliable information",q+" latest news"]);
   const batches=await Promise.all(variants.map(async variant=>{
     const results=await Promise.all([
       wikipedia(env,variant,language).catch(()=>[]),
@@ -258,7 +261,11 @@ const providerAttempted=["BAYAN Knowledge Base","Wikipedia","Wikidata","GDELT","
   // Person/name lookups should return a useful collection, not stop after the first matching page.
   const personQuery=personLookup(q);
   const firstPassCount=()=>candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q)).length;
-  if(firstPassCount()<(personQuery?6:2)){
+  // Expand when the first pass is merely sparse, not only when it is empty.
+  // People searches need several independent identity clues; general searches need
+  // enough relevant evidence to produce a useful answer rather than a thin snippet.
+  const expansionThreshold=personQuery?Math.min(8,Math.max(4,Number(s.min_sources||3)*2)):Math.max(4,Number(s.min_sources||3));
+  if(firstPassCount()<expansionThreshold){
     const [broadened,expanded,web]=await Promise.all([
       safe(broadGdelt(q),[]),
       safe(expandedSearch(env,q,language,personQuery),[]),
