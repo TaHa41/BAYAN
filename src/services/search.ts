@@ -391,7 +391,6 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
     candidates.push(...expanded,...web);
   }
   
-  const seen=new Set<string>();
   const safeCandidates=candidates.filter(x=>(language==="ar"?hasArabic(x.title):!hasArabic(x.title))&&!disallowedContent(x.title+" "+x.summary));
   let ranked=safeCandidates.filter(x=>relevantCandidate(x,q)).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
   // If strict matching rejected every result, recover candidates with a real
@@ -410,10 +409,24 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
     }).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
   }
   // Never pad the result list with unrelated items: expand providers first, then report honestly if relevance is still weak.
-  const results=ranked.filter(x=>{
-    const k=x.title.toLowerCase().replace(/\W+/g," ")+"|"+x.summary.toLowerCase().slice(0,160);
-    if(seen.has(k))return false; seen.add(k); return true;
-  }).slice(0,max).map(({score,provider,...x})=>({...x,summary:localeSafeText(x.summary,language)?x.summary:"",sources:(x.sources||[]).map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}));
+  // Collapse duplicate provider hits by normalized title while preserving the
+  // distinct evidence URLs. The old title+summary key let the same encyclopedia
+  // page appear multiple times whenever providers returned slightly different extracts.
+  const uniqueByTitle = new Map<string,Candidate>();
+  for (const candidate of ranked) {
+    const key = String(candidate.title || "").normalize("NFKC").toLowerCase()
+      .replace(/[\u064B-\u065F\u0670]/g, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    if (!key) continue;
+    const existing = uniqueByTitle.get(key);
+    if (!existing) { uniqueByTitle.set(key, {...candidate, sources:[...(candidate.sources||[])]}); continue; }
+    const sourceKeys = new Set((existing.sources||[]).map(source => String(source.url||"").trim()).filter(Boolean));
+    for (const source of candidate.sources||[]) {
+      const sourceUrl = String(source.url||"").trim();
+      if (sourceUrl && !sourceKeys.has(sourceUrl)) { existing.sources.push(source); sourceKeys.add(sourceUrl); }
+    }
+    if ((!existing.summary || existing.summary.length < 80) && candidate.summary) existing.summary = candidate.summary;
+  }
+  const results=[...uniqueByTitle.values()].slice(0,max).map(({score,provider,...x})=>({...x,summary:localeSafeText(x.summary,language)?x.summary:"",sources:(x.sources||[]).map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}));
   const providers=[...new Set(candidates.map(x=>x.provider))];
   const publishers=[...new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean))];
   const configuredMin=Math.max(2,Math.min(5,Number(s.min_sources||3)));
