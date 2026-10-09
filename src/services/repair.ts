@@ -22,8 +22,11 @@ async function newsCacheDiagnostics(env:Env){
   const output:string[]=[];
   for(const language of ["ar","en"] as const){
     try{
-      const row=await env.DB.prepare("SELECT payload FROM news_cache WHERE language=? LIMIT 1").bind(language).first<any>();
+      const row=await env.DB.prepare("SELECT payload,updated_at FROM news_cache WHERE language=? LIMIT 1").bind(language).first<any>();
       if(!row?.payload){output.push(language+"{cache=missing}");continue}
+      const updated=Date.parse(String(row.updated_at||""));
+      const cacheAgeMinutes=Number.isFinite(updated)?Math.round((Date.now()-updated)/60000):-1;
+      const payloadBytes=String(row.payload).length;
       const parsed=JSON.parse(String(row.payload));
       const items:any[]=Array.isArray(parsed)?parsed:(Array.isArray(parsed?.items)?parsed.items:[]);
       let localeMatched=0,validDate=0,fresh=0,stale=0,future=0,missingDate=0,missingImages=0;
@@ -40,7 +43,7 @@ async function newsCacheDiagnostics(env:Env){
         else if(current-date>72*60*60*1000)stale++;
         else if(localeMatch)fresh++;
       }
-      output.push(language+"{total="+items.length+",locale="+localeMatched+",validDate="+validDate+",freshLocale="+fresh+",stale="+stale+",future="+future+",missingDate="+missingDate+",missingImages="+missingImages+"}");
+      output.push(language+"{total="+items.length+",cacheAgeMinutes="+cacheAgeMinutes+",payloadChars="+payloadBytes+",locale="+localeMatched+",validDate="+validDate+",freshLocale="+fresh+",stale="+stale+",future="+future+",missingDate="+missingDate+",missingImages="+missingImages+"}");
     }catch(error){
       output.push(language+"{diagnostic_error="+String(error).slice(0,100)+"}");
     }
