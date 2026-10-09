@@ -361,10 +361,10 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   return language==="ar" ? hasArabic(title) : !hasArabic(title);
 };
 const isVideoEvidenceUrl=(value:string)=>{
- try{const u=new URL(value);return /(^|\\.)((youtube\\.com)|(youtu\\.be)|(vimeo\\.com))$/i.test(u.hostname.replace(/^www\\./i,""))}catch{return false}
+ try{const u=new URL(value);return /(^|\.)(youtube\.com|youtu\.be|vimeo\.com)$/i.test(u.hostname.replace(/^www\./i,""))}catch{return false}
 };
 const getYouTubeVideoId=(value:string)=>{
- try{const u=new URL(value);if(u.hostname.endsWith("youtu.be"))return u.pathname.split("/").filter(Boolean)[0]||"";if(u.hostname.endsWith("youtube.com"))return u.searchParams.get("v")||u.pathname.match(/\\/(?:embed|shorts)\\/([^/?]+)/)?.[1]||"";return ""}catch{return ""}
+ try{const u=new URL(value);if(u.hostname.endsWith("youtu.be"))return u.pathname.split("/").filter(Boolean)[0]||"";if(u.hostname.endsWith("youtube.com"))return u.searchParams.get("v")||u.pathname.match(/\/(?:embed|shorts)\/([^/?]+)/)?.[1]||"";return ""}catch{return ""}
 };
 const extractVideoTranscript=async(url:string,language:Locale)=>{
  const id=getYouTubeVideoId(url);if(!id)return "";
@@ -375,16 +375,16 @@ const extractVideoTranscript=async(url:string,language:Locale)=>{
   const start=html.indexOf('"captionTracks":[');if(start<0)return "";
   const end=html.indexOf("]",start);if(end<0)return "";
   const block=html.slice(start,end+1);
-  const trackRe=/"baseUrl":"((?:\\\\.|[^"\\\\])*)"[\\s\\S]{0,1400}?"languageCode":"([^"]+)"/g;
+  const trackRe=/"baseUrl":"([^"]+)"/g;
   let match:RegExpExecArray|null,captionUrl="";
-  while((match=trackRe.exec(block))){const trackLang=String(match[2]||"").toLowerCase();if(language==="ar"?trackLang.startsWith("ar"):trackLang.startsWith("en")){captionUrl=String(match[1]||"").replace(/\\\\u0026/g,"&").replace(/\\\\u003d/g,"=").replace(/\\\\u002f/g,"/").replace(/\\\\\\//g,"/");break;}}
+  while((match=trackRe.exec(block))){const tail=block.slice(trackRe.lastIndex,trackRe.lastIndex+1200);const languageMatch=tail.match(/"languageCode":"([^"]+)"/);const trackLang=String(languageMatch?.[1]||"").toLowerCase();if(language==="ar"?trackLang.startsWith("ar"):trackLang.startsWith("en")){captionUrl=String(match[1]||"").replace(/\\u0026/g,"&").replace(/\\u003d/g,"=").replace(/\\u002f/g,"/").replace(/\\\//g,"/");break;}}
   if(!captionUrl)return "";
   const captions=await fetch(captionUrl+(captionUrl.includes("?")?"&":"?")+"fmt=json3",{signal:AbortSignal.timeout(3200)});
   if(!captions.ok)return "";
   const data=await captions.json<any>();
-  const transcript=(data.events||[]).flatMap((event:any)=>(event.segs||[]).map((seg:any)=>String(seg.utf8||""))).join(" ").replace(/\\s+/g," ").trim();
+  const transcript=(data.events||[]).flatMap((event:any)=>(event.segs||[]).map((seg:any)=>String(seg.utf8||""))).join(" ").replace(/\s+/g," ").trim();
   if(transcript.length<180)return "";
-  const localeCorrect=language==="ar"?/[\\u0600-\\u06ff]/.test(transcript):!/[\\u0600-\\u06ff]/.test(transcript);
+  const localeCorrect=language==="ar"?/[\u0600-\u06ff]/.test(transcript):! /[\u0600-\u06ff]/.test(transcript);
   return localeCorrect?transcript.slice(0,3600):"";
  }catch{return ""}
 };
@@ -395,7 +395,8 @@ const gateVideoEvidence=async(candidates:Candidate[],language:Locale)=>{
  for(const item of extracted){if(!item.transcript)continue;item.candidate.summary="[Video transcript extracted] "+item.transcript;item.candidate.sources=[{title:item.candidate.title,publisher:"YouTube transcript",url:item.url}];item.candidate.provider="YouTube transcript";allowed.add(item.url);}
  return candidates.filter(x=>!isVideoEvidenceUrl(String(x.url||x.sources?.[0]?.url||""))||allowed.has(String(x.url||x.sources?.[0]?.url||"")));
 };
-\nexport async function search(env:Env,q:string,language:Locale,options:{publish?:boolean}={}):Promise<SearchResponse>{
+
+export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean}={}):Promise<SearchResponse>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};const academicQuery=/(research|paper|papers|study|studies|journal|doi|scholar|academic|citation|crossref|openalex|pubmed|clinical trial|systematic review|بحث علمي|أبحاث|دراسة|دراسات|مجلة علمية|ورقة بحثية|مصدر أكاديمي|دراسات سريرية|مراجعة منهجية)/i.test(q);
 const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|medicine|health study|بحث طبي|دراسة طبية|دراسات سريرية|تجربة سريرية|مراجعة منهجية)/i.test(q);
@@ -428,7 +429,8 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   }
   
   const seen=new Set<string>();
-  const evidenceCandidates=await gateVideoEvidence(candidates,language);\n  const safeCandidates=evidenceCandidates.filter(x=>(language==="ar"?hasArabic(x.title):!hasArabic(x.title))&&!disallowedContent(x.title+" "+x.summary));
+  const evidenceCandidates=await gateVideoEvidence(candidates,language);
+  const safeCandidates=evidenceCandidates.filter(x=>(language==="ar"?hasArabic(x.title):!hasArabic(x.title))&&!disallowedContent(x.title+" "+x.summary));
   let ranked=safeCandidates.filter(x=>relevantCandidate(x,q)).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
   // If strict matching rejected every result, recover candidates with a real
   // query-term match in the headline or at least two matches in the snippet.
