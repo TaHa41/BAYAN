@@ -574,6 +574,10 @@ export async function news(env: Env, lang: Locale) {
       ...languageSafeCache.filter((story) => !seenTitles.has(story.title.trim().toLowerCase())),
     ].slice(0, Math.max(6, Math.min(40, limit)));
     if (merged.length >= 3) {
+      // Persist the verified live+cache merge so the health check can recover
+      // from an underfilled cache instead of serving a good merge forever while
+      // the stored payload remains below the minimum.
+      await writeNewsCache(env, lang, merged);
       return {
         ok: true,
         stale: true,
