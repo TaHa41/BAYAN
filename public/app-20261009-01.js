@@ -61,7 +61,7 @@
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), Number(options.timeoutMs || 9000));
     try {
-      const response = await fetch(url + separator + "_b=20261009.30", {
+      const response = await fetch(url + separator + "_b=20261009.31", {
         ...options,
         cache: "no-store",
         signal: controller.signal
@@ -646,7 +646,7 @@
       const currencyNames = {EGP:"الجنيه المصري / Egyptian pound",EUR:"اليورو / Euro",GBP:"الجنيه الإسترليني / British pound",SAR:"الريال السعودي / Saudi riyal",AED:"الدرهم الإماراتي / UAE dirham",KWD:"الدينار الكويتي / Kuwaiti dinar",QAR:"الريال القطري / Qatari riyal",BHD:"الدينار البحريني / Bahraini dinar",OMR:"الريال العماني / Omani rial",JOD:"الدينار الأردني / Jordanian dinar",TRY:"الليرة التركية / Turkish lira",JPY:"الين الياباني / Japanese yen",CNY:"اليوان الصيني / Chinese yuan",CAD:"الدولار الكندي / Canadian dollar",AUD:"الدولار الأسترالي / Australian dollar",CHF:"الفرنك السويسري / Swiss franc",INR:"الروبية الهندية / Indian rupee",ILS:"الشيكل / Israeli shekel",LYD:"الدينار الليبي / Libyan dinar",TND:"الدينار التونسي / Tunisian dinar",MAD:"الدرهم المغربي / Moroccan dirham",ZAR:"الراند الجنوب أفريقي / South African rand"};
       const rates = fx.rates || {};
       const currencyRows = Object.entries(rates).filter(([code,value]) => Number.isFinite(Number(value))).map(([code,value]) =>
-        '<div class="market-row"><span>'+escapeHtml(code)+' <small>'+escapeHtml(currencyNames[code]||code)+'</small></span><strong>'+escapeHtml(Number(value).toLocaleString(undefined,{maximumFractionDigits:4}))+'</strong></div>'
+        '<div class="market-row"><span class="currency-label"><b>'+escapeHtml(code)+'</b><small>'+escapeHtml(currencyNames[code]||code)+'</small></span><strong>'+escapeHtml(Number(value).toLocaleString(undefined,{maximumFractionDigits:4}))+'</strong></div>'
       ).join("");
       document.querySelector("#fx").innerHTML =
         '<span class="kicker">' + t("أسعار الصرف","Exchange rates") + '</span><h2>1 USD</h2><p>' +
