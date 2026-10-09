@@ -34,7 +34,7 @@ const checks = [
   ["search headlines and summaries must match the requested locale", search.includes("hasArabic(title) && localeSafeText(summary,language)") && search.includes("!hasArabic(title) && localeSafeText(summary,language)")],
   ["AI rejects English-only sentences in Arabic answers", ai.includes("const languageConsistent") && ai.includes("sentences.every")],
   ["short news drafts are not marked as complete analysis", api.includes("generatedBody.length>=1800") && api.includes('status:hasFullAnalysis?generated.status:"source_only"')],
-  ["admin exposes content quality metrics", read("src/db.ts").includes("length(trim(body))<500") && app.includes("analytics.contentQuality?.short_bodies")],
+  ["admin exposes content quality metrics", read("src/db.ts").includes("length(trim(body))<1800") && app.includes("analytics.contentQuality?.short_bodies")],
   ["top searches are isolated by language", read("src/db.ts").includes("FROM searches WHERE language=?") && api.includes("analyticsStats(env,lang)")],
   ["self-healing rechecks news and image health after repairs before reporting success", repair.includes('["news_cache",async()=>await newsCacheHealthy(env)]') && repair.includes('["images",async()=>await imageHealth(env)]') && repair.includes("for(const [name,check] of checks)") && repair.includes("verification=remainingFailures.length===0")],
   ["self-healing alerts are deduplicated", repair.includes("Date.now()-previousTime<30*60*1000") && repair.includes("if(shouldNotify)await notify")],
