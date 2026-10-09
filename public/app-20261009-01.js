@@ -383,7 +383,16 @@
     try { data = await api("/api/search?q=" + encodeURIComponent(query) + "&lang=" + lang, {timeoutMs:18000}); } catch {}
     if (!data?.results?.length && !((data?.providers||[]).includes("BAYAN content safety"))) {
       fallbackUsed = true;
-      try { data = {results: await browserSearchFallback(query), providers:[t("مسار بحث احتياطي","Fallback search")], status:"mixed"}; } catch { data = {results:[]}; }
+      const serverData = data || {};
+      let fallbackResults = [];
+      try { fallbackResults = await browserSearchFallback(query); } catch {}
+      data = {
+        ...serverData,
+        results: fallbackResults,
+        providers: [...new Set([...(serverData.providers || []), t("ويكيبيديا وويكي بيانات وGDELT وDuckDuckGo","Wikipedia, Wikidata, GDELT and DuckDuckGo")])],
+        status: fallbackResults.length ? "mixed" : (serverData.status || "insufficient"),
+        message: fallbackResults.length ? undefined : (serverData.message || t("تعذر الوصول إلى نتائج من مزودي البحث الخارجيين الآن. أعد المحاولة بعد قليل؛ لم يُستبدل البحث بمحتوى داخلي فقط.","External search providers did not return accessible results right now. Please retry shortly; this was not replaced with internal-only content."))
+      };
     }
     const results = Array.isArray(data.results) ? data.results : [];
     const answerText=String(data?.answer||"");
