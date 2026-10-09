@@ -651,7 +651,19 @@
         return Number.isFinite(stamp) ? new Date(stamp).toLocaleString(ar ? "ar-EG-u-nu-latn" : "en-US", {dateStyle:"medium",timeStyle:"short"}) : t("وقت التحديث غير متاح","Update time unavailable");
       };
       const freshness = (value) => value ? t("بيانات قد تكون متأخرة","Data may be delayed") : t("بيانات متاحة","Data available");
-      const currencyNames = {EGP:"الجنيه المصري / Egyptian pound",EUR:"اليورو / Euro",GBP:"الجنيه الإسترليني / British pound",SAR:"الريال السعودي / Saudi riyal",AED:"الدرهم الإماراتي / UAE dirham",KWD:"الدينار الكويتي / Kuwaiti dinar",QAR:"الريال القطري / Qatari riyal",BHD:"الدينار البحريني / Bahraini dinar",OMR:"الريال العماني / Omani rial",JOD:"الدينار الأردني / Jordanian dinar",TRY:"الليرة التركية / Turkish lira",JPY:"الين الياباني / Japanese yen",CNY:"اليوان الصيني / Chinese yuan",CAD:"الدولار الكندي / Canadian dollar",AUD:"الدولار الأسترالي / Australian dollar",CHF:"الفرنك السويسري / Swiss franc",INR:"الروبية الهندية / Indian rupee",ILS:"الشيكل / Israeli shekel",LYD:"الدينار الليبي / Libyan dinar",TND:"الدينار التونسي / Tunisian dinar",MAD:"الدرهم المغربي / Moroccan dirham",ZAR:"الراند الجنوب أفريقي / South African rand"};
+      const currencyNames = ar ? {
+        EGP:"الجنيه المصري",EUR:"اليورو",GBP:"الجنيه الإسترليني",SAR:"الريال السعودي",AED:"الدرهم الإماراتي",
+        KWD:"الدينار الكويتي",QAR:"الريال القطري",BHD:"الدينار البحريني",OMR:"الريال العماني",JOD:"الدينار الأردني",
+        TRY:"الليرة التركية",JPY:"الين الياباني",CNY:"اليوان الصيني",CAD:"الدولار الكندي",AUD:"الدولار الأسترالي",
+        CHF:"الفرنك السويسري",INR:"الروبية الهندية",ILS:"الشيكل",LYD:"الدينار الليبي",TND:"الدينار التونسي",
+        MAD:"الدرهم المغربي",ZAR:"الراند الجنوب أفريقي"
+      } : {
+        EGP:"Egyptian pound",EUR:"Euro",GBP:"British pound",SAR:"Saudi riyal",AED:"UAE dirham",
+        KWD:"Kuwaiti dinar",QAR:"Qatari riyal",BHD:"Bahraini dinar",OMR:"Omani rial",JOD:"Jordanian dinar",
+        TRY:"Turkish lira",JPY:"Japanese yen",CNY:"Chinese yuan",CAD:"Canadian dollar",AUD:"Australian dollar",
+        CHF:"Swiss franc",INR:"Indian rupee",ILS:"Israeli shekel",LYD:"Libyan dinar",TND:"Tunisian dinar",
+        MAD:"Moroccan dirham",ZAR:"South African rand"
+      };
       const rates = fx.rates || {};
       const currencyRows = Object.entries(rates).filter(([code,value]) => Number.isFinite(Number(value))).map(([code,value]) =>
         '<div class="market-row"><span class="currency-label"><b>'+escapeHtml(code)+'</b><small>'+escapeHtml(currencyNames[code]||code)+'</small></span><strong>'+escapeHtml(Number(value).toLocaleString(ar ? "ar-EG-u-nu-latn" : "en-US",{maximumFractionDigits:4}))+'</strong></div>'
