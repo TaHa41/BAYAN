@@ -810,9 +810,11 @@
     const trimmed=String(query||"").trim();
     if(!trimmed)return [];
     const wikiHost=ar?"ar.wikipedia.org":"en.wikipedia.org";
-    const looksLikePerson=/[\u0600-\u06ff]/.test(trimmed)
-      ? trimmed.split(/\s+/).filter(Boolean).length>=2 && !/(طقس|حرارة|سعر|ذهب|دولار|عملة|أخبار|اليوم|تاريخ|علوم|تقنية|اقتصاد|سياسة|رياضة|كيف|ماذا|لماذا|أفضل|دليل|معنى|مطاعم|وصفة)/.test(trimmed)
-      : /^(who is|who was|biography|profile)\s+/i.test(trimmed);
+    // Do not infer that an Arabic two-word query is a person lookup:
+    // common topic phrases (for example "اكتشافات الفضاء") are also two words.
+    // Explicit Arabic person prompts and explicit English biography prompts remain supported.
+    const looksLikePerson=/^(who is|who was|biography|profile)\s+/i.test(trimmed)
+      || /^(من هو|من هي|سيرة(?: ذاتية)?|نبذة عن|شخصية)\s+/i.test(trimmed);
     const variants=[...new Set((looksLikePerson
       ? [trimmed,trimmed+(ar?" سيرة ذاتية":" biography")]
       : [trimmed,trimmed+(ar?" شرح":" overview")]).filter(Boolean))].slice(0,2);
