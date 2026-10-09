@@ -97,7 +97,7 @@ export async function api(request:Request,env:Env){const u=new URL(request.url),
   if(request.method!=="GET")return json({error:"method_not_allowed"},405);
   const title=clean(u.searchParams.get("title")||"",500);let image=clean(u.searchParams.get("image")||"",2000);const summary=clean(u.searchParams.get("summary")||"",1500),storyUrl=clean(u.searchParams.get("url")||"",2000),publisher=clean(u.searchParams.get("publisher")||"",200),publishedAt=clean(u.searchParams.get("publishedAt")||"",100);
   if(!title)return json({error:"title_required"},400);
-  if(isVideoUrl(storyUrl))return json({error:"video_source_not_article",kind:"video",message:lang==="ar"?"هذا رابط فيديو، وليس مقالًا مكتوبًا. افتح الفيديو كمصدر منفصل، ولا تُنشئ منه مقالًا دون نص موثوق ومصادر مكتوبة مستقلة.":"This is a video, not a written article. Open it as a separate source; do not draft an article without a reliable transcript and independent written sources."},422);
+  if(isVideoUrl(storyUrl)&&!summary.includes("[Video transcript extracted]"))return json({error:"video_source_not_article",kind:"video",message:lang==="ar"?"هذا رابط فيديو، وليس مقالًا مكتوبًا. افتح الفيديو كمصدر منفصل، ولا تُنشئ منه مقالًا دون نص موثوق ومصادر مكتوبة مستقلة.":"This is a video, not a written article. Open it as a separate source; do not draft an article without a reliable transcript and independent written sources."},422);
   try{
     let found:any={results:[],status:"insufficient"};
     try{found=await bounded(search(env,title,lang),7000)}catch{}
