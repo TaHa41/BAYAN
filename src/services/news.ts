@@ -248,9 +248,22 @@ export async function findRelatedImage(query: string, sourceUrl?: string): Promi
     return "https://commons.wikimedia.org/wiki/Special:FilePath/Naguib%20Mahfouz%20HR.jpg?width=1200";
   }
 
-  // Headlines identify the subject better than long summaries. Try at most two
-  // short, distinct queries and only accept a Commons filename with subject overlap.
+  // Prefer encyclopedia/Wikidata subject images before a broad Commons search.
+  // This gives biographies, science topics and named events a subject-specific
+  // fallback even when the publisher has no usable og:image metadata.
   const headline = cleanQuery.split(/[.!؟?\n:؛|—–]/)[0].trim();
+  const imageQueries = [...new Set([headline, cleanQuery.slice(0, 180)].filter(Boolean))].slice(0, 2);
+  for (const candidate of imageQueries) {
+    const exact = await wikipediaExactImage(candidate);
+    if (exact && /^https:\/\//i.test(exact)) return exact;
+    const summaryImage = await wikipediaSummaryImage(candidate);
+    if (summaryImage && /^https:\/\//i.test(summaryImage)) return summaryImage;
+  }
+  const relatedWikipediaImage = await wikipediaImage(headline);
+  if (relatedWikipediaImage && /^https:\/\//i.test(relatedWikipediaImage)) return relatedWikipediaImage;
+
+  // Headlines identify the subject better than long summaries. Search Commons
+  // with short title variants, and reject images whose filenames barely overlap.
   const tokens = terms(headline).filter((term) => term.length >= 3);
   const queries = [
     headline.split(/\s+/).slice(0, 7).join(" "),
@@ -274,7 +287,8 @@ export async function findRelatedImage(query: string, sourceUrl?: string): Promi
         const matches = meaningful.filter((term) => label.includes(term)).length;
         const url = String(page.imageinfo?.[0]?.thumburl || page.imageinfo?.[0]?.url || "");
         return { url, matches };
-      }).filter((item) => item.url.startsWith("https://") && item.matches > 0)
+      }).filter((item) => item.url.startsWith("https://") &&
+        (meaningful.length >= 2 ? item.matches >= 2 : item.matches === 1))
         .sort((a, b) => b.matches - a.matches);
       if (ranked[0]?.url) return ranked[0].url;
     } catch {}
