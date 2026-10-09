@@ -82,11 +82,10 @@ async function repairRuntime(env:Env,failures:string[]){
   if(failures.includes("news_cache")&&failures.includes("images")){
     try{const previous=await env.DB.prepare("SELECT action FROM repair_jobs WHERE signature=?").bind(failures.join(",")).first<any>();previousAction=String(previous?.action||"")}catch{}
   }
-  let priorNewsRefresh=false;
-  if(failures.includes("news_cache")&&failures.includes("images")){
-    try{const history=await env.DB.prepare("SELECT COUNT(*) AS n FROM repair_attempts WHERE signature=? AND action LIKE '%live news refresh attempted%'").bind(failures.join(",")).first<any>();priorNewsRefresh=Number(history?.n||0)>0}catch{}
-  }
-  const imageOnlyPass=failures.includes("news_cache")&&failures.includes("images")&&priorNewsRefresh;
+  // Alternate the bounded work based on the last completed action, not on whether
+  // any historical news refresh ever happened. A historical count caused image-only
+  // repair to repeat forever and starved news-cache recovery.
+  const imageOnlyPass=failures.includes("news_cache")&&failures.includes("images")&&previousAction.includes("image repair deferred until the next run");
   if(failures.includes("news_cache")&&!imageOnlyPass){
     const refreshed:string[]=[];
     for(const language of ["ar","en"] as const){
@@ -106,7 +105,7 @@ async function repairRuntime(env:Env,failures:string[]){
     if(missing.length)actions.push("missing section content: "+missing.join(", "));
   }catch{}
   if(failures.includes("images")&&failures.includes("news_cache")&&!imageOnlyPass){actions.push("image repair deferred until the next run to preserve Worker subrequest budget after news refresh")}else if(failures.includes("images"))try{
-    const rows=await env.DB.prepare("SELECT id,title,summary,sources_json FROM articles WHERE status='PUBLISHED' AND (image_url IS NULL OR trim(image_url)='') ORDER BY RANDOM() LIMIT 4").all<any>();
+    const rows=await env.DB.prepare("SELECT id,title,summary,sources_json FROM articles WHERE status='PUBLISHED' AND (image_url IS NULL OR trim(image_url)='') ORDER BY updated_at DESC LIMIT 4").all<any>();
     let filledArticles=0;
     for(const row of rows.results||[])try{let sourceUrl="";try{const sources=JSON.parse(String(row.sources_json||"[]"));sourceUrl=String(sources.find((item:any)=>String(item.url||"").startsWith("https://"))?.url||"")}catch{}const url=await findRelatedImage(String(row.title||""),sourceUrl||undefined);if(url){await env.DB.prepare("UPDATE articles SET image_url=?,updated_at=? WHERE id=? AND (image_url IS NULL OR trim(image_url)='')").bind(url,now(),row.id).run();filledArticles++}else await record(env,"warn","image_repair_no_match","No topic-matched image found for article "+String(row.id)+" ("+String(row.title||"").slice(0,180)+")")}catch(error){await record(env,"warn","image_repair_article_error","Article "+String(row.id)+": "+String(error).slice(0,300))}
     let filledNews=0;
@@ -116,7 +115,7 @@ async function repairRuntime(env:Env,failures:string[]){
       const parsed=JSON.parse(String(row.payload));
       const items:any[]=Array.isArray(parsed)?parsed:(Array.isArray(parsed?.items)?parsed.items:[]);
       let changed=false;
-      for(const item of items.filter((entry:any)=>!entry.imageUrl&&String(entry.title||"").trim()).sort(()=>Math.random()-.5).slice(0,3)){
+      for(const item of items.filter((entry:any)=>!String(entry.imageUrl||"").trim()&&String(entry.title||"").trim()).slice(0,3)){
         const url=await findRelatedImage(String(item.title||""),String(item.url||""));
         if(url){item.imageUrl=url;item.imageAlt=String(item.title||"");filledNews++;changed=true}else await record(env,"warn","image_repair_news_no_match","No topic-matched image found for cached "+language+" story: "+String(item.title||"").slice(0,180))
       }
