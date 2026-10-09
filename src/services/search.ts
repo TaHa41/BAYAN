@@ -4,7 +4,7 @@ import {ask} from "./ai";
 import {findRelatedImage} from "./news";
 
 type Candidate = SearchResult & {score:number; provider:string};
-const timeout = async (url:string, ms=4500) => {
+const timeout = async (url:string, ms=3200) => {
   const c=new AbortController(); const t=setTimeout(()=>c.abort(),ms);
   try { return await fetch(url,{signal:c.signal,headers:{accept:"application/json,text/plain,*/*"}}); }
   finally { clearTimeout(t); }
@@ -55,7 +55,7 @@ async function googleNewsSearch(q:string,language:Locale):Promise<Candidate[]>{
   try{
     const hl=language==="ar"?"ar":"en-US",gl=language==="ar"?"EG":"US",ceid=language==="ar"?"EG:ar":"US:en";
     const url="https://news.google.com/rss/search?q="+encodeURIComponent(q)+"&hl="+hl+"&gl="+gl+"&ceid="+ceid;
-    const response=await timeout(url,4500);if(!response.ok)return[];
+    const response=await timeout(url,3200);if(!response.ok)return[];
     const xml=await response.text();const out:Candidate[]=[];
     for(const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
       const block=match[1];const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
@@ -103,10 +103,10 @@ async function pubmedSearch(q:string,language:Locale):Promise<Candidate[]>{
   if(language!=="en")return[];
   try{
     const searchUrl="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax=5&term="+encodeURIComponent(q);
-    const sr=await timeout(searchUrl,4000);if(!sr.ok)return[];
+    const sr=await timeout(searchUrl,3000);if(!sr.ok)return[];
     const ids=(await sr.json<any>()).esearchresult?.idlist||[];if(!ids.length)return[];
     const detailUrl="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&retmode=json&id="+ids.join(",");
-    const dr=await timeout(detailUrl,4000);if(!dr.ok)return[];
+    const dr=await timeout(detailUrl,3000);if(!dr.ok)return[];
     const d=await dr.json<any>();
     return ids.map((id:string)=>{const x=d.result?.[id]||{};const title=cleanText(x.title||"");return {title,summary:[x.pubdate,x.fulljournalname,x.elocationid].filter(Boolean).map(cleanText).join(" — "),section:"health",kind:"web",evidence:"mixed",sources:[source(title,"PubMed", "https://pubmed.ncbi.nlm.nih.gov/"+id+"/")],url:"https://pubmed.ncbi.nlm.nih.gov/"+id+"/",score:scoreSource("PubMed",title,q)+18,provider:"PubMed / NCBI"};}).filter((x:any)=>x.title);
   }catch{return[]}
@@ -167,6 +167,25 @@ async function duck(q:string,language:Locale):Promise<Candidate[]>{
     return out;
   }catch{return[]}
 }
+async function duckWebSearch(q:string,language:Locale):Promise<Candidate[]>{
+  try{
+    const url="https://html.duckduckgo.com/html/?q="+encodeURIComponent(q)+"&kl="+(language==="ar"?"ar-eg":"us-en");
+    const response=await timeout(url,3200);if(!response.ok)return[];
+    const html=await response.text();const out:Candidate[]=[];
+    const anchors=[...html.matchAll(/<a\b([^>]*class=["'][^"']*result__a[^"']*["'][^>]*)>([\s\S]*?)<\/a>/gi)];
+    for(const match of anchors.slice(0,10)){
+      const attrs=match[1],title=cleanText(decodeXml(match[2]).replace(/<[^>]*>/g," "));
+      let url=decodeXml(attrs.match(/href=["']([^"']+)["']/i)?.[1]||"");
+      try{const parsed=new URL(url,"https://duckduckgo.com");const redirect=parsed.searchParams.get("uddg");url=redirect?decodeURIComponent(redirect):parsed.href;}catch{}
+      if(!title||!/^https:\/\//i.test(url)||/duckduckgo\.com\/l\//i.test(url))continue;
+      const around=html.slice(match.index||0,(match.index||0)+1800);
+      const snippet=cleanText(decodeXml(around.match(/class=["'][^"']*result__snippet[^"']*["'][^>]*>([\s\S]*?)<\//i)?.[1]||"")).slice(0,1200);
+      let publisher="Web result";try{publisher=new URL(url).hostname.replace(/^www\./i,"");}catch{}
+      out.push({title,summary:snippet,section:"world",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+10,provider:"DuckDuckGo Web"});
+    }
+    return out;
+  }catch{return[]}
+}
 async function broadGdelt(q:string):Promise<Candidate[]>{
   const variants=[...new Set([q,q.split(/\s+/).slice(0,6).join(" "),q.split(/\s+/).slice(0,3).join(" ")].filter(Boolean))];
   const batches=await Promise.all(variants.map(v=>gdelt(v).catch(()=>[])));
@@ -184,12 +203,8 @@ const personLookup=(q:string)=>{
 async function expandedSearch(env:Env,q:string,language:Locale,person=false):Promise<Candidate[]>{
   // Keep retries diverse but bounded: each variant fans out across independent providers.
   const variants=person
-    ? (language==="ar"
-      ? [q+" سيرة ذاتية",q+" آخر الأخبار",q+" مصدر رسمي"]
-      : [q+" biography",q+" latest news",q+" official profile"])
-    : (language==="ar"
-      ? [q+" شرح",q+" معلومات موثوقة",q+" آخر الأخبار"]
-      : [q+" explanation",q+" reliable information",q+" latest news"]);
+    ? (language==="ar" ? [q+" سيرة ذاتية",q+" مصدر رسمي"] : [q+" biography",q+" official profile"])
+    : (language==="ar" ? [q+" شرح",q+" معلومات موثوقة"] : [q+" overview",q+" reliable information"]);
   const batches=await Promise.all(variants.map(async variant=>{
     const results=await Promise.all([
       wikipedia(env,variant,language).catch(()=>[]),
@@ -197,7 +212,8 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false):Pro
       gdelt(variant).catch(()=>[]),
       googleNewsSearch(variant,language).catch(()=>[]),
       bingNewsSearch(variant,language).catch(()=>[]),
-      duck(variant,language).catch(()=>[])
+      duck(variant,language).catch(()=>[]),
+      duckWebSearch(variant,language).catch(()=>[])
     ]);
     return results.flat();
   }));
@@ -259,9 +275,9 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};const academicQuery=/(research|paper|papers|study|studies|journal|doi|scholar|academic|citation|crossref|openalex|pubmed|clinical trial|systematic review|بحث علمي|أبحاث|دراسة|دراسات|مجلة علمية|ورقة بحثية|مصدر أكاديمي|دراسات سريرية|مراجعة منهجية)/i.test(q);
 const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|medicine|health study|بحث طبي|دراسة طبية|دراسات سريرية|تجربة سريرية|مراجعة منهجية)/i.test(q);
-let [local, wiki, wd, gd, oa, remote, dd, google, bing, crossref, pubmed] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[]),safe(googleNewsSearch(q,language),[]),safe(bingNewsSearch(q,language),[]),safe((academicQuery&&!personLookup(q))?crossrefSearch(q):Promise.resolve([]),[]),safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language),[])]);
+let [local, wiki, wd, gd, oa, remote, dd, duckWeb, google, bing, crossref, pubmed] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[]),safe(duckWebSearch(q,language),[]),safe(googleNewsSearch(q,language),[]),safe(bingNewsSearch(q,language),[]),safe((academicQuery&&!personLookup(q))?crossrefSearch(q):Promise.resolve([]),[]),safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language),[])]);
 const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...(s.source_gdelt==="0"?[]:["GDELT"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo","Google News Search","Bing News RSS"];const candidates:Candidate[]=[
-    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...google,...bing
+    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...duckWeb,...google,...bing
   ];
   // Person/name lookups should return a useful collection, not stop after the first matching page.
   const personQuery=personLookup(q);
@@ -269,15 +285,14 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   // Expand when the first pass is merely sparse, not only when it is empty.
   // People searches need several independent identity clues; general searches need
   // enough relevant evidence to produce a useful answer rather than a thin snippet.
-  const expansionThreshold=personQuery?Math.min(8,Math.max(4,Number(s.min_sources||3)*2)):Math.max(4,Number(s.min_sources||3));
+  const expansionThreshold=personQuery?Math.min(6,Math.max(3,Number(s.min_sources||3))):Math.max(3,Number(s.min_sources||3));
   if(firstPassCount()<expansionThreshold){
-    providerAttempted.push("Expanded topic variants: Wikipedia, Wikidata, GDELT, Google News Search, Bing News RSS, DuckDuckGo","OpenAI Web Search (fallback)");
-    const [broadened,expanded,web]=await Promise.all([
-      safe(broadGdelt(q),[]),
+    providerAttempted.push("Expanded topic variants: Wikipedia, Wikidata, GDELT, DuckDuckGo Web Search, Google News Search, Bing News RSS","OpenAI Web Search (fallback)");
+    const [expanded,web]=await Promise.all([
       safe(expandedSearch(env,q,language,personQuery),[]),
       safe(openAiWebSearch(env,q,language),[])
     ]);
-    candidates.push(...broadened,...expanded,...web);
+    candidates.push(...expanded,...web);
   }
   
   const seen=new Set<string>();
