@@ -270,3 +270,9 @@ html[dir="rtl"] .section-card:before{inset:0 0 0 auto;border-radius:0 18px 18px 
 .prices-page>.muted{margin-top:22px;padding:13px 15px;border-radius:13px;background:var(--soft);font-size:12px;line-height:1.9}
 @media(max-width:760px){.prices-page .market-overview{grid-template-columns:minmax(0,1fr)}.prices-page .gold-panel{min-height:205px}.prices-page .prices-extra-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.prices-page .fx-panel,.prices-page .gold-panel{padding:16px;border-radius:18px}.prices-page .market-list{grid-template-columns:minmax(0,1fr)}.prices-page .market-row{padding:10px 11px}.prices-page .prices-extra-grid{grid-template-columns:minmax(0,1fr)}.prices-extra-heading{align-items:flex-start;flex-direction:column}.prices-heading-note{text-align:start;max-width:none}.prices-intro-strip{padding:13px;align-items:flex-start}.prices-intro-icon{flex-basis:38px;width:38px;height:38px}}
+
+
+/* Article imagery: preserve a clear layout while a relevant image is resolved. */
+.article-hero-placeholder{display:grid;place-items:center;min-height:clamp(190px,34vw,420px);width:100%;margin:0 0 1.25rem;border:1px solid var(--line,rgba(128,128,128,.22));border-radius:18px;background:linear-gradient(135deg,rgba(120,140,160,.12),rgba(120,140,160,.04));color:var(--muted,#718096);font-size:.95rem;text-align:center;padding:1rem;}
+.article-hero-placeholder.is-unavailable{min-height:100px;font-size:.9rem;}
+.article-full .article-hero-image{display:block;width:100%;max-height:560px;object-fit:cover;border-radius:18px;margin:0 0 1.25rem;}
