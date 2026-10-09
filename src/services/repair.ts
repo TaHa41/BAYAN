@@ -18,6 +18,37 @@ async function newsCacheHealthy(env:Env){
 }
 
 
+async function newsCacheDiagnostics(env:Env){
+  const output:string[]=[];
+  for(const language of ["ar","en"] as const){
+    try{
+      const row=await env.DB.prepare("SELECT payload FROM news_cache WHERE language=? LIMIT 1").bind(language).first<any>();
+      if(!row?.payload){output.push(language+"{cache=missing}");continue}
+      const parsed=JSON.parse(String(row.payload));
+      const items:any[]=Array.isArray(parsed)?parsed:(Array.isArray(parsed?.items)?parsed.items:[]);
+      let localeMatched=0,validDate=0,fresh=0,stale=0,future=0,missingDate=0,missingImages=0;
+      const current=Date.now();
+      for(const item of items){
+        const title=String(item?.title||"");
+        const localeMatch=language==="ar"?/[\u0600-\u06ff]/.test(title):!/[\u0600-\u06ff]/.test(title);
+        if(localeMatch)localeMatched++;
+        const date=Date.parse(String(item?.publishedAt||""));
+        if(!Number.isFinite(date)){missingDate++;continue}
+        validDate++;
+        if(date>current+5*60*1000)future++;
+        else if(current-date>72*60*60*1000)stale++;
+        else if(localeMatch)fresh++;
+        if(!String(item?.imageUrl||"").trim())missingImages++;
+      }
+      output.push(language+"{total="+items.length+",locale="+localeMatched+",validDate="+validDate+",freshLocale="+fresh+",stale="+stale+",future="+future+",missingDate="+missingDate+",missingImages="+missingImages+"}");
+    }catch(error){
+      output.push(language+"{diagnostic_error="+String(error).slice(0,100)+"}");
+    }
+  }
+  return output.join("; ");
+}
+
+
 const CANONICAL_SECTIONS=["science","technology","economy","politics","health","history","people","sports","travel","art","news","trends","prices","egypt","arab","world"] as const;
 const CONTENT_SECTIONS=["science","technology","economy","politics","health","history","people","sports","travel","art","trends","egypt","arab","world"] as const;
 
@@ -109,6 +140,7 @@ async function repairRuntime(env:Env,failures:string[]){
       try{const result=await news(env,language);refreshed.push(language+":"+result.items.length)}catch(error){refreshed.push(language+":failed");await record(env,"warn","self_heal_news_refresh",language+" "+String(error).slice(0,300))}
     }
     actions.push("live news refresh attempted for both locales ("+refreshed.join(", ")+"); no news content fabricated");
+    actions.push("news cache diagnostics after refresh: "+await newsCacheDiagnostics(env));
   }else if(imageOnlyPass){
     actions.push("bounded image-only repair pass selected because the previous run deferred images");
   }
