@@ -316,9 +316,9 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   // still need a real provider URL, the requested headline language, and safety checks.
   if(!ranked.length){
     const terms=searchTerms(q);
-    const normalize=(v:string)=>String(v||"").normalize("NFKC").toLowerCase().replace(/[\\u064B-\\u065F\\u0670]/g,"");
+    const normalize=(v:string)=>String(v||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"");
     ranked=safeCandidates.filter(x=>{
-      if(!x.url||!/^https:\\/\\//i.test(String(x.url)))return false;
+      if(!x.url||!/^https:\/\//i.test(String(x.url)))return false;
       const title=normalize(x.title),summary=normalize(x.summary);
       const titleHits=terms.filter(term=>title.includes(term)).length;
       const totalHits=terms.filter(term=>(title+" "+summary).includes(term)).length;
