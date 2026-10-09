@@ -118,7 +118,7 @@ async function openAiWebSearch(env:Env,q:string,language:Locale):Promise<Candida
     const response=await fetch("https://api.openai.com/v1/responses",{
       method:"POST",
       headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},
-      signal:AbortSignal.timeout(6500),
+      signal:AbortSignal.timeout(5500),
       body:JSON.stringify({
         model:env.OPENAI_MODEL||"gpt-5-mini",
         tools:[{type:"web_search"}],
@@ -238,15 +238,13 @@ const languageSafe=(x:Candidate,language:Locale)=>{
 };export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean}={}):Promise<SearchResponse>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};let [local, wiki, wd, gd, oa, remote, dd, google, bing, crossref, pubmed] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe(s.source_openalex==="0"?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[]),safe(googleNewsSearch(q,language),[]),safe(bingNewsSearch(q,language),[]),safe(crossrefSearch(q),[]),safe(pubmedSearch(q,language),[])]);
-if(!local.length && !wiki.length && !wd.length && !gd.length && !oa.length && !remote.length && !dd.length && !google.length && !bing.length && !crossref.length && !pubmed.length) gd=await broadGdelt(q);
-  const providerAttempted=["BAYAN Knowledge Base","Wikipedia","Wikidata","GDELT","OpenAlex","Crossref","PubMed / NCBI","Cloudflare AI Search","DuckDuckGo","Google News Search","Bing News RSS","OpenAI Web Search (fallback)"];const candidates:Candidate[]=[
-    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...google,...bing,...webSearch
+const providerAttempted=["BAYAN Knowledge Base","Wikipedia","Wikidata","GDELT","OpenAlex","Crossref","PubMed / NCBI","Cloudflare AI Search","DuckDuckGo","Google News Search","Bing News RSS","OpenAI Web Search (fallback)"];const candidates:Candidate[]=[
+    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...google,...bing
   ];
-  // A provider can return results that are unusable for the requested language.
-  // Retry broad GDELT variants when that happens instead of stopping because raw candidates existed.
-  if(candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q)).length<2){const broadened=await safe(broadGdelt(q),[]);candidates.push(...broadened);}
+  // Expand only when first-pass results are weak; fallback providers run concurrently to cap added latency.
   if(candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q)).length<2){
-    candidates.push(...await safe(expandedSearch(env,q,language),[]));
+    const [broadened,expanded,web]=await Promise.all([safe(broadGdelt(q),[]),safe(expandedSearch(env,q,language),[]),safe(openAiWebSearch(env,q,language),[])]);
+    candidates.push(...broadened,...expanded,...web);
   }
   
   const seen=new Set<string>();
@@ -265,7 +263,7 @@ if(!local.length && !wiki.length && !wd.length && !gd.length && !oa.length && !r
   let answer:string|undefined;
   let answerStatus:SearchResponse["status"]|undefined;
   if(results.length){
-    try{const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),4500))]);if(drafted.answer){answer=drafted.answer;answerStatus=drafted.status;}const independentSources=new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean));const articleTitle=results.find(x=>x.title&&x.summary)?.title||"";const articleSummary=results.find(x=>x.title&&x.summary)?.summary||q;if(options.publish!==false&&drafted.status==="verified"&&usefulDraft(drafted.answer,language)&&independentSources.size>=2&&articleTitle&&!disallowedContent(articleTitle+" "+articleSummary)){const imageUrl=await findRelatedImage(articleTitle+" "+articleSummary).catch(()=>undefined);publishedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:drafted.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle});}}catch{}
+    try{const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),3000))]);if(drafted.answer){answer=drafted.answer;answerStatus=drafted.status;}const independentSources=new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean));const articleTitle=results.find(x=>x.title&&x.summary)?.title||"";const articleSummary=results.find(x=>x.title&&x.summary)?.summary||q;if(options.publish!==false&&drafted.status==="verified"&&usefulDraft(drafted.answer,language)&&independentSources.size>=2&&articleTitle&&!disallowedContent(articleTitle+" "+articleSummary)){const imageUrl=await findRelatedImage(articleTitle+" "+articleSummary).catch(()=>undefined);publishedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:drafted.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle});}}catch{}
   }
   const message=results.length?undefined:(language==="ar"?"تعذر العثور على نتيجة من مصادر البحث المتاحة حاليًا. يمكن توسيع البحث لاحقًا عند توفر مزودات إضافية.":"No result was returned by the available search providers right now. The search can be expanded when additional providers are available.");
   try{await saveSearch(env,q,language,intent(q),status,results.length,classifySection(q,results,language),results)}catch{}
