@@ -333,15 +333,38 @@
         const key = item.slug || item.url || item.title;
         const sectionMeta=sections.find(section=>section[0]===item.section); const sectionLabel=sectionMeta?(ar?sectionMeta[1]:sectionMeta[2]):t("نتيجة بحث","Search result"); return '<article class="search-result"><span class="kicker">' + escapeHtml(sectionLabel) + " · " +
           escapeHtml(item.evidence || "mixed") + "</span><h2>" +
-          (item.slug ? '<a href="/article/' + encodeURIComponent(item.slug) + '?lang=' + lang + '">' + escapeHtml(item.title) + "</a>" : escapeHtml(item.title)) +
+          ('<a href="' + (item.slug ? ("/article/" + encodeURIComponent(item.slug) + "?lang=" + lang) : ("/research?title=" + encodeURIComponent(item.title || query) + "&summary=" + encodeURIComponent(item.summary || "") + "&url=" + encodeURIComponent(item.url || (item.sources || [])[0]?.url || "") + "&publisher=" + encodeURIComponent((item.sources || [])[0]?.publisher || "") + "&lang=" + lang)) + '">' + escapeHtml(item.title) + "</a>") +
           "</h2><p>" + escapeHtml(item.summary || "") + '</p><div class="source-line">' +
           (item.sources || []).slice(0, 3).map((source) => escapeHtml(source.publisher)).join(" · ") +
-          "</div>" + socialActions({...item, _key:key}) + "</article>";
+          '</div><a class="read" href="' + (item.slug ? ("/article/" + encodeURIComponent(item.slug) + "?lang=" + lang) : ("/research?title=" + encodeURIComponent(item.title || query) + "&summary=" + encodeURIComponent(item.summary || "") + "&url=" + encodeURIComponent(item.url || (item.sources || [])[0]?.url || "") + "&publisher=" + encodeURIComponent((item.sources || [])[0]?.publisher || "") + "&lang=" + lang)) + '" >' + t("اقرأ المقال داخل بيان","Read article inside BAYAN") + " →</a>" + socialActions({...item, _key:key}) + "</article>";
       }).join(""))
       : '<div class="notice"><h2>' + escapeHtml(data?.message || t("لم نعثر على نتيجة مناسبة في المسارات المتاحة الآن.","No suitable result was found in the available search paths.")) +
         '</h2><p>' + t("يمكنك تجربة صياغة أخرى؛ يوسّع بيان البحث عبر المصادر المتاحة دون اختلاق معلومات.","Try another phrasing; BAYAN searches available sources without fabricating information.") + "</p>" +
         '<button class="primary" id="search-retry">' + t("إعادة البحث","Search again") + "</button></div>";
     document.querySelector("#search-retry")?.addEventListener("click", () => renderSearch());
+  }
+
+  async function renderResearchArticle() {
+    const p=new URLSearchParams(location.search);
+    const title=p.get("title")||"",summary=p.get("summary")||"",url=p.get("url")||"",publisher=p.get("publisher")||"";
+    app.innerHTML='<section class="page narrow"><div id="researchArticle"><div class="notice loading">'+t("يجمع بيان الأدلة ويجهز المقال…","BAYAN is gathering evidence and preparing the article…")+'</div></div></section>';
+    const output=document.querySelector("#researchArticle");
+    try{
+      if(!title)throw new Error("title_required");
+      const data=await api("/api/news/article?title="+encodeURIComponent(title)+"&summary="+encodeURIComponent(summary)+"&url="+encodeURIComponent(url)+"&publisher="+encodeURIComponent(publisher)+"&lang="+lang,{timeoutMs:22000});
+      const article=data.article||{};
+      if(!data.ok||!article.title)throw new Error("article_unavailable");
+      output.innerHTML='<article class="article-full">'+(article.image?heroImageHtml(article.image,article.title):"")+
+        '<span class="eyebrow">'+escapeHtml(article.sources?.[0]?.publisher||publisher||t("بحث موثق","Evidence search"))+'</span><h1>'+escapeHtml(article.title)+'</h1>'+
+        '<p class="lead">'+escapeHtml(article.summary||summary)+'</p>'+
+        (article.status==="source_only"?'<div class="notice">'+t("يعرض بيان النص المتاح من المصدر مع الأدلة؛ لم تتوفر معلومات كافية لإعداد تحليل موسع موثوق.","BAYAN is showing the source text available with its evidence; there is not enough information for a reliable expanded analysis.")+'</div>':"")+
+        '<div class="article-body">'+String(article.body||article.summary||summary).split(String.fromCharCode(10)).map(line=>"<p>"+escapeHtml(line)+"</p>").join("")+'</div>'+
+        '<div class="sources-box"><h2>'+t("الأدلة والمصادر","Evidence & sources")+'</h2>'+
+        (article.sources||[]).map(source=>'<div class="source-line">'+escapeHtml(source.publisher||"")+' · '+escapeHtml(source.title||"")+'</div>').join("")+
+        '</div>'+socialActions({...article,title:article.title||title,summary:article.summary||summary,href:location.pathname+location.search,_key:"research:"+title})+'</article>';
+    }catch{
+      output.innerHTML='<div class="notice"><h2>'+t("تعذر تجهيز المقال من المصادر المتاحة الآن","Could not prepare the article from available sources")+'</h2><p>'+t("حاول إعادة البحث أو اختيار نتيجة أخرى. لن يعرض بيان نصًا مختلقًا على أنه مقال موثق.","Try searching again or choose another result. BAYAN will not present invented text as a sourced article.")+'</p><a class="read" href="/search?q='+encodeURIComponent(title)+'&lang='+lang+'">'+t("العودة إلى البحث","Back to search")+' →</a></div>';
+    }
   }
 
   async function renderArticle() {
@@ -787,6 +810,7 @@
     const path = location.pathname.replace(/^\//, "").replace(/\/$/, "");
     if (!path) return renderHome();
     if (path === "search") return renderSearch();
+    if (path === "research") return renderResearchArticle();
     if (path.startsWith("article/")) return renderArticle();
     if (path === "news") return renderNews();
     if (path === "ask") return renderAsk();
