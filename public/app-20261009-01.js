@@ -817,7 +817,7 @@
       ? [trimmed,trimmed+(ar?" سيرة ذاتية":" biography")]
       : [trimmed,trimmed+(ar?" شرح":" overview")]).filter(Boolean))].slice(0,2);
     const clean=(v)=>String(v||"").replace(/<[^>]*>/g," ").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/\s+/g," ").trim();
-    const fetchJson=async(url,ms=3000)=>{const r=await fetch(url,{signal:AbortSignal.timeout(ms),headers:{accept:"application/json"}});if(!r.ok)throw new Error("provider_http_"+r.status);return r.json();};
+    const fetchJson=async(url,ms=2600)=>{const r=await fetch(url,{signal:AbortSignal.timeout(ms),headers:{accept:"application/json"}});if(!r.ok)throw new Error("provider_http_"+r.status);return r.json();};
     const jobs=[];
     for(const term of variants){
       jobs.push((async()=>{
@@ -832,7 +832,7 @@
       })());
       jobs.push((async()=>{
         const url="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(term)+"&mode=artlist&maxrecords=6&format=json&sort=HybridRel";
-        const d=await fetchJson(url,3200);
+        const d=await fetchJson(url,2800);
         return (d.articles||[]).map(x=>({title:clean(x.title),summary:clean(x.seendate||"")+" "+clean(x.domain||""),section:"news",kind:"web",evidence:"mixed",sources:[{publisher:clean(x.domain||"GDELT"),title:clean(x.title),url:String(x.url||"")}],url:String(x.url||""),provider:"GDELT"})).filter(x=>x.title&&/^https:\/\//i.test(x.url));
       })());
       jobs.push((async()=>{

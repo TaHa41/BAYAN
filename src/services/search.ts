@@ -4,7 +4,7 @@ import {ask} from "./ai";
 import {findRelatedImage} from "./news";
 
 type Candidate = SearchResult & {score:number; provider:string};
-const timeout = async (url:string, ms=3200) => {
+const timeout = async (url:string, ms=2600) => {
   const c=new AbortController(); const t=setTimeout(()=>c.abort(),ms);
   try { return await fetch(url,{signal:c.signal,headers:{accept:"application/json,text/plain,*/*"}}); }
   finally { clearTimeout(t); }
@@ -55,7 +55,7 @@ async function googleNewsSearch(q:string,language:Locale):Promise<Candidate[]>{
   try{
     const hl=language==="ar"?"ar":"en-US",gl=language==="ar"?"EG":"US",ceid=language==="ar"?"EG:ar":"US:en";
     const url="https://news.google.com/rss/search?q="+encodeURIComponent(q)+"&hl="+hl+"&gl="+gl+"&ceid="+ceid;
-    const response=await timeout(url,3200);if(!response.ok)return[];
+    const response=await timeout(url,2600);if(!response.ok)return[];
     const xml=await response.text();const out:Candidate[]=[];
     for(const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
       const block=match[1];const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
@@ -103,10 +103,10 @@ async function pubmedSearch(q:string,language:Locale):Promise<Candidate[]>{
   if(language!=="en")return[];
   try{
     const searchUrl="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&retmode=json&retmax=5&term="+encodeURIComponent(q);
-    const sr=await timeout(searchUrl,3000);if(!sr.ok)return[];
+    const sr=await timeout(searchUrl,2600);if(!sr.ok)return[];
     const ids=(await sr.json<any>()).esearchresult?.idlist||[];if(!ids.length)return[];
     const detailUrl="https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&retmode=json&id="+ids.join(",");
-    const dr=await timeout(detailUrl,3000);if(!dr.ok)return[];
+    const dr=await timeout(detailUrl,2600);if(!dr.ok)return[];
     const d=await dr.json<any>();
     return ids.map((id:string)=>{const x=d.result?.[id]||{};const title=cleanText(x.title||"");return {title,summary:[x.pubdate,x.fulljournalname,x.elocationid].filter(Boolean).map(cleanText).join(" — "),section:"health",kind:"web",evidence:"mixed",sources:[source(title,"PubMed", "https://pubmed.ncbi.nlm.nih.gov/"+id+"/")],url:"https://pubmed.ncbi.nlm.nih.gov/"+id+"/",score:scoreSource("PubMed",title,q)+18,provider:"PubMed / NCBI"};}).filter((x:any)=>x.title);
   }catch{return[]}
@@ -118,7 +118,7 @@ async function openAiWebSearch(env:Env,q:string,language:Locale):Promise<Candida
     const response=await fetch("https://api.openai.com/v1/responses",{
       method:"POST",
       headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},
-      signal:AbortSignal.timeout(5500),
+      signal:AbortSignal.timeout(3500),
       body:JSON.stringify({
         model:env.OPENAI_MODEL||"gpt-5-mini",
         tools:[{type:"web_search"}],
@@ -170,7 +170,7 @@ async function duck(q:string,language:Locale):Promise<Candidate[]>{
 async function duckWebSearch(q:string,language:Locale):Promise<Candidate[]>{
   try{
     const url="https://html.duckduckgo.com/html/?q="+encodeURIComponent(q)+"&kl="+(language==="ar"?"ar-eg":"us-en");
-    const response=await timeout(url,3200);if(!response.ok)return[];
+    const response=await timeout(url,2600);if(!response.ok)return[];
     const html=await response.text();const out:Candidate[]=[];
     const anchors=[...html.matchAll(/<a\b([^>]*class=["'][^"']*result__a[^"']*["'][^>]*)>([\s\S]*?)<\/a>/gi)];
     for(const match of anchors.slice(0,10)){
@@ -311,7 +311,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   let answer:string|undefined;
   let answerStatus:SearchResponse["status"]|undefined;
   if(results.length){
-    try{const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),3000))]);if(drafted.answer){answer=drafted.answer;answerStatus=drafted.status;}const independentSources=new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean));const articleTitle=results.find(x=>x.title&&x.summary)?.title||"";const articleSummary=results.find(x=>x.title&&x.summary)?.summary||q;if(options.publish!==false&&drafted.status==="verified"&&usefulDraft(drafted.answer,language)&&independentSources.size>=2&&articleTitle&&!disallowedContent(articleTitle+" "+articleSummary)){const imageUrl=await findRelatedImage(articleTitle+" "+articleSummary).catch(()=>undefined);publishedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:drafted.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle});}}catch{}
+    try{const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),1000))]);if(drafted.answer){answer=drafted.answer;answerStatus=drafted.status;}const independentSources=new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean));const articleTitle=results.find(x=>x.title&&x.summary)?.title||"";const articleSummary=results.find(x=>x.title&&x.summary)?.summary||q;if(options.publish!==false&&drafted.status==="verified"&&usefulDraft(drafted.answer,language)&&independentSources.size>=2&&articleTitle&&!disallowedContent(articleTitle+" "+articleSummary)){const imageUrl=await findRelatedImage(articleTitle+" "+articleSummary).catch(()=>undefined);publishedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:drafted.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle});}}catch{}
   }
   const message=results.length?undefined:(language==="ar"?"تعذر العثور على نتيجة من مصادر البحث المتاحة حاليًا. يمكن توسيع البحث لاحقًا عند توفر مزودات إضافية.":"No result was returned by the available search providers right now. The search can be expanded when additional providers are available.");
   try{await saveSearch(env,q,language,intent(q),status,results.length,classifySection(q,results,language),results)}catch{}
