@@ -119,8 +119,11 @@ try{
 }catch(e){console.error("ARTICLE",e);bad++}
 try{
   const s=await get("/api/search?q=%D9%86%D8%AC%D9%8A%D8%A8%20%D9%85%D8%AD%D9%81%D9%88%D8%B8&lang=ar"); const d=JSON.parse(s.text);
-  if(!Array.isArray(d.results)||d.results.length<1)throw new Error("search_empty");
+  if(!Array.isArray(d.results)||d.results.length<1)throw new Error("person_search_empty");
   if(!Array.isArray(d.providerAttempted)||d.providerAttempted.length<5)throw new Error("provider_coverage_missing");
+  const topic=await get("/api/search?q=%D8%A7%D9%83%D8%AA%D8%B4%D8%A7%D9%81%D8%A7%D8%AA%20%D8%A7%D9%84%D9%81%D8%B6%D8%A7%D8%A1&lang=ar"); const td=JSON.parse(topic.text);
+  if(!Array.isArray(td.results)||td.results.length<1)throw new Error("general_topic_search_empty");
+  if(td.results.some(x=>!/[\\u0600-\\u06ff]/.test(String(x.title||""))))throw new Error("general_topic_result_language_mismatch");
 }catch(e){console.error("SEARCH",e);bad++}
 for(const section of sections.filter(section=>section!=="prices")){
   for(const language of ["ar","en"]){
