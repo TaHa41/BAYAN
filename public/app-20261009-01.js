@@ -151,6 +151,59 @@
     }
   }
 
+  // Render article Markdown as semantic, readable HTML instead of wrapping every
+  // source line in a paragraph (which made headings and lists appear as raw text).
+  const renderArticleBody = (value) => {
+    const lines = String(value || "").replace(/\r/g, "").split("\n");
+    const out = [];
+    let paragraph = [];
+    let listType = "";
+    let listItems = [];
+    const flushParagraph = () => {
+      const text = paragraph.join(" ").trim();
+      if (text) out.push("<p>" + escapeHtml(text) + "</p>");
+      paragraph = [];
+    };
+    const flushList = () => {
+      if (!listItems.length) return;
+      const tag = listType === "ol" ? "ol" : "ul";
+      out.push("<" + tag + ">" + listItems.map(item => "<li>" + escapeHtml(item) + "</li>").join("") + "</" + tag + ">");
+      listItems = [];
+      listType = "";
+    };
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) { flushParagraph(); flushList(); continue; }
+      const heading = line.match(/^(#{1,3})\s+(.+)$/);
+      if (heading) {
+        flushParagraph(); flushList();
+        const level = Math.min(3, heading[1].length + 1);
+        out.push("<h" + level + ">" + escapeHtml(heading[2].replace(/\s+#+\s*$/, "")) + "</h" + level + ">");
+        continue;
+      }
+      const bullet = line.match(/^[-*+]\s+(.+)$/);
+      const numbered = line.match(/^\d+[.)]\s+(.+)$/);
+      if (bullet || numbered) {
+        flushParagraph();
+        const nextType = numbered ? "ol" : "ul";
+        if (listType && listType !== nextType) flushList();
+        listType = nextType;
+        listItems.push((bullet || numbered)[1]);
+        continue;
+      }
+      const quote = line.match(/^>\s?(.*)$/);
+      if (quote) {
+        flushParagraph(); flushList();
+        out.push("<blockquote><p>" + escapeHtml(quote[1]) + "</p></blockquote>");
+        continue;
+      }
+      flushList();
+      paragraph.push(line);
+    }
+    flushParagraph(); flushList();
+    return out.join("");
+  };
+
   const articleCard = (item) => {
     const sectionMeta = sections.find((section) => section[0] === item.section);
     const sectionLabel = sectionMeta ? (ar ? sectionMeta[1] : sectionMeta[2]) : t("مادة معرفية","Knowledge item");
@@ -431,7 +484,7 @@
         '<span class="eyebrow">'+escapeHtml(article.sources?.[0]?.publisher||publisher||t("بحث موثق","Evidence search"))+'</span><h1>'+escapeHtml(article.title)+'</h1>'+
         '<p class="lead">'+escapeHtml(article.summary||summary)+'</p>'+(article.savedSlug?'<div class="notice">'+t("تمت إضافة المقال تلقائيًا إلى قسم","Automatically added to section")+' <a href="/'+encodeURIComponent(article.section||"news")+'?lang='+lang+'">'+escapeHtml((sections.find(section=>section[0]===(article.section||"news"))||[])[ar?1:2]||article.section||"news")+'</a></div>':"")+
         (article.status==="source_only"?'<div class="notice">'+t("يعرض بيان النص المتاح من المصدر مع الأدلة؛ لم تتوفر معلومات كافية لإعداد تحليل موسع موثوق.","BAYAN is showing the source text available with its evidence; there is not enough information for a reliable expanded analysis.")+'</div>':"")+
-        '<div class="article-body">'+String(article.body||article.summary||summary).split(String.fromCharCode(10)).map(line=>"<p>"+escapeHtml(line)+"</p>").join("")+'</div>'+
+        '<div class="article-body">'+renderArticleBody(article.body||article.summary||summary)+'</div>'+
         '<div class="sources-box"><h2>'+t("الأدلة والمصادر","Evidence & sources")+'</h2>'+
         (article.sources||[]).map(source=>'<div class="source-line">'+escapeHtml(source.publisher||"")+' · '+escapeHtml(source.title||"")+'</div>').join("")+
         '</div>'+socialActions({...article,title:article.title||title,summary:article.summary||summary,href:location.pathname+location.search,_key:"research:"+title})+'</article>';
