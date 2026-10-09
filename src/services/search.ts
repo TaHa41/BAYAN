@@ -178,8 +178,8 @@ const personLookup=(q:string)=>{
   const explicit=/(who is|who was|biography|profile|person|scientist|writer|author|politician|actor|athlete|من هو|من هي|سيرة|شخصية|عالم|عالمة|كاتب|مؤلف|ممثل|لاعب|رئيس)/i.test(raw);
   if(explicit)return true;
   if(words.length<2||words.length>4)return false;
-  if(/(weather|temperature|price|gold|dollar|currency|news|latest|today|history|science|technology|artificial intelligence|economy|politics|football|sports|طقس|حرارة|سعر|ذهب|دولار|عملة|أخبار|اليوم|تاريخ|علوم|تقنية|اقتصاد|سياسة|رياضة|ذكاء اصطناعي)/i.test(raw))return false;
-  return /[\u0600-\u06ff]/.test(raw) || words.every(w=>/^[A-Z][a-z]/.test(w));
+  if(/(weather|temperature|price|gold|dollar|currency|news|latest|today|history|science|technology|artificial intelligence|machine learning|climate change|renewable energy|economy|politics|football|sports|best|top|how|what|why|where|when|guide|definition|meaning|difference|compare|types|benefits|tutorial|examples|restaurant|restaurants|recipe|recipes|طقس|حرارة|سعر|ذهب|دولار|عملة|أخبار|اليوم|تاريخ|علوم|تقنية|اقتصاد|سياسة|رياضة|ذكاء اصطناعي|تعلم الآلة|تغير المناخ|أفضل|كيف|ماذا|لماذا|أين|دليل|معنى|أنواع|فوائد|مطاعم|وصفة)/i.test(raw))return false;
+  return /[\\u0600-\\u06ff]/.test(raw) || words.length>=2;
 };
 async function expandedSearch(env:Env,q:string,language:Locale,person=false):Promise<Candidate[]>{
   const variants=person
