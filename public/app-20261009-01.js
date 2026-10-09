@@ -797,9 +797,9 @@
   async function browserSearchFallback(query) {
     const wikiHost=ar?"ar.wikipedia.org":"en.wikipedia.org";
     const trimmed=String(query||"").trim();
-    const looksLikePerson=/[\\u0600-\\u06ff]/.test(trimmed)
-      ? trimmed.split(/\\s+/).filter(Boolean).length>=2 && !/(طقس|حرارة|سعر|ذهب|دولار|عملة|أخبار|اليوم|تاريخ|علوم|تقنية|اقتصاد|سياسة|رياضة|كيف|ماذا|لماذا|أفضل|دليل|معنى|مطاعم|وصفة)/.test(trimmed)
-      : /^(who is|who was|biography|profile)\\s+/i.test(trimmed);
+    const looksLikePerson=/[\u0600-\u06ff]/.test(trimmed)
+      ? trimmed.split(/\s+/).filter(Boolean).length>=2 && !/(طقس|حرارة|سعر|ذهب|دولار|عملة|أخبار|اليوم|تاريخ|علوم|تقنية|اقتصاد|سياسة|رياضة|كيف|ماذا|لماذا|أفضل|دليل|معنى|مطاعم|وصفة)/.test(trimmed)
+      : /^(who is|who was|biography|profile)\s+/i.test(trimmed);
     const variants=looksLikePerson
       ? [trimmed, trimmed+(ar?" سيرة":" biography"), trimmed+(ar?" إنجازات":" achievements"), trimmed+(ar?" آخر الأخبار":" latest news")]
       : [trimmed, trimmed+(ar?" شرح":" overview")];
@@ -809,11 +809,11 @@
       (async()=>{const url="https://www.wikidata.org/w/api.php?action=wbsearchentities&search="+encodeURIComponent(term)+"&language="+lang+"&limit=6&format=json&origin=*";const r=await fetch(url,{signal:AbortSignal.timeout(8500),headers:{accept:"application/json"}});if(!r.ok)throw new Error("wikidata");const d=await r.json();return(d.search||[]).map(x=>({title:String(x.label||""),summary:String(x.description||""),section:"people",kind:"web",evidence:"mixed",sources:[{publisher:t("ويكي بيانات","Wikidata"),title:String(x.label||""),url:"https://www.wikidata.org/wiki/"+x.id}],url:"https://www.wikidata.org/wiki/"+x.id}));})()
     ]);
     const settled=await Promise.allSettled(jobs),items=settled.flatMap(x=>x.status==="fulfilled"?x.value:[]);
-    const queryTerms=trimmed.toLowerCase().split(/\\s+/).filter(x=>x.length>=2);
-    const seen=new Set();return items.filter(x=>x.title&&(ar?/\\u0600-\\u06ff/.test(x.title):!/[\\u0600-\\u06ff]/.test(x.title))).filter(x=>{
+    const queryTerms=trimmed.toLowerCase().split(/\s+/).filter(x=>x.length>=2);
+    const seen=new Set();return items.filter(x=>x.title&&(ar?/\u0600-\u06ff/.test(x.title):!/[\u0600-\u06ff]/.test(x.title))).filter(x=>{
       const searchable=(String(x.title||"")+" "+String(x.summary||"")).toLowerCase();
       return !queryTerms.length||queryTerms.some(term=>searchable.includes(term));
-    }).filter(x=>!/(?:porn(?:ography)?|xxx\\b|hentai|onlyfans|sex\\s*video|explicit\\s+sex|nude\\s+leak|leaked\\s+nudes|child\\s+sexual\\s+abuse|child\\s+porn|csam|sexual\\s+exploitation|اباحي|إباحي|اباحية|إباحية|بورنو|بورن|هنتاي|صور\\s+عارية|فيديوهات?\\s+جنسية|مقاطع?\\s+جنسية|تسريب\\s+صور\\s+حميمية|استغلال\\s+جنسي\\s+للأطفال)/i.test(String(x.title||"")+" "+String(x.summary||""))).filter(x=>{const k=x.title.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;}).slice(0,12);
+    }).filter(x=>!/(?:porn(?:ography)?|xxx\b|hentai|onlyfans|sex\s*video|explicit\s+sex|nude\s+leak|leaked\s+nudes|child\s+sexual\s+abuse|child\s+porn|csam|sexual\s+exploitation|اباحي|إباحي|اباحية|إباحية|بورنو|بورن|هنتاي|صور\s+عارية|فيديوهات?\s+جنسية|مقاطع?\s+جنسية|تسريب\s+صور\s+حميمية|استغلال\s+جنسي\s+للأطفال)/i.test(String(x.title||"")+" "+String(x.summary||""))).filter(x=>{const k=x.title.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;}).slice(0,12);
   }
 
   async function renderTools() {
