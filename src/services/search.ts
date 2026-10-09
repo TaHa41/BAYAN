@@ -44,7 +44,7 @@ async function wikipedia(env:Env,q:string,language:Locale):Promise<Candidate[]>{
         sources:[source(x.title,language==="ar"?"Wikipedia Arabic":"Wikipedia","https://"+(language==="ar"?"ar":"en")+".wikipedia.org/wiki/"+encodeURIComponent(String(x.title).replace(/ /g,"_")))],
         url:"https://"+(language==="ar"?"ar":"en")+".wikipedia.org/wiki/"+encodeURIComponent(String(x.title).replace(/ /g,"_")),
         score:scoreSource("Wikipedia",x.title,query)+8,provider:"Wikipedia"
-      })).filter((x:any)=>x.title&&x.summary);
+      })).filter((x:any)=>x.title);
       if(results.length)return results;
     }catch{}
   }
