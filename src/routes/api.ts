@@ -28,7 +28,38 @@ const sourceArticleText=async(url:string,lang:"ar"|"en")=>{
     const relevant=paragraphs.filter(p=>lang==="ar"?/[\u0600-\u06ff]/.test(p):! /[\u0600-\u06ff]/.test(p));
     return relevant.slice(0,10).join("\n\n").slice(0,7000);
   }catch{return ""}
-};;export async function api(request:Request,env:Env){const u=new URL(request.url),lang=locale(request),ownerExcluded=(request.headers.get("cookie")||"").split(";").some(part=>part.trim()==="bayan_exclude_analytics=1"),vid=ownerExcluded?"owner-excluded":await visitorId(request);if(u.pathname==="/api/health")return json({ok:true,service:"BAYAN",version:"1.2.0",database:!!env.DB});if(u.pathname==="/api/features")return json({version:"1.2.0",evidenceFirst:true,locales:["ar","en"],capabilities:["search","news","live-data","ask-bayan","contribute","saved","admin","self-healing","rotating-wisdom","private-analytics","content-management"]});if(u.pathname==="/api/search"){const q=clean(u.searchParams.get("q")||"",500);if(!q)return json({error:"query_required"},400);let r:any;try{r=await search(env,q,lang)}catch{r={query:q,locale:lang,results:[],providers:[],providerAttempted:["BAYAN Knowledge Base","Wikipedia","Wikidata","GDELT","OpenAlex","Cloudflare AI Search","DuckDuckGo"],status:"insufficient",message:lang==="ar"?"لم تُرجع المسارات الأولى نتائج؛ يجري استخدام مسارات البحث الاحتياطية.":"Primary search paths returned no results; fallback search paths will be used."}}try{await track(env,vid,"search","/search",lang)}catch{}return json(r)}if(u.pathname==="/api/news/article"){
+};;const sectionForOpenedStory=(title:string,summary:string)=>{
+ const s=(title+" "+summary).toLowerCase();
+ if(/\b(football|soccer|match|league|championship|tournament|goal|player|coach|رياضة|مباراة|الدوري|بطولة|منتخب|لاعب|مدرب|هدف)\b/i.test(s))return "sports";
+ if(/\b(health|medical|medicine|hospital|disease|vaccine|doctor|صحة|طب|مستشفى|مرض|لقاح|طبيب|علاج)\b/i.test(s))return "health";
+ if(/\b(technology|artificial intelligence|software|cyber|chip|robot|تقنية|ذكاء اصطناعي|برمجيات|رقائق|روبوت|سيبراني)\b/i.test(s))return "technology";
+ if(/\b(economy|economic|market|stock|inflation|currency|bank|trade|اقتصاد|اقتصادي|سوق|أسهم|تضخم|عملة|بنك|تجارة|ذهب|دولار)\b/i.test(s))return "economy";
+ if(/\b(election|president|parliament|government|minister|policy|politics|انتخابات|رئيس|برلمان|حكومة|وزير|سياسة|قرار حكومي)\b/i.test(s))return "politics";
+ if(/\b(science|scientific|research|discovery|space|nasa|climate|environment|علم|بحث علمي|اكتشاف|فضاء|مناخ|بيئة)\b/i.test(s))return "science";
+ if(/\b(history|historical|heritage|archaeology|تاريخ|تاريخي|تراث|آثار|حضارة)\b/i.test(s))return "history";
+ if(/\b(film|movie|music|actor|actress|celebrity|artist|الفن|فيلم|سينما|موسيقى|ممثل|ممثلة|فنان|مشهور)\b/i.test(s))return "art";
+ if(/\b(travel|tourism|airport|flight|hotel|destination|سفر|سياحة|مطار|رحلة|فندق|وجهة)\b/i.test(s))return "travel";
+ if(/\b(people|biography|profile|born|career|من هو|من هي|سيرة|مسيرة|ولد|ولدت|شخصية)\b/i.test(s))return "people";
+ return "news";
+};
+const persistOpenedNewsArticle=async(env:Env,article:{title:string;summary:string;body:string;sources:Source[];image?:string|null;publishedAt?:string;status?:string},lang:Locale)=>{
+ try{
+  const title=String(article.title||"").trim().slice(0,300),summary=String(article.summary||"").trim().slice(0,500),bodyText=String(article.body||summary).trim();
+  if(title.length<4||summary.length<12||bodyText.length<12||!article.sources?.some(s=>/^https:\/\//i.test(String(s.url||""))))return null;
+  const hasArabic=(v:string)=>/[\u0600-\u06ff]/.test(v);
+  if(lang==="ar"?(!hasArabic(title)||!hasArabic(summary)||!hasArabic(bodyText)): (hasArabic(title)||hasArabic(summary)||hasArabic(bodyText)))return null;
+  const existing=await env.DB.prepare("SELECT slug FROM articles WHERE language=? AND status='PUBLISHED' AND title=? LIMIT 1").bind(lang,title).first<any>();
+  if(existing?.slug)return String(existing.slug);
+  const section=sectionForOpenedStory(title,summary);
+  const slugBase=title.toLowerCase().normalize("NFKC").replace(/[^a-z0-9\u0600-\u06ff]+/gi,"-").replace(/^-|-$/g,"").slice(0,85)||"bayan-news";
+  const slug=slugBase+"-"+Date.now().toString(36);
+  const stamp=String(article.publishedAt||new Date().toISOString());
+  await env.DB.prepare("INSERT INTO articles(slug,section,language,title,summary,body,sources_json,status,image_url,image_alt,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
+   .bind(slug,section,lang,title,summary,bodyText,JSON.stringify(article.sources.slice(0,12)),"PUBLISHED",article.image||null,title,stamp,new Date().toISOString()).run();
+  return slug;
+ }catch{return null}
+};
+export async function api(request:Request,env:Env){const u=new URL(request.url),lang=locale(request),ownerExcluded=(request.headers.get("cookie")||"").split(";").some(part=>part.trim()==="bayan_exclude_analytics=1"),vid=ownerExcluded?"owner-excluded":await visitorId(request);if(u.pathname==="/api/health")return json({ok:true,service:"BAYAN",version:"1.2.0",database:!!env.DB});if(u.pathname==="/api/features")return json({version:"1.2.0",evidenceFirst:true,locales:["ar","en"],capabilities:["search","news","live-data","ask-bayan","contribute","saved","admin","self-healing","rotating-wisdom","private-analytics","content-management"]});if(u.pathname==="/api/search"){const q=clean(u.searchParams.get("q")||"",500);if(!q)return json({error:"query_required"},400);let r:any;try{r=await search(env,q,lang)}catch{r={query:q,locale:lang,results:[],providers:[],providerAttempted:["BAYAN Knowledge Base","Wikipedia","Wikidata","GDELT","OpenAlex","Cloudflare AI Search","DuckDuckGo"],status:"insufficient",message:lang==="ar"?"لم تُرجع المسارات الأولى نتائج؛ يجري استخدام مسارات البحث الاحتياطية.":"Primary search paths returned no results; fallback search paths will be used."}}try{await track(env,vid,"search","/search",lang)}catch{}return json(r)}if(u.pathname==="/api/news/article"){
   if(request.method!=="GET")return json({error:"method_not_allowed"},405);
   const title=clean(u.searchParams.get("title")||"",500);let image=clean(u.searchParams.get("image")||"",2000);const summary=clean(u.searchParams.get("summary")||"",1500),storyUrl=clean(u.searchParams.get("url")||"",2000),publisher=clean(u.searchParams.get("publisher")||"",200),publishedAt=clean(u.searchParams.get("publishedAt")||"",100);
   if(!title)return json({error:"title_required"},400);
