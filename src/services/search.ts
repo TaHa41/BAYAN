@@ -197,8 +197,13 @@ const personLookup=(q:string)=>{
   const explicit=/(who is|who was|biography|profile|person|scientist|writer|author|politician|actor|athlete|من هو|من هي|سيرة|شخصية|عالم|عالمة|كاتب|مؤلف|ممثل|لاعب|رئيس)/i.test(raw);
   if(explicit)return true;
   if(words.length<2||words.length>4)return false;
-  if(/(weather|temperature|price|gold|dollar|currency|news|latest|today|history|science|technology|artificial intelligence|machine learning|climate change|renewable energy|economy|politics|football|sports|education|environment|energy|programming|cybersecurity|nutrition|agriculture|water resources|philosophy|mathematics|physics|chemistry|tourism|investment|taxes|law|international relations|best|top|how|what|why|where|when|guide|definition|meaning|difference|compare|types|benefits|tutorial|examples|restaurant|restaurants|recipe|recipes|طقس|حرارة|سعر|ذهب|دولار|عملة|أخبار|اليوم|تاريخ|علوم|تقنية|اقتصاد|سياسة|رياضة|ذكاء اصطناعي|تعلم الآلة|تغير المناخ|التغير المناخي|البيئة|الطاقة|التعليم|الاقتصاد|التاريخ|البرمجة|الأمن السيبراني|التغذية|الزراعة|المياه|الفلسفة|الرياضيات|الفيزياء|الكيمياء|السياحة|الاستثمار|الضرائب|القانون|التجارة|العلاقات الدولية|أفضل|كيف|ماذا|لماذا|أين|دليل|معنى|أنواع|فوائد|مطاعم|وصفة)/i.test(raw))return false;
-  return /[\u0600-\u06ff]/.test(raw) || words.length>=2;
+  // Topic phrases must not be mistaken for people merely because they contain
+  // two or more words. This is especially important for Arabic knowledge queries.
+  if(/(weather|temperature|price|gold|dollar|currency|news|latest|today|history|science|technology|artificial intelligence|machine learning|climate change|renewable energy|economy|politics|football|sports|education|environment|energy|programming|cybersecurity|nutrition|agriculture|water resources|philosophy|mathematics|physics|chemistry|tourism|investment|taxes|law|international relations|space|astronomy|discoveries|discovery|planets|stars|galaxies|nasa|space exploration|best|top|how|what|why|where|when|guide|definition|meaning|difference|compare|types|benefits|tutorial|examples|restaurant|restaurants|recipe|recipes|طقس|حرارة|سعر|ذهب|دولار|عملة|أخبار|اليوم|تاريخ|علوم|تقنية|اقتصاد|سياسة|رياضة|ذكاء اصطناعي|تعلم الآلة|تغير المناخ|التغير المناخي|البيئة|الطاقة|التعليم|الاقتصاد|التاريخ|البرمجة|الأمن السيبراني|التغذية|الزراعة|المياه|الفلسفة|الرياضيات|الفيزياء|الكيمياء|السياحة|الاستثمار|الضرائب|القانون|التجارة|العلاقات الدولية|الفضاء|اكتشافات|اكتشاف|فلك|كواكب|نجوم|مجرات|ناسا|أفضل|كيف|ماذا|لماذا|أين|دليل|معنى|أنواع|فوائد|مطاعم|وصفة)/i.test(raw))return false;
+  // Only infer a name-only English lookup from proper-name capitalization.
+  // Arabic names still use the normal multi-provider search unless the user
+  // explicitly asks "من هو/من هي", avoiding the restrictive person-only filter.
+  return /^[A-Z][a-z]+(?:[ '-]+[A-Z][a-z]+){1,3}$/.test(raw);
 };
 async function expandedSearch(env:Env,q:string,language:Locale,person=false):Promise<Candidate[]>{
   // Keep retries diverse but bounded: each variant fans out across independent providers.
