@@ -198,7 +198,7 @@ const personLookup=(q:string)=>{
   // biography/profile, or when an English proper name is detected below.
   // Role words such as "scientist", "عالم", and "رئيس" also occur in ordinary
   // topic searches and must not force the restrictive biography-only path.
-  const explicit=/^(?:who is|who was|biography(?: of)?|profile(?: of)?|tell me about|من هو|من هي|سيرة(?: ذاتية)?(?: عن)?|نبذة عن|معلومات عن)\s+/i.test(raw);
+  const explicit=/^(?:who is|who was|biography(?: of)?|profile(?: of)?|من هو|من هي|سيرة ذاتية عن|سيرة ذاتية لشخص)\s+/i.test(raw);
   if(explicit)return true;
   if(words.length<2||words.length>4)return false;
   // Topic phrases must not be mistaken for people merely because they contain
@@ -278,8 +278,11 @@ const localeSafeText=(value:string,language:Locale)=>{
   return sentences.every(part=>hasArabic(part)||!/[A-Za-z]{5,}/.test(part));
 };
 const languageSafe=(x:Candidate,language:Locale)=>{
-  const title=String(x.title||""),summary=String(x.summary||"");
-  return language==="ar" ? hasArabic(title) && localeSafeText(summary,language) : !hasArabic(title) && localeSafeText(summary,language);
+  // Use the title to select the requested language. A source may have a useful
+  // localized headline but an English abstract; keep the result and blank only
+  // the mismatched summary below rather than discarding the entire source.
+  const title=String(x.title||"");
+  return language==="ar" ? hasArabic(title) : !hasArabic(title);
 };export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean}={}):Promise<SearchResponse>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};const academicQuery=/(research|paper|papers|study|studies|journal|doi|scholar|academic|citation|crossref|openalex|pubmed|clinical trial|systematic review|بحث علمي|أبحاث|دراسة|دراسات|مجلة علمية|ورقة بحثية|مصدر أكاديمي|دراسات سريرية|مراجعة منهجية)/i.test(q);
@@ -307,6 +310,21 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   const seen=new Set<string>();
   const safeCandidates=candidates.filter(x=>(language==="ar"?hasArabic(x.title):!hasArabic(x.title))&&!disallowedContent(x.title+" "+x.summary));
   let ranked=safeCandidates.filter(x=>relevantCandidate(x,q)).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
+  // If strict matching rejected every result, recover candidates with a real
+  // query-term match in the headline or at least two matches in the snippet.
+  // This is a last-resort relevance tier, not unrelated padding: all candidates
+  // still need a real provider URL, the requested headline language, and safety checks.
+  if(!ranked.length){
+    const terms=searchTerms(q);
+    const normalize=(v:string)=>String(v||"").normalize("NFKC").toLowerCase().replace(/[\\u064B-\\u065F\\u0670]/g,"");
+    ranked=safeCandidates.filter(x=>{
+      if(!x.url||!/^https:\\/\\//i.test(String(x.url)))return false;
+      const title=normalize(x.title),summary=normalize(x.summary);
+      const titleHits=terms.filter(term=>title.includes(term)).length;
+      const totalHits=terms.filter(term=>(title+" "+summary).includes(term)).length;
+      return terms.length>0&&(titleHits>=1||totalHits>=2);
+    }).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
+  }
   // Never pad the result list with unrelated items: expand providers first, then report honestly if relevance is still weak.
   const results=ranked.filter(x=>{
     const k=x.title.toLowerCase().replace(/\W+/g," ")+"|"+x.summary.toLowerCase().slice(0,160);
