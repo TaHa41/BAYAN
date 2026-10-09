@@ -403,9 +403,9 @@
       '<div class="result-meta">' + escapeHtml((data.providers || []).join(" · ") || "BAYAN") + "</div>" +
       results.map((item) => {
         const key = item.slug || item.url || item.title;
-        const sectionMeta=sections.find(section=>section[0]===item.section); const sectionLabel=sectionMeta?(ar?sectionMeta[1]:sectionMeta[2]):t("نتيجة بحث","Search result"); return '<article class="search-result search-article-card"><span class="kicker">' + escapeHtml(sectionLabel) + " · " +
+        const sectionMeta=sections.find(section=>section[0]===item.section); const sectionLabel=sectionMeta?(ar?sectionMeta[1]:sectionMeta[2]):t("نتيجة بحث","Search result"); const sourceUrl=String(item.url||(item.sources||[])[0]?.url||""); const videoUrl=/^https:\/\/(www\.)?(youtube\.com|youtu\.be|vimeo\.com)\//i.test(sourceUrl); const videoId=(sourceUrl.match(/[?&]v=([A-Za-z0-9_-]{6,})/)||sourceUrl.match(/youtu\.be\/([A-Za-z0-9_-]{6,})/)||sourceUrl.match(/\/video\/([A-Za-z0-9_-]{6,})/))?.[1]; const cardImage=item.imageUrl||(videoId?"https://i.ytimg.com/vi/"+videoId+"/hqdefault.jpg":""); const destination=videoUrl?sourceUrl:(item.slug?("/article/"+encodeURIComponent(item.slug)+"?lang="+lang):("/research?title="+encodeURIComponent(item.title||query)+"&summary="+encodeURIComponent(item.summary||"")+"&url="+encodeURIComponent(sourceUrl)+"&publisher="+encodeURIComponent((item.sources||[])[0]?.publisher||"")+"&lang="+lang)); return '<article class="search-result search-article-card">' + imageHtml({...item,imageUrl:cardImage}) + '<span class="kicker">' + escapeHtml(videoUrl?t("فيديو — مصدر بحث","Video source"):sectionLabel) + " · " +
           escapeHtml(item.evidence || "mixed") + "</span><h2>" +
-          ('<a href="' + (item.slug ? ("/article/" + encodeURIComponent(item.slug) + "?lang=" + lang) : ("/research?title=" + encodeURIComponent(item.title || query) + "&summary=" + encodeURIComponent(item.summary || "") + "&url=" + encodeURIComponent(item.url || (item.sources || [])[0]?.url || "") + "&publisher=" + encodeURIComponent((item.sources || [])[0]?.publisher || "") + "&lang=" + lang)) + '">' + escapeHtml(item.title) + "</a>") +
+          ('<a href="' + destination + '"' + (videoUrl?' target="_blank" rel="noopener noreferrer"':"") + '>' + escapeHtml(item.title) + "</a>") +
           "</h2><p>" + escapeHtml(item.summary || "") + '</p><div class="source-line">' +
           (item.sources || []).slice(0, 3).map((source) => escapeHtml(source.publisher)).join(" · ") +
           '</div><a class="read" href="' + (item.slug ? ("/article/" + encodeURIComponent(item.slug) + "?lang=" + lang) : ("/research?title=" + encodeURIComponent(item.title || query) + "&summary=" + encodeURIComponent(item.summary || "") + "&url=" + encodeURIComponent(item.url || (item.sources || [])[0]?.url || "") + "&publisher=" + encodeURIComponent((item.sources || [])[0]?.publisher || "") + "&lang=" + lang)) + '" >' + t("اقرأ المقال داخل بيان","Read article inside BAYAN") + " →</a>" + socialActions({...item, _key:key}) + "</article>";
@@ -414,6 +414,7 @@
         '</h2><p>' + t("يمكنك تجربة صياغة أخرى؛ يوسّع بيان البحث عبر المصادر المتاحة دون اختلاق معلومات.","Try another phrasing; BAYAN searches available sources without fabricating information.") + "</p>" +
         '<button class="primary" id="search-retry">' + t("إعادة البحث","Search again") + "</button></div>";
     document.querySelector("#search-retry")?.addEventListener("click", () => renderSearch());
+    if(results.length)hydrateSectionImages(results);
   }
 
   async function renderResearchArticle() {
