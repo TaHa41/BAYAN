@@ -19,25 +19,32 @@ async function extraMarkets(){const quotes=await Promise.all([marketQuote("SI=F"
 export async function gold(env:Env){const providers=[["CoinGecko PAXG","https://api.coingecko.com/api/v3/simple/price?ids=pax-gold&vs_currencies=usd"],["Yahoo Finance","https://query1.finance.yahoo.com/v8/finance/chart/XAUUSD=X?range=1d&interval=1m"],["GoldPrice.dev","https://api.goldprice.dev/v1/prices?symbol=XAU-USD-SPOT"],["Gold API","https://api.gold-api.com/price/XAU"]];try{const [g,f,markets]=await Promise.all([Promise.any(providers.map(async([name,url])=>{const r=await timeout(url,5000);if(!r.ok)throw new Error(name);const d=await r.json<any>();let p=Number(d?.["pax-gold"]?.usd);if(!p)p=Number(d?.chart?.result?.[0]?.meta?.regularMarketPrice);if(!p)p=Number(d?.symbols?.[0]?.price??d?.price);if(!Number.isFinite(p)||p<=0)throw new Error(name+"_data");return{name,price:p}})),timeout("https://api.frankfurter.dev/v2/rates?base=USD&quotes=EGP",5000),extraMarkets()]);const fd=await f.json<any>();const egp=Number(fd.rates?.EGP);if(!egp)throw new Error("fx");return{ok:true,provider:g.name+" + Frankfurter",price:(g.price/31.1034768)*egp,unit:"EGP/g (24K reference)",usdPerOunce:g.price,fx:egp,markets,updatedAt:new Date().toISOString(),stale:false}}catch{try{const [r,markets]=await Promise.all([timeout("https://goldpriceo.com/egypt.html",5000),extraMarkets()]);if(!r.ok)throw new Error("goldpriceo");const h=await r.text();const m=h.match(/(?:عيار 24|24K)[^0-9]{0,120}([0-9][0-9,]*(?:\.[0-9]+)?)/i);const p=Number((m?.[1]||"").replace(/,/g,""));if(!p||p<1000||p>20000)throw new Error("goldpriceo_data");return{ok:true,provider:"GoldPriceO Egypt",price:p,unit:"EGP/g (24K reference)",markets,updatedAt:new Date().toISOString(),stale:false}}catch{return{ok:false,provider:"gold providers unavailable",stale:true,message:"Gold providers temporarily unavailable",markets:await extraMarkets()}}}}
 
 export async function prayerTimes(cityInput?:string,countryInput?:string){
-  const city=String(cityInput||"Hurghada").trim().slice(0,100)||"Hurghada";
-  const country=String(countryInput||"Egypt").trim().slice(0,100)||"Egypt";
+ const city=String(cityInput||"Hurghada").trim().slice(0,100)||"Hurghada",country=String(countryInput||"Egypt").trim().slice(0,100)||"Egypt";
+ try{
+  let data:any=null,displayCity=city,displayCountry=country;
   try{
-    const url="https://api.aladhan.com/v1/timingsByCity?city="+encodeURIComponent(city)+"&country="+encodeURIComponent(country)+"&method=5";
-    const r=await timeout(url,6000);if(!r.ok)throw new Error("prayer_provider");
-    const d=await r.json<any>();const data=d?.data;
-    if(d?.code!==200||!data?.timings||!data?.date?.hijri)throw new Error("prayer_payload");
-    const hijri=data.date.hijri;
-    let ramadan:any=null,eidFitr:any=null,eidAdha:any=null;
-    const hijriYear=Number(hijri.year),hijriMonth=Number(hijri.month?.number||0),hijriDay=Number(hijri.day||1),nextRamadanYear=hijriMonth>=9?hijriYear+1:hijriYear,nextEidYear=hijriMonth>=10?hijriYear+1:hijriYear,nextAdhaYear=hijriMonth===12&&hijriDay>10?hijriYear+1:hijriYear;
-    const convert=async(date:string)=>{try{const response=await timeout("https://api.aladhan.com/v1/hToG/"+date,3500);if(!response.ok)return null;const payload=await response.json<any>();return payload?.code===200?payload.data?.gregorian:null}catch{return null}};
-    const [rDate,fDate,aDate]=await Promise.all([
-      convert("01-09-"+nextRamadanYear),
-      convert("01-10-"+nextEidYear),
-      convert("10-12-"+nextAdhaYear)
-    ]);
-    if(rDate)ramadan={date:rDate.date,readable:rDate.date, hijriYear:nextRamadanYear,certainty:"calculated_estimate"};
-    if(fDate)eidFitr={date:fDate.date,readable:fDate.date,certainty:"calculated_estimate",prayerTime:null};
-    if(aDate)eidAdha={date:aDate.date,readable:aDate.date,certainty:"calculated_estimate",prayerTime:null};
-    return{ok:true,provider:"AlAdhan",city,country,timezone:data.meta?.timezone||"",gregorian:data.date?.gregorian,hijri:{day:hijri.day,month:hijri.month?.en,monthAr:hijri.month?.ar,year:hijri.year,designation:hijri.designation?.abbreviated},timings:{Fajr:data.timings.Fajr,Sunrise:data.timings.Sunrise,Dhuhr:data.timings.Dhuhr,Asr:data.timings.Asr,Maghrib:data.timings.Maghrib,Isha:data.timings.Isha},events:{ramadan,eidFitr,eidAdha},eidPrayerNotice:"Eid prayer time is announced locally by the relevant religious authority; no unverified time is shown.",updatedAt:new Date().toISOString(),stale:false};
-  }catch{return{ok:false,provider:"AlAdhan",city,country,stale:true,message:"Prayer times are temporarily unavailable"}}
+   const geo=await timeout("https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(city)+"&count=10&language=en&format=json",4500);
+   if(geo.ok){
+    const gd=await geo.json<any>(),rows=Array.isArray(gd.results)?gd.results:[],norm=(v:string)=>String(v||"").normalize("NFKD").toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g," ").trim(),target=norm(country);
+    const place=rows.find((x:any)=>norm(x.country)===target)||rows.find((x:any)=>norm(x.country_code)===target)||rows.find((x:any)=>norm(x.name)===norm(city))||rows[0];
+    if(place&&Number.isFinite(Number(place.latitude))&&Number.isFinite(Number(place.longitude))){
+     displayCity=String(place.name||city);displayCountry=String(place.country||country);
+     const r=await timeout("https://api.aladhan.com/v1/timings?latitude="+encodeURIComponent(String(place.latitude))+"&longitude="+encodeURIComponent(String(place.longitude))+"&method=5",6000);
+     if(r.ok){const payload=await r.json<any>();if(payload?.code===200&&payload?.data?.timings&&payload?.data?.date?.hijri)data=payload.data;}
+    }
+   }
+  }catch{}
+  if(!data){
+   const r=await timeout("https://api.aladhan.com/v1/timingsByCity?city="+encodeURIComponent(city)+"&country="+encodeURIComponent(country)+"&method=5",6000);if(!r.ok)throw new Error("prayer_provider");
+   const payload=await r.json<any>();if(payload?.code!==200||!payload?.data?.timings||!payload?.data?.date?.hijri)throw new Error("prayer_payload");data=payload.data;
+  }
+  const hijri=data.date.hijri;let ramadan:any=null,eidFitr:any=null,eidAdha:any=null;
+  const hy=Number(hijri.year),hm=Number(hijri.month?.number||0),hd=Number(hijri.day||1),ry=hm>=9?hy+1:hy,fy=hm>=10?hy+1:hy,ay=hm===12&&hd>10?hy+1:hy;
+  const convert=async(date:string)=>{try{const r=await timeout("https://api.aladhan.com/v1/hToG/"+date,3500);if(!r.ok)return null;const p=await r.json<any>();return p?.code===200?p.data?.gregorian:null}catch{return null}};
+  const [rd,fd,ad]=await Promise.all([convert("01-09-"+ry),convert("01-10-"+fy),convert("10-12-"+ay)]);
+  if(rd)ramadan={date:rd.date,readable:rd.date,hijriYear:ry,certainty:"calculated_estimate"};
+  if(fd)eidFitr={date:fd.date,readable:fd.date,certainty:"calculated_estimate",prayerTime:null};
+  if(ad)eidAdha={date:ad.date,readable:ad.date,certainty:"calculated_estimate",prayerTime:null};
+  return{ok:true,provider:"AlAdhan",city:displayCity,country:displayCountry,timezone:data.meta?.timezone||"",gregorian:data.date?.gregorian,hijri:{day:hijri.day,month:hijri.month?.en,monthAr:hijri.month?.ar,year:hijri.year,designation:hijri.designation?.abbreviated},timings:{Fajr:data.timings.Fajr,Sunrise:data.timings.Sunrise,Dhuhr:data.timings.Dhuhr,Asr:data.timings.Asr,Maghrib:data.timings.Maghrib,Isha:data.timings.Isha},events:{ramadan,eidFitr,eidAdha},eidPrayerNotice:"Eid prayer time is announced locally by the relevant religious authority; no unverified time is shown.",updatedAt:new Date().toISOString(),stale:false};
+ }catch{return{ok:false,provider:"AlAdhan",city,country,stale:true,message:"Prayer times are temporarily unavailable"}}
 }
