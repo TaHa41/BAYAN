@@ -99,7 +99,9 @@ const checks = [
   ["frontend cards reject unsafe image schemes and non-local injected href values", app.includes("const safeImageUrl = (value) =>") && app.includes("const safeInternalHref = (value, fallback) =>") && app.includes("escapeHtml(href)")],
   ["news article generation explicitly requests original long-form analysis grounded in evidence", read("src/routes/api.ts").includes("اكتب مقالًا معرفيًا تحليليًا أصليًا") && read("src/routes/api.ts").includes("Write a comprehensive original knowledge article")],
   ["news article endpoint rejects search results unrelated to the headline before drafting", read("src/routes/api.ts").includes("const newsArticleEvidenceRelevant=") && read("src/routes/api.ts").includes(".filter((candidate:any)=>newsArticleEvidenceRelevant(title,candidate))")],
-  ["site shell and production smoke agree on the cache-busted build marker", read("src/index.ts").includes('const BUILD="2026.10.09.43";') && read("scripts/production-smoke.mjs").includes("2026.10.09.43")],
+  ["browser fallback fans out to independent public search providers", app.includes("api.gdeltproject.org/api/v2/doc/doc") && app.includes("api.duckduckgo.com/?q=") && app.includes("Promise.allSettled(jobs)")],
+  ["empty external fallback preserves server diagnostics instead of silently replacing them", app.includes("const serverData = data || {}") && app.includes("External search providers did not return accessible results")],
+  ["site shell and production smoke agree on the cache-busted build marker", read("src/index.ts").includes('const BUILD="2026.10.09.44";') && read("scripts/production-smoke.mjs").includes("2026.10.09.44")],
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
