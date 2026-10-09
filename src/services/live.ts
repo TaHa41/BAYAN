@@ -23,7 +23,8 @@ export async function prayerTimes(cityInput?:string,countryInput?:string){
  try{
   let data:any=null,displayCity=city,displayCountry=country;
   try{
-   const geo=await timeout("https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(city)+"&count=10&language=en&format=json",4500);
+   const geoLanguage=/[\u0600-\u06ff]/.test(city+" "+country)?"ar":"en";
+   const geo=await timeout("https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(city)+"&count=10&language="+geoLanguage+"&format=json",4500);
    if(geo.ok){
     const gd=await geo.json<any>(),rows=Array.isArray(gd.results)?gd.results:[],norm=(v:string)=>String(v||"").normalize("NFKD").toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g," ").trim(),target=norm(country);
     const place=rows.find((x:any)=>norm(x.country)===target)||rows.find((x:any)=>norm(x.country_code)===target)||rows.find((x:any)=>norm(x.name)===norm(city))||rows[0];
