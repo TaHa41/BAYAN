@@ -75,24 +75,45 @@ const sourceArticleText=async(url:string,lang:"ar"|"en")=>{
  if(/people|biography|profile|born|career|من هو|من هي|سيرة|مسيرة|ولد|ولدت|شخصية/i.test(s))return "people";
  return "world";
 };
+const articleTitleKey=(value:string)=>String(value||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").trim();
+const articleTitleWords=(value:string)=>new Set(articleTitleKey(value).split(/\s+/).filter(word=>word.length>2));
+const sameArticleTitle=(a:string,b:string)=>{
+ const left=articleTitleWords(a),right=articleTitleWords(b),common=[...left].filter(word=>right.has(word)).length;
+ return articleTitleKey(a)===articleTitleKey(b)||(Math.min(left.size,right.size)>=3&&common/Math.max(1,Math.min(left.size,right.size))>=0.82);
+};
 const persistOpenedNewsArticle=async(env:Env,article:{title:string;summary:string;body:string;sources:Source[];image?:string|null;publishedAt?:string;status?:string},lang:Locale)=>{
  try{
-  const title=String(article.title||"").trim().slice(0,300),summary=String(article.summary||article.body||article.title||"").trim().slice(0,500),bodyText=String(article.body||"").trim();
-  // Never publish a short source snippet or a fallback headline as a complete article.
-  if(article.status==="source_only"||title.length<4||summary.length<12||bodyText.length<1800||!article.sources?.some(s=>/^https:\/\//i.test(String(s.url||""))))return null;
-  const hasArabic=(v:string)=>/[\u0600-\u06ff]/.test(v);
-  if(lang==="ar"?(!hasArabic(title)||!hasArabic(summary)||!hasArabic(bodyText)): (hasArabic(title)||hasArabic(summary)||hasArabic(bodyText)))return null;
-  const existing=await env.DB.prepare("SELECT slug FROM articles WHERE language=? AND status='PUBLISHED' AND title=? LIMIT 1").bind(lang,title).first<any>();
-  if(existing?.slug)return String(existing.slug);
+  const title=String(article.title||"").trim().slice(0,300),summary=String(article.summary||"").trim().slice(0,500),quality=articleBodyQuality(String(article.body||"")),bodyText=quality.body;
+  if(article.status==="source_only"||title.length<8||summary.length<40||!quality.ok||!articleLocaleSafe(title+" "+summary+" "+bodyText,lang))return null;
+  const hosts=new Set((article.sources||[]).flatMap(source=>{try{const url=new URL(String(source.url||""));return url.protocol==="https:"?[url.hostname.toLowerCase().replace(/^www\./,"")]:[]}catch{return []}}));
+  if(hosts.size<2)return null;
+  let image=String(article.image||"").trim();
+  if(!/^https:\/\//i.test(image))image=String(await bounded(findRelatedImage(title+" "+summary,article.sources?.[0]?.url),4500).catch(()=> "")||"").trim();
+  if(!/^https:\/\//i.test(image))image=String(await bounded(findRelatedImage(title),4500).catch(()=> "")||"").trim();
+  if(!/^https:\/\//i.test(image))return null;
+  const rows=await env.DB.prepare("SELECT slug,title,summary,body,section,sources_json,image_url FROM articles WHERE language=? AND status='PUBLISHED' ORDER BY updated_at DESC LIMIT 600").bind(lang).all<any>();
+  const existing=(rows.results||[]).find(row=>sameArticleTitle(String(row.title||""),title));
+  const stamp=String(article.publishedAt||new Date().toISOString()),updatedAt=new Date().toISOString();
+  if(existing?.slug){
+   const priorBody=String(existing.body||""),priorWords=articleTitleWords(priorBody),incomingWords=articleTitleWords(bodyText),novel=[...incomingWords].filter(word=>!priorWords.has(word));
+   const priorQuality=articleBodyQuality(priorBody).ok,shouldUpdate=!priorQuality||(novel.length>=18&&bodyText.length>=Math.max(1800,priorBody.length*0.85));
+   const sourcesMap=new Map<string,Source>();
+   for(const source of [...(JSON.parse(String(existing.sources_json||"[]")) as Source[]),...(article.sources||[])]){try{const url=new URL(String(source.url||""));if(url.protocol==="https:")sourcesMap.set(url.toString(),source)}catch{}}
+   if(shouldUpdate){
+    await env.DB.prepare("UPDATE articles SET summary=?,body=?,sources_json=?,image_url=CASE WHEN image_url IS NULL OR trim(image_url)='' THEN ? ELSE image_url END,image_alt=CASE WHEN image_url IS NULL OR trim(image_url)='' THEN ? ELSE image_alt END,updated_at=? WHERE slug=? AND language=? AND status='PUBLISHED'").bind(summary,bodyText,JSON.stringify([...sourcesMap.values()].slice(0,16)),image,title,updatedAt,String(existing.slug),lang).run();
+   }else if(!String(existing.image_url||"").trim()){
+    await env.DB.prepare("UPDATE articles SET image_url=?,image_alt=?,updated_at=? WHERE slug=? AND language=? AND status='PUBLISHED'").bind(image,title,updatedAt,String(existing.slug),lang).run();
+   }
+   return String(existing.slug);
+  }
   const section=sectionForOpenedStory(title,summary);
-  const slugBase=title.toLowerCase().normalize("NFKC").replace(/[^a-z0-9\u0600-\u06ff]+/gi,"-").replace(/^-|-$/g,"").slice(0,85)||"bayan-news";
+  const slugBase=title.toLowerCase().normalize("NFKC").replace(/[^a-z0-9\u0600-\u06ff]+/gi,"-").replace(/^-|-$/g,"").slice(0,85)||"bayan-article";
   const slug=slugBase+"-"+Date.now().toString(36);
-  const stamp=String(article.publishedAt||new Date().toISOString());
   await env.DB.prepare("INSERT INTO articles(slug,section,language,title,summary,body,sources_json,status,image_url,image_alt,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")
-   .bind(slug,section,lang,title,summary,bodyText,JSON.stringify(article.sources.slice(0,12)),"PUBLISHED",article.image||null,title,stamp,new Date().toISOString()).run();
+   .bind(slug,section,lang,title,summary,bodyText,JSON.stringify(article.sources.slice(0,12)),"PUBLISHED",image,title,stamp,updatedAt).run();
   return slug;
  }catch{return null}
-};
+}
 export async function api(request:Request,env:Env){const u=new URL(request.url),lang=locale(request),ownerExcluded=(request.headers.get("cookie")||"").split(";").some(part=>part.trim()==="bayan_exclude_analytics=1"),vid=ownerExcluded?"owner-excluded":await visitorId(request);if(u.pathname==="/api/health")return json({ok:true,service:"BAYAN",version:"1.2.0",database:!!env.DB});if(u.pathname==="/api/features")return json({version:"1.2.0",evidenceFirst:true,locales:["ar","en"],capabilities:["search","news","live-data","ask-bayan","contribute","saved","admin","self-healing","rotating-wisdom","private-analytics","content-management"]});if(u.pathname==="/api/search"){const q=clean(u.searchParams.get("q")||"",500);if(!q)return json({error:"query_required"},400);let r:any;try{r=await search(env,q,lang)}catch{r={query:q,locale:lang,results:[],providers:[],providerAttempted:["BAYAN Knowledge Base","Wikipedia","Wikidata","GDELT","OpenAlex","Cloudflare AI Search","DuckDuckGo"],status:"insufficient",message:lang==="ar"?"لم تُرجع المسارات الأولى نتائج؛ يجري استخدام مسارات البحث الاحتياطية.":"Primary search paths returned no results; fallback search paths will be used."}}try{await track(env,vid,"search","/search",lang)}catch{}return json(r)}if(u.pathname==="/api/news/article"){
   if(request.method!=="GET")return json({error:"method_not_allowed"},405);
   const title=clean(u.searchParams.get("title")||"",500);let image=clean(u.searchParams.get("image")||"",2000);const summary=clean(u.searchParams.get("summary")||"",1500),storyUrl=clean(u.searchParams.get("url")||"",2000),publisher=clean(u.searchParams.get("publisher")||"",200),publishedAt=clean(u.searchParams.get("publishedAt")||"",100);
