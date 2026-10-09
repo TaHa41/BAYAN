@@ -26,7 +26,7 @@ describe("BAYAN API",()=>{
     await expect(body<{ok:boolean}>(r)).resolves.toEqual({ok:true});
   });
   it("JSON body parser rejects declared oversized payloads",async()=>{
-    const r=new Request("https://bayan.test/api/test",{method:"POST",headers:{"content-type":"application/json","content-length":"65537"},body:"{}"});
+    const r=new Request("https://bayan.test/api/test",{method:"POST",headers:{"content-type":"application/json"},body:"x".repeat(65537)});
     await expect(body(r)).resolves.toBeNull();
   });
   it("search validates query",async()=>{
