@@ -46,7 +46,7 @@ export async function publishVerifiedResearch(env:Env,input:{title:string;summar
   const nextSummary=materiallyNew||repairWeakArticle?input.summary.slice(0,500):String(existing.summary||input.summary).slice(0,500);
   const nextTitle=materiallyNew||repairWeakArticle?input.title:String(existing.title||input.title);
   const nextSection=materiallyNew||repairWeakArticle?input.section:String(existing.section||input.section);
-  await env.DB.prepare("UPDATE articles SET title=?,summary=?,body=?,section=?,sources_json=?,image_url=?,image_alt=?,updated_at=? WHERE slug=? AND language=? AND status='PUBLISHED'").bind(nextTitle,nextSummary,nextBody,nextSection,JSON.stringify(mergedSources),String(existing.image_url||"").trim()?String(existing.image_url):input.imageUrl,input.imageAlt||String(existing.image_alt||nextTitle),t,String(existing.slug),input.language).run();
+  await env.DB.prepare("UPDATE articles SET title=?,summary=?,body=?,section=?,sources_json=?,image_url=?,image_alt=?,updated_at=? WHERE slug=? AND language=? AND status='PUBLISHED'").bind(nextTitle,nextSummary,nextBody,nextSection,JSON.stringify(mergedSources),/^https:\/\//i.test(String(existing.image_url||"").trim())?String(existing.image_url):input.imageUrl,input.imageAlt||String(existing.image_alt||nextTitle),t,String(existing.slug),input.language).run();
   return String(existing.slug);
  }
  const base=input.title.toLowerCase().normalize("NFKC").replace(/[^a-z0-9\u0600-\u06ff]+/gi,"-").replace(/^-|-$/g,"").slice(0,90)||"bayan-research";
