@@ -7,8 +7,13 @@ import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 type Candidate = SearchResult & {score:number; provider:string};
 const timeout = async (url:string, ms=2600) => {
   const c=new AbortController(); const t=setTimeout(()=>c.abort(),ms);
-  try { return await fetch(url,{signal:c.signal,headers:{accept:"application/json,text/plain,*/*"}}); }
-  finally { clearTimeout(t); }
+  try {
+    return await fetch(url,{signal:c.signal,headers:{
+      accept:"application/json,text/plain,*/*",
+      "user-agent":"BAYAN/1.2 (+https://bayan.tahaomar411.workers.dev; contact: bayan.contact@yahoo.com)",
+      "api-user-agent":"BAYAN/1.2 (https://bayan.tahaomar411.workers.dev)"
+    }});
+  } finally { clearTimeout(t); }
 };
 const cleanText=(s:string)=>String(s||"").replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim();
 const scoreSource=(publisher:string, title:string, q:string) => {
@@ -49,6 +54,26 @@ async function wikipedia(env:Env,q:string,language:Locale):Promise<Candidate[]>{
     }catch{}
   }
   return[];
+}
+async function wikipediaRestSearch(q:string,language:Locale):Promise<Candidate[]>{
+  // Independent Wikimedia REST search fallback: the Action API may be throttled
+  // or unavailable from a particular edge location even when the REST endpoint works.
+  try{
+    const code=language==="ar"?"ar":"en";
+    const url="https://api.wikimedia.org/core/v1/wikipedia/"+code+"/search/page?q="+encodeURIComponent(q)+"&limit=8";
+    const r=await timeout(url,3500);
+    if(!r.ok)return[];
+    const data=await r.json<any>();
+    return (Array.isArray(data.pages)?data.pages:[]).map((x:any)=>{
+      const title=cleanText(x.title||x.key||"");
+      const summary=cleanText(x.description||x.excerpt||"").slice(0,1600);
+      const key=String(x.key||title).replace(/ /g,"_");
+      const url="https://"+code+".wikipedia.org/wiki/"+encodeURIComponent(key);
+      return {title,summary,section:"world",kind:"web" as const,evidence:"mixed" as const,
+        sources:[source(title,language==="ar"?"Wikipedia Arabic":"Wikipedia",url)],
+        url,score:scoreSource("Wikipedia",title,q)+8,provider:"Wikipedia REST Search"};
+    }).filter((x:any)=>x.title&&x.url);
+  }catch{return[]}
 }
 async function wikidata(q:string,language:Locale):Promise<Candidate[]>{
   try{
@@ -227,6 +252,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false):Pro
   const batches=await Promise.all(variants.map(async variant=>{
     const results=await Promise.all([
       wikipedia(env,variant,language).catch(()=>[]),
+      wikipediaRestSearch(variant,language).catch(()=>[]),
       wikidata(variant,language).catch(()=>[]),
       gdelt(variant).catch(()=>[]),
       googleNewsSearch(variant,language).catch(()=>[]),
@@ -297,9 +323,9 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};const academicQuery=/(research|paper|papers|study|studies|journal|doi|scholar|academic|citation|crossref|openalex|pubmed|clinical trial|systematic review|بحث علمي|أبحاث|دراسة|دراسات|مجلة علمية|ورقة بحثية|مصدر أكاديمي|دراسات سريرية|مراجعة منهجية)/i.test(q);
 const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|medicine|health study|بحث طبي|دراسة طبية|دراسات سريرية|تجربة سريرية|مراجعة منهجية)/i.test(q);
-let [local, wiki, wd, gd, oa, remote, dd, duckWeb, google, bing, crossref, pubmed] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[]),safe(duckWebSearch(q,language),[]),safe(googleNewsSearch(q,language),[]),safe(bingNewsSearch(q,language),[]),safe((academicQuery&&!personLookup(q))?crossrefSearch(q):Promise.resolve([]),[]),safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language),[])]);
-const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...(s.source_gdelt==="0"?[]:["GDELT"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers","DuckDuckGo Web Search","Google News Search","Bing News RSS"];const candidates:Candidate[]=[
-    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...duckWeb,...google,...bing
+let [local, wiki, wikiRest, wd, gd, oa, remote, dd, duckWeb, google, bing, crossref, pubmed] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipediaRestSearch(q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[]),safe(duckWebSearch(q,language),[]),safe(googleNewsSearch(q,language),[]),safe(bingNewsSearch(q,language),[]),safe((academicQuery&&!personLookup(q))?crossrefSearch(q):Promise.resolve([]),[]),safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language),[])]);
+const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...(s.source_gdelt==="0"?[]:["GDELT"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers","DuckDuckGo Web Search","Google News Search","Bing News RSS"];const candidates:Candidate[]=[
+    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wikiRest,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...duckWeb,...google,...bing
   ];
   // Optional authenticated Enterprise enrichment: exact-title article lookups only.
   // Public Wikipedia remains the discovery mechanism; Enterprise is supplemental.
@@ -317,7 +343,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   // enough relevant evidence to produce a useful answer rather than a thin snippet.
   const expansionThreshold=personQuery?Math.min(6,Math.max(3,Number(s.min_sources||3))):Math.max(3,Number(s.min_sources||3));
   if(firstPassCount()<expansionThreshold){
-    providerAttempted.push("Expanded topic variants: Wikipedia, Wikidata, GDELT, DuckDuckGo Web Search, Google News Search, Bing News RSS","OpenAI Web Search (fallback)");
+    providerAttempted.push("Expanded topic variants: Wikipedia, Wikipedia REST Search, Wikidata, GDELT, DuckDuckGo Web Search, Google News Search, Bing News RSS","OpenAI Web Search (fallback)");
     const [expanded,web]=await Promise.all([
       safe(expandedSearch(env,q,language,personQuery),[]),
       safe(openAiWebSearch(env,q,language),[])
