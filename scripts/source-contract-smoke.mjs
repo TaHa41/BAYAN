@@ -92,6 +92,7 @@ const checks = [
   ["HTML pages, static assets, and API failure responses receive browser security headers", read("src/index.ts").includes('headers.set("X-Content-Type-Options","nosniff")') && read("src/index.ts").includes('"x-frame-options":"DENY"') && read("src/index.ts").includes('"permissions-policy":"camera=(), microphone=(), geolocation=()"')],
   ["frontend cards reject unsafe image schemes and non-local injected href values", app.includes("const safeImageUrl = (value) =>") && app.includes("const safeInternalHref = (value, fallback) =>") && app.includes("escapeHtml(href)")],
   ["news article generation explicitly requests original long-form analysis grounded in evidence", read("src/routes/api.ts").includes("اكتب مقالًا معرفيًا تحليليًا أصليًا") && read("src/routes/api.ts").includes("Write an original, detailed, evidence-based knowledge article")],
+  ["news article endpoint rejects search results unrelated to the headline before drafting", read("src/routes/api.ts").includes("const newsArticleEvidenceRelevant=") && read("src/routes/api.ts").includes(".filter((candidate:any)=>newsArticleEvidenceRelevant(title,candidate))")],
   ["site shell and production smoke agree on the cache-busted build marker", read("src/index.ts").includes('const BUILD="2026.10.09.42";') && read("scripts/production-smoke.mjs").includes("2026.10.09.42")],
 ];
 let failed = 0;
