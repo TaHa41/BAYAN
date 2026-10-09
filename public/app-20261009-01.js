@@ -419,7 +419,7 @@
       if(!data.ok||!article.title)throw new Error("article_unavailable");
       output.innerHTML='<article class="article-full">'+(article.image?heroImageHtml(article.image,article.title):"")+
         '<span class="eyebrow">'+escapeHtml(article.sources?.[0]?.publisher||publisher||t("بحث موثق","Evidence search"))+'</span><h1>'+escapeHtml(article.title)+'</h1>'+
-        '<p class="lead">'+escapeHtml(article.summary||summary)+'</p>'+
+        '<p class="lead">'+escapeHtml(article.summary||summary)+'</p>'+(article.savedSlug?'<div class="notice">'+t("تمت إضافة المقال تلقائيًا إلى قسم","Automatically added to section")+' <a href="/'+encodeURIComponent(article.section||"news")+'?lang='+lang+'">'+escapeHtml((sections.find(section=>section[0]===(article.section||"news"))||[])[ar?1:2]||article.section||"news")+'</a></div>':"")+
         (article.status==="source_only"?'<div class="notice">'+t("يعرض بيان النص المتاح من المصدر مع الأدلة؛ لم تتوفر معلومات كافية لإعداد تحليل موسع موثوق.","BAYAN is showing the source text available with its evidence; there is not enough information for a reliable expanded analysis.")+'</div>':"")+
         '<div class="article-body">'+String(article.body||article.summary||summary).split(String.fromCharCode(10)).map(line=>"<p>"+escapeHtml(line)+"</p>").join("")+'</div>'+
         '<div class="sources-box"><h2>'+t("الأدلة والمصادر","Evidence & sources")+'</h2>'+
@@ -498,7 +498,7 @@
             '<article class="article-full">' + (article.image ? heroImageHtml(article.image, article.title) : "") +
             '<span class="eyebrow">' + escapeHtml(story.publisher || t("الأخبار","News")) + "</span><h1>" +
             escapeHtml(article.title) + '</h1><p class="lead">' + escapeHtml(article.summary || story.summary || "") +
-            '</p>' + (article.status === "source_only" ? '<div class="notice">' + t("هذا ملخص المصدر المتاح؛ لم تتوفر أدلة كافية لإعداد عرض تحليلي كامل بعد.","This is the available source summary; there is not enough evidence to prepare a full analysis yet.") + '</div>' : "") +
+            '</p>' + (article.savedSlug ? '<div class="notice">' + t("تمت إضافة المقال تلقائيًا إلى قسم", "Automatically added to section") + ' <a href="/' + encodeURIComponent(article.section || "news") + '?lang=' + lang + '">' + escapeHtml((sections.find(section => section[0] === (article.section || "news")) || [])[ar ? 1 : 2] || article.section || "news") + '</a></div>' : "") + (article.status === "source_only" ? '<div class="notice">' + t("هذا ملخص المصدر المتاح؛ لم تتوفر أدلة كافية لإعداد عرض تحليلي كامل بعد.","This is the available source summary; there is not enough evidence to prepare a full analysis yet.") + '</div>' : "") +
             '<div class="article-body">' + String(article.body || "").split(String.fromCharCode(10)).map((line) =>
             "<p>" + escapeHtml(line) + "</p>").join("") +
             '</div><div class="sources-box"><h2>' + t("الأدلة والمصادر","Evidence & sources") + "</h2>" +
