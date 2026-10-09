@@ -179,7 +179,7 @@ const personLookup=(q:string)=>{
   if(explicit)return true;
   if(words.length<2||words.length>4)return false;
   if(/(weather|temperature|price|gold|dollar|currency|news|latest|today|history|science|technology|artificial intelligence|machine learning|climate change|renewable energy|economy|politics|football|sports|best|top|how|what|why|where|when|guide|definition|meaning|difference|compare|types|benefits|tutorial|examples|restaurant|restaurants|recipe|recipes|طقس|حرارة|سعر|ذهب|دولار|عملة|أخبار|اليوم|تاريخ|علوم|تقنية|اقتصاد|سياسة|رياضة|ذكاء اصطناعي|تعلم الآلة|تغير المناخ|أفضل|كيف|ماذا|لماذا|أين|دليل|معنى|أنواع|فوائد|مطاعم|وصفة)/i.test(raw))return false;
-  return /[\\u0600-\\u06ff]/.test(raw) || words.length>=2;
+  return /[\u0600-\u06ff]/.test(raw) || words.length>=2;
 };
 async function expandedSearch(env:Env,q:string,language:Locale,person=false):Promise<Candidate[]>{
   const variants=person
