@@ -41,7 +41,7 @@ const checks = [
   ["RSS and Atom feeds are both parsed", news.includes('matchAll(/<(item|entry)\\b')],
   ["search headlines match the requested locale and mismatched summaries are safely blanked", search.includes("Use the title to select the requested language") && search.includes('return language==="ar" ? hasArabic(title) : !hasArabic(title)') && search.includes('summary:localeSafeText(x.summary,language)?x.summary:""')],
   ["AI rejects English-only sentences in Arabic answers", ai.includes("const languageConsistent") && ai.includes("sentences.every")],
-  ["short news drafts are not marked as complete analysis", api.includes("articleBodyQuality(String(generated.answer||") && api.includes('status:hasFullAnalysis?generated.status:"source_only"')],
+  ["short news drafts are not marked as complete analysis", api.includes("const articleBodyQuality=") && api.includes("hasFullAnalysis=quality.ok&&generated.status") && api.includes('status:hasFullAnalysis?generated.status:"source_only"')],
   ["admin exposes content quality metrics", read("src/db.ts").includes("length(trim(body))<1800") && app.includes("analytics.contentQuality?.short_bodies")],
   ["top searches are isolated by language", read("src/db.ts").includes("FROM searches WHERE language=?") && api.includes("analyticsStats(env,lang)")],
   ["self-healing rechecks news and image health after repairs before reporting success", repair.includes('["news_cache",async()=>await newsCacheHealthy(env)]') && repair.includes('["images",async()=>await imageHealth(env)]') && repair.includes("for(const [name,check] of checks)") && repair.includes("verification=remainingFailures.length===0")],
