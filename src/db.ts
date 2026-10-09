@@ -74,9 +74,8 @@ export async function addContribution(env:Env,title:string,body:string,source:st
   if(summary.length<40)throw new Error("contribution_summary_missing");
   const image=await findRelatedImage(title,sources[0]?.url);
   if(!image||!/^https:\/\//i.test(image))throw new Error("contribution_image_unavailable");
-  const slug=title.toLowerCase().normalize("NFKC").replace(/[^a-z0-9\u0600-\u06ff]+/gi,"-").replace(/^-|-$/g,"").slice(0,100)+"-"+id;
-  const t=now();
-  await env.DB.prepare("INSERT INTO articles(slug,section,language,title,summary,body,sources_json,status,image_url,image_alt,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)").bind(slug,String(c.section||"world"),language,title,summary,body,JSON.stringify(sources),"PUBLISHED",image,title,t,t).run();
+  const published=await publishVerifiedResearch(env,{title,summary,body,section:String(c.section||"world"),language,sources,imageUrl:image,imageAlt:title});
+  if(!published)throw new Error("contribution_article_not_publishable");
  }
  await env.DB.prepare("UPDATE contributions SET status=?,reviewer_note=?,reviewed_at=? WHERE id=?").bind(action==="APPROVE"?"APPROVED":"REJECTED",note||null,now(),id).run();
 }export async function track(env:Env,visitor:string,event:string,path:string,language:Locale){if(visitor==="owner-excluded")return;try{await env.DB.prepare("INSERT INTO analytics(visitor_hash,event,path,language,created_at) VALUES(?,?,?,?,?)").bind(visitor,event,path,language,now()).run()}catch{}}
