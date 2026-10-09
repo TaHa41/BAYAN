@@ -681,7 +681,7 @@
       const markets = Array.isArray(gold.markets) ? gold.markets : [];
       const extras = document.querySelector("#marketExtras");
       extras.innerHTML = markets.length ? markets.map(item =>
-        '<article class="live live-card market-card"><span class="kicker">'+escapeHtml(ar ? (item.ar||item.symbol) : (item.en||item.symbol))+'</span><h2>'+escapeHtml(item.price == null ? "—" : Number(item.price).toLocaleString(ar ? "ar-EG-u-nu-latn" : "en-US",{maximumFractionDigits:4}))+'</h2><p>'+escapeHtml(item.unit||item.currency||"")+'</p><span class="source-line">'+escapeHtml(item.provider||"Market provider")+' · '+escapeHtml(item.symbol||"")+'<br>'+escapeHtml(t("آخر تحديث: ","Updated: ")+formatUpdate(item.updatedAt))+(item.stale?' · '+escapeHtml(freshness(true)):'')+'</span></article>'
+        '<article class="live live-card market-card"><span class="kicker">'+escapeHtml(ar ? (item.ar||item.symbol) : (item.en||item.symbol))+'</span><h2>'+escapeHtml(item.price == null ? "—" : Number(item.price).toLocaleString(ar ? "ar-EG-u-nu-latn" : "en-US",{maximumFractionDigits:4}))+'</h2><p>'+escapeHtml(ar ? (item.unitAr||item.unit||item.currency||"") : (item.unitEn||item.unit||item.currency||""))+'</p><span class="source-line">'+escapeHtml(item.provider||"Market provider")+' · '+escapeHtml(item.symbol||"")+'<br>'+escapeHtml(t("آخر تحديث: ","Updated: ")+formatUpdate(item.updatedAt))+(item.stale?' · '+escapeHtml(freshness(true)):'')+'</span></article>'
       ).join("") : '<div class="notice">'+t("لم تتوفر أسعار الأسواق الإضافية من المزودات في الوقت الحالي.","Additional market quotes are currently unavailable from providers.")+'</div>';
     } catch {
       document.querySelector(".live-grid").innerHTML =

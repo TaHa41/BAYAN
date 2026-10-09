@@ -70,6 +70,7 @@ const checks = [
   ["removed Resend integration and obsolete daily-wisdom labels stay absent", !api.includes("Resend") && !app.includes("Daily wisdom") && !app.includes("الحكمة اليومية")],
   ["the prominent taxonomy keeps community and debate labels instead of the removed geographic category labels", read("src/sections.ts").includes('ar:"حياة ومجتمعات"') && read("src/sections.ts").includes('ar:"أفكار ونقاشات"') && read("src/sections.ts").includes('ar:"تحولات كبرى"') && !read("src/sections.ts").includes('ar:"مصر"') && !read("src/sections.ts").includes('ar:"العالم العربي"')],
   ["currency names are fully localized instead of mixing Arabic and English labels", app.includes("const currencyNames = ar ?") && !app.includes("الجنيه المصري / Egyptian pound") && app.includes('Egyptian pound') && app.includes('الجنيه المصري')],
+  ["market measurement units are localized with the selected page language", app.includes("item.unitAr||item.unit") && app.includes("item.unitEn||item.unit") && read("src/services/live.ts").includes("unitAr:\"دولار أمريكي / برميل\"")],
   ["production smoke checks the loaded price bundle rather than expecting client-rendered markup in the HTML shell", read("scripts/production-smoke.mjs").includes("bundleText.includes") && read("scripts/production-smoke.mjs").includes("pricesRefresh") && read("scripts/production-smoke.mjs").includes("2026.10.09.38")],
 ];
 let failed = 0;
