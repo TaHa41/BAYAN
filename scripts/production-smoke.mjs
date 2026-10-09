@@ -10,6 +10,7 @@ async function get(path){
   const text=await r.text();
   console.log(path,r.status,text.slice(0,220));
   if(!r.ok)throw new Error(path+" status "+r.status);
+  for(const [name,value] of [["x-content-type-options","nosniff"],["x-frame-options","DENY"],["referrer-policy","strict-origin-when-cross-origin"]])if(r.headers.get(name)!==value)throw new Error(path+" missing security header "+name);
   return{text,status:r.status,headers:r.headers};
 }
 for(const path of checks){try{await get(path)}catch(e){console.error(e);bad++}}
