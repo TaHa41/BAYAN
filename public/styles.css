@@ -362,3 +362,9 @@ main,header,footer,nav,section,article,aside{min-width:0}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+/* Price-page controls and data provenance. */
+.prices-page .prices-refresh{display:inline-flex;align-items:center;justify-content:center;min-height:42px;margin:12px 0 18px;padding:10px 16px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--text);font-weight:750;cursor:pointer;}
+.prices-page .prices-refresh:hover{border-color:var(--accent);background:var(--soft)}
+.prices-page .prices-refresh:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.prices-page .source-line{overflow-wrap:anywhere;}

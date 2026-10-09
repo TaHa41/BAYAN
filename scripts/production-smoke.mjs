@@ -132,7 +132,17 @@ for(const section of sections.filter(section=>section!=="prices")){
   }
 }
 try{
-  for(const live of ["/api/live/weather","/api/live/fx","/api/live/gold"]){const z=await get(live);if(!z.text||z.text.length<20)throw new Error("live_data_empty_"+live)}
+  for(const live of ["/api/live/weather","/api/live/fx","/api/live/gold"]){
+    const z=await get(live);if(!z.text||z.text.length<20)throw new Error("live_data_empty_"+live);
+    const payload=JSON.parse(z.text);
+    if(live.endsWith("/fx")&&payload.ok&&(!Number(payload.rates?.EGP)||!Date.parse(String(payload.updatedAt||""))))throw new Error("fx_payload_missing_rate_or_update_time");
+    if(live.endsWith("/gold")&&payload.ok&&(!Number(payload.price)||!Date.parse(String(payload.updatedAt||""))))throw new Error("gold_payload_missing_price_or_update_time");
+    if(live.endsWith("/gold")&&Array.isArray(payload.markets)&&payload.markets.some(item=>!Number(item.price)||!item.provider||!Date.parse(String(item.updatedAt||""))))throw new Error("market_quote_missing_price_provider_or_timestamp");
+  }
+  const page=await get("/prices?lang=ar");
+  if(!page.text.includes("pricesRefresh")||!page.text.includes("2026.10.09.33"))throw new Error("prices_page_assets_not_updated");
+  const css=await get("/styles.css?v=2026.10.09.33");
+  if(!css.text.includes(".prices-refresh")||!css.text.includes("@media(max-width:360px)"))throw new Error("responsive_prices_styles_missing");
 }catch(e){console.error("LIVE_DATA",e);bad++}
 try{const a=await fetch(origin+"/api/admin/analytics",{headers:{accept:"application/json"}});if(a.status!==401)throw new Error("admin_auth_not_enforced")}catch(e){console.error("ADMIN_AUTH",e);bad++}
 if(bad)process.exit(1);

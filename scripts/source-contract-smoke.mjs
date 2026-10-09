@@ -62,6 +62,11 @@ const checks = [
   ["search results open an in-site evidence article", app.includes("async function renderResearchArticle()") && app.includes('path === "research"') && app.includes("/api/news/article?title=")],
   ["prayer times geocode cities and regions globally", read("src/services/live.ts").includes("geocoding-api.open-meteo.com/v1/search") && read("src/services/live.ts").includes("api.aladhan.com/v1/timings?latitude=") && app.includes("City, governorate, state or region")],
   ["sidebar close control supports touch and capture-phase close events", app.includes('closeButton.addEventListener("pointerup"') && app.includes('target?.closest("#closeDrawer")')],
+  ["live market quotes have CoinGecko and daily-market fallback providers", read("src/services/live.ts").includes("async function cryptoQuote") && read("src/services/live.ts").includes("async function stooqQuote") && read("src/services/live.ts").includes("Stooq (daily close)")],
+  ["prices page isolates provider failures and shows quote timestamps with a manual refresh", app.includes("Promise.allSettled([api(\"/api/live/fx\"), api(\"/api/live/gold\")])") && app.includes('id="pricesRefresh"') && app.includes("formatUpdate(fx.updatedAt)") && app.includes("formatUpdate(gold.updatedAt)") && app.includes("formatUpdate(item.updatedAt)")],
+  ["site-wide responsive rules cover phone tablet desktop and reduced motion", read("public/styles.css").includes("@media(max-width:360px)") && read("public/styles.css").includes("@media(max-width:760px)") && read("public/styles.css").includes("@media(min-width:1200px)") && read("public/styles.css").includes("prefers-reduced-motion:reduce")],
+  ["removed Resend integration and obsolete daily-wisdom labels stay absent", !api.includes("Resend") && !app.includes("Daily wisdom") && !app.includes("الحكمة اليومية")],
+  ["the prominent taxonomy keeps community and debate labels instead of the removed geographic category labels", read("src/sections.ts").includes('ar:"حياة ومجتمعات"') && read("src/sections.ts").includes('ar:"أفكار ونقاشات"') && read("src/sections.ts").includes('ar:"تحولات كبرى"') && !read("src/sections.ts").includes('ar:"مصر"') && !read("src/sections.ts").includes('ar:"العالم العربي"')],
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
