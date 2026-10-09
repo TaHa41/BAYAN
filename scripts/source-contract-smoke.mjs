@@ -58,6 +58,10 @@ const checks = [
   ["admin repair monitor exposes review states and verification details", app.includes('"REVIEW","REPAIRED"') && app.includes("x.verification") && app.includes("x.action||x.diagnosis")],
   ["admin layout and icon containers have responsive design refinements", read("public/styles.css").includes(".admin-shortcuts{position:sticky") && read("public/styles.css").includes(".section-icon,.drawer-icon") && read("public/styles.css").includes("@media(max-width:700px)")],
 ["sparse searches expand across alternate queries and use citation-validated OpenAI web search", search.includes("async function expandedSearch") && search.includes("q+\" official source\"") && search.includes("async function openAiWebSearch") && search.includes("tools:[{type:\"web_search\"}]") && search.includes("cited.has(String(x.url||\"\"))") && search.includes("length<2")]
+  ["search relevance excludes off-topic papers and ranks title matches above author-only matches", search.includes("const relevanceScore=") && search.includes("titleHits===0") && search.includes("relevantCandidate(x,q)")],
+  ["search results open an in-site evidence article", app.includes("async function renderResearchArticle()") && app.includes('path === "research"') && app.includes("/api/news/article?title=")],
+  ["prayer times geocode cities and regions globally", read("src/services/live.ts").includes("geocoding-api.open-meteo.com/v1/search") && read("src/services/live.ts").includes("api.aladhan.com/v1/timings?latitude=") && app.includes("City, governorate, state or region")],
+  ["sidebar close control supports touch and capture-phase close events", app.includes('closeButton.addEventListener("pointerup"') && app.includes('target?.closest("#closeDrawer")')],
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
