@@ -44,7 +44,7 @@ const sourceArticleText=async(url:string,lang:"ar"|"en")=>{
 };
 const persistOpenedNewsArticle=async(env:Env,article:{title:string;summary:string;body:string;sources:Source[];image?:string|null;publishedAt?:string;status?:string},lang:Locale)=>{
  try{
-  const title=String(article.title||"").trim().slice(0,300),summary=String(article.summary||"").trim().slice(0,500),bodyText=String(article.body||summary).trim();
+  const title=String(article.title||"").trim().slice(0,300),summary=String(article.summary||article.body||article.title||"").trim().slice(0,500),bodyText=String(article.body||summary).trim();
   if(title.length<4||summary.length<12||bodyText.length<12||!article.sources?.some(s=>/^https:\/\//i.test(String(s.url||""))))return null;
   const hasArabic=(v:string)=>/[\u0600-\u06ff]/.test(v);
   if(lang==="ar"?(!hasArabic(title)||!hasArabic(summary)||!hasArabic(bodyText)): (hasArabic(title)||hasArabic(summary)||hasArabic(bodyText)))return null;
