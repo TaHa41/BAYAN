@@ -221,6 +221,32 @@ async function duckWebSearch(q:string,language:Locale):Promise<Candidate[]>{
     return out;
   }catch{return[]}
 }
+async function bingWebSearch(q:string,language:Locale):Promise<Candidate[]>{
+  // General web search, independent of Bing News RSS and Wikimedia.
+  // This is a public HTML fallback, so parse defensively and tolerate layout changes.
+  try{
+    const setlang=language==="ar"?"ar":"en-US";
+    const url="https://www.bing.com/search?q="+encodeURIComponent(q)+"&setlang="+setlang+"&count=10";
+    const response=await timeout(url,3000);
+    if(!response.ok)return[];
+    const html=await response.text();
+    const out:Candidate[]=[];
+    const blocks=[...html.matchAll(/<li\b[^>]*class=["'][^"']*b_algo[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi)];
+    for(const match of blocks.slice(0,10)){
+      const block=match[1];
+      const anchor=block.match(/<h2\b[^>]*>[\s\S]*?<a\b([^>]*)>([\s\S]*?)<\/a>/i);
+      if(!anchor)continue;
+      const title=cleanText(decodeXml(anchor[2].replace(/<[^>]*>/g," ")));
+      let target=decodeXml(anchor[1].match(/href=["']([^"']+)["']/i)?.[1]||"");
+      try{const parsed=new URL(target);if(parsed.hostname==="www.bing.com"||parsed.hostname.endsWith(".bing.com"))continue;}catch{continue;}
+      if(!title||!/^https:\/\//i.test(target))continue;
+      const snippet=cleanText(decodeXml(block.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)?.[1]?.replace(/<[^>]*>/g," ")||"")).slice(0,1200);
+      let publisher="Web result";try{publisher=new URL(target).hostname.replace(/^www\./i,"");}catch{}
+      out.push({title,summary:snippet,section:"world",kind:"web",evidence:"mixed",sources:[source(title,publisher,target)],url:target,score:scoreSource(publisher,title,q)+9,provider:"Bing Web Search"});
+    }
+    return out;
+  }catch{return[]}
+}
 async function broadGdelt(q:string):Promise<Candidate[]>{
   const variants=[...new Set([q,q.split(/\s+/).slice(0,6).join(" "),q.split(/\s+/).slice(0,3).join(" ")].filter(Boolean))];
   const batches=await Promise.all(variants.map(v=>gdelt(v).catch(()=>[])));
@@ -258,7 +284,8 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false):Pro
       googleNewsSearch(variant,language).catch(()=>[]),
       bingNewsSearch(variant,language).catch(()=>[]),
       duck(variant,language).catch(()=>[]),
-      duckWebSearch(variant,language).catch(()=>[])
+      duckWebSearch(variant,language).catch(()=>[]),
+      bingWebSearch(variant,language).catch(()=>[])
     ]);
     return results.flat();
   }));
@@ -323,9 +350,9 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};const academicQuery=/(research|paper|papers|study|studies|journal|doi|scholar|academic|citation|crossref|openalex|pubmed|clinical trial|systematic review|بحث علمي|أبحاث|دراسة|دراسات|مجلة علمية|ورقة بحثية|مصدر أكاديمي|دراسات سريرية|مراجعة منهجية)/i.test(q);
 const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|medicine|health study|بحث طبي|دراسة طبية|دراسات سريرية|تجربة سريرية|مراجعة منهجية)/i.test(q);
-let [local, wiki, wikiRest, wd, gd, oa, remote, dd, duckWeb, google, bing, crossref, pubmed] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipediaRestSearch(q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[]),safe(duckWebSearch(q,language),[]),safe(googleNewsSearch(q,language),[]),safe(bingNewsSearch(q,language),[]),safe((academicQuery&&!personLookup(q))?crossrefSearch(q):Promise.resolve([]),[]),safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language),[])]);
-const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...(s.source_gdelt==="0"?[]:["GDELT"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers","DuckDuckGo Web Search","Google News Search","Bing News RSS"];const candidates:Candidate[]=[
-    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wikiRest,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...duckWeb,...google,...bing
+let [local, wiki, wikiRest, wd, gd, oa, remote, dd, duckWeb, bingWeb, google, bing, crossref, pubmed] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipediaRestSearch(q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[]),safe(duckWebSearch(q,language),[]),safe(bingWebSearch(q,language),[]),safe(googleNewsSearch(q,language),[]),safe(bingNewsSearch(q,language),[]),safe((academicQuery&&!personLookup(q))?crossrefSearch(q):Promise.resolve([]),[]),safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language),[])]);
+const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...(s.source_gdelt==="0"?[]:["GDELT"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers","DuckDuckGo Web Search","Bing Web Search","Google News Search","Bing News RSS"];const candidates:Candidate[]=[
+    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wikiRest,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...duckWeb,...bingWeb,...google,...bing
   ];
   // Optional authenticated Enterprise enrichment: exact-title article lookups only.
   // Public Wikipedia remains the discovery mechanism; Enterprise is supplemental.
@@ -343,7 +370,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   // enough relevant evidence to produce a useful answer rather than a thin snippet.
   const expansionThreshold=personQuery?Math.min(6,Math.max(3,Number(s.min_sources||3))):Math.max(3,Number(s.min_sources||3));
   if(firstPassCount()<expansionThreshold){
-    providerAttempted.push("Expanded topic variants: Wikipedia, Wikipedia REST Search, Wikidata, GDELT, DuckDuckGo Web Search, Google News Search, Bing News RSS","OpenAI Web Search (fallback)");
+    providerAttempted.push("Expanded topic variants: Wikipedia, Wikipedia REST Search, Wikidata, GDELT, DuckDuckGo Web Search, Bing Web Search, Google News Search, Bing News RSS","OpenAI Web Search (fallback)");
     const [expanded,web]=await Promise.all([
       safe(expandedSearch(env,q,language,personQuery),[]),
       safe(openAiWebSearch(env,q,language),[])
