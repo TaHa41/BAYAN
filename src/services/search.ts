@@ -211,7 +211,12 @@ const disallowedContent=(value:string)=>{
 };
 const usefulDraft=(answer:string,language:Locale)=>{
  const a=String(answer||"").trim();
- if(a.length<260||disallowedContent(a))return false;
+ if(a.length<1800||disallowedContent(a))return false;
+ const paragraphs=a.split(/\n\s*\n/).map(part=>part.trim()).filter(part=>part.length>=45);
+ const headings=(a.match(/^#{1,3}\s+.+$/gm)||[]).length;
+ // A length threshold alone can be satisfied by repetition. Require a meaningful
+ // article structure as well; otherwise keep the result in search and do not publish it.
+ if(paragraphs.length<5||(headings<4&&paragraphs.length<7))return false;
  if(language==="ar")return hasArabic(a)&&!a.includes("وجدت أدلة يمكن الرجوع إليها، لكن تعذر تشغيل صياغة BAYAN الذكية الآن");
  return !hasArabic(a)&&!a.includes("Relevant evidence was found, but BAYAN's drafting model is temporarily unavailable");
 };
