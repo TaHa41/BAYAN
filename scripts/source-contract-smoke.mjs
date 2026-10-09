@@ -19,7 +19,7 @@ const checks = [
   ["Telegram contribution notification uses real line break", !/BAYAN: مساهمة جديدة للمراجعة\\\\n/.test(api) && /BAYAN: مساهمة جديدة للمراجعة\\n/.test(api)],
   ["explicit lang query overrides browser language", read("src/http.ts").includes('if(requested==="ar")return"ar"')],
   ["section fallback content is filtered by locale", api.includes('lang==="ar"?hasArabic(title)&&hasArabic(summary)') && api.includes('!hasArabic(title)&&!hasArabic(summary)')],
-  ["RTL drawer uses a reversible off-canvas transform", read("public/styles.css").includes('html[dir="rtl"] .drawer,html[dir="ltr"] .drawer{transform:translateX(110%)}') && read("public/app-20261009-01.js").includes('drawer.querySelector("#closeDrawer")?.addEventListener')],
+  ["RTL drawer uses a reversible off-canvas transform", read("public/styles.css").includes('html[dir="rtl"] .drawer,html[dir="ltr"] .drawer{transform:translateX(110%)}') && read("public/app-20261009-01.js").includes('closeButton.addEventListener("pointerup"')],
   ["news rejects missing and future publication dates", news.includes("const isFreshNews") && news.includes("all = all.filter(isFreshNews)") && news.includes("timestamp <= Date.now() + 5 * 60 * 1000")],
   ["legacy news cache payload column is migrated", read("src/schema.ts").includes("ALTER TABLE news_cache ADD COLUMN payload TEXT")],
   ["image placeholders hydrate by card title, not global index", read("public/app-20261009-01.js").includes("Match each image placeholder to its own card by title") && read("public/app-20261009-01.js").includes('candidate.querySelector("h2,h3")')],
