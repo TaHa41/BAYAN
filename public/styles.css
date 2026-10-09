@@ -229,3 +229,44 @@ html[dir="rtl"] .section-card:before{inset:0 0 0 auto;border-radius:0 18px 18px 
 .search-log-row p{margin:8px 0;font-size:.92rem}
 
 .search-article-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;margin:16px 0;box-shadow:0 8px 26px #102a4308}.search-article-card h2{margin:8px 0;font-size:clamp(20px,3vw,27px);line-height:1.45}.search-article-card h2 a{text-decoration:none}.search-article-card h2 a:hover{color:var(--accent)}.search-result-image{display:block;width:100%;max-height:260px;object-fit:cover;border-radius:12px;margin:0 0 16px}.search-article-card>p{font-size:16px;line-height:1.9}.drawer #closeDrawer{touch-action:manipulation;pointer-events:auto;user-select:none;-webkit-tap-highlight-color:transparent}.drawer.open{pointer-events:auto;touch-action:pan-y}
+
+
+/* Professional live-prices dashboard */
+.prices-page{max-width:1120px;margin-inline:auto}
+.prices-heading{margin-bottom:22px}
+.prices-heading h1{letter-spacing:-.035em}
+.prices-heading>p{max-width:720px;line-height:1.9}
+.prices-intro-strip{display:flex;align-items:center;gap:14px;margin:0 0 20px;padding:16px 18px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(110deg,var(--surface),var(--soft))}
+.prices-intro-icon{display:grid;place-items:center;flex:0 0 44px;width:44px;height:44px;border-radius:14px;background:var(--surface);border:1px solid var(--line);font-size:22px;color:var(--accent)}
+.prices-intro-strip strong{display:block;font-size:15px}
+.prices-intro-strip p{margin:4px 0 0;color:var(--muted);font-size:13px;line-height:1.7}
+.prices-page .market-overview{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(250px,.8fr);gap:18px;align-items:stretch}
+.prices-page .fx-panel,.prices-page .gold-panel{min-width:0;border-radius:22px;padding:22px;border:1px solid var(--line);box-shadow:0 12px 36px #102a4308}
+.prices-page .fx-panel{background:var(--surface)}
+.prices-page .fx-panel>.kicker,.prices-page .gold-panel>.kicker{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:850;letter-spacing:.015em}
+.prices-page .fx-panel>h2{font-size:clamp(27px,4vw,38px);letter-spacing:-.04em;margin:10px 0 4px}
+.prices-page .fx-panel>p,.prices-page .gold-panel>p{color:var(--muted);font-size:13px;line-height:1.7;margin:0 0 18px}
+.prices-page .market-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.prices-page .market-row{display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0;padding:11px 12px;border:1px solid var(--line);border-radius:13px;background:var(--bg);transition:border-color .16s,transform .16s}
+.prices-page .market-row:hover{border-color:var(--accent);transform:translateY(-1px)}
+.prices-page .market-row>span{min-width:0;font-size:13px;font-weight:850}
+.prices-page .market-row small{display:block;color:var(--muted);font-size:11px;font-weight:500;line-height:1.5;margin-top:3px}
+.prices-page .market-row strong{flex:0 0 auto;font-size:15px;font-variant-numeric:tabular-nums;direction:ltr;white-space:nowrap}
+.prices-page .source-line{display:block;margin-top:16px;padding-top:12px;border-top:1px solid var(--line);font-size:11px;line-height:1.7;color:var(--muted)}
+.prices-page .gold-panel{display:flex;flex-direction:column;align-items:flex-start;background:linear-gradient(145deg,var(--surface),var(--soft));position:relative;overflow:hidden}
+.prices-page .gold-panel:before{content:"";position:absolute;width:150px;height:150px;border-radius:50%;inset-inline-end:-60px;top:-65px;border:1px solid color-mix(in srgb,var(--accent) 18%,transparent);box-shadow:0 0 0 18px color-mix(in srgb,var(--accent) 5%,transparent),0 0 0 36px color-mix(in srgb,var(--accent) 3%,transparent);pointer-events:none}
+.prices-page .gold-panel>*{position:relative}
+.prices-page .gold-panel h2{font-size:clamp(32px,4.5vw,46px);line-height:1.2;letter-spacing:-.04em;margin:24px 0 8px;font-variant-numeric:tabular-nums}
+.prices-page .gold-panel>p{margin-bottom:10px}
+.prices-page .gold-panel .source-line{margin-top:auto;width:100%}
+.prices-extra-heading{display:flex;justify-content:space-between;align-items:end;gap:16px;margin:30px 0 14px}
+.prices-extra-heading .eyebrow{font-size:11px;color:var(--accent);font-weight:850}
+.prices-extra-heading .section-title{margin:4px 0 0;font-size:clamp(20px,3vw,26px)}
+.prices-heading-note{font-size:12px;color:var(--muted);text-align:end;max-width:230px;line-height:1.6}
+.prices-page .prices-extra-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.prices-page .market-card{min-width:0;border-radius:18px;padding:18px;background:var(--surface);border:1px solid var(--line);box-shadow:0 8px 24px #102a4306}
+.prices-page .market-card h2{font-size:clamp(21px,3vw,29px);font-variant-numeric:tabular-nums;margin:14px 0 5px;overflow-wrap:anywhere}
+.prices-page .market-card p{font-size:13px;color:var(--muted);line-height:1.7;margin:0}
+.prices-page>.muted{margin-top:22px;padding:13px 15px;border-radius:13px;background:var(--soft);font-size:12px;line-height:1.9}
+@media(max-width:760px){.prices-page .market-overview{grid-template-columns:minmax(0,1fr)}.prices-page .gold-panel{min-height:205px}.prices-page .prices-extra-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){.prices-page .fx-panel,.prices-page .gold-panel{padding:16px;border-radius:18px}.prices-page .market-list{grid-template-columns:minmax(0,1fr)}.prices-page .market-row{padding:10px 11px}.prices-page .prices-extra-grid{grid-template-columns:minmax(0,1fr)}.prices-extra-heading{align-items:flex-start;flex-direction:column}.prices-heading-note{text-align:start;max-width:none}.prices-intro-strip{padding:13px;align-items:flex-start}.prices-intro-icon{flex-basis:38px;width:38px;height:38px}}

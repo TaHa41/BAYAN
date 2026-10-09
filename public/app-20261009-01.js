@@ -257,6 +257,7 @@
           ${searchBox()}<div class="home-actions"><a class="primary" href="/ask?lang=${lang}">${t("اسأل بيان","Ask BAYAN")}</a></div>
           <div class="trust-row"><span>✓ ${t("أدلة ومصادر","Evidence & sources")}</span><span>◉ ${t("تحديث مستمر","Continuously updated")}</span><span>⌁ ${t("ذكاء يساعدك","AI assistance")}</span></div>
         </div>
+        <div class="wisdom-card home-wisdom"><p id="home-wisdom-text">${t("المعرفة تبدأ بسؤال جيد، وتكتمل بدليل موثوق.","Knowledge begins with a good question and grows stronger with reliable evidence.")}</p></div>
         <div class="section-intro"><span class="eyebrow">${t("استكشف الأقسام","Explore sections")}</span><div class="section-grid">${primarySections.map((s) => '<a class="section-card" href="/' + s[0] + '?lang=' + lang + '"><span class="section-icon">' + iconSvg(s[0]) + '</span><div><h2>' + escapeHtml(ar ? s[1] : s[2]) + '</h2><p>' + escapeHtml(ar ? s[3] : s[4]) + '</p></div><b>↗</b></a>').join("")}</div></div>
         <div class="home-content">
           <div class="page-head home-feed-head"><span class="eyebrow">${t("آخر ما نُشر","Latest published")}</span><h2>${t("أحدث المعرفة والأخبار","Latest knowledge and news")}</h2></div>
@@ -265,6 +266,19 @@
         </div>
       </section>`;
     bindSearch();
+    const refreshHomeWisdom = () => api("/api/wisdom?section=world&lang=" + lang, { timeoutMs: 5000 })
+      .then((wd) => {
+        const el = document.querySelector("#home-wisdom-text");
+        if (el && wd?.wisdom) el.textContent = wd.wisdom;
+      }).catch(() => {});
+    refreshHomeWisdom();
+    const homeWisdomTimer = setInterval(() => {
+      if (!document.querySelector("#home-wisdom-text")) {
+        clearInterval(homeWisdomTimer);
+        return;
+      }
+      refreshHomeWisdom();
+    }, 30000);
     const newsTask = api("/api/news?lang=" + lang).catch(() => ({items: []}));
     const sectionTasks = sections
       .filter((s) => !["news","prices","trends"].includes(s[0]))
@@ -404,8 +418,8 @@
     app.innerHTML =
       '<section class="page"><div class="page-head"><span class="eyebrow">' + t("محدث الآن","Updated now") +
       '</span><h1>' + t("الأخبار","News") + '</h1><p>' +
-      t("أخبار حديثة من أكثر من مزود، مع الصورة والوقت والمصدر، وتُفتح داخل بيان كصفحات خبر منظمة.",
-        "Current stories from multiple providers, with imagery, time and source metadata, opened inside BAYAN.") +
+      t("أبرز التطورات والأحداث التي تساعدك على فهم ما يحدث حولك.",
+        "Key developments and events to help you understand what is happening around you.") +
       '</p></div><div id="news" class="article-grid"><div class="notice">…</div></div></section>';
 
     try {
@@ -589,10 +603,10 @@
   }
   async function renderPrices() {
     app.innerHTML =
-      '<section class="page"><div class="page-head"><span class="eyebrow">' +
+      '<section class="page prices-page"><div class="page-head prices-heading"><span class="eyebrow">' +
       t("بيانات مباشرة","Live data") + '</span><h1>' + t("الأسعار والبيانات الحية","Prices & Live Data") +
       '</h1><p>' + t("أسعار العملات والمعادن والطاقة والعملات الرقمية ومؤشرات الأسواق، مع المصدر والوحدة ووقت التحديث.","Currencies, metals, energy, crypto and market indices with provider, units and update time.") +
-      '</p></div><div class="live-grid market-overview"><article class="live live-card" id="fx">…</article><article class="live live-card" id="gold">…</article></div><h2 class="section-title">'+t("أسواق ومواد إضافية","More markets & commodities")+'</h2><div class="live-grid" id="marketExtras"><div class="notice loading">'+t("جاري تحميل الأسعار من المزودات…","Loading provider quotes…")+'</div></div><p class="muted">'+t("الأسعار إرشادية وقد تتأخر أو تتوقف عند تعطل المزود؛ تحقق من المصدر قبل اتخاذ قرارات مالية.","Quotes are indicative and may be delayed or unavailable; verify with the provider before making financial decisions.")+'</p></section>';
+      '</p></div><div class="prices-intro-strip"><span class="prices-intro-icon">↗</span><div><strong>'+t("صورة أوضح لحركة الأسعار","A clearer view of market prices")+'</strong><p>'+t("تابع أسعار الصرف والذهب في مكان واحد، مع توضيح الوحدة ومصدر البيانات.","Track exchange rates and gold in one place, with units and data sources clearly shown.") +'</p></div></div><div class="live-grid market-overview"><article class="live live-card fx-panel" id="fx">…</article><article class="live live-card gold-panel" id="gold">…</article></div><div class="prices-extra-heading"><div><span class="eyebrow">'+t("نظرة أوسع","More to explore")+'</span><h2 class="section-title">'+t("أسواق ومواد إضافية","More markets & commodities")+'</h2></div><span class="prices-heading-note">'+t("تُعرض عند توافر بيانات موثوقة","Shown when reliable data is available")+'</span></div><div class="live-grid prices-extra-grid" id="marketExtras"><div class="notice loading">'+t("جاري تحميل الأسعار من المزودات…","Loading provider quotes…")+'</div></div><p class="muted">'+t("الأسعار إرشادية وقد تتأخر أو تتوقف عند تعطل المزود؛ تحقق من المصدر قبل اتخاذ قرارات مالية.","Quotes are indicative and may be delayed or unavailable; verify with the provider before making financial decisions.")+'</p></section>';
     try {
       const [fx, gold] = await Promise.all([api("/api/live/fx"), api("/api/live/gold")]);
       const currencyNames = {EGP:"الجنيه المصري / Egyptian pound",EUR:"اليورو / Euro",GBP:"الجنيه الإسترليني / British pound",SAR:"الريال السعودي / Saudi riyal",AED:"الدرهم الإماراتي / UAE dirham",KWD:"الدينار الكويتي / Kuwaiti dinar",QAR:"الريال القطري / Qatari riyal",BHD:"الدينار البحريني / Bahraini dinar",OMR:"الريال العماني / Omani rial",JOD:"الدينار الأردني / Jordanian dinar",TRY:"الليرة التركية / Turkish lira",JPY:"الين الياباني / Japanese yen",CNY:"اليوان الصيني / Chinese yuan",CAD:"الدولار الكندي / Canadian dollar",AUD:"الدولار الأسترالي / Australian dollar",CHF:"الفرنك السويسري / Swiss franc",INR:"الروبية الهندية / Indian rupee",ILS:"الشيكل / Israeli shekel",LYD:"الدينار الليبي / Libyan dinar",TND:"الدينار التونسي / Tunisian dinar",MAD:"الدرهم المغربي / Moroccan dirham",ZAR:"الراند الجنوب أفريقي / South African rand"};

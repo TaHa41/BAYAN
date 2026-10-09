@@ -172,8 +172,21 @@ async function broadGdelt(q:string):Promise<Candidate[]>{
   const batches=await Promise.all(variants.map(v=>gdelt(v).catch(()=>[])));
   return batches.flat().slice(0,12);
 }
-async function expandedSearch(env:Env,q:string,language:Locale):Promise<Candidate[]>{
-  const variants=[q+" official source",q+" overview"];
+const personLookup=(q:string)=>{
+  const raw=String(q||"").trim();
+  const words=raw.split(/\s+/).filter(Boolean);
+  const explicit=/(who is|who was|biography|profile|person|scientist|writer|author|politician|actor|athlete|من هو|من هي|سيرة|شخصية|عالم|عالمة|كاتب|مؤلف|ممثل|لاعب|رئيس)/i.test(raw);
+  if(explicit)return true;
+  if(words.length<2||words.length>4)return false;
+  if(/(weather|temperature|price|gold|dollar|currency|news|latest|today|history|science|technology|artificial intelligence|machine learning|climate change|renewable energy|economy|politics|football|sports|best|top|how|what|why|where|when|guide|definition|meaning|difference|compare|types|benefits|tutorial|examples|restaurant|restaurants|recipe|recipes|طقس|حرارة|سعر|ذهب|دولار|عملة|أخبار|اليوم|تاريخ|علوم|تقنية|اقتصاد|سياسة|رياضة|ذكاء اصطناعي|تعلم الآلة|تغير المناخ|أفضل|كيف|ماذا|لماذا|أين|دليل|معنى|أنواع|فوائد|مطاعم|وصفة)/i.test(raw))return false;
+  return /[\\u0600-\\u06ff]/.test(raw) || words.length>=2;
+};
+async function expandedSearch(env:Env,q:string,language:Locale,person=false):Promise<Candidate[]>{
+  const variants=person
+    ? (language==="ar"
+      ? [q+" سيرة ذاتية",q+" آخر الأخبار",q+" إنجازات",q+" مقابلة",q+" تصريحات"]
+      : [q+" biography",q+" latest news",q+" achievements",q+" interview",q+" statements"])
+    : [q+" official source",q+" overview"];
   const batches=await Promise.all(variants.map(async variant=>{
     const results=await Promise.all([
       wikipedia(env,variant,language).catch(()=>[]),
@@ -240,9 +253,15 @@ const languageSafe=(x:Candidate,language:Locale)=>{
 const providerAttempted=["BAYAN Knowledge Base","Wikipedia","Wikidata","GDELT","OpenAlex","Crossref","PubMed / NCBI","Cloudflare AI Search","DuckDuckGo","Google News Search","Bing News RSS","OpenAI Web Search (fallback)"];const candidates:Candidate[]=[
     ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...google,...bing
   ];
-  // Expand only when first-pass results are weak; fallback providers run concurrently to cap added latency.
-  if(candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q)).length<2){
-    const [broadened,expanded,web]=await Promise.all([safe(broadGdelt(q),[]),safe(expandedSearch(env,q,language),[]),safe(openAiWebSearch(env,q,language),[])]);
+  // Person/name lookups should return a useful collection, not stop after the first matching page.
+  const personQuery=personLookup(q);
+  const firstPassCount=()=>candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q)).length;
+  if(firstPassCount()<(personQuery?6:2)){
+    const [broadened,expanded,web]=await Promise.all([
+      safe(broadGdelt(q),[]),
+      safe(expandedSearch(env,q,language,personQuery),[]),
+      safe(openAiWebSearch(env,q,language),[])
+    ]);
     candidates.push(...broadened,...expanded,...web);
   }
   
