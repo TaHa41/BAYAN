@@ -383,7 +383,16 @@
     try { data = await api("/api/search?q=" + encodeURIComponent(query) + "&lang=" + lang, {timeoutMs:18000}); } catch {}
     if (!data?.results?.length && !((data?.providers||[]).includes("BAYAN content safety"))) {
       fallbackUsed = true;
-      try { data = {results: await browserSearchFallback(query), providers:[t("مسار بحث احتياطي","Fallback search")], status:"mixed"}; } catch { data = {results:[]}; }
+      const serverData = data || {};
+      let fallbackResults = [];
+      try { fallbackResults = await browserSearchFallback(query); } catch {}
+      data = {
+        ...serverData,
+        results: fallbackResults,
+        providers: [...new Set([...(serverData.providers || []), t("ويكيبيديا وويكي بيانات وGDELT وDuckDuckGo","Wikipedia, Wikidata, GDELT and DuckDuckGo")])],
+        status: fallbackResults.length ? "mixed" : (serverData.status || "insufficient"),
+        message: fallbackResults.length ? undefined : (serverData.message || t("تعذر الوصول إلى نتائج من مزودي البحث الخارجيين الآن. أعد المحاولة بعد قليل؛ لم يُستبدل البحث بمحتوى داخلي فقط.","External search providers did not return accessible results right now. Please retry shortly; this was not replaced with internal-only content."))
+      };
     }
     const results = Array.isArray(data.results) ? data.results : [];
     const answerText=String(data?.answer||"");
@@ -795,25 +804,59 @@
     }
   });
   async function browserSearchFallback(query) {
-    const wikiHost=ar?"ar.wikipedia.org":"en.wikipedia.org";
+    // This is a real external-source fallback, not a second query against BAYAN's
+    // own database. Each public provider is isolated so one failure cannot cancel
+    // the remaining providers.
     const trimmed=String(query||"").trim();
+    if(!trimmed)return [];
+    const wikiHost=ar?"ar.wikipedia.org":"en.wikipedia.org";
     const looksLikePerson=/[\u0600-\u06ff]/.test(trimmed)
       ? trimmed.split(/\s+/).filter(Boolean).length>=2 && !/(طقس|حرارة|سعر|ذهب|دولار|عملة|أخبار|اليوم|تاريخ|علوم|تقنية|اقتصاد|سياسة|رياضة|كيف|ماذا|لماذا|أفضل|دليل|معنى|مطاعم|وصفة)/.test(trimmed)
       : /^(who is|who was|biography|profile)\s+/i.test(trimmed);
-    const variants=looksLikePerson
-      ? [trimmed, trimmed+(ar?" سيرة":" biography"), trimmed+(ar?" إنجازات":" achievements"), trimmed+(ar?" آخر الأخبار":" latest news")]
-      : [trimmed, trimmed+(ar?" شرح":" overview")];
-    const uniqueVariants=[...new Set(variants.filter(Boolean))].slice(0,4);
-    const jobs=uniqueVariants.flatMap(term=>[
-      (async()=>{const url="https://"+wikiHost+"/w/api.php?action=query&generator=search&gsrsearch="+encodeURIComponent(term)+"&gsrlimit=6&prop=extracts|pageimages&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=900&format=json&origin=*";const r=await fetch(url,{signal:AbortSignal.timeout(8500),headers:{accept:"application/json"}});if(!r.ok)throw new Error("wiki");const d=await r.json();return Object.values(d.query?.pages||{}).map(x=>({title:String(x.title||""),summary:String(x.extract||"").slice(0,1400),section:looksLikePerson?"people":"world",kind:"web",evidence:"mixed",sources:[{publisher:t("ويكيبيديا","Wikipedia"),title:String(x.title||""),url:"https://"+wikiHost+"/wiki/"+encodeURIComponent(String(x.title||"").replace(/ /g,"_"))}],url:"https://"+wikiHost+"/wiki/"+encodeURIComponent(String(x.title||"").replace(/ /g,"_"))}));})(),
-      (async()=>{const url="https://www.wikidata.org/w/api.php?action=wbsearchentities&search="+encodeURIComponent(term)+"&language="+lang+"&limit=6&format=json&origin=*";const r=await fetch(url,{signal:AbortSignal.timeout(8500),headers:{accept:"application/json"}});if(!r.ok)throw new Error("wikidata");const d=await r.json();return(d.search||[]).map(x=>({title:String(x.label||""),summary:String(x.description||""),section:"people",kind:"web",evidence:"mixed",sources:[{publisher:t("ويكي بيانات","Wikidata"),title:String(x.label||""),url:"https://www.wikidata.org/wiki/"+x.id}],url:"https://www.wikidata.org/wiki/"+x.id}));})()
-    ]);
-    const settled=await Promise.allSettled(jobs),items=settled.flatMap(x=>x.status==="fulfilled"?x.value:[]);
-    const queryTerms=trimmed.toLowerCase().split(/\s+/).filter(x=>x.length>=2);
-    const seen=new Set();return items.filter(x=>x.title&&(ar?/\u0600-\u06ff/.test(x.title):!/[\u0600-\u06ff]/.test(x.title))).filter(x=>{
-      const searchable=(String(x.title||"")+" "+String(x.summary||"")).toLowerCase();
-      return !queryTerms.length||queryTerms.some(term=>searchable.includes(term));
-    }).filter(x=>!/(?:porn(?:ography)?|xxx\b|hentai|onlyfans|sex\s*video|explicit\s+sex|nude\s+leak|leaked\s+nudes|child\s+sexual\s+abuse|child\s+porn|csam|sexual\s+exploitation|اباحي|إباحي|اباحية|إباحية|بورنو|بورن|هنتاي|صور\s+عارية|فيديوهات?\s+جنسية|مقاطع?\s+جنسية|تسريب\s+صور\s+حميمية|استغلال\s+جنسي\s+للأطفال)/i.test(String(x.title||"")+" "+String(x.summary||""))).filter(x=>{const k=x.title.toLowerCase();if(seen.has(k))return false;seen.add(k);return true;}).slice(0,12);
+    const variants=[...new Set((looksLikePerson
+      ? [trimmed,trimmed+(ar?" سيرة ذاتية":" biography"),trimmed+(ar?" معلومات":" profile"),trimmed+(ar?" إنجازات":" achievements")]
+      : [trimmed,trimmed+(ar?" شرح":" overview"),trimmed+(ar?" معلومات":" facts"),trimmed+(ar?" آخر الأخبار":" latest news")]).filter(Boolean))].slice(0,4);
+    const clean=(v)=>String(v||"").replace(/<[^>]*>/g," ").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/\s+/g," ").trim();
+    const fetchJson=async(url,ms=6500)=>{const r=await fetch(url,{signal:AbortSignal.timeout(ms),headers:{accept:"application/json"}});if(!r.ok)throw new Error("provider_http_"+r.status);return r.json();};
+    const jobs=[];
+    for(const term of variants){
+      jobs.push((async()=>{
+        const url="https://"+wikiHost+"/w/api.php?action=query&generator=search&gsrsearch="+encodeURIComponent(term)+"&gsrlimit=6&prop=extracts|pageimages&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=900&format=json&origin=*";
+        const d=await fetchJson(url);
+        return Object.values(d.query?.pages||{}).map(x=>({title:clean(x.title),summary:clean(x.extract).slice(0,1600),section:looksLikePerson?"people":"world",kind:"web",evidence:"mixed",sources:[{publisher:t("ويكيبيديا","Wikipedia"),title:clean(x.title),url:"https://"+wikiHost+"/wiki/"+encodeURIComponent(String(x.title||"").replace(/ /g,"_"))}],url:"https://"+wikiHost+"/wiki/"+encodeURIComponent(String(x.title||"").replace(/ /g,"_")),provider:"Wikipedia"}));
+      })());
+      jobs.push((async()=>{
+        const url="https://www.wikidata.org/w/api.php?action=wbsearchentities&search="+encodeURIComponent(term)+"&language="+lang+"&limit=6&format=json&origin=*";
+        const d=await fetchJson(url);
+        return (d.search||[]).map(x=>({title:clean(x.label||x.id),summary:clean(x.description||""),section:looksLikePerson?"people":"world",kind:"web",evidence:"mixed",sources:[{publisher:t("ويكي بيانات","Wikidata"),title:clean(x.label||x.id),url:"https://www.wikidata.org/wiki/"+x.id}],url:"https://www.wikidata.org/wiki/"+x.id,provider:"Wikidata"}));
+      })());
+      jobs.push((async()=>{
+        const url="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(term)+"&mode=artlist&maxrecords=6&format=json&sort=HybridRel";
+        const d=await fetchJson(url,7000);
+        return (d.articles||[]).map(x=>({title:clean(x.title),summary:clean(x.seendate||"")+" "+clean(x.domain||""),section:"news",kind:"web",evidence:"mixed",sources:[{publisher:clean(x.domain||"GDELT"),title:clean(x.title),url:String(x.url||"")}],url:String(x.url||""),provider:"GDELT"})).filter(x=>x.title&&/^https:\/\//i.test(x.url));
+      })());
+      jobs.push((async()=>{
+        const url="https://api.duckduckgo.com/?q="+encodeURIComponent(term)+"&format=json&no_html=1&skip_disambig=0";
+        const d=await fetchJson(url,5000),out=[];
+        if(d.AbstractText)out.push({title:clean(d.Heading||term),summary:clean(d.AbstractText).slice(0,1600),section:looksLikePerson?"people":"world",kind:"web",evidence:"mixed",sources:[{publisher:"DuckDuckGo",title:clean(d.Heading||term),url:String(d.AbstractURL||"https://duckduckgo.com/?q="+encodeURIComponent(term))}],url:String(d.AbstractURL||"https://duckduckgo.com/?q="+encodeURIComponent(term)),provider:"DuckDuckGo"});
+        for(const x of (d.RelatedTopics||[]).slice(0,4))if(x?.Text&&x?.FirstURL)out.push({title:clean(String(x.Text).split(" - ")[0]),summary:clean(x.Text).slice(0,1200),section:"world",kind:"web",evidence:"mixed",sources:[{publisher:"DuckDuckGo",title:clean(String(x.Text).split(" - ")[0]),url:String(x.FirstURL)}],url:String(x.FirstURL),provider:"DuckDuckGo"});
+        return out;
+      })());
+    }
+    const settled=await Promise.allSettled(jobs);
+    const items=settled.flatMap(x=>x.status==="fulfilled"&&Array.isArray(x.value)?x.value:[]);
+    const queryTerms=trimmed.normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").split(/\s+/).filter(x=>x.length>=2);
+    const seen=new Set();
+    return items.filter(x=>x.title&&/^https:\/\//i.test(String(x.url||"")))
+      .filter(x=>ar?/\u0600-\u06ff/.test(x.title):!/[\u0600-\u06ff]/.test(x.title))
+      .filter(x=>{
+        const searchable=(String(x.title||"")+" "+String(x.summary||"")).normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"");
+        const hits=queryTerms.filter(term=>searchable.includes(term)).length;
+        return !queryTerms.length||hits>=Math.min(1,queryTerms.length);
+      })
+      .filter(x=>!/(?:porn(?:ography)?|xxx\b|hentai|onlyfans|sex\s*video|explicit\s+sex|nude\s+leak|leaked\s+nudes|child\s+sexual\s+abuse|child\s+porn|csam|sexual\s+exploitation|اباحي|إباحي|اباحية|إباحية|بورنو|بورن|هنتاي|صور\s+عارية|فيديوهات?\s+جنسية|مقاطع?\s+جنسية|تسريب\s+صور\s+حميمية|استغلال\s+جنسي\s+للأطفال)/i.test(String(x.title||"")+" "+String(x.summary||"")))
+      .filter(x=>{const k=String(x.title).toLowerCase().replace(/\W+/g," ");if(seen.has(k))return false;seen.add(k);return true;})
+      .slice(0,12);
   }
 
   async function renderTools() {
