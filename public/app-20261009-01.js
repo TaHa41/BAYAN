@@ -96,14 +96,28 @@
   const link = (url, label, cls = "") =>
     '<a class="' + cls + '" href="' + url + '">' + label + "</a>";
 
-  const imageHtml = (item, className = "article-card-image") =>
-    item.imageUrl
-      ? '<img loading="lazy" class="' + className + '" src="' + escapeHtml(item.imageUrl) + '" alt="' + escapeHtml(item.imageAlt || item.title || "") + '" data-image-query="' + escapeHtml(String(item.title || "") + " " + String(item.summary || "")) + '" onerror="window.BAYAN_IMAGE_RETRY(this)">'
+  const safeImageUrl = (value) => {
+    const url = String(value || "");
+    return /^https:\/\/[^\s"'<>]+$/i.test(url) ? url : "";
+  };
+  const safeInternalHref = (value, fallback) => {
+    const href = String(value || "");
+    return href.startsWith("/") && !href.startsWith("//") && !/[\s"'<>\\\\]/.test(href) ? href : fallback;
+  };
+  const imageHtml = (item, className = "article-card-image") => {
+    const url = safeImageUrl(item.imageUrl);
+    return url
+      ? '<img loading="lazy" class="' + className + '" src="' + escapeHtml(url) + '" alt="' + escapeHtml(item.imageAlt || item.title || "") + '" data-image-query="' + escapeHtml(String(item.title || "") + " " + String(item.summary || "")) + '" onerror="window.BAYAN_IMAGE_RETRY(this)">'
       : '<div class="image-placeholder">BAYAN</div>';
+  };
 
-  const heroImageHtml = (url, alt) =>
-    '<img class="article-hero-image" src="' + escapeHtml(url) + '" alt="' + escapeHtml(alt || "") +
-    '" data-image-query="' + escapeHtml(alt || "") + '" onerror="window.BAYAN_IMAGE_RETRY(this)">';
+  const heroImageHtml = (url, alt) => {
+    const safeUrl = safeImageUrl(url);
+    return safeUrl
+      ? '<img class="article-hero-image" src="' + escapeHtml(safeUrl) + '" alt="' + escapeHtml(alt || "") +
+        '" data-image-query="' + escapeHtml(alt || "") + '" onerror="window.BAYAN_IMAGE_RETRY(this)">'
+      : "";
+  };
 
   async function ensureHeroImage(container, title, summary = "") {
     if (!container || container.querySelector(".article-hero-image")) return;
@@ -140,12 +154,13 @@
   const articleCard = (item) => {
     const sectionMeta = sections.find((section) => section[0] === item.section);
     const sectionLabel = sectionMeta ? (ar ? sectionMeta[1] : sectionMeta[2]) : t("مادة معرفية","Knowledge item");
-    const href = item.href || (item.slug ? "/article/" + encodeURIComponent(item.slug) + "?lang=" + lang : "/search?q=" + encodeURIComponent(item.title || "") + "&lang=" + lang);
+    const fallbackHref = item.slug ? "/article/" + encodeURIComponent(item.slug) + "?lang=" + lang : "/search?q=" + encodeURIComponent(item.title || "") + "&lang=" + lang;
+    const href = safeInternalHref(item.href, fallbackHref);
     const body = imageHtml(item) +
       '<div class="article-card-body"><span class="kicker">' + escapeHtml(sectionLabel) + "</span>" +
       "<h3>" + escapeHtml(item.title) + "</h3><p>" + escapeHtml(item.summary || "") + '</p><span class="read">' +
       t(item.slug ? "اقرأ الملف" : "اعرض الموضوع", item.slug ? "Read the file" : "Explore topic") + " →</span></div>";
-    return '<article class="article-card' + (item.slug ? "" : " evidence-card") + '"><a class="article-card-link" href="' + href + '">' + body + "</a>" + socialActions(item) + "</article>";
+    return '<article class="article-card' + (item.slug ? "" : " evidence-card") + '"><a class="article-card-link" href="' + escapeHtml(href) + '">' + body + "</a>" + socialActions(item) + "</article>";
   };
 
   function searchBox(value = "") {
