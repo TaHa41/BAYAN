@@ -168,10 +168,9 @@ async function duck(q:string,language:Locale):Promise<Candidate[]>{
   }catch{return[]}
 }
 async function broadGdelt(q:string):Promise<Candidate[]>{
-  const variants=[q,q.split(/\s+/).slice(0,6).join(" "),q.split(/\s+/).slice(0,3).join(" ")].filter(Boolean);
-  const all:Candidate[]=[];
-  for(const v of variants){const x=await gdelt(v);all.push(...x);if(all.length>=8)break}
-  return all;
+  const variants=[...new Set([q,q.split(/\s+/).slice(0,6).join(" "),q.split(/\s+/).slice(0,3).join(" ")].filter(Boolean))];
+  const batches=await Promise.all(variants.map(v=>gdelt(v).catch(()=>[])));
+  return batches.flat().slice(0,12);
 }
 async function expandedSearch(env:Env,q:string,language:Locale):Promise<Candidate[]>{
   const variants=[q+" official source",q+" overview"];
