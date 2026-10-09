@@ -28,26 +28,52 @@ async function stooqQuote(symbol:string,stooqSymbol:string){
     return{symbol,price,currency:"USD",provider:"Stooq (daily close)",updatedAt,stale:true};
   }catch{return null}
 }
-async function cryptoQuote(symbol:string,id:string){
+async function preciousMetalQuote(symbol:string,metal:"XAG"){
   try{
-    const r=await timeout("https://api.coingecko.com/api/v3/simple/price?ids="+encodeURIComponent(id)+"&vs_currencies=usd&include_last_updated_at=true",3500);
+    const r=await timeout("https://api.gold-api.com/price/"+metal,3500);
     if(!r.ok)return null;
-    const d=await r.json<any>(),row=d?.[id],price=Number(row?.usd),stamp=Number(row?.last_updated_at);
+    const d=await r.json<any>(),price=Number(d?.symbols?.[0]?.price??d?.price);
     if(!Number.isFinite(price)||price<=0)return null;
-    return{symbol,price,currency:"USD",provider:"CoinGecko",updatedAt:stamp?new Date(stamp*1000).toISOString():new Date().toISOString(),stale:!stamp};
+    const stamp=Date.parse(String(d?.updatedAt||d?.updated_at||d?.timestamp||""));
+    return{symbol,price,currency:"USD",provider:"Gold API",updatedAt:Number.isFinite(stamp)?new Date(stamp).toISOString():new Date().toISOString(),stale:!Number.isFinite(stamp)};
   }catch{return null}
 }
+async function cryptoQuote(symbol:string,id:string,pair:string){
+  const [coingecko,binance]=await Promise.all([
+    (async()=>{try{
+      const r=await timeout("https://api.coingecko.com/api/v3/simple/price?ids="+encodeURIComponent(id)+"&vs_currencies=usd&include_last_updated_at=true",3500);
+      if(!r.ok)return null;
+      const d=await r.json<any>(),row=d?.[id],price=Number(row?.usd),stamp=Number(row?.last_updated_at);
+      if(!Number.isFinite(price)||price<=0)return null;
+      return{symbol,price,currency:"USD",provider:"CoinGecko",updatedAt:stamp?new Date(stamp*1000).toISOString():new Date().toISOString(),stale:!stamp};
+    }catch{return null}})(),
+    (async()=>{try{
+      const r=await timeout("https://api.binance.com/api/v3/ticker/price?symbol="+encodeURIComponent(pair),3500);
+      if(!r.ok)return null;
+      const d=await r.json<any>(),price=Number(d?.price);
+      if(!Number.isFinite(price)||price<=0)return null;
+      return{symbol,price,currency:"USDT",provider:"Binance",updatedAt:new Date().toISOString(),stale:true};
+    }catch{return null}})()
+  ]);
+  return coingecko||binance;
+}
 async function marketQuote(symbol:string){
-  try{
-    const r=await timeout("https://query1.finance.yahoo.com/v8/finance/chart/"+encodeURIComponent(symbol)+"?range=1d&interval=5m",3500);
-    if(r.ok){
+  const yahooHosts=["query1.finance.yahoo.com","query2.finance.yahoo.com"];
+  const yahoo=await Promise.all(yahooHosts.map(async host=>{
+    try{
+      const r=await timeout("https://"+host+"/v8/finance/chart/"+encodeURIComponent(symbol)+"?range=1d&interval=5m",3500);
+      if(!r.ok)return null;
       const d=await r.json<any>(),meta=d?.chart?.result?.[0]?.meta,price=Number(meta?.regularMarketPrice);
-      if(Number.isFinite(price)&&price>0)return{symbol,price,currency:String(meta?.currency||"USD"),provider:"Yahoo Finance",updatedAt:meta?.regularMarketTime?new Date(Number(meta.regularMarketTime)*1000).toISOString():new Date().toISOString(),stale:false};
-    }
-  }catch{}
-  if(symbol==="BTC-USD")return cryptoQuote(symbol,"bitcoin");
-  if(symbol==="ETH-USD")return cryptoQuote(symbol,"ethereum");
-  const stooq:Record<string,string>={"SI=F":"si.f","CL=F":"cl.f","GC=F":"gc.f","^GSPC":"^spx","^IXIC":"^ndq"};
+      if(!Number.isFinite(price)||price<=0)return null;
+      return{symbol,price,currency:String(meta?.currency||"USD"),provider:"Yahoo Finance",updatedAt:meta?.regularMarketTime?new Date(Number(meta.regularMarketTime)*1000).toISOString():new Date().toISOString(),stale:false};
+    }catch{return null}
+  }));
+  const quote=yahoo.find(Boolean);
+  if(quote)return quote;
+  if(symbol==="BTC-USD")return cryptoQuote(symbol,"bitcoin","BTCUSDT");
+  if(symbol==="ETH-USD")return cryptoQuote(symbol,"ethereum","ETHUSDT");
+  if(symbol==="SI=F")return (await preciousMetalQuote(symbol,"XAG"))||await stooqQuote(symbol,"si.f");
+  const stooq:Record<string,string>={"CL=F":"cl.f","GC=F":"gc.f","^GSPC":"^spx","^IXIC":"^ndq"};
   return stooq[symbol]?stooqQuote(symbol,stooq[symbol]):null;
 }
 async function extraMarkets(){
