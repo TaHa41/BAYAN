@@ -29,17 +29,26 @@ const relevanceScore=(x:Candidate,q:string)=>{const terms=searchTerms(q);if(!ter
 // Use the summary and all query terms too, then fall back to the best locale-safe candidates if providers are weak.
 const relevantCandidate=(x:Candidate,q:string)=>{const terms=searchTerms(q);const score=relevanceScore(x,q);if(!terms.length)return false;const normalize=(v:string)=>String(v||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"");const title=normalize(x.title),summary=normalize(x.summary),combined=title+" "+summary;const titleHits=terms.filter(t=>title.includes(t)).length;const hits=terms.filter(t=>combined.includes(t)).length;const person=personLookup(q);if(person){/* A name appearing only in an academic abstract/author list is not a person-profile result. */if(titleHits===0)return /wikipedia|wikidata/i.test(x.provider)&&hits>0&&score>=20;return titleHits>=Math.min(1,terms.length)&& (hits>=Math.min(1,terms.length)||score>=25);}if(terms.length<=1)return score>=4;return hits>=Math.min(2,terms.length)||score>=25;};
 async function wikipedia(env:Env,q:string,language:Locale):Promise<Candidate[]>{
-  try{
-    const api=language==="ar"?"https://ar.wikipedia.org/w/api.php":"https://en.wikipedia.org/w/api.php";
-    const u=api+"?action=query&generator=search&gsrsearch="+encodeURIComponent(q)+"&gsrlimit=6&prop=extracts|pageimages&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=900&format=json&origin=*";
-    const r=await timeout(u); if(!r.ok)return[];
-    const d=await r.json<any>(); return Object.values(d.query?.pages||{}).map((x:any)=>({
-      title:cleanText(x.title),summary:cleanText(x.extract).slice(0,1800),section:"world",kind:"web",evidence:"mixed",
-      sources:[source(x.title,language==="ar"?"Wikipedia Arabic":"Wikipedia",api.replace("api.php","wiki/")+encodeURIComponent(String(x.title).replace(/ /g,"_")))],
-      url:"https://"+(language==="ar"?"ar":"en")+".wikipedia.org/wiki/"+encodeURIComponent(String(x.title).replace(/ /g,"_")),
-      score:scoreSource("Wikipedia",x.title,q)+8,provider:"Wikipedia"
-    }));
-  }catch{return[]}
+  const api=language==="ar"?"https://ar.wikipedia.org/w/api.php":"https://en.wikipedia.org/w/api.php";
+  const stop=new Set(["في","من","على","عن","إلى","الى","ما","ماذا","كيف","لماذا","هل","هو","هي","هذا","هذه","التي","الذي","مع","the","and","for","with","from","about","what","when","where","who","how","why","is","are"]);
+  const normalized=String(q||"").replace(/[؟?،,:;.!]+/g," ").split(/\s+/).filter((word)=>word.length>1&&!stop.has(word.toLowerCase())).join(" ");
+  const queries=[...new Set([q,normalized].filter((value)=>value&&value.trim()))];
+  for(const query of queries){
+    try{
+      const u=api+"?action=query&generator=search&gsrsearch="+encodeURIComponent(query)+"&gsrlimit=8&prop=extracts|pageimages&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=900&format=json&origin=*";
+      const r=await timeout(u,5000); if(!r.ok)continue;
+      const d=await r.json<any>();
+      const pages=Object.values(d.query?.pages||{}) as any[];
+      const results=pages.map((x:any)=>({
+        title:cleanText(x.title),summary:cleanText(x.extract).slice(0,1800),section:"world",kind:"web" as const,evidence:"mixed" as const,
+        sources:[source(x.title,language==="ar"?"Wikipedia Arabic":"Wikipedia","https://"+(language==="ar"?"ar":"en")+".wikipedia.org/wiki/"+encodeURIComponent(String(x.title).replace(/ /g,"_")))],
+        url:"https://"+(language==="ar"?"ar":"en")+".wikipedia.org/wiki/"+encodeURIComponent(String(x.title).replace(/ /g,"_")),
+        score:scoreSource("Wikipedia",x.title,query)+8,provider:"Wikipedia"
+      })).filter((x:any)=>x.title&&x.summary);
+      if(results.length)return results;
+    }catch{}
+  }
+  return[];
 }
 async function wikidata(q:string,language:Locale):Promise<Candidate[]>{
   try{
