@@ -262,6 +262,11 @@ export async function findRelatedImage(query: string, sourceUrl?: string): Promi
   const relatedWikipediaImage = await wikipediaImage(headline);
   if (relatedWikipediaImage && /^https:\/\//i.test(relatedWikipediaImage)) return relatedWikipediaImage;
 
+  // Wikidata is a separate subject-image provider and can recover biographies/topics
+  // whose localized Wikipedia pages have no thumbnail. Keep it behind exact page lookups.
+  const structuredSubjectImage = await wikidataImage(headline);
+  if (structuredSubjectImage && /^https:\/\//i.test(structuredSubjectImage)) return structuredSubjectImage;
+
   // Headlines identify the subject better than long summaries. Search Commons
   // with short title variants, and reject images whose filenames barely overlap.
   const tokens = terms(headline).filter((term) => term.length >= 3);
