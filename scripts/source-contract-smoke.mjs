@@ -29,7 +29,7 @@ const checks = [
   ["RSS image metadata includes embedded thumbnails", /item\.match\(\/\<img\\b\[\^>\]\+src=/.test(news)],
   ["page view metrics exclude non-page events", read("src/db.ts").includes("event='page' AND created_at>=?")],
   ["admin has authenticated Telegram test route", api.includes('/api/admin/telegram-test') && api.includes("telegram_delivery_failed")],
-  ["news article evidence and generation have bounded fallbacks", api.includes("bounded(search(env,title,lang),7000)") && api.includes("bounded(ask(env,articlePrompt(title,lang),lang,[{title,summary:evidenceText") && api.includes("}),7500)") && api.includes("if(!found.results.length&&(summary||storyUrl))") && api.includes("sourceDescription(storyUrl,lang)") && api.includes("const hasFullAnalysis=generatedBody.length>=500")],
+  ["news article evidence and generation have bounded fallbacks", api.includes("bounded(search(env,title,lang),7000)") && api.includes("bounded(ask(env,articlePrompt(title,lang),lang,[{title,summary:evidenceText") && api.includes("as any]),7500)") && api.includes("if(!found.results.length&&(summary||storyUrl))") && api.includes("sourceDescription(storyUrl,lang)") && api.includes("const hasFullAnalysis=generatedBody.length>=500")],
   ["RSS and Atom feeds are both parsed", news.includes('matchAll(/<(item|entry)\\b')],
   ["search headlines and summaries must match the requested locale", search.includes("hasArabic(title) && localeSafeText(summary,language)") && search.includes("!hasArabic(title) && localeSafeText(summary,language)")],
   ["AI rejects English-only sentences in Arabic answers", ai.includes("const languageConsistent") && ai.includes("sentences.every")],
