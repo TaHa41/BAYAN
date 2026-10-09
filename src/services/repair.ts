@@ -32,13 +32,13 @@ async function newsCacheDiagnostics(env:Env){
         const title=String(item?.title||"");
         const localeMatch=language==="ar"?/[\u0600-\u06ff]/.test(title):!/[\u0600-\u06ff]/.test(title);
         if(localeMatch)localeMatched++;
+        if(!String(item?.imageUrl||"").trim())missingImages++;
         const date=Date.parse(String(item?.publishedAt||""));
         if(!Number.isFinite(date)){missingDate++;continue}
         validDate++;
         if(date>current+5*60*1000)future++;
         else if(current-date>72*60*60*1000)stale++;
         else if(localeMatch)fresh++;
-        if(!String(item?.imageUrl||"").trim())missingImages++;
       }
       output.push(language+"{total="+items.length+",locale="+localeMatched+",validDate="+validDate+",freshLocale="+fresh+",stale="+stale+",future="+future+",missingDate="+missingDate+",missingImages="+missingImages+"}");
     }catch(error){
@@ -140,7 +140,7 @@ async function repairRuntime(env:Env,failures:string[]){
       try{const result=await news(env,language);refreshed.push(language+":"+result.items.length)}catch(error){refreshed.push(language+":failed");await record(env,"warn","self_heal_news_refresh",language+" "+String(error).slice(0,300))}
     }
     actions.push("live news refresh attempted for both locales ("+refreshed.join(", ")+"); no news content fabricated");
-    actions.push("news cache diagnostics after refresh: "+await newsCacheDiagnostics(env));
+
   }else if(imageOnlyPass){
     actions.push("bounded image-only repair pass selected because the previous run deferred images");
   }
@@ -173,6 +173,7 @@ async function repairRuntime(env:Env,failures:string[]){
     }catch{}
     actions.push("image repair filled "+filledArticles+" article(s) and "+filledNews+" cached news image(s); attempted up to 4 articles and 3 stories per locale");
   }catch{actions.push("image repair failed before completion; inspect runtime_events for database or image-provider errors")}
+  actions.push("news cache diagnostics after repair: "+await newsCacheDiagnostics(env));
   return actions;
 }
 
