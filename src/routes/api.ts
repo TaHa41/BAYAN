@@ -68,12 +68,12 @@ const sourceArticleText=async(url:string,lang:"ar"|"en")=>{
  if(/technology|artificial intelligence|software|cyber|chip|robot|تقنية|ذكاء اصطناعي|برمجيات|رقائق|روبوت|سيبراني/i.test(s))return "technology";
  if(/economy|economic|market|stock|inflation|currency|bank|trade|اقتصاد|اقتصادي|سوق|أسهم|تضخم|عملة|بنك|تجارة|ذهب|دولار/i.test(s))return "economy";
  if(/election|president|parliament|government|minister|policy|politics|انتخابات|رئيس|برلمان|حكومة|وزير|سياسة|قرار حكومي/i.test(s))return "politics";
- if(/science|scientific|research|discovery|space|nasa|climate|environment|علم|بحث علمي|اكتشاف|فضاء|مناخ|بيئة/i.test(s))return "science";
+ if(/science|scientific|research|discovery|space|nasa|astronomy|planet|universe|علم|بحث علمي|اكتشاف|فضاء|فلك|كوكب|الكون/i.test(s))return "science";
  if(/history|historical|heritage|archaeology|تاريخ|تاريخي|تراث|آثار|حضارة/i.test(s))return "history";
  if(/film|movie|music|actor|actress|celebrity|artist|الفن|فيلم|سينما|موسيقى|ممثل|ممثلة|فنان|مشهور/i.test(s))return "art";
  if(/travel|tourism|airport|flight|hotel|destination|سفر|سياحة|مطار|رحلة|فندق|وجهة/i.test(s))return "travel";
  if(/people|biography|profile|born|career|من هو|من هي|سيرة|مسيرة|ولد|ولدت|شخصية/i.test(s))return "people";
- return "news";
+ return "world";
 };
 const persistOpenedNewsArticle=async(env:Env,article:{title:string;summary:string;body:string;sources:Source[];image?:string|null;publishedAt?:string;status?:string},lang:Locale)=>{
  try{
@@ -97,6 +97,7 @@ export async function api(request:Request,env:Env){const u=new URL(request.url),
   if(request.method!=="GET")return json({error:"method_not_allowed"},405);
   const title=clean(u.searchParams.get("title")||"",500);let image=clean(u.searchParams.get("image")||"",2000);const summary=clean(u.searchParams.get("summary")||"",1500),storyUrl=clean(u.searchParams.get("url")||"",2000),publisher=clean(u.searchParams.get("publisher")||"",200),publishedAt=clean(u.searchParams.get("publishedAt")||"",100);
   if(!title)return json({error:"title_required"},400);
+  if(isVideoUrl(storyUrl))return json({error:"video_source_not_article",kind:"video",message:lang==="ar"?"هذا رابط فيديو، وليس مقالًا مكتوبًا. افتح الفيديو كمصدر منفصل، ولا تُنشئ منه مقالًا دون نص موثوق ومصادر مكتوبة مستقلة.":"This is a video, not a written article. Open it as a separate source; do not draft an article without a reliable transcript and independent written sources."},422);
   try{
     let found:any={results:[],status:"insufficient"};
     try{found=await bounded(search(env,title,lang),7000)}catch{}
