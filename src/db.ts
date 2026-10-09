@@ -10,13 +10,21 @@ const publicationQuality=(input:{title:string;summary:string;body:string;languag
  const body=String(input.body||"").trim(),title=String(input.title||"").trim(),summary=String(input.summary||"").trim();
  const headings=(body.match(/^#{1,3}\s+.+$/gm)||[]).length;
  const paragraphs=body.split(/\n\s*\n/).map(p=>p.trim()).filter(p=>p.length>=65&&!/^#{1,4}\s/.test(p)&&!/^([-*+] |\d+[.)] )/.test(p));
+ const normalizedParagraphs=paragraphs.map(p=>publicationTextKey(p));
+ const uniqueParagraphs=new Set(normalizedParagraphs);
+ const noDuplicateParagraphs=uniqueParagraphs.size===normalizedParagraphs.length;
  const hasArabic=/[\u0600-\u06ff]/.test(title+" "+summary+" "+body);
+ const localeConsistent=input.language==="ar"
+  ? hasArabic&&[title,summary,...paragraphs].every(part=>/[\u0600-\u06ff]/.test(part)||!/[A-Za-z]{5,}/.test(part))
+  : !hasArabic;
  const hosts=new Set((input.sources||[]).flatMap(source=>{try{const url=new URL(String(source?.url||""));return url.protocol==="https:"?[url.hostname.toLowerCase().replace(/^www\./,"")]:[]}catch{return []}}));
- return title.length>=8&&summary.length>=40&&body.length>=1800&&headings>=4&&paragraphs.length>=5&&(input.language==="ar"?hasArabic:!hasArabic)&&hosts.size>=2&&/^https:\/\//i.test(String(input.imageUrl||""));
+ const publishers=new Set((input.sources||[]).map(source=>String(source?.publisher||"").trim().toLowerCase()).filter(Boolean));
+ const image=String(input.imageUrl||"");
+ return title.length>=8&&summary.length>=40&&body.length>=1800&&headings>=4&&paragraphs.length>=5&&uniqueParagraphs.size>=5&&noDuplicateParagraphs&&localeConsistent&&hosts.size>=2&&publishers.size>=2&&/^https:\/\//i.test(image);
 };
 export async function publishVerifiedResearch(env:Env,input:{title:string;summary:string;body:string;section:string;language:Locale;sources:any[];imageUrl?:string;imageAlt?:string}){
  if(!publicationQuality(input))return null;
- const rows=await env.DB.prepare("SELECT slug,title,summary,body,section,sources_json,image_url FROM articles WHERE language=? AND status='PUBLISHED' ORDER BY updated_at DESC LIMIT 600").bind(input.language).all<any>();
+ const rows=await env.DB.prepare("SELECT slug,title,summary,body,section,sources_json,image_url,image_alt FROM articles WHERE language=? AND status='PUBLISHED' ORDER BY updated_at DESC").bind(input.language).all<any>();
  const candidates=(rows.results||[]).filter(row=>publicationTitleMatch(String(row.title||""),input.title));
  const existing=candidates.sort((a,b)=>Number(publicationTextKey(a.title)===publicationTextKey(input.title))-Number(publicationTextKey(b.title)===publicationTextKey(input.title))).at(-1);
  const t=now();
@@ -24,26 +32,28 @@ export async function publishVerifiedResearch(env:Env,input:{title:string;summar
  for(const source of [...(existing?JSON.parse(String(existing.sources_json||"[]")):[]),...(input.sources||[])]){
   try{const url=new URL(String(source?.url||""));if(url.protocol==="https:")sourceMap.set(url.toString(),source)}catch{}
  }
- const mergedSources=[...sourceMap.values()].slice(0,16);
+ const mergedSources=[...sourceMap.values()].slice(0,20);
  if(existing){
   const priorBody=String(existing.body||"");
   const priorWords=publicationWords(priorBody),incomingWords=publicationWords(input.body);
   const newFacts=[...incomingWords].filter(word=>!priorWords.has(word));
-  const oldQuality=priorBody.length>=1800&&(priorBody.match(/^#{1,3}\s+.+$/gm)||[]).length>=4&&priorBody.split(/\n\s*\n/).filter(p=>p.trim().length>=65&&!/^#{1,4}\s/.test(p.trim())).length>=5;
-  const materiallyNew=newFacts.length>=18&&input.body.length>=Math.max(1800,priorBody.length*0.85);
+  const oldHeadings=(priorBody.match(/^#{1,3}\s+.+$/gm)||[]).length;
+  const oldParagraphs=priorBody.split(/\n\s*\n/).map(p=>p.trim()).filter(p=>p.length>=65&&!/^#{1,4}\s/.test(p)&&!/^([-*+] |\d+[.)] )/.test(p));
+  const oldQuality=priorBody.length>=1800&&oldHeadings>=4&&oldParagraphs.length>=5&&new Set(oldParagraphs.map(publicationTextKey)).size===oldParagraphs.length;
+  const materiallyNew=newFacts.length>=12&&input.body.length>=Math.max(1800,priorBody.length*0.75);
   const repairWeakArticle=!oldQuality;
-  if(materiallyNew||repairWeakArticle){
-   await env.DB.prepare("UPDATE articles SET title=?,summary=?,body=?,section=?,sources_json=?,image_url=CASE WHEN image_url IS NULL OR trim(image_url)='' THEN ? ELSE image_url END,image_alt=CASE WHEN image_url IS NULL OR trim(image_url)='' THEN ? ELSE image_alt END,updated_at=? WHERE slug=? AND language=? AND status='PUBLISHED'").bind(input.title,input.summary.slice(0,500),input.body,input.section,JSON.stringify(mergedSources),input.imageUrl,input.imageAlt||input.title,t,String(existing.slug),input.language).run();
-  }else if(!String(existing.image_url||"").trim()){
-   await env.DB.prepare("UPDATE articles SET image_url=?,image_alt=?,sources_json=?,updated_at=? WHERE slug=? AND language=? AND status='PUBLISHED'").bind(input.imageUrl,input.imageAlt||input.title,JSON.stringify(mergedSources),t,String(existing.slug),input.language).run();
-  }
+  const nextBody=materiallyNew||repairWeakArticle?input.body:priorBody;
+  const nextSummary=materiallyNew||repairWeakArticle?input.summary.slice(0,500):String(existing.summary||input.summary).slice(0,500);
+  const nextTitle=materiallyNew||repairWeakArticle?input.title:String(existing.title||input.title);
+  const nextSection=materiallyNew||repairWeakArticle?input.section:String(existing.section||input.section);
+  await env.DB.prepare("UPDATE articles SET title=?,summary=?,body=?,section=?,sources_json=?,image_url=?,image_alt=?,updated_at=? WHERE slug=? AND language=? AND status='PUBLISHED'").bind(nextTitle,nextSummary,nextBody,nextSection,JSON.stringify(mergedSources),String(existing.image_url||"").trim()?String(existing.image_url):input.imageUrl,input.imageAlt||String(existing.image_alt||nextTitle),t,String(existing.slug),input.language).run();
   return String(existing.slug);
  }
- const base=input.title.toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/gi,"-").replace(/^-|-$/g,"").slice(0,90)||"bayan-research";
+ const base=input.title.toLowerCase().normalize("NFKC").replace(/[^a-z0-9\u0600-\u06ff]+/gi,"-").replace(/^-|-$/g,"").slice(0,90)||"bayan-research";
  const slug=base+"-"+Date.now().toString(36);
  await env.DB.prepare("INSERT INTO articles(slug,section,language,title,summary,body,sources_json,status,image_url,image_alt,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)").bind(slug,input.section,input.language,input.title,input.summary.slice(0,500),input.body,JSON.stringify(mergedSources.length?mergedSources:input.sources.slice(0,12)),"PUBLISHED",input.imageUrl,input.imageAlt||input.title,t,t).run();
  return slug;
-}export async function addContribution(env:Env,title:string,body:string,source:string|undefined,section:string,language:Locale="ar"){await env.DB.prepare("INSERT INTO contributions(title,body,source,section,language,status,created_at) VALUES(?,?,?,?,?,?,?)").bind(title,body,source||null,section,language,"PENDING",now()).run()}export async function reviewContribution(env:Env,id:number,action:"APPROVE"|"REJECT",note:string){const c=await env.DB.prepare("SELECT * FROM contributions WHERE id=?").bind(id).first<any>();if(!c)throw new Error("contribution_not_found");if(action==="APPROVE"){const slug=String(c.title).toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/gi,"-").replace(/^-|-$/g,"").slice(0,100)+"-"+id;const sources=c.source?[{title:c.source,publisher:"Contributor",url:c.source}]:[];const language=c.language==="en"?"en":"ar";const t=now();await env.DB.prepare("INSERT INTO articles(slug,section,language,title,summary,body,sources_json,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(slug,c.section,language,c.title,c.body.slice(0,300),c.body,JSON.stringify(sources),"PUBLISHED",t,t).run()}await env.DB.prepare("UPDATE contributions SET status=?,reviewer_note=?,reviewed_at=? WHERE id=?").bind(action==="APPROVE"?"APPROVED":"REJECTED",note||null,now(),id).run()}export async function track(env:Env,visitor:string,event:string,path:string,language:Locale){if(visitor==="owner-excluded")return;try{await env.DB.prepare("INSERT INTO analytics(visitor_hash,event,path,language,created_at) VALUES(?,?,?,?,?)").bind(visitor,event,path,language,now()).run()}catch{}}
+}
 export async function analyticsStats(env:Env,language:Locale="ar"){
   const day=new Date(Date.now()-86400000).toISOString(),week=new Date(Date.now()-604800000).toISOString(),month=new Date(Date.now()-2592000000).toISOString();
   const r=await env.DB.batch([
