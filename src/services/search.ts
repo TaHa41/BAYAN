@@ -277,11 +277,15 @@ const personLookup=(q:string)=>{
   return /^[A-Z][a-z]+(?:[ '-]+[A-Z][a-z]+){1,3}$/.test(raw);
 };
 async function expandedSearch(env:Env,q:string,language:Locale,person=false):Promise<Candidate[]>{
-  // Keep retries diverse but bounded: each variant fans out across independent providers.
+  // Recovery uses distinct query formulations, not just the same phrase with a suffix.
+  // Keep the fan-out bounded so broader recall does not create unbounded latency/subrequests.
+  const normalized=q.normalize("NFKC").replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/[“”‘’]/g,'"').replace(/[؟?!،,;；]+/g," ").replace(/\\s+/g," ").trim();
+  const compact=searchTerms(normalized).slice(0,6).join(" ");
   const variants=person
-    ? (language==="ar" ? [q+" سيرة ذاتية",q+" مصدر رسمي"] : [q+" biography",q+" official profile"])
-    : (language==="ar" ? [q+" شرح",q+" معلومات موثوقة"] : [q+" overview",q+" reliable information"]);
-  const batches=await Promise.all(variants.map(async variant=>{
+    ? (language==="ar" ? [q+" سيرة ذاتية",normalized,q+" مصدر رسمي"] : [q+" biography",normalized,q+" official profile"])
+    : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
+  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,3);
+  const batches=await Promise.all(uniqueVariants.map(async variant=>{
     const results=await Promise.all([
       wikipedia(env,variant,language).catch(()=>[]),
       wikipediaRestSearch(variant,language).catch(()=>[]),
