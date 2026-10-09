@@ -325,13 +325,15 @@
       try { data = {results: await browserSearchFallback(query), providers:[t("مسار بحث احتياطي","Fallback search")], status:"mixed"}; } catch { data = {results:[]}; }
     }
     const results = Array.isArray(data.results) ? data.results : [];
+    const answerText=String(data?.answer||"");
+    const answerUsable=Boolean(answerText)&&!/(تعذر تشغيل صياغة BAYAN الذكية الآن|drafting model is temporarily unavailable)/i.test(answerText);
     output.innerHTML = results.length
-      ? ((data.answer ? '<article class="answer search-answer"><span class="eyebrow">' + t("إجابة بيان","BAYAN answer") + '</span><div class="article-body">' + String(data.answer).split(String.fromCharCode(10)).map((line) => "<p>" + escapeHtml(line) + "</p>").join("") + '</div>' + (data.articleSlug ? '<a class="read" href="/article/' + encodeURIComponent(data.articleSlug) + "?lang=" + lang + '">' + t("فتح الملف الكامل داخل بيان","Open the full BAYAN file") + " →</a>" : "") + "</article>" : "") +
+      ? ((answerUsable ? '<article class="answer search-answer"><span class="eyebrow">' + t("إجابة بيان","BAYAN answer") + '</span><div class="article-body">' + String(answerText).split(String.fromCharCode(10)).map((line) => "<p>" + escapeHtml(line) + "</p>").join("") + '</div>' + (data.articleSlug ? '<a class="read" href="/article/' + encodeURIComponent(data.articleSlug) + "?lang=" + lang + '">' + t("فتح الملف الكامل داخل بيان","Open the full BAYAN file") + " →</a>" : "") + "</article>" : "") +
       (fallbackUsed ? '<div class="notice">' + t("عرض بيان نتائج من مسار احتياطي؛ يجري توسيع البحث دون اختلاق نتائج.","BAYAN is showing fallback-source results while expanding search without inventing results.") + "</div>" : "") +
       '<div class="result-meta">' + escapeHtml((data.providers || []).join(" · ") || "BAYAN") + "</div>" +
       results.map((item) => {
         const key = item.slug || item.url || item.title;
-        const sectionMeta=sections.find(section=>section[0]===item.section); const sectionLabel=sectionMeta?(ar?sectionMeta[1]:sectionMeta[2]):t("نتيجة بحث","Search result"); return '<article class="search-result"><span class="kicker">' + escapeHtml(sectionLabel) + " · " +
+        const sectionMeta=sections.find(section=>section[0]===item.section); const sectionLabel=sectionMeta?(ar?sectionMeta[1]:sectionMeta[2]):t("نتيجة بحث","Search result"); return '<article class="search-result search-article-card"><span class="kicker">' + escapeHtml(sectionLabel) + " · " +
           escapeHtml(item.evidence || "mixed") + "</span><h2>" +
           ('<a href="' + (item.slug ? ("/article/" + encodeURIComponent(item.slug) + "?lang=" + lang) : ("/research?title=" + encodeURIComponent(item.title || query) + "&summary=" + encodeURIComponent(item.summary || "") + "&url=" + encodeURIComponent(item.url || (item.sources || [])[0]?.url || "") + "&publisher=" + encodeURIComponent((item.sources || [])[0]?.publisher || "") + "&lang=" + lang)) + '">' + escapeHtml(item.title) + "</a>") +
           "</h2><p>" + escapeHtml(item.summary || "") + '</p><div class="source-line">' +
