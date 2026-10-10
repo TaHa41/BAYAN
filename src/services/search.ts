@@ -299,7 +299,7 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
  const profile=cleanExact.filter(personEvidence);
  // A single disambiguation result must not hide a valid exact profile from another provider.
  if(profile.length){
-   const canonical=profile.sort((a,b)=>relevanceScore(b,query)-relevanceScore(a,query))[0];
+   const canonical=profile.sort((a,b)=>{const concise=(value:string)=>String(value||"").length<=320?1:0;return concise(String(b.summary||""))-concise(String(a.summary||""))||relevanceScore(b,query)-relevanceScore(a,query);})[0];
    const description=String(canonical.summary||"");
    const sports=/football|soccer|athlete|لاعب كرة قدم|رياضي/i.test(description);
    const medicine=/physician|doctor|surgeon|طبيب|طبيبة/i.test(description);
@@ -462,7 +462,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
     }
   }
   // Person/name lookups should return a useful collection, not stop after the first matching page.
-  const personQuery=personLookup(q);
+  const personQuery=personLookup(q)||(nameOnlyArabicQuery(q)&&candidates.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(q)&&personEvidence(item)));
   const firstPassCount=()=>candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q)).length;
   // Expand when the first pass is merely sparse, not only when it is empty.
   // People searches need several independent identity clues; general searches need
