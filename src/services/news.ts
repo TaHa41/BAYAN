@@ -136,6 +136,14 @@ const terms = (value: string) =>
     .filter((term) => term.length > 2);
 
 const wikidataImage = async (query: string): Promise<string | undefined> => {
+  // Never use the first fuzzy Wikidata result for a person: common names can
+  // resolve to a different person. Only accept a label that matches the requested
+  // subject exactly after Unicode/diacritic normalization.
+  const normalize = (value: string) => String(value || "").normalize("NFKC").toLowerCase()
+    .replace(/[\\u064B-\\u065F\\u0670]/g, "")
+    .replace(/[^\\p{L}\\p{N}]+/gu, " ").trim();
+  const requested = normalize(query);
+  if (!requested || requested.length > 100) return;
   try {
     for (const language of ["ar", "en"]) {
       const searchUrl =
@@ -143,14 +151,18 @@ const wikidataImage = async (query: string): Promise<string | undefined> => {
         encodeURIComponent(query) +
         "&language=" +
         language +
-        "&limit=3&format=json&origin=*";
+        "&limit=5&format=json&origin=*";
       const searchResponse = await fetch(searchUrl, {
         signal: AbortSignal.timeout(2500),
         headers: { accept: "application/json" },
       });
       if (!searchResponse.ok) continue;
       const searchData = await searchResponse.json<any>();
-      const ids = (searchData.search || []).map((x: any) => x.id).filter(Boolean).slice(0, 3);
+      const matches = (searchData.search || []).filter((item: any) => {
+        const label = normalize(item.label || "");
+        return label === requested;
+      });
+      const ids = matches.map((item: any) => item.id).filter(Boolean).slice(0, 5);
       if (!ids.length) continue;
 
       const entityUrl =
