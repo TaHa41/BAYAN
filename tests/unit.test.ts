@@ -20,6 +20,17 @@ describe("exact person identity isolation",()=>{
     expect(result).toHaveLength(1);
     expect(result[0].title).toBe("محمد صلاح");
   });
+  it("keeps several same-subject football results but drops unrelated people with the same name",()=>{
+    const items=[
+      {title:"محمد صلاح",summary:"لاعب كرة قدم مصري محترف.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح",provider:"Wikidata",score:80,sources:[{title:"محمد صلاح",publisher:"Wikidata",url:"https://www.wikidata.org/wiki/Q"}]},
+      {title:"محمد صلاح يسجل هدفًا لليفربول",summary:"سجل لاعب كرة القدم المصري محمد صلاح هدفًا مع ليفربول.",url:"https://www.bbc.com/sport/football/123",provider:"BBC Web Search",score:75,sources:[{title:"محمد صلاح يسجل هدفًا لليفربول",publisher:"BBC Sport",url:"https://www.bbc.com/sport/football/123"}]},
+      {title:"محمد صلاح دندراوي",summary:"كاتب وأديب سعودي.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي",provider:"Wikipedia",score:70,sources:[{title:"محمد صلاح دندراوي",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي"}]}
+    ] as any;
+    const result=isolateExactPerson("محمد صلاح",items);
+    expect(result.some((item:any)=>item.title==="محمد صلاح")).toBe(true);
+    expect(result.some((item:any)=>item.title==="محمد صلاح يسجل هدفًا لليفربول")).toBe(true);
+    expect(result.some((item:any)=>item.title==="محمد صلاح دندراوي")).toBe(false);
+  });
   it("rejects an exact-name disambiguation page whose summary lists several people",()=>{
     const items=[
       {title:"محمد صلاح",summary:"محمد صلاح لاعب كرة قدم مصري. محمد صلاح دندراوي كاتب سعودي. محمد صلاح (توضيح) يشير إلى عدة أشخاص.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح",provider:"Wikipedia",score:90,sources:[{title:"محمد صلاح",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح"}]},
