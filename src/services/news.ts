@@ -223,11 +223,13 @@ const wikipediaImage = async (query: string): Promise<string | undefined> => {
 const wikipediaExactImage=async(query:string):Promise<string|undefined>=>{
   const lookup = async (lang:string) => {
     try {
-      const u="https://"+lang+".wikipedia.org/w/api.php?action=query&prop=pageimages&piprop=thumbnail&titles="+encodeURIComponent(query)+"&format=json&origin=*";
+      const u="https://"+lang+".wikipedia.org/w/api.php?action=query&prop=pageimages|pageprops&piprop=thumbnail&titles="+encodeURIComponent(query)+"&format=json&origin=*";
       const r=await fetch(u,{signal:AbortSignal.timeout(2500),headers:{accept:"application/json"}});
       if(!r.ok) return undefined;
       const d=await r.json<any>();
       const p=Object.values(d.query?.pages||{})[0] as any;
+      // Never take an image from a page that is explicitly a disambiguation page.
+      if(!p||p.missing||p.pageprops?.disambiguation!==undefined)return undefined;
       return p?.thumbnail?.source as string|undefined;
     } catch { return undefined; }
   };
