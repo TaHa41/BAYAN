@@ -534,6 +534,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   // Re-apply identity isolation after recovery: fallback must never reintroduce
   // unrelated people after the strict ranking tier rejected every candidate.
   ranked=isolateExactPerson(q,ranked);
+  if(personQuery){const exactTitle=normalizedEntityTitle(personQueryName(q));ranked.sort((a,b)=>Number(normalizedEntityTitle(a.title)!==exactTitle)-Number(normalizedEntityTitle(b.title)!==exactTitle));}
   // Never pad the result list with unrelated items: expand providers first, then report honestly if relevance is still weak.
   // Merge provider duplicates only when their descriptions support the same entity.
   // A title-only key can incorrectly merge different people who share a name.
@@ -585,7 +586,8 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   let publishedSlug:string|undefined;
   let answer:string|undefined;
   let answerStatus:SearchResponse["status"]|undefined;
-  if(results.length){
+  const exactPersonConfirmed=!personQuery||results.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
+  if(results.length&&exactPersonConfirmed){
     try{const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),1000))]);if(drafted.answer){answer=drafted.answer;answerStatus=drafted.status;}const independentSources=new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean));const articleTitle=results.find(x=>x.title&&x.summary)?.title||"";const articleSummary=results.find(x=>x.title&&x.summary)?.summary||q;if(options.publish!==false&&drafted.status==="verified"&&usefulDraft(drafted.answer,language)&&independentSources.size>=2&&articleTitle&&!disallowedContent(articleTitle+" "+articleSummary)){const imageUrl=results.find(item=>/^https:\/\//i.test(String(item.imageUrl||""))&&String(item.imageAlt||item.title||"").trim().length>0)?.imageUrl||await findRelatedImage(articleTitle,undefined,articleSummary).catch(()=>undefined);const savedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:drafted.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle});if(savedSlug)publishedSlug=savedSlug;}}catch{}
   }
   const message=results.length?undefined:(language==="ar"?"تعذر العثور على نتيجة من مصادر البحث المتاحة حاليًا. يمكن توسيع البحث لاحقًا عند توفر مزودات إضافية.":"No result was returned by the available search providers right now. The search can be expanded when additional providers are available.");
