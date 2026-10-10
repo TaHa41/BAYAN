@@ -137,13 +137,13 @@ items=items.filter((x:any)=>x.kind==="evidence"||/^https:\/\//i.test(String(x.im
 if(items.length<2&&section!=="prices"){
  try{
   const queries:Record<string,{ar:string;en:string}>={
-   science:{ar:"اكتشافات علمية وشرح مبادئ العلوم من مصادر موثوقة",en:"scientific discoveries and evidence-based explanations of science"},
+   science:{ar:"اكتشافات علمية وشرح مبادئ العلوم من مصادر موثوقة",en:"science discoveries and evidence-based explanations of science"},
    technology:{ar:"تقنيات الذكاء الاصطناعي والحوسبة وأمن المعلومات",en:"artificial intelligence computing and information security explained"},
    economy:{ar:"شرح التضخم والأسواق والاقتصاد من مصادر موثوقة",en:"economics inflation markets and financial systems explained"},
-   politics:{ar:"السياسات العامة والمؤسسات والحكم بمصادر موثوقة",en:"public policy institutions and governance explained with sources"},
+   politics:{ar:"السياسات العامة والمؤسسات والحكم بمصادر موثوقة",en:"politics, public policy institutions and governance explained with sources"},
    health:{ar:"الصحة العامة والطب المبني على الأدلة من مصادر طبية",en:"public health and evidence-based medicine from medical sources"},
    history:{ar:"أحداث تاريخية وحضارات وسياق تاريخي من مصادر موثوقة",en:"historical events civilizations and historical context from reliable sources"},
-   people:{ar:"سير شخصيات عامة موثقة وحياتهم وأعمالهم",en:"documented biographies of public figures and their work"},
+   people:{ar:"سير شخصيات عامة موثقة وحياتهم وأعمالهم",en:"biography of public figures and their work from reliable sources"},
    sports:{ar:"قواعد الرياضة والإحصاءات الرياضية وتاريخ المنافسات",en:"sports rules statistics and competition history"},
    travel:{ar:"وجهات السفر والجغرافيا وإرشادات السفر الرسمية",en:"travel destinations geography and official travel guidance"},
    art:{ar:"الفنون والسينما والموسيقى وتاريخها من مصادر موثوقة",en:"arts film music and their history from reliable sources"},
@@ -155,8 +155,16 @@ if(items.length<2&&section!=="prices"){
   const meta=sectionBySlug(section)!;
   const q=queries[section]?.[lang]||(lang==="ar"?meta.descriptionAr:meta.descriptionEn);
   const found=await search(env,q,lang);
-  const fallback=(found.results||[]).filter((x:any)=>{const title=String(x?.title||""),summary=String(x?.summary||""),body=String(x?.body||"");return title&&summary&&(lang==="ar"?hasArabic(title)&&hasArabic(summary)&&(!body||hasArabic(body)):!hasArabic(title)&&!hasArabic(summary)&&!hasArabic(body));}).slice(0,12).map((x:any)=>({...x,section:section,kind:"evidence"}));
-  items=[...items,...fallback];
+  const refreshed=await listArticles(env,section,lang,24);
+  const existingSlugs=new Set(items.map((x:any)=>String(x.slug||"")).filter(Boolean));
+  const refreshedComplete=refreshed.filter((x:any)=>x.slug&&!existingSlugs.has(String(x.slug))&&articleBodyQuality(String(x.body||"")).ok&&localeSafeItem(x)&&/^https:\/\//i.test(String(x.imageUrl||"")));
+  items=[...items,...refreshedComplete];
+  const completeCount=items.filter((x:any)=>x.slug&&articleBodyQuality(String(x.body||"")).ok&&/^https:\/\//i.test(String(x.imageUrl||""))).length;
+  if(completeCount<2){
+   const existingTitles=new Set(items.map((x:any)=>String(x.title||"").normalize("NFKC").toLowerCase().trim()));
+   const fallback=(found.results||[]).filter((x:any)=>{const title=String(x?.title||""),summary=String(x?.summary||""),body=String(x?.body||"");return title&&summary&&!existingTitles.has(title.normalize("NFKC").toLowerCase().trim())&&(lang==="ar"?hasArabic(title)&&hasArabic(summary)&&(!body||hasArabic(body)):!hasArabic(title)&&!hasArabic(summary)&&!hasArabic(body));}).slice(0,12).map((x:any)=>({...x,section:section,kind:"evidence"}));
+   items=[...items,...fallback];
+  }
  }catch{}
 }
 items=items.filter(localeSafeItem);
