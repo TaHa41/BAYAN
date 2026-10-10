@@ -409,16 +409,32 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
     }).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
   }
   // Never pad the result list with unrelated items: expand providers first, then report honestly if relevance is still weak.
-  // Collapse duplicate provider hits by normalized title while preserving the
-  // distinct evidence URLs. The old title+summary key let the same encyclopedia
-  // page appear multiple times whenever providers returned slightly different extracts.
+  // Merge provider duplicates only when their descriptions support the same entity.
+  // A title-only key can incorrectly merge different people who share a name.
   const uniqueByTitle = new Map<string,Candidate>();
+  const identityTerms = (value:string) => new Set(String(value||"").normalize("NFKC").toLowerCase()
+    .replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/[^\\p{L}\\p{N}]+/gu," ")
+    .split(/\\s+/).filter(term=>term.length>=4&&!/^(the|this|that|with|from|about|news|article|said|says|من|في|على|عن|هذا|هذه|الذي|التي|قال|عنها|عنه)$/.test(term)));
+  const normalizedTitle = (value:string) => String(value||"").normalize("NFKC").toLowerCase()
+    .replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/[^\\p{L}\\p{N}]+/gu," ").trim();
+  const sameEntity = (a:Candidate,b:Candidate) => {
+    const left=identityTerms(a.summary),right=identityTerms(b.summary);
+    const common=[...left].filter(term=>right.has(term)).length;
+    const sameUrl=String(a.url||"").trim()===String(b.url||"").trim()&&Boolean(a.url);
+    return sameUrl || (common>=2 && common/Math.max(1,Math.min(left.size,right.size))>=0.18);
+  };
   for (const candidate of ranked) {
-    const key = String(candidate.title || "").normalize("NFKC").toLowerCase()
-      .replace(/[\u064B-\u065F\u0670]/g, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
-    if (!key) continue;
-    const existing = uniqueByTitle.get(key);
-    if (!existing) { uniqueByTitle.set(key, {...candidate, sources:[...(candidate.sources||[])]}); continue; }
+    const titleKey=normalizedTitle(candidate.title);
+    if (!titleKey) continue;
+    const matching=[...uniqueByTitle.entries()].find(([key,existing])=>key.startsWith(titleKey+"|")&&sameEntity(existing,candidate));
+    const existing=matching?.[1];
+    if (!existing) {
+      const terms=[...identityTerms(candidate.summary)].sort().slice(0,6).join(" ");
+      const fallback=String(candidate.url||candidate.sources?.[0]?.url||candidate.provider||"").toLowerCase();
+      const key=titleKey+"|"+(terms||fallback||String(uniqueByTitle.size));
+      uniqueByTitle.set(key,{...candidate,sources:[...(candidate.sources||[])]});
+      continue;
+    }
     const sourceKeys = new Set((existing.sources||[]).map(source => String(source.url||"").trim()).filter(Boolean));
     for (const source of candidate.sources||[]) {
       const sourceUrl = String(source.url||"").trim();
