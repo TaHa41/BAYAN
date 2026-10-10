@@ -122,6 +122,10 @@ try{
 try{
   const s=await get("/api/search?q=%D9%86%D8%AC%D9%8A%D8%A8%20%D9%85%D8%AD%D9%81%D9%88%D8%B8&lang=ar"); const d=JSON.parse(s.text);
   if(!Array.isArray(d.results)||d.results.length<1)throw new Error("person_search_empty");
+  const salah=await get("/api/search?q=%D9%85%D8%AD%D9%85%D8%AF%20%D8%B5%D9%84%D8%A7%D8%AD&lang=ar"); const sd=JSON.parse(salah.text);
+  if(!Array.isArray(sd.results)||!sd.results.some(x=>String(x.title||"").trim()==="محمد صلاح"))throw new Error("exact_person_subject_missing");
+  if(sd.results.some(x=>String(x.title||"").trim()!=="محمد صلاح"))throw new Error("same_name_people_mixed_into_biography");
+  if(!sd.results.find(x=>String(x.title||"").trim()==="محمد صلاح")?.imageUrl)throw new Error("exact_person_subject_image_missing");
   if(!Array.isArray(d.providerAttempted)||d.providerAttempted.length<5)throw new Error("provider_coverage_missing");
   const topic=await get("/api/search?q=%D8%A7%D9%83%D8%AA%D8%B4%D8%A7%D9%81%D8%A7%D8%AA%20%D8%A7%D9%84%D9%81%D8%B6%D8%A7%D8%A1&lang=ar"); const td=JSON.parse(topic.text);
   if(!Array.isArray(td.results)||td.results.length<1)throw new Error("general_topic_search_empty");
