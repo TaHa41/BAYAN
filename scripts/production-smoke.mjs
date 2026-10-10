@@ -147,6 +147,41 @@ try{
   if(!Array.isArray(ed.providerAttempted)||ed.providerAttempted.length<5)throw new Error("english_provider_coverage_missing");
   if(ed.results.some(x=>/[\u0600-\u06ff]/.test(String(x.title||""))))throw new Error("english_topic_result_language_mismatch");
 }catch(e){console.error("SEARCH",e);bad++}
+try{
+  // General-search regression matrix: coverage must not be special-cased to one name or one subject.
+  const generalQueries=[
+    {q:"التغير المناخي",lang:"ar"},
+    {q:"الذكاء الاصطناعي",lang:"ar"},
+    {q:"أسباب التضخم",lang:"ar"},
+    {q:"الطاقة الشمسية",lang:"ar"},
+    {q:"تاريخ الأهرامات",lang:"ar"},
+    {q:"climate change",lang:"en"},
+    {q:"artificial intelligence",lang:"en"},
+    {q:"inflation causes",lang:"en"},
+    {q:"solar energy",lang:"en"},
+    {q:"history of pyramids",lang:"en"}
+  ];
+  const hostCoverage=new Set();
+  const outcomes=[];
+  // Run queries sequentially to avoid flooding the Worker and external providers during monitoring.
+  for(const item of generalQueries){
+    const response=await get("/api/search?q="+encodeURIComponent(item.q)+"&lang="+item.lang);
+    const data=JSON.parse(response.text);
+    if(!Array.isArray(data.results)||data.results.length<1)throw new Error("general_search_empty_"+item.lang+"_"+item.q);
+    if(!Array.isArray(data.providerAttempted)||data.providerAttempted.length<5)throw new Error("general_search_provider_coverage_missing_"+item.lang+"_"+item.q);
+    for(const result of data.results){
+      const title=String(result.title||"");
+      if(item.lang==="ar"?(!/[\u0600-\u06ff]/.test(title)):(/[\u0600-\u06ff]/.test(title)))throw new Error("general_search_title_language_mismatch_"+item.lang+"_"+item.q);
+      for(const source of result.sources||[]){
+        try{const url=new URL(String(source.url||""));if(url.protocol==="https:"&&!/wikipedia.org|wikidata.org|news.google.com/i.test(url.hostname))hostCoverage.add(url.hostname.toLowerCase().replace(/^www\./,""))}catch{}
+      }
+    }
+    if(!data.results.some(result=>/^https:\/\//i.test(String(result.url||""))||(result.sources||[]).some(source=>/^https:\/\//i.test(String(source.url||"")))))throw new Error("general_search_sources_missing_"+item.lang+"_"+item.q);
+    outcomes.push({query:item.q,language:item.lang,count:data.results.length});
+  }
+  console.log("GENERAL_SEARCH_MATRIX",JSON.stringify({outcomes,independentSourceHosts:hostCoverage.size}));
+  if(hostCoverage.size<4)throw new Error("general_search_source_diversity_too_low");
+}catch(e){console.error("GENERAL_SEARCH_MATRIX",e);bad++}
 for(const section of sections.filter(section=>section!=="prices")){
   for(const language of ["ar","en"]){
     try{
