@@ -286,21 +286,47 @@ const mixedIdentitySummary=(query:string,candidate:Candidate)=>{
   }
   return variants.size>=2;
 };
-export const isolateExactPerson=(query:string,items:Candidate[])=>{
-  const name=normalizedEntityTitle(personQueryName(query));
-  if(!name)return items;
-  const exactTitle=items.filter(item=>normalizedEntityTitle(item.title)===name);
-  if(exactTitle.some(item=>isDisambiguation(item)||mixedIdentitySummary(query,item)))return [];
-  const exact=exactTitle.filter(item=>personEvidence(item));
-  if(exact.length){
-    const canonical=exact.sort((a,b)=>relevanceScore(b,query)-relevanceScore(a,query))[0];
-    const canonicalUrl=String(canonical.url||canonical.sources?.[0]?.url||"");
-    return items.filter(item=>normalizedEntityTitle(item.title)===name&&!isDisambiguation(item)&&!mixedIdentitySummary(query,item)&&
-      String(item.url||item.sources?.[0]?.url||"")===canonicalUrl);
-  }
-  if(personLookup(query))return items.filter(item=>!isDisambiguation(item)&&!mixedIdentitySummary(query,item));
-  return items.filter(item=>!mixedIdentitySummary(query,item));
+const nameOnlyArabicQuery=(query:string)=>{
+ const raw=String(query||"").trim();
+ if(!/^[\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){1,3}$/.test(raw))return false;
+ return !/(?:ما هو|ما هي|تاريخ|علوم|تقنية|اقتصاد|سياسة|رياضة|ذكاء اصطناعي|تغير المناخ|الفضاء|الطاقة|الصحة|السياحة|البرمجة|مصر|العالم العربي|التجارة|العملات|أسعار|فوائد|أنواع|دليل|شرح|مفهوم|تعريف)/.test(raw);
 };
+export const isolateExactPerson=(query:string,items:Candidate[])=>{
+ const name=normalizedEntityTitle(personQueryName(query));
+ if(!name)return items;
+ const exactTitle=items.filter(item=>normalizedEntityTitle(item.title)===name);
+ const cleanExact=exactTitle.filter(item=>!isDisambiguation(item)&&!mixedIdentitySummary(query,item));
+ const profile=cleanExact.filter(personEvidence);
+ // A single disambiguation result must not hide a valid exact profile from another provider.
+ if(profile.length){
+   const canonical=profile.sort((a,b)=>relevanceScore(b,query)-relevanceScore(a,query))[0];
+   const description=String(canonical.summary||"");
+   const sports=/football|soccer|athlete|لاعب كرة قدم|رياضي/i.test(description);
+   const medicine=/physician|doctor|surgeon|طبيب|طبيبة/i.test(description);
+   const politics=/politician|president|minister|سياسي|رئيس|وزير/i.test(description);
+   const arts=/writer|author|poet|actor|actress|كاتب|مؤلف|شاعر|ممثل|ممثلة/i.test(description);
+   const context=sports?/(football|soccer|premier league|liverpool|club|goal|match|team|منتخب|كرة قدم|الدوري|ليفربول|هدف|مباراة|نادي|رياضة)/i:
+     medicine?/(medical|medicine|hospital|clinical|doctor|طب|طبي|مستشفى|علاج|طبيب)/i:
+     politics?/(government|election|president|minister|politic|حكومة|انتخابات|رئيس|وزير|سياسة)/i:
+     arts?/(book|novel|film|movie|writer|author|actor|poet|كتاب|رواية|فيلم|كاتب|مؤلف|ممثل|شاعر)/i:null;
+   const safe=items.filter(item=>{
+     if(isDisambiguation(item)||mixedIdentitySummary(query,item))return false;
+     if(normalizedEntityTitle(item.title)===name)return cleanExact.includes(item);
+     const title=normalizedEntityTitle(item.title);
+     // Exclude encyclopedia pages whose titles append a second person's identity.
+     if(title.startsWith(name+" ")&&/(?:دندراوي|زكريا|مصطفى|العزب|جندي|ممثل|مدرب|توضيح|تشالدران|denrawi|zakaria|mustafa|al.?azab|soldier|actor|disambiguation)/i.test(title.slice(name.length)))return false;
+     const text=String(item.title||"")+" "+String(item.summary||"");
+     if(context)return context.test(text);
+     return identityTextForSearch(text).includes(name);
+   });
+   return safe.length?safe:cleanExact;
+ }
+ // A bare Arabic name becomes a strict person lookup only when an exact profile exists.
+ if(personLookup(query)||nameOnlyArabicQuery(query))return items.filter(item=>!isDisambiguation(item)&&!mixedIdentitySummary(query,item));
+ return items.filter(item=>!mixedIdentitySummary(query,item));
+};
+const identityTextForSearch=(value:string)=>String(value||"").normalize("NFKC").toLowerCase()
+ .replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").replace(/\s+/g," ").trim();
 export const isolateArticleSubject=(title:string,items:Candidate[])=>{
  const query=normalizedEntityTitle(title);
  if(!query||!Array.isArray(items))return [];
