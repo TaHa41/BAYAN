@@ -165,7 +165,7 @@ export async function api(request:Request,env:Env){const u=new URL(request.url),
       for(const candidateUrl of candidateUrls){
         try{
           const parsed=new URL(String(candidateUrl||""));
-          const host=parsed.hostname.toLowerCase().replace(/^www\\./,"");
+          const host=parsed.hostname.toLowerCase().replace(/^www\./,"");
           if(parsed.protocol!=="https:"||articleEvidenceHosts.has(host)||articleEvidenceUrls.includes(parsed.toString()))continue;
           articleEvidenceHosts.add(host);articleEvidenceUrls.push(parsed.toString());break;
         }catch{}
@@ -177,7 +177,7 @@ export async function api(request:Request,env:Env){const u=new URL(request.url),
     found.results=found.results.map((candidate:any)=>{
       const candidateUrls=[candidate.url,...(Array.isArray(candidate.sources)?candidate.sources.map((item:any)=>item?.url):[])].map((value:any)=>String(value||""));
       const extra=candidateUrls.map(url=>evidenceByUrl.get(url)||"").find(value=>value.length>=160)||"";
-      return extra?{...candidate,summary:[String(candidate.summary||"").trim(),extra].filter(Boolean).join("\\n\\n").slice(0,5000)}:candidate;
+      return extra?{...candidate,summary:[String(candidate.summary||"").trim(),extra].filter(Boolean).join("\n\n").slice(0,5000)}:candidate;
     });
     let generated:{status:string;answer?:string;sources?:Source[]}={status:"mixed"};
     try{generated=await bounded(ask(env,articlePrompt(title,lang),lang,found.results),8000)}catch{}
