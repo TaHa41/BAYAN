@@ -267,14 +267,20 @@ const personQueryName=(query:string)=>String(query||"").trim()
   .replace(/^(?:who is|who was|biography(?: of)?|profile(?: of)?|من هو|من هي|سيرة ذاتية عن|سيرة ذاتية لشخص)\s+/i,"")
   .replace(/\s+(?:biography|profile|official profile|سيرة ذاتية|مصدر رسمي)$/i,"").trim();
 const personEvidence=(candidate:SearchResult)=>/(footballer|football player|soccer player|athlete|politician|writer|author|actor|actress|scientist|researcher|coach|president|minister|born in|is a .*player|لاعب كرة قدم|لاعب|رياضي|سياسي|كاتب|مؤلف|ممثل|عالِم|عالم|باحث|مدرب|رئيس|وزير|وُلد|ولد)/i.test(String(candidate.title||"")+" "+String(candidate.summary||""));
-const isDisambiguation=(candidate:Candidate|string)=>{const value=typeof candidate==="string"?candidate:String(candidate.title||"")+" "+String(candidate.summary||"");return /(?:disambiguation|\(توضيح\)|صفحة توضيح|معاني الأسماء|قد يشير إلى|قد تشير إلى|may refer to|people with the name)/i.test(value);};
+const isDisambiguation=(candidate:Candidate|string)=>{
+  const value=typeof candidate==="string"?candidate:String(candidate.title||"")+" "+String(candidate.summary||"").slice(0,420);
+  return /(?:disambiguation|\(توضيح\)|صفحة توضيح|معاني الأسماء|قد يشير إلى|قد تشير إلى|may refer to|people with the name)/i.test(value);
+};
 const identityText=(value:string)=>String(value||"").normalize("NFKC").toLowerCase()
   .replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").replace(/\s+/g," ").trim();
 const mixedIdentitySummary=(query:string,candidate:Candidate)=>{
   const name=identityText(personQueryName(query));
-  const summary=identityText(candidate.summary||"");
+  // Inspect the lead first: encyclopedia search extracts can append disambiguation
+  // entries after a valid biography. A late namesake list must not erase the real profile.
+  const rawLead=String(candidate.summary||"").slice(0,420);
+  const summary=identityText(rawLead);
   if(!name||!summary)return false;
-  const explicitMarker=/(?:may refer to|people with the name|صفحة توضيح|قد يشير إلى|قد تشير إلى)/i.test(String(candidate.summary||""))||
+  const explicitMarker=/(?:may refer to|people with the name|صفحة توضيح|قد يشير إلى|قد تشير إلى)/i.test(rawLead)||
     summary.includes(name+" توضيح");
   if(!explicitMarker)return false;
   const variants=new Set<string>();
@@ -285,6 +291,20 @@ const mixedIdentitySummary=(query:string,candidate:Candidate)=>{
     pos=summary.indexOf(name,pos+name.length);
   }
   return variants.size>=2;
+};
+const sanitizePersonProfileSummary=(query:string,value:string)=>{
+  const name=String(personQueryName(query)||"").trim();
+  let summary=String(value||"").trim();
+  if(!name||!summary)return summary;
+  const tailMarkers=[name+" (توضيح)",name+" (جندي)",name+" دندراوي",name+" زكريا",name+" مصطفى",name+" العزب","قد يشير إلى عدة أشخاص","قد تشير إلى عدة أشخاص","people with the name","disambiguation"];
+  for(const marker of tailMarkers){
+    const at=summary.toLowerCase().indexOf(marker.toLowerCase());
+    if(at>120)summary=summary.slice(0,at).trim();
+  }
+  const currentClaimPattern=/(?:يلعب\s+حالي\S*[^.!؟?؛]*|ناديه\s+الحالي[^.!؟?؛]*|currently\s+plays[^.!?]*|current\s+club[^.!?]*)/gi;
+  const claims=[...summary.matchAll(currentClaimPattern)].length;
+  if(claims>1)summary=summary.replace(currentClaimPattern," ").replace(/\s+/g," ").trim();
+  return summary;
 };
 const nameOnlyArabicQuery=(query:string)=>{
  const raw=String(query||"").trim();
@@ -312,7 +332,12 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
       if(isDisambiguation(item)||mixedIdentitySummary(query,item))rank-=1000;
       return rank+relevanceScore(item,query)/100;
     };
-    const canonical=profile.sort((a,b)=>canonicalRank(b)-canonicalRank(a))[0];
+    const sportsProfiles=profile.filter(item=>/(footballer|football player|soccer player|لاعب كرة قدم|لاعب كرة القدم)/i.test(String(item.summary||"")));
+    const writerProfiles=profile.filter(item=>/(writer|author|novelist|poet|كاتب|مؤلف|روائي|شاعر)/i.test(String(item.summary||"")));
+    const profilePool=sportsProfiles.length?sportsProfiles:writerProfiles.length?writerProfiles:profile;
+    const canonical=profilePool.sort((a,b)=>canonicalRank(b)-canonicalRank(a))[0];
+    canonical.summary=sanitizePersonProfileSummary(query,String(canonical.summary||""));
+    canonical.section="people";
    const description=String(canonical.summary||"");
    const sports=/football|soccer|athlete|لاعب كرة قدم|رياضي/i.test(description);
    const medicine=/physician|doctor|surgeon|طبيب|طبيبة/i.test(description);
@@ -325,8 +350,14 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
    // Collapse exact-title providers to one canonical identity, but merge their distinct source citations and a safe exact-page image.
    canonical.sources=(canonical.sources||[]).filter(source=>normalizedEntityTitle(source.title)===name);
    const sourceKeys=new Set((canonical.sources||[]).map(source=>String(source.url||"").trim()).filter(Boolean));
+   const canonicalIsSports=/(footballer|football player|soccer player|لاعب كرة قدم|لاعب كرة القدم)/i.test(String(canonical.summary||""));
+   const canonicalIsWriter=/(writer|author|novelist|poet|كاتب|مؤلف|روائي|شاعر)/i.test(String(canonical.summary||""));
    for(const candidate of cleanExact){
      if(candidate!==canonical){
+       const candidateSummary=String(candidate.summary||"");
+       const conflictsWithCanonical=(canonicalIsSports&&/(actor|actress|ممثل|ممثلة)/i.test(candidateSummary)&&!/(footballer|football player|soccer player|لاعب كرة قدم|لاعب كرة القدم)/i.test(candidateSummary))||
+         (canonicalIsWriter&&/(actor|actress|ممثل|ممثلة)/i.test(candidateSummary)&&!/(writer|author|novelist|poet|كاتب|مؤلف|روائي|شاعر)/i.test(candidateSummary));
+       if(conflictsWithCanonical)continue;
        for(const source of candidate.sources||[]){if(normalizedEntityTitle(source.title)!==name)continue;const url=String(source.url||"").trim();if(url&&!sourceKeys.has(url)){canonical.sources=[...(canonical.sources||[]),source];sourceKeys.add(url);}}
        if(!canonical.imageUrl&&/^https:\/\//i.test(String(candidate.imageUrl||""))){canonical.imageUrl=candidate.imageUrl;canonical.imageAlt=candidate.imageAlt||candidate.title;}
      }
