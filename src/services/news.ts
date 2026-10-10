@@ -10,6 +10,27 @@ type Story = {
   imageAlt?: string;
 };
 
+/**
+ * Put independent publishers first so the bounded image-enrichment budget is
+ * spent across sources instead of letting one fast feed occupy every early slot.
+ * This changes ordering only; it never invents a publisher or a story.
+ */
+const diversifyByPublisher = (stories: Story[]): Story[] => {
+  const firstByPublisher: Story[] = [];
+  const remaining: Story[] = [];
+  const seenPublishers = new Set<string>();
+  for (const story of stories) {
+    const publisher = String(story.publisher || "").trim().toLowerCase();
+    if (publisher && !seenPublishers.has(publisher)) {
+      seenPublishers.add(publisher);
+      firstByPublisher.push(story);
+    } else {
+      remaining.push(story);
+    }
+  }
+  return [...firstByPublisher, ...remaining];
+};
+
 // Reject generic Google News thumbnails and obvious UI assets.
 const isUsableNewsImage = (value: unknown): value is string => {
   if (typeof value !== "string" || !value.trim()) return false;
@@ -596,17 +617,18 @@ export async function news(env: Env, lang: Locale) {
     ),
   );
 
-  const unique = all
-    .filter((story) => {
-      const key = story.title
-        .toLowerCase()
-        .replace(/[^\p{L}\p{N}]+/gu, " ")
-        .trim();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .slice(0, limit);
+  const deduplicated = all.filter((story) => {
+    const key = story.title
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, " ")
+      .trim();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  // Preserve recency within each publisher while ensuring the first image-repair
+  // slots are not monopolized by one feed.
+  const unique = diversifyByPublisher(deduplicated).slice(0, limit);
 
   const enriched = await Promise.all(unique.map(async (story, index) => {
     // Every visible news card must have an image. Prefer RSS/publisher metadata,
