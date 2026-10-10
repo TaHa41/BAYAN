@@ -396,9 +396,6 @@ export const isolateArticleSubject=(title:string,items:Candidate[])=>{
  const exact=items.filter(item=>normalizedEntityTitle(item.title)===query);
  const validExact=exact.filter(item=>!isDisambiguation(String(item.title||"")+" "+String(item.summary||"")));
  if(validExact.length){
-  const profile=validExact.find(item=>personEvidence(item));
-  const chosen=profile||validExact[0];
-  const chosenUrl=String(chosen.url||chosen.sources?.[0]?.url||"");
   return validExact.filter(item=>!isDisambiguation(String(item.title||"")+" "+String(item.summary||""))&&!mixedIdentitySummary(title,item));
  }
  const arabicName=/^[\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){1,3}$/.test(String(title||"").trim())&&!/(?:ما هو|ما هي|تاريخ|علوم|تقنية|اقتصاد|سياسة|رياضة|ذكاء اصطناعي|تغير المناخ|الفضاء|الطاقة|الصحة|السياحة|البرمجة|مصر|العالم العربي)/.test(title);
