@@ -495,6 +495,7 @@
       const data=await api("/api/news/article?title="+encodeURIComponent(title)+"&summary="+encodeURIComponent(summary)+"&url="+encodeURIComponent(url)+"&publisher="+encodeURIComponent(publisher)+"&image="+encodeURIComponent(p.get("image")||"")+"&lang="+lang,{timeoutMs:36000});
       const article=data.article||{};
       if(!data.ok||!article.title)throw new Error("article_unavailable");
+      if(article.status!=="verified")throw new Error("article_not_verified");
       output.innerHTML='<article class="article-full">'+(article.image?heroImageHtml(article.image,article.title,article.summary||summary):"")+
         '<span class="eyebrow">'+escapeHtml(article.sources?.[0]?.publisher||publisher||t("بحث موثق","Evidence search"))+'</span><h1>'+escapeHtml(article.title)+'</h1>'+
         articleLeadHtml(article.summary||summary,article.body||summary)+(article.savedSlug?'<div class="notice">'+t("تمت إضافة المقال تلقائيًا إلى قسم","Automatically added to section")+' <a href="/'+encodeURIComponent(article.section||"news")+'?lang='+lang+'">'+escapeHtml((sections.find(section=>section[0]===(article.section||"news"))||[])[ar?1:2]||article.section||"news")+'</a></div>':"")+
@@ -506,7 +507,7 @@
       if (!article.image) ensureHeroImage(output.querySelector(".article-full"), article.title || title, article.summary || summary);
     }catch{
       const fallbackSummary=String(summary||"").trim();
-      output.innerHTML='<article class="article-full"><span class="eyebrow">'+escapeHtml(publisher||t("نتيجة بحث","Search result"))+'</span><h1>'+escapeHtml(title)+'</h1>'+(fallbackSummary?'<p class="lead">'+escapeHtml(fallbackSummary)+'</p>':'')+'<div class="notice"><p>'+t("تعذر إكمال التحقق من المصادر المستقلة هذه المرة. أبقينا معلومات نتيجة البحث ظاهرة بدلًا من عرض مقال غير مكتمل.","Independent-source verification could not be completed this time. The available search result is shown instead of an incomplete article.")+'</p><button class="primary" id="research-retry">'+t("إعادة المحاولة","Retry")+'</button> <a class="read" href="/search?q='+encodeURIComponent(title)+'&lang='+lang+'">'+t("العودة إلى البحث","Back to search")+' →</a></div></article>';
+      output.innerHTML='<article class="article-full">'+(p.get("image")?heroImageHtml(p.get("image"),title,fallbackSummary):"")+'<span class="eyebrow">'+escapeHtml(publisher||t("نتيجة بحث","Search result"))+'</span><h1>'+escapeHtml(title)+'</h1>'+(fallbackSummary?'<p class="lead">'+escapeHtml(fallbackSummary)+'</p>':'')+'<div class="notice"><p>'+t("تعذر إكمال التحقق من المصادر المستقلة هذه المرة. أبقينا معلومات نتيجة البحث ظاهرة بدلًا من عرض مقال غير مكتمل.","Independent-source verification could not be completed this time. The available search result is shown instead of an incomplete article.")+'</p><button class="primary" id="research-retry">'+t("إعادة المحاولة","Retry")+'</button> <a class="read" href="/search?q='+encodeURIComponent(title)+'&lang='+lang+'">'+t("العودة إلى البحث","Back to search")+' →</a></div></article>';
       document.querySelector("#research-retry")?.addEventListener("click",()=>renderResearchArticle());
     }
   }
@@ -578,6 +579,8 @@
             "&publisher=" + encodeURIComponent(story.publisher || "") +
             "&publishedAt=" + encodeURIComponent(story.publishedAt || "") + "&lang=" + lang, { timeoutMs:36000 });
           const article = articleData.article;
+          if(!article?.title)throw new Error("article_unavailable");
+          if(article.status!=="verified")throw new Error("article_not_verified");
           output.innerHTML =
             '<article class="article-full">' + (article.image ? heroImageHtml(article.image, article.title, article.summary || "") : "") +
             '<span class="eyebrow">' + escapeHtml(story.publisher || t("الأخبار","News")) + "</span><h1>" +
