@@ -146,6 +146,9 @@ const checks = [
   ["world section has complete bilingual global-affairs seeds and exact topic terms", ["world-global-supply-chains-ar","world-climate-risks-ar","world-global-supply-chains-en","world-climate-risks-en"].every(slug=>read("migrations_v1/0024_seed_global_knowledge_articles.sql").includes(slug)) && read("src/routes/api.ts").includes("التغير") && read("src/routes/api.ts").includes("globalization")],
   ["site shell and production smoke agree on the cache-busted build marker", read("src/index.ts").includes('const BUILD="2026.10.10.02";') && read("scripts/production-smoke.mjs").includes("2026.10.10.02")],
 ];
+  ["person lookup resolves an exact non-disambiguation Wikipedia profile and carries its real thumbnail", read("src/services/search.ts").includes("wikipediaExactPersonPage") && read("src/services/search.ts").includes("pageprops?.disambiguation") && read("src/services/search.ts").includes("candidates.unshift(...exactProfile)")],
+  ["legacy published articles contaminated by namesakes are archived instead of repeatedly resurfacing", read("src/routes/api.ts").includes("article_identity_ambiguous") && read("src/routes/api.ts").includes("status='ARCHIVED'") && read("src/routes/api.ts").includes("article_subject_mismatch")],
+  ["missing result-card images are resolved from the exact title, not a mixed multi-person summary", read("public/app-20261009-01.js").includes('encodeURIComponent(item.title), {timeoutMs: 18000}') && read("src/services/news.ts").includes("pageprops?.disambiguation")],
 let failed = 0;
 for (const [name, ok] of checks) {
   console.log((ok ? "PASS " : "FAIL ") + name);
