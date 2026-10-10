@@ -22,7 +22,7 @@ export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[
   return sentences.some(sentence=>{
     const names=(sentence.match(/\b[A-Z][A-Za-z0-9&.-]{2,}\b/g)||[]).filter(name=>!generic.has(name.toLowerCase()));
     const numbers=normalizeDigits(sentence).match(/[0-9]+/g)||[];
-    const arabicEntities=[];
+    const arabicEntities:{phrase:string;hasAlias:boolean}[]=[];
     for(const pattern of arabicEntityPatterns){
       pattern.lastIndex=0;
       for(const match of sentence.matchAll(pattern)){
