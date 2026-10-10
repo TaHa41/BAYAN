@@ -321,6 +321,7 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
    const safe=items.filter(item=>{
      if(isDisambiguation(item)||mixedIdentitySummary(query,item))return false;
      if(normalizedEntityTitle(item.title)===name)return item===canonical;
+     if((item.sources||[]).some(source=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(source.publisher||""))))return false;
      const title=normalizedEntityTitle(item.title);
      // Exclude encyclopedia pages whose titles append a second person's identity.
      if(title.startsWith(name+" ")&&/(?:دندراوي|زكريا|مصطفى|العزب|جندي|ممثل|مدرب|توضيح|تشالدران|denrawi|zakaria|mustafa|al.?azab|soldier|actor|disambiguation)/i.test(title.slice(name.length)))return false;
@@ -449,6 +450,30 @@ const localeSafeText=(value:string,language:Locale)=>{
   const sentences=value.split(/[\n.!؟?]+/).map(part=>part.trim()).filter(Boolean);
   return sentences.every(part=>hasArabic(part)||!/[A-Za-z]{5,}/.test(part));
 };
+const localizedPersonDescription=(value:string,language:Locale)=>{
+ const text=String(value||"").normalize("NFKC").toLowerCase();
+ if(language==="ar"){
+  if(/egyptian footballer|egyptian soccer player/.test(text))return "لاعب كرة قدم مصري.";
+  if(/footballer|soccer player|association football player/.test(text))return "لاعب كرة قدم.";
+  if(/egyptian novelist|egyptian writer|egyptian author/.test(text))return "كاتب مصري.";
+  if(/novelist|writer|author/.test(text))return "كاتب أو مؤلف.";
+  if(/politician|political figure/.test(text))return "شخصية سياسية.";
+  if(/scientist|researcher/.test(text))return "عالم أو باحث.";
+  if(/actor|actress/.test(text))return "ممثل.";
+  if(/football manager|football coach/.test(text))return "مدرب كرة قدم.";
+ }
+ if(language==="en"){
+  if(/لاعب كرة قدم مصري/.test(text))return "Egyptian footballer.";
+  if(/لاعب كرة قدم/.test(text))return "Footballer.";
+  if(/كاتب مصري/.test(text))return "Egyptian writer.";
+  if(/كاتب|مؤلف/.test(text))return "Writer or author.";
+  if(/شخصية سياسية|سياسي/.test(text))return "Political figure.";
+  if(/عالم|باحث/.test(text))return "Scientist or researcher.";
+  if(/ممثل/.test(text))return "Actor.";
+  if(/مدرب كرة قدم/.test(text))return "Football coach.";
+ }
+ return "";
+};
 const languageSafe=(x:Candidate,language:Locale)=>{
   // Use the title to select the requested language. A source may have a useful
   // localized headline but an English abstract; keep the result and blank only
@@ -542,7 +567,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
     }
     if ((!existing.summary || existing.summary.length < 80) && candidate.summary) existing.summary = candidate.summary;
   }
-  const results=[...uniqueByTitle.values()].slice(0,max).map(({score,provider,...x})=>({...x,summary:localeSafeText(x.summary,language)?x.summary:"",sources:(x.sources||[]).map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}));
+  const results=[...uniqueByTitle.values()].slice(0,max).map(({score,provider,...x})=>({...x,summary:localeSafeText(x.summary,language)?x.summary:(personQuery&&normalizedEntityTitle(x.title)===normalizedEntityTitle(q)?localizedPersonDescription(x.summary,language):""),sources:(x.sources||[]).map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}));
   const providers=[...new Set(candidates.map(x=>x.provider))];
   const publishers=[...new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean))];
   const configuredMin=Math.max(2,Math.min(5,Number(s.min_sources||3)));

@@ -13,6 +13,7 @@ describe("exact person identity isolation",()=>{
     const items=[
       {title:"محمد صلاح",summary:"محمد صلاح لاعب كرة قدم مصري محترف.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح",provider:"Wikipedia",score:90,sources:[{title:"محمد صلاح",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح"}]},
       {title:"محمد صلاح دندراوي",summary:"كاتب وأديب سعودي.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي",provider:"Wikipedia",score:70,sources:[{title:"محمد صلاح دندراوي",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي"}]},
+      {title:"محمد صلاح — الإحصائيات",summary:"إحصائيات لاعب كرة القدم محمد صلاح.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح",provider:"Wikipedia",score:69,sources:[{title:"محمد صلاح — الإحصائيات",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح"}]},
       {title:"محمد صلاح (توضيح)",summary:"صفحة توضيح لأشخاص يحملون الاسم.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_(توضيح)",provider:"Wikipedia",score:60,sources:[{title:"محمد صلاح (توضيح)",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_(توضيح)"}]},
       {title:"محمد صلاح زكريا",summary:"كاتب قصص وروائي مصري.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_زكريا",provider:"Wikipedia REST Search",score:55,sources:[{title:"محمد صلاح زكريا",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_زكريا"}]}
     ] as any;
@@ -30,6 +31,7 @@ describe("exact person identity isolation",()=>{
     expect(result.some((item:any)=>item.title==="محمد صلاح")).toBe(true);
     expect(result.some((item:any)=>item.title==="محمد صلاح يسجل هدفًا لليفربول")).toBe(true);
     expect(result.some((item:any)=>item.title==="محمد صلاح دندراوي")).toBe(false);
+    expect(result.some((item:any)=>String(item.title).includes("الإحصائيات"))).toBe(false);
   });
   it("keeps the concise canonical biography and its exact-page image when a provider has a contradictory long summary",()=>{
     const items=[
