@@ -174,7 +174,7 @@ const sectionRelevant=(x:any)=>{
  if(section==="sports"&&/(video game|لعبة فيديو|ألعاب فيديو)/i.test(text))return false;
  const terms=sectionTerms[section],pattern=sectionPatterns[section];
  if(!terms)return !pattern||pattern.test(text);
- const words=(value:string)=>new Set(value.normalize("NFKC").toLowerCase().replace(/[\\u064B-\\u065F\\u0670]/g,"").split(/[^\\p{L}\\p{N}]+/u).filter(Boolean));
+ const words=(value:string)=>new Set(value.normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").split(/[^\p{L}\p{N}]+/u).filter(Boolean));
  const titleWords=words(title),summaryWords=words(summary);
  if(terms.some(term=>titleWords.has(term)))return true;
  return terms.filter(term=>summaryWords.has(term)).length>=2;
