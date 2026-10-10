@@ -307,6 +307,8 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
       if(/wikidata/i.test(provider))rank-=18;
       if(/footballer|football player|soccer player|لاعب كرة قدم|لاعب كرة القدم/i.test(summary))rank+=24;
       if(/actor|actress|ممثل|ممثلة/i.test(summary)&&!/footballer|football player|soccer player|لاعب كرة قدم|لاعب كرة القدم/i.test(summary))rank-=8;
+      const currentClubClaims=(summary.match(/currently plays for|current club is|plays for [^,.؛]+|يلعب حاليا مع نادي|يلعب حاليًا مع نادي|ناديه الحالي/gi)||[]).length;
+      if(currentClubClaims>1)rank-=140;
       if(isDisambiguation(item)||mixedIdentitySummary(query,item))rank-=1000;
       return rank+relevanceScore(item,query)/100;
     };
