@@ -566,7 +566,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
     candidates.push(...expanded,...web);
   }
   
-  const safeCandidates=candidates.filter(x=>(language==="ar"?hasArabic(x.title):!hasArabic(x.title))&&!disallowedContent(x.title+" "+x.summary)&&!(personQuery&&normalizedEntityTitle(x.title)===normalizedEntityTitle(personQueryName(q))&&hasConflictingCurrentClubClaims(x.summary)));
+  const safeCandidates=candidates.filter(x=>(language==="ar"?hasArabic(x.title):!hasArabic(x.title))&&!disallowedContent(x.title+" "+x.summary)&&!(normalizedEntityTitle(x.title)===normalizedEntityTitle(personQueryName(q))&&hasConflictingCurrentClubClaims(x.summary)));
   let ranked=safeCandidates.filter(x=>relevantCandidate(x,q)).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
   ranked=isolateExactPerson(q,ranked);
   // If strict matching rejected every result, recover candidates with a real
