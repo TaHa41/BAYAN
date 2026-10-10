@@ -126,6 +126,7 @@ try{
   if(!Array.isArray(sd.results)||!sd.results.some(x=>String(x.title||"").trim()==="محمد صلاح"))throw new Error("exact_person_subject_missing");
   if(sd.results.some(x=>String(x.title||"").trim()!=="محمد صلاح"))throw new Error("same_name_people_mixed_into_biography");
   if(!sd.results.find(x=>String(x.title||"").trim()==="محمد صلاح")?.imageUrl)throw new Error("exact_person_subject_image_missing");
+  if(sd.results.some(x=>/طرابزون\s*سبور/i.test(String(x.summary||""))&&/ليفربول/i.test(String(x.summary||""))&&/(يلعب|ناديه الحالي|currently plays for|current club)/i.test(String(x.summary||""))))throw new Error("contradictory_current_club_claim_displayed");
   if(!Array.isArray(d.providerAttempted)||d.providerAttempted.length<5)throw new Error("provider_coverage_missing");
   const topic=await get("/api/search?q=%D8%A7%D9%83%D8%AA%D8%B4%D8%A7%D9%81%D8%A7%D8%AA%20%D8%A7%D9%84%D9%81%D8%B6%D8%A7%D8%A1&lang=ar"); const td=JSON.parse(topic.text);
   if(!Array.isArray(td.results)||td.results.length<1)throw new Error("general_topic_search_empty");
