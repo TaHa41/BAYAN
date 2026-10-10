@@ -268,7 +268,7 @@ const personQueryName=(query:string)=>String(query||"").trim()
   .replace(/\s+(?:biography|profile|official profile|سيرة ذاتية|مصدر رسمي)$/i,"").trim();
 const personEvidence=(candidate:Candidate)=>/(footballer|football player|soccer player|athlete|politician|writer|author|actor|actress|scientist|researcher|coach|president|minister|born in|is a .*player|لاعب كرة قدم|لاعب|رياضي|سياسي|كاتب|مؤلف|ممثل|عالِم|عالم|باحث|مدرب|رئيس|وزير|وُلد|ولد)/i.test(String(candidate.title||"")+" "+String(candidate.summary||""));
 const isDisambiguation=(candidate:Candidate)=>/(?:disambiguation|\(توضيح\)|صفحة توضيح|معاني الأسماء)/i.test(String(candidate.title||""));
-const isolateExactPerson=(query:string,items:Candidate[])=>{
+export const isolateExactPerson=(query:string,items:Candidate[])=>{
   const name=normalizedEntityTitle(personQueryName(query));
   if(!name)return items;
   const exact=items.filter(item=>normalizedEntityTitle(item.title)===name&&!isDisambiguation(item)&&personEvidence(item));
