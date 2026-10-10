@@ -117,7 +117,7 @@ async function gnewsSearch(env:Env,q:string,language:Locale):Promise<Candidate[]
   if(!apiKey)return[];
   try{
     let query=String(q||"").trim();
-    if(/محمد\\s+صلاح/i.test(query))query=language==="ar" ? '"محمد صلاح" OR "Mohamed Salah" OR "Mo Salah"' : '"Mohamed Salah" OR "Mo Salah"';
+    if(/محمد\s+صلاح/i.test(query))query=language==="ar" ? '"محمد صلاح" OR "Mohamed Salah" OR "Mo Salah"' : '"Mohamed Salah" OR "Mo Salah"';
     const params=new URLSearchParams({q:query,lang:language,max:"10",sortby:"publishedAt",apikey:apiKey});
     const response=await timeout("https://gnews.io/api/v4/search?"+params.toString(),5000);
     if(!response.ok)return[];
