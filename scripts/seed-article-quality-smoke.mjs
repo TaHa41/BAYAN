@@ -11,12 +11,12 @@ const parseMigration = (migrationPath) => {
   const parsedRows = [];
   let i = valuesStart + "VALUES".length;
   while (i < sql.length) {
-    while (/\\s|,/.test(sql[i] || "")) i++;
+    while (/\s|,/.test(sql[i] || "")) i++;
     if (sql[i] !== "(") break;
     i++;
     const fields = [];
     while (i < sql.length) {
-      while (/\\s/.test(sql[i] || "")) i++;
+      while (/\s/.test(sql[i] || "")) i++;
       if (sql[i] === "'") {
         i++;
         let value = "";
@@ -52,7 +52,7 @@ const parseMigration = (migrationPath) => {
         }
         fields.push(sql.slice(start, i).trim());
       }
-      while (/\\s/.test(sql[i] || "")) i++;
+      while (/\s/.test(sql[i] || "")) i++;
       if (sql[i] === ",") { i++; continue; }
       if (sql[i] === ")") { i++; break; }
       throw new Error("could not parse " + migrationPath + " near offset " + i);
@@ -70,7 +70,7 @@ for (const row of rows) {
   if (row.length !== 12) { fail("expected 12 columns, got " + row.length); continue; }
   if (seen.has(slug)) fail("duplicate slug");
   seen.add(slug);
-  if (!["health", "history", "economy"].includes(section)) fail("unexpected section");
+  if (!["health", "history", "economy", "world"].includes(section)) fail("unexpected section");
   if (!["ar", "en"].includes(language)) fail("unexpected language");
   if (status !== "PUBLISHED") fail("not marked PUBLISHED");
   if (!/^https:\/\//i.test(imageUrl)) fail("missing HTTPS topic image");
