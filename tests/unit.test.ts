@@ -11,7 +11,7 @@ describe("BAYAN product foundation",()=>{
 describe("exact person identity isolation",()=>{
   it("keeps only the exact biography page when multiple people share the same Arabic name",()=>{
     const items=[
-      {title:"محمد صلاح",summary:"محمد صلاح لاعب كرة قدم مصري محترف يلعب مع ليفربول في الدوري الإنجليزي.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح",provider:"Wikipedia",score:90,imageUrl:"https://upload.wikimedia.org/example.jpg",sources:[{title:"محمد صلاح",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح"}]},
+      {title:"محمد صلاح",summary:"محمد صلاح لاعب كرة قدم مصري محترف يلعب مع ليفربول في الدوري الإنجليزي.",section:"world",url:"https://ar.wikipedia.org/wiki/محمد_صلاح",provider:"Wikipedia",score:90,imageUrl:"https://upload.wikimedia.org/example.jpg",sources:[{title:"محمد صلاح",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح"}]},
       {title:"محمد صلاح دندراوي",summary:"كاتب وأديب سعودي.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي",provider:"Wikipedia",score:70,sources:[{title:"محمد صلاح دندراوي",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي"}]},
       {title:"محمد صلاح (توضيح)",summary:"صفحة توضيح لأشخاص يحملون الاسم.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_(توضيح)",provider:"Wikipedia",score:60,sources:[{title:"محمد صلاح (توضيح)",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_(توضيح)"}]},
       {title:"محمد صلاح زكريا",summary:"كاتب قصص وروائي مصري.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_زكريا",provider:"Wikipedia REST Search",score:55,sources:[{title:"محمد صلاح زكريا",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_زكريا"}]},
@@ -19,6 +19,7 @@ describe("exact person identity isolation",()=>{
     ] as any;
     const result=isolateExactPerson("محمد صلاح",items);
     expect(result.some((item:any)=>item.title==="محمد صلاح")).toBe(true);
+    expect(result.find((item:any)=>item.title==="محمد صلاح").section).toBe("people");
     expect(result.some((item:any)=>item.title==="محمد صلاح يسجل هدفًا مع ليفربول")).toBe(true);
     expect(result.some((item:any)=>/دندراوي|زكريا|توضيح/.test(item.title))).toBe(false);
   });
