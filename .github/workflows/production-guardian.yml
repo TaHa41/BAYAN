@@ -1,7 +1,7 @@
 name: BAYAN post-deploy production guardian
 on:
   workflow_run:
-    workflows: ["BAYAN production direct deploy"]
+    workflows: ["BAYAN production direct deploy", "BAYAN Worker Deploy"]
     types: [completed]
 permissions:
   contents: read
