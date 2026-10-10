@@ -16,6 +16,10 @@ describe("evidence-backed AI answer validation",()=>{
   it("rejects a club name absent from the retrieved evidence",()=>{
     expect(answerHasUnsupportedSpecifics("Mohamed Salah plays for Trabzonspor.",evidence)).toBe(true);
   });
+  it("does not combine unrelated sources to validate a wrong club name",()=>{
+    const mixedEvidence=[...evidence,{title:"Trabzonspor signs a midfielder",summary:"The Turkish club announced a new midfielder.",sources:[{title:"Club news",publisher:"Sports Wire",url:"https://example.com"}]}] as any;
+    expect(answerHasUnsupportedSpecifics("Mohamed Salah plays for Trabzonspor.",mixedEvidence)).toBe(true);
+  });
   it("accepts named entities and numbers that are present in the evidence",()=>{
     expect(answerHasUnsupportedSpecifics("Mohamed Salah scored 7 goals for Liverpool in 2025.",evidence)).toBe(false);
   });
