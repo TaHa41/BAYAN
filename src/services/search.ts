@@ -277,12 +277,12 @@ const mixedIdentitySummary=(query:string,candidate:Candidate)=>{
   const explicitMarker=/(?:may refer to|people with the name|صفحة توضيح|قد يشير إلى|قد تشير إلى)/i.test(String(candidate.summary||""))||
     summary.includes(name+" توضيح");
   if(!explicitMarker)return false;
-  const escaped=name.split(" ").map(part=>part.replace(/[.*+?^$\\{\\}()|[\\]\\\\]/g,"\\\\$&")).join("\\\\s+");
   const variants=new Set<string>();
-  const re=new RegExp(escaped+"\\\\s+([\\\\p{L}]{2,})","giu");
-  for(const match of summary.matchAll(re)){
-    const suffix=String(match[1]||"");
-    if(suffix&&!new Set(["محمد","صلاح","حامد","محروس","غالي","لاعب","اللاعب","من","هو","هي","الذي","التي"]).has(suffix))variants.add(suffix);
+  let pos=summary.indexOf(name);
+  while(pos>=0){
+    const suffix=summary.slice(pos+name.length).trim().split(" ")[0]||"";
+    if(suffix&&!new Set(["محمد","صلاح","حامد","محروس","غالي","لاعب","اللاعب","من","هو","هي","الذي","التي","توضيح"]).has(suffix))variants.add(suffix);
+    pos=summary.indexOf(name,pos+name.length);
   }
   return variants.size>=2;
 };
