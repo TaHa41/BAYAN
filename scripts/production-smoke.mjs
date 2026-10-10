@@ -126,8 +126,14 @@ try{
   if(!Array.isArray(d.results)||d.results.length<1)throw new Error("person_search_empty");
   const salah=await get("/api/search?q=%D9%85%D8%AD%D9%85%D8%AF%20%D8%B5%D9%84%D8%A7%D8%AD&lang=ar"); const sd=JSON.parse(salah.text);
   if(!Array.isArray(sd.results)||!sd.results.some(x=>String(x.title||"").trim()==="محمد صلاح"))throw new Error("exact_person_subject_missing");
+  const profile=sd.results.find(x=>String(x.title||"").trim()==="محمد صلاح");
+  const related=sd.results.filter(x=>String(x.title||"").trim()!=="محمد صلاح");
+  if(related.length<2)throw new Error("person_search_needs_multiple_related_results");
+  const independentNews=related.filter(x=>(x.sources||[]).some(source=>/^https:\/\//i.test(String(source.url||""))&&!/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(source.publisher||""))));
+  const newsPublishers=new Set(independentNews.flatMap(x=>(x.sources||[]).filter(source=>/^https:\/\//i.test(String(source.url||""))&&!/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(source.publisher||""))).map(source=>String(source.publisher||"").trim().toLowerCase())).filter(Boolean));
+  if(independentNews.length<2||newsPublishers.size<2)throw new Error("person_search_needs_multiple_independent_news_sources");
   if(sd.results.some(x=>String(x.title||"").trim()!=="محمد صلاح"&&((x.sources||[]).some(source=>/ويكيبيديا|ويكي بيانات|Wikipedia|Wikidata/i.test(String(source.publisher||"")))||/محمد صلاح\s*(?:دندراوي|زكريا|مصطفى|العزب|\(جندي\)|\(توضيح\))/i.test(String(x.title||"")))))throw new Error("same_name_people_mixed_into_biography");
-  if(!sd.results.find(x=>String(x.title||"").trim()==="محمد صلاح")?.imageUrl)throw new Error("exact_person_subject_image_missing");
+  if(!profile?.imageUrl)throw new Error("exact_person_subject_image_missing");
   if(sd.results.find(x=>String(x.title||"").trim()==="محمد صلاح")?.section!=="people")throw new Error("exact_person_section_mismatch");
   if(sd.results.some(x=>/طرابزون\s*سبور/i.test(String(x.summary||""))&&/ليفربول/i.test(String(x.summary||""))&&/(يلعب|ناديه الحالي|currently plays for|current club)/i.test(String(x.summary||""))))throw new Error("contradictory_current_club_claim_displayed");
   if(!Array.isArray(d.providerAttempted)||d.providerAttempted.length<5)throw new Error("provider_coverage_missing");

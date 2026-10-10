@@ -4,15 +4,17 @@ on:
     branches: [v1,main,bayan-v1-knowledge-redesign]
   pull_request:
     branches: [v1,main]
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
   quality:
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - run: npm install
+      - run: npm install --no-audit --no-fund
       - run: npm run check
