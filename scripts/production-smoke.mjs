@@ -129,7 +129,7 @@ try{
   const en=await get("/api/search?q=NASA%20Artemis%20mission&lang=en"); const ed=JSON.parse(en.text);
   if(!Array.isArray(ed.results)||ed.results.length<1)throw new Error("english_topic_search_empty");
   if(!Array.isArray(ed.providerAttempted)||ed.providerAttempted.length<5)throw new Error("english_provider_coverage_missing");
-  if(ed.results.some(x=>/[\\u0600-\\u06ff]/.test(String(x.title||""))))throw new Error("english_topic_result_language_mismatch");
+  if(ed.results.some(x=>/[\u0600-\u06ff]/.test(String(x.title||""))))throw new Error("english_topic_result_language_mismatch");
 }catch(e){console.error("SEARCH",e);bad++}
 for(const section of sections.filter(section=>section!=="prices")){
   for(const language of ["ar","en"]){
