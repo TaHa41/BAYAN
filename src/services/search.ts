@@ -315,13 +315,11 @@ const mixedIdentitySummary=(query:string,candidate:Candidate)=>{
 };
 const sanitizeConflictingCurrentClubClaims=(value:string)=>{
   const text=String(value||"");
-  const hasTrabzon=/(?:طرابزون\\s*سبور|trabzonspor)/i.test(text);
+  const hasTrabzon=/(?:طرابزون\s*سبور|trabzonspor)/i.test(text);
   const hasLiverpool=/(?:ليفربول|liverpool)/i.test(text);
-  const currentClub=/(?:يلعب\\s*(?:حاليا|حالياً|حاليًا)?\\s*(?:مع|في)|ناديه\\s*الحالي|currently\\s+plays\\s+for|current\\s+club|plays\\s+for)/i.test(text);
+  const currentClub=/(?:يلعب\s*(?:حاليا|حالياً|حاليًا)?\s*(?:مع|في)|ناديه\s*الحالي|currently\s+plays\s+for|current\s+club|plays\s+for)/i.test(text);
   if(!hasTrabzon||!hasLiverpool||!currentClub)return text;
-  // If one source claims two current clubs, remove the disputed club sentences rather
-  // than selecting one claim without evidence. The rest of the biography can remain useful.
-  return text.split(/(?<=[.!؟?])\\s+|\\n+/).filter(sentence=>!/(?:طرابزون\\s*سبور|trabzonspor|ليفربول|liverpool)/i.test(sentence)).join(" ").trim();
+  return text.split(/(?<=[.!؟?])\s+|\n+/).filter(sentence=>!/(?:طرابزون\s*سبور|trabzonspor|ليفربول|liverpool)/i.test(sentence)).join(" ").trim();
 };
 
 const nameOnlyArabicQuery=(query:string)=>{
