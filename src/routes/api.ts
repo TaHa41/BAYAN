@@ -160,13 +160,15 @@ export async function api(request:Request,env:Env){const u=new URL(request.url),
     // Publisher failures remain non-fatal; a failed fetch falls back to the original search snippet.
     const articleEvidenceUrls:string[]=[];
     const articleEvidenceHosts=new Set<string>();
+    const articleReadableHosts=["aljazeera.net","aljazeera.com","bbc.com","bbc.co.uk","france24.com","dw.com","apnews.com","reuters.com","theguardian.com","skynewsarabia.com","independentarabia.com","aawsat.com","news.google.com","wikipedia.org","wikidata.org","openalex.org","who.int","un.org","worldbank.org","imf.org","ourworldindata.org","britannica.com","nature.com","science.org"];
     for(const candidate of found.results as any[]){
       const candidateUrls=[candidate.url,...(Array.isArray(candidate.sources)?candidate.sources.map((item:any)=>item?.url):[])];
       for(const candidateUrl of candidateUrls){
         try{
           const parsed=new URL(String(candidateUrl||""));
           const host=parsed.hostname.toLowerCase().replace(/^www\./,"");
-          if(parsed.protocol!=="https:"||articleEvidenceHosts.has(host)||articleEvidenceUrls.includes(parsed.toString()))continue;
+          const readable=articleReadableHosts.some(allowed=>host===allowed||host.endsWith("."+allowed));
+          if(parsed.protocol!=="https:"||!readable||articleEvidenceHosts.has(host)||articleEvidenceUrls.includes(parsed.toString()))continue;
           articleEvidenceHosts.add(host);articleEvidenceUrls.push(parsed.toString());break;
         }catch{}
       }
