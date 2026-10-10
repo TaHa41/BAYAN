@@ -136,6 +136,23 @@ export async function api(request:Request,env:Env){const u=new URL(request.url),
 }if(u.pathname==="/api/news")return json(await news(env,lang),200,"public, max-age=45, stale-while-revalidate=180");if(u.pathname==="/api/image"){const q=clean(u.searchParams.get("q")||"",500);if(!q)return json({error:"query_required"},400);return json({ok:true,imageUrl:await findRelatedImage(q)});}if(u.pathname==="/api/wisdom"){const section=clean(u.searchParams.get("section")||"world",80);if(!sectionBySlug(section))return json({error:"invalid_section"},400);return json({section,wisdom:wisdomFor(section,lang)});}if(u.pathname==="/api/section"){const section=clean(u.searchParams.get("section")||"",80);if(!section||!sectionBySlug(section))return json({error:"invalid_section"},400);if(section==="news"){const live=await news(env,lang);const items=(live.items||[]).map((story:any)=>({...story,section:"news",kind:"news",body:String(story.summary||story.title||""),sources:[]}));return json({section,items})}let items=await listArticles(env,section,lang,24);
 const hasArabic=(value:unknown)=>/[\u0600-\u06ff]/.test(String(value||""));
 const localeSafeItem=(x:any)=>{const title=String(x?.title||""),summary=String(x?.summary||""),bodyText=String(x?.body||"");return lang==="ar"?hasArabic(title)&&(!summary||hasArabic(summary))&&(!bodyText||hasArabic(bodyText)):!hasArabic(title)&&!hasArabic(summary)&&!hasArabic(bodyText);};
+const sectionPatterns:Record<string,RegExp>={
+ science:/(science|scientific|space|nasa|physics|chemistry|biology|علم|فضاء|ناسا|فيزياء|كيمياء|أحياء|اكتشاف)/i,
+ technology:/(technology|artificial intelligence|software|computing|cyber|تقنية|تكنولوجيا|ذكاء اصطناعي|برمج|حوسبة|أمن المعلومات)/i,
+ economy:/(econom|inflation|market|finance|currency|bank|trade|gdp|اقتصاد|تضخم|أسواق|سوق|مال|عملة|بنك|تجارة|ناتج|بطالة)/i,
+ politics:/(politic|government|election|parliament|constitution|diplomac|president|minister|policy|سياس|حكومة|انتخابات|برلمان|دستور|دبلوماس|رئيس|وزير|سياسة|مؤسسات الحكم)/i,
+ health:/(health|medical|medicine|disease|hospital|drug|public health|صحة|طب|مرض|طبي|مستشفى|دواء|علاج|وقاية)/i,
+ history:/(history|historical|civilization|ancient|تاريخ|حضارة|تاريخي|قديم|آثار)/i,
+ people:/(biograph|writer|author|novelist|player|scientist|president|poet|artist|inventor|actor|شخصية|سيرة|كاتب|روائي|لاعب|عالم|شاعر|فنان|مؤلف|أديب|رئيس|ممثل|مخترع|شكسبير|محفوظ)/i,
+ sports:/(sport|football|soccer|basketball|tennis|league|championship|match|athlete|رياضة|كرة|دوري|بطولة|مباراة|لاعب|سوكر)/i,
+ travel:/(travel|tourism|destination|airport|hotel|visa|trip|سفر|سياحة|وجهة|مطار|فندق|تأشيرة|رحلة|سياحي)/i,
+ art:/(\barts?\b|film|cinema|music|theatre|theater|song|literature|museum|فن|سينما|موسيقى|مسرح|فيلم|أغنية|أدب|ثقافة|فنان)/i,
+ trends:/(trend|viral|popular|social media|survey|poll|data|اتجاه|ترند|متداول|رائج|استطلاع|بيانات|شبكات اجتماعية)/i,
+ egypt:/(egypt|egyptian|cairo|alexandria|nile|aswan|luxor|suez|sinai|red sea|مصر|المصري|القاهرة|الإسكندرية|النيل|أسوان|الأقصر|السويس|سيناء|البحر الأحمر)/i,
+ arab:/(arab|arabic|arab league|العرب|عربي|العالم العربي|جامعة الدول العربية)/i,
+ world:/(world|global|international|united nations|international relations|global risk|عالمي|دولي|العالم|الأمم المتحدة|علاقات دولية|حرب|نزاع)/i
+};
+const sectionRelevant=(x:any)=>{const text=String(x?.title||"")+" "+String(x?.summary||"");if(section==="sports"&&/(video game|لعبة فيديو|ألعاب فيديو)/i.test(text))return false;const pattern=sectionPatterns[section];return !pattern||pattern.test(text);};
 items=items.filter((x:any)=>x.kind==="evidence"||(articleBodyQuality(String(x.body||"")).ok&&articleEvidenceQuality(x.sources))).filter(localeSafeItem);
 const imageCandidates=items.filter((x:any)=>x.slug&&!/^https:\/\//i.test(String(x.imageUrl||""))).slice(0,3);
 await Promise.all(imageCandidates.map(async(item:any)=>{try{const imageUrl=await bounded(findRelatedImage(String(item.title||"")),3500);if(imageUrl&&/^https:\/\//i.test(imageUrl)){item.imageUrl=imageUrl;item.imageAlt=String(item.title||"");await env.DB.prepare("UPDATE articles SET image_url=?,image_alt=?,updated_at=? WHERE slug=? AND language=? AND (image_url IS NULL OR trim(image_url)='')").bind(imageUrl,item.imageAlt,new Date().toISOString(),item.slug,lang).run();}}catch{}}));
@@ -146,15 +163,15 @@ if(items.length<2&&section!=="prices"){
    science:{ar:"اكتشافات علمية وشرح مبادئ العلوم من مصادر موثوقة",en:"science discoveries and evidence-based explanations of science"},
    technology:{ar:"تقنيات الذكاء الاصطناعي والحوسبة وأمن المعلومات",en:"artificial intelligence computing and information security explained"},
    economy:{ar:"شرح التضخم والأسواق والاقتصاد من مصادر موثوقة",en:"economics inflation markets and financial systems explained"},
-   politics:{ar:"السياسات العامة والمؤسسات والحكم بمصادر موثوقة",en:"politics, public policy institutions and governance explained with sources"},
+   politics:{ar:"سياسة عامة وحكومة ودستور وانتخابات من مصادر موثوقة",en:"politics, elections, constitutions and public institutions from reliable sources"},
    health:{ar:"الصحة العامة والطب المبني على الأدلة من مصادر طبية",en:"public health and evidence-based medicine from medical sources"},
    history:{ar:"أحداث تاريخية وحضارات وسياق تاريخي من مصادر موثوقة",en:"historical events civilizations and historical context from reliable sources"},
-   people:{ar:"سير شخصيات عامة موثقة وحياتهم وأعمالهم",en:"biography of public figures and their work from reliable sources"},
+   people:{ar:"سيرة ذاتية لشخصيات عامة موثقة وحياتهم وأعمالهم",en:"biography and life stories of public figures from reliable sources"},
    sports:{ar:"قواعد الرياضة والإحصاءات الرياضية وتاريخ المنافسات",en:"sports rules statistics and competition history"},
-   travel:{ar:"وجهات السفر والجغرافيا وإرشادات السفر الرسمية",en:"travel destinations geography and official travel guidance"},
-   art:{ar:"الفنون والسينما والموسيقى وتاريخها من مصادر موثوقة",en:"arts film music and their history from reliable sources"},
+   travel:{ar:"السياحة ووجهات السفر وإرشادات التأشيرات الرسمية",en:"travel destinations tourism and official visa guidance"},
+   art:{ar:"الفنون والسينما والموسيقى والمسرح من مصادر موثوقة",en:"arts film music theatre and literature from reliable sources"},
    trends:{ar:"اتجاهات اجتماعية وبيانات حديثة وكيفية التحقق منها",en:"social trends and current data with methods to verify them"},
-   egypt:{ar:"المجتمع المصري والجغرافيا والخدمات العامة بمعلومات موثوقة",en:"Egyptian society geography and public services from reliable sources"},
+   egypt:{ar:"مصر: الجغرافيا والمدن ونهر النيل والمعلومات العامة",en:"Egypt geography cities the Nile and public information"},
    arab:{ar:"المنظمات العربية والمجتمعات والقضايا الفكرية بمصادر موثوقة",en:"Arab organizations societies and public ideas with reliable sources"},
    world:{ar:"قضايا عالمية وتحولات دولية وتأثيراتها بمصادر موثوقة",en:"global issues international changes and their impacts from reliable sources"}
   };
@@ -173,7 +190,7 @@ if(items.length<2&&section!=="prices"){
      const key=title.normalize("NFKC").toLowerCase().trim();
      if(!title||!summary||!key||seenCached.has(key))continue;
      const safe=lang==="ar"?hasArabic(title)&&hasArabic(summary):!hasArabic(title)&&!hasArabic(summary);
-     if(!safe)continue;
+     if(!safe||!sectionRelevant(item))continue;
      seenCached.add(key);cachedEvidence.push({...item,section,kind:"evidence"});
      if(cachedEvidence.length>=8)break;
     }
@@ -191,7 +208,7 @@ if(items.length<2&&section!=="prices"){
   const completeCount=items.filter((x:any)=>x.slug&&articleBodyQuality(String(x.body||"")).ok&&/^https:\/\//i.test(String(x.imageUrl||""))).length;
   if(completeCount<2){
    const existingTitles=new Set(items.map((x:any)=>String(x.title||"").normalize("NFKC").toLowerCase().trim()));
-   const fallback=(found.results||[]).filter((x:any)=>{const title=String(x?.title||""),summary=String(x?.summary||""),body=String(x?.body||"");return title&&summary&&!existingTitles.has(title.normalize("NFKC").toLowerCase().trim())&&(lang==="ar"?hasArabic(title)&&hasArabic(summary)&&(!body||hasArabic(body)):!hasArabic(title)&&!hasArabic(summary)&&!hasArabic(body));}).slice(0,12).map((x:any)=>({...x,section:section,kind:"evidence"}));
+   const fallback=(found.results||[]).filter((x:any)=>{const title=String(x?.title||""),summary=String(x?.summary||""),body=String(x?.body||"");return title&&summary&&!existingTitles.has(title.normalize("NFKC").toLowerCase().trim())&&sectionRelevant(x)&&(lang==="ar"?hasArabic(title)&&hasArabic(summary)&&(!body||hasArabic(body)):!hasArabic(title)&&!hasArabic(summary)&&!hasArabic(body));}).slice(0,12).map((x:any)=>({...x,section:section,kind:"evidence"}));
    items=[...items,...fallback];
   }
  }catch{}
