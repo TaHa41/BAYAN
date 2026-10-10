@@ -16,7 +16,7 @@ const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[])=>{
   const unsupportedName=names.some(name=>!generic.has(name.toLowerCase())&&!corpusTokens.has(name.toLowerCase()));
   const normalizeDigits=(value:string)=>value.replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[٬,]/g,"");
   const corpusNumbers=new Set(normalizeDigits(corpus).match(/[0-9]+/g)||[]);
-  const answerNumbers=normalizeDigits(answer.replace(/^\\s*\\d+[.)]\\s/gm,"")).match(/[0-9]+/g)||[];
+  const answerNumbers=normalizeDigits(answer.replace(/^\s*\d+[.)]\s/gm,"")).match(/[0-9]+/g)||[];
   const unsupportedNumber=answerNumbers.some(number=>!corpusNumbers.has(number));
   return unsupportedName||unsupportedNumber;
 };
