@@ -527,7 +527,7 @@
           "</div>").join("") + "</div>" + socialActions({...data, _key:data.slug || slug, slug}) + "</article>";
       if (!data.imageUrl) {
         try {
-          const image = await api("/api/image?q=" + encodeURIComponent(data.title + ": " + (data.summary || "")));
+          const image = await api("/api/image?q=" + encodeURIComponent(data.title));
           if (image.imageUrl) document.querySelector(".article-full")?.insertAdjacentHTML(
             "afterbegin", heroImageHtml(image.imageUrl, data.title, data.summary || ""));
         } catch {}
