@@ -21,6 +21,22 @@ describe("canonical same-name profile selection",()=>{
     expect(result[0].sources.every((source:any)=>source.title==="محمد صلاح")).toBe(true);
   });
 });
+describe("biography lead sanitation",()=>{
+  it("keeps a clear sports profile when unrelated namesakes are appended after the biography",()=>{
+    const lead=("محمد صلاح لاعب كرة قدم مصري محترف بدأ مسيرته مع المقاولون العرب ثم احترف في أوروبا. ").repeat(8);
+    const items=[
+      {title:"محمد صلاح",summary:lead+"يلعب حاليا مع نادي طرابزون سبور. ناديه الحالي ليفربول. محمد صلاح دندراوي كاتب سعودي. محمد صلاح (توضيح) قد يشير إلى عدة أشخاص.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح",provider:"Wikipedia",score:90,sources:[{title:"محمد صلاح",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح"}]},
+      {title:"محمد صلاح",summary:"ممثل.",url:"https://www.wikidata.org/wiki/Q999",provider:"Wikidata",score:80,sources:[{title:"محمد صلاح",publisher:"Wikidata",url:"https://www.wikidata.org/wiki/Q999"}]}
+    ] as any;
+    const result=isolateExactPerson("محمد صلاح",items);
+    expect(result).toHaveLength(1);
+    expect(result[0].summary).toContain("لاعب كرة قدم");
+    expect(result[0].summary).not.toContain("طرابزون");
+    expect(result[0].summary).not.toContain("ليفربول");
+    expect(result[0].summary).not.toContain("دندراوي");
+    expect(result[0].summary).not.toContain("قد يشير إلى عدة أشخاص");
+  });
+});
 describe("exact person identity isolation",()=>{
   it("keeps only the exact biography page when multiple people share the same Arabic name",()=>{
     const items=[
