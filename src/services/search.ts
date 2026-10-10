@@ -313,6 +313,15 @@ const mixedIdentitySummary=(query:string,candidate:Candidate)=>{
   }
   return variants.size>=2;
 };
+const sanitizeConflictingCurrentClubClaims=(value:string)=>{
+  const text=String(value||"");
+  const hasTrabzon=/(?:طرابزون\s*سبور|trabzonspor)/i.test(text);
+  const hasLiverpool=/(?:ليفربول|liverpool)/i.test(text);
+  const currentClub=/(?:يلعب\s*(?:حاليا|حالياً|حاليًا)?\s*(?:مع|في)|ناديه\s*الحالي|currently\s+plays\s+for|current\s+club|plays\s+for)/i.test(text);
+  if(!hasTrabzon||!hasLiverpool||!currentClub)return text;
+  return text.split(/(?<=[.!؟?])\s+|\n+/).filter(sentence=>!/(?:طرابزون\s*سبور|trabzonspor|ليفربول|liverpool)/i.test(sentence)).join(" ").trim();
+};
+
 const nameOnlyArabicQuery=(query:string)=>{
  const raw=String(query||"").trim();
  if(!/^[\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){1,3}$/.test(raw))return false;
@@ -340,6 +349,7 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
       return rank+relevanceScore(item,query)/100;
     };
     const canonical=profile.sort((a,b)=>canonicalRank(b)-canonicalRank(a))[0];
+    canonical.section="people";
    const description=String(canonical.summary||"");
    const sports=/football|soccer|athlete|لاعب كرة قدم|رياضي/i.test(description);
    const medicine=/physician|doctor|surgeon|طبيب|طبيبة/i.test(description);
@@ -543,6 +553,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   }
   // Person/name lookups should return a useful collection, not stop after the first matching page.
   const personQuery=personLookup(q)||nameOnlyArabicQuery(q);
+  if(personQuery){const exactName=normalizedEntityTitle(personQueryName(q));for(const item of candidates){if(normalizedEntityTitle(item.title)===exactName){item.summary=sanitizeConflictingCurrentClubClaims(item.summary||"");item.section="people";}}}
   if(personQuery){const exactProfile=await wikipediaExactPersonPage(q,language);if(exactProfile.length)candidates.unshift(...exactProfile);}
   const firstPassCount=()=>{const matching=candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q));return personQuery?isolateExactPerson(q,matching).length:matching.length;};
   // Expand when the first pass is merely sparse, not only when it is empty.
