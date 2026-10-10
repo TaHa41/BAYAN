@@ -200,16 +200,16 @@ async function imageHealth(env:Env){
 const completeSectionArticle=(row:any,language:string)=>{
   const title=String(row?.title||""),summary=String(row?.summary||""),body=String(row?.body||"").trim(),image=String(row?.image_url||"").trim();
   if(title.length<8||summary.length<40||body.length<1800||!/^https:\/\//i.test(image))return false;
-  const headings=(body.match(/^#{1,3}\\s+.+$/gm)||[]).length;
-  const paragraphs=body.split(/\\n\\s*\\n/).map((part:string)=>part.trim()).filter((part:string)=>part.length>=65&&!/^#{1,4}\\s/.test(part)&&!/^([-*+] |\\d+[.)] )/.test(part));
-  const normalized=(value:string)=>value.normalize("NFKC").toLowerCase().replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/[^\\p{L}\\p{N}]+/gu," ").trim();
+  const headings=(body.match(/^#{1,3}\s+.+$/gm)||[]).length;
+  const paragraphs=body.split(/\n\s*\n/).map((part:string)=>part.trim()).filter((part:string)=>part.length>=65&&!/^#{1,4}\s/.test(part)&&!/^([-*+] |\d+[.)] )/.test(part));
+  const normalized=(value:string)=>value.normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").trim();
   if(headings<4||paragraphs.length<5||new Set(paragraphs.map(normalized)).size<5)return false;
-  const arabic=/[\\u0600-\\u06ff]/.test(title+" "+summary+" "+body);
-  if(language==="ar"?!(/[\\u0600-\\u06ff]/.test(title)&&/[\\u0600-\\u06ff]/.test(summary)&&/[\\u0600-\\u06ff]/.test(body)):arabic)return false;
+  const arabic=/[\u0600-\u06ff]/.test(title+" "+summary+" "+body);
+  if(language==="ar"?!(/[\u0600-\u06ff]/.test(title)&&/[\u0600-\u06ff]/.test(summary)&&/[\u0600-\u06ff]/.test(body)):arabic)return false;
   let sources:any[]=[];try{sources=JSON.parse(String(row?.sources_json||"[]"))}catch{return false}
   if(!Array.isArray(sources))return false;
   const hosts=new Set<string>(),publishers=new Set<string>();
-  for(const source of sources){try{const url=new URL(String(source?.url||""));if(url.protocol!=="https:")continue;hosts.add(url.hostname.toLowerCase().replace(/^www\\./,""));const publisher=String(source?.publisher||"").trim().toLowerCase();if(publisher)publishers.add(publisher)}catch{}}
+  for(const source of sources){try{const url=new URL(String(source?.url||""));if(url.protocol!=="https:")continue;hosts.add(url.hostname.toLowerCase().replace(/^www\./,""));const publisher=String(source?.publisher||"").trim().toLowerCase();if(publisher)publishers.add(publisher)}catch{}}
   return hosts.size>=2&&publishers.size>=2;
 };
 
