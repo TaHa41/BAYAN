@@ -10,6 +10,22 @@ type Story = {
   imageAlt?: string;
 };
 
+// Reject generic Google News thumbnails and obvious UI assets.
+const isUsableNewsImage = (value: unknown): value is string => {
+  if (typeof value !== "string" || !value.trim()) return false;
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "https:") return false;
+    const host = url.hostname.toLowerCase();
+    const path = url.pathname.toLowerCase();
+    if (host === "googleusercontent.com" || host.endsWith(".googleusercontent.com") ||
+        host === "news.google.com" || host.endsWith(".news.google.com") ||
+        host === "gstatic.com" || host.endsWith(".gstatic.com")) return false;
+    if (/(favicon|site-icon|logo|placeholder|default-image|avatar)/i.test(path)) return false;
+    return true;
+  } catch { return false; }
+};
+
 const feeds = (lang: Locale) =>
   lang === "ar"
     ? [
@@ -82,11 +98,12 @@ const readFeed = async (name: string, url: string): Promise<Story[]> => {
       const rawDate = tag("pubDate", "dc:date", "published", "updated", "date", "lastBuildDate");
       const parsedDate = rawDate ? Date.parse(rawDate) : Number.NaN;
       const publishedAt = Number.isFinite(parsedDate) ? new Date(parsedDate).toISOString() : "";
-      const imageUrl = (
+      const rawImageUrl = (
         item.match(/<(?:media:content|media:thumbnail|enclosure)\b[^>]+url=["']([^"']+)["']/i)?.[1] ||
         item.match(/<img\b[^>]+src=["']([^"']+)["']/i)?.[1] ||
         item.match(/<content\b[^>]+src=["']([^"']+)["']/i)?.[1]
       )?.replace(/&amp;/g, "&");
+      const imageUrl = isUsableNewsImage(rawImageUrl) ? rawImageUrl : undefined;
       const title = tag("title");
       const summary = tag("content:encoded", "description", "summary", "content").slice(0, 1800);
       const sourceName = tag("source");
@@ -115,14 +132,20 @@ const sourceImage = async (url: string): Promise<string | undefined> => {
     if (!response.ok) return;
     const html = await response.text();
 
-    return (
+    const candidate = (
       html.match(
         /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
       )?.[1] ||
       html.match(
         /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+      )?.[1] ||
+      html.match(
+        /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
       )?.[1]
     );
+    let absolute: string | undefined;
+    try { absolute = candidate ? new URL(candidate, url).toString() : undefined; } catch {}
+    return isUsableNewsImage(absolute);
   } catch {
     return;
   }
@@ -247,7 +270,7 @@ export async function findRelatedImage(query: string, sourceUrl?: string, contex
       const looksPrivate = !host.includes(".") || host === "localhost" || host.endsWith(".local") || host.endsWith(".internal") || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) || host.startsWith("[");
       if (parsed.protocol === "https:" && !looksPrivate) {
         const publisherImage = await sourceImage(parsed.toString());
-        if (publisherImage && /^https:\/\//i.test(publisherImage)) return publisherImage;
+        if (isUsableNewsImage(publisherImage)) return publisherImage;
       }
     } catch {}
   }
@@ -588,20 +611,20 @@ export async function news(env: Env, lang: Locale) {
   const enriched = await Promise.all(unique.map(async (story, index) => {
     // Every visible news card must have an image. Prefer RSS/publisher metadata,
     // then search the publisher page and topic-specific image providers.
-    if (story.imageUrl && /^https:\/\//i.test(story.imageUrl)) return story;
+    if (isUsableNewsImage(story.imageUrl)) return story;
     // Keep publisher-image fetches bounded so feed refresh stays within Worker limits.
     if (index >= 6) return story;
     const direct = await sourceImage(story.url);
-    if (direct && /^https:\/\//i.test(direct)) return { ...story, imageUrl: direct, imageAlt: story.imageAlt || story.title };
+    if (isUsableNewsImage(direct)) return { ...story, imageUrl: direct, imageAlt: story.imageAlt || story.title };
     if (index < 4) {
       const image = await findRelatedImage(story.title, story.url);
-      if (image && /^https:\/\//i.test(image)) return { ...story, imageUrl: image, imageAlt: story.title };
+      if (isUsableNewsImage(image)) return { ...story, imageUrl: image, imageAlt: story.title };
     }
     return story;
   }));
   // Fail closed: an item without a relevant HTTPS image is not rendered or cached.
   const finalStories = enriched
-    .filter((story) => /^https:\/\//i.test(String(story.imageUrl || "")))
+    .filter((story) => isUsableNewsImage(story.imageUrl))
     .map((story) => ({ ...story, publisher: localizedPublisher(story.publisher, lang), summary: languageSafeText(story.summary, lang) ? story.summary : "" }));
 
   const cached = await readNewsCache(env, lang);
@@ -613,7 +636,7 @@ export async function news(env: Env, lang: Locale) {
   } else if (cached?.items?.length) {
     const seenTitles = new Set(finalStories.map((story) => story.title.trim().toLowerCase()));
     const languageSafeCache = cached.items.filter((story) =>
-      (lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title)) && isFreshNews(story) && /^https:\/\//i.test(String(story.imageUrl || ""))
+      (lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title)) && isFreshNews(story) && isUsableNewsImage(story.imageUrl)
     ).map((story) => ({ ...story, publisher: localizedPublisher(story.publisher, lang), summary: languageSafeText(story.summary, lang) ? story.summary : "" }));
     const merged = [
       ...finalStories,
