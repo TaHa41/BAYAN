@@ -159,4 +159,54 @@ A temporary verification code is a short-lived key to an account. A scammer may 
 
 ## A simple protection plan
 
-Secure your email account first because it often helps recover other accounts, then protect financial and social accounts. Use unique passwords, multi-factor authentication and regular updates, and review alerts and active sessions. These steps do not eliminate every risk, but they lower the chance of compromise and help you detect problems earlier.','[{"title":"Secure Our World","publisher":"Cybersecurity and Infrastructure Security Agency","url":"https://www.cisa.gov/secure-our-world"},{"title":"Recognizing and Avoiding Phishing Scams","publisher":"Federal Trade Commission","url":"https://consumer.ftc.gov/articles/how-recognize-and-avoid-phishing-scams"}]','PUBLISHED','https://commons.wikimedia.org/wiki/Special:FilePath/Computer_keyboard.jpg?width=1200','Computer keyboard',strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+Secure your email account first because it often helps recover other accounts, then protect financial and social accounts. Use unique passwords, multi-factor authentication and regular updates, and review alerts and active sessions. These steps do not eliminate every risk, but they lower the chance of compromise and help you detect problems earlier.','[{"title":"Secure Our World","publisher":"Cybersecurity and Infrastructure Security Agency","url":"https://www.cisa.gov/secure-our-world"},{"title":"Recognizing and Avoiding Phishing Scams","publisher":"Federal Trade Commission","url":"https://consumer.ftc.gov/articles/how-recognize-and-avoid-phishing-scams"}]','PUBLISHED','https://commons.wikimedia.org/wiki/Special:FilePath/Computer_keyboard.jpg?width=1200','Computer keyboard',strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+('science-read-space-observations-ar','science','ar','كيف نقرأ أدلة اكتشافات الفضاء؟','منهج لفهم صور التلسكوبات والبيانات الفلكية والتمييز بين الرصد والتفسير والادعاء المبكر.','## الرصد ليس هو التفسير
+
+تبدأ المعرفة الفلكية بقياس الضوء أو الإشعاع أو الحركة، ثم تحويل البيانات إلى صورة أو جدول أو نموذج. الصورة المنشورة قد تكون معالجة لإظهار تفاصيل لا تراها العين مباشرة، لذلك ينبغي قراءة شرح فريق الرصد ومعرفة الأطوال الموجية والألوان الاصطناعية المستخدمة. لا يجعل ذلك الصورة مضللة؛ بل يوضح كيف انتقل العلماء من الإشارة الخام إلى التمثيل المرئي، وما المعلومات التي يمكن استخلاصها منه.
+
+## ما الذي يقدمه التلسكوب؟
+
+تختلف التلسكوبات في قدرتها على رصد أنواع الضوء ومجالات السماء ودرجات الدقة. يستطيع تلسكوب جيمس ويب رصد الأشعة تحت الحمراء، وهو ما يساعد الباحثين على دراسة أجسام بعيدة أو باردة أو محجوبة جزئيًا بالغبار. لكن كل جهاز له حدود مرتبطة بحساسيته ووقت الرصد والضوضاء وطريقة المعايرة. لذلك لا تعني صورة جميلة بالضرورة أن كل تفاصيل الجسم أو تاريخه أصبحت معروفة.
+
+## من البيانات إلى الاستنتاج
+
+يقارن الباحثون القياسات بنماذج وتوقعات بديلة، ثم يفحصون ما إذا كانت البيانات تدعم تفسيرًا واحدًا أو عدة تفسيرات. قد تتغير النتيجة عندما تتوفر ملاحظات إضافية أو عندما يعاد تحليل البيانات بطريقة أفضل. من المفيد الفصل بين ما قيس مباشرة، وما استنتجه الفريق، وما يزال فرضية تحتاج إلى اختبار. هذه الفروق مهمة خصوصًا عند قراءة العناوين التي تصف كل نتيجة جديدة بأنها اكتشاف نهائي.
+
+## لماذا نحتاج إلى تحقق مستقل؟
+
+تزداد الثقة عندما تتوافق قياسات مستقلة أو أدوات مختلفة على تفسير متقارب، أو عندما يستطيع فريق آخر إعادة تحليل البيانات والوصول إلى نتيجة مشابهة. لا يعني الاستقلال أن كل جهة تستخدم الجهاز نفسه؛ فقد توفر ملاحظات من مراصد مختلفة اختبارًا إضافيًا. وفي المقابل، قد تتفق مصادر كثيرة لأنها تنقل بيانًا صحفيًا واحدًا، فلا تعد جميعها تأكيدات مستقلة.
+
+## كيف نقرأ خبرًا فلكيًا؟
+
+ابدأ باسم المهمة أو الجهاز، وتاريخ الرصد، والجهة العلمية التي نشرت البيانات. ثم اقرأ الدراسة أو الشرح الأصلي إن كان متاحًا، وتحقق من الفرق بين القياس والتفسير. ابحث عن حدود الدراسة وما يقوله الباحثون إنهم لا يعرفونه بعد. وإذا كان الخبر مبنيًا على مؤتمر صحفي فقط، فاعتبره وصفًا أوليًا حتى تظهر التفاصيل العلمية.
+
+## حدود المعرفة الحالية
+
+قد تكون البيانات حقيقية لكن تفسيرها غير محسوم، وقد يتغير تقدير المسافة أو الكتلة أو عمر الجسم مع تحسن القياسات. هذا لا ينتقص من العلم؛ بل يوضح أنه عملية تصحيح مستمرة. القراءة الدقيقة تمنح الاكتشاف أهميته دون تحويل الاحتمال إلى يقين أو تجاهل الأسئلة المفتوحة.','[{"title":"Webb Space Telescope","publisher":"NASA","url":"https://science.nasa.gov/mission/webb/"},{"title":"Webb Space Science","publisher":"European Space Agency","url":"https://www.esa.int/Science_Exploration/Space_Science/Webb"}]','PUBLISHED','https://commons.wikimedia.org/wiki/Special:FilePath/James_Webb_Space_Telescope_Mirror.jpg?width=1200','مرآة تلسكوب جيمس ويب الفضائي',strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+('science-test-scientific-claims-ar','science','ar','كيف نختبر الادعاءات العلمية؟','خطوات عملية لفحص السؤال والدليل والمنهج وحدود الدراسة قبل قبول نتيجة علمية أو تداولها.','## ابدأ بالسؤال المحدد
+
+الادعاء العلمي الجيد يمكن صياغته بطريقة واضحة تسمح بفحصه، مثل سؤال عن علاقة متغيرين أو أثر تدخل محدد. أما العبارات العامة من نوع أن مادة ما تعالج كل الأمراض أو أن تقنية ما تغير كل شيء، فهي واسعة ولا تحدد النتيجة التي يمكن قياسها. يساعد السؤال المحدد على اختيار نوع الدليل المناسب بدل جمع معلومات تؤيد الانطباع الأول فقط.
+
+## افحص طريقة جمع البيانات
+
+تختلف قوة الدليل بحسب تصميم الدراسة وحجم العينة وطريقة اختيار المشاركين وأدوات القياس. قد تكشف دراسة رصدية ارتباطًا بين عاملين، لكنها لا تثبت وحدها أن أحدهما سبب الآخر. أما التجارب المحكمة فقد تساعد على اختبار السببية عندما تكون مناسبة وأخلاقية، ومع ذلك تظل النتائج مرتبطة بظروف التجربة ومدى تمثيل المشاركين أو البيانات للفئة الأوسع.
+
+## لا تخلط بين الارتباط والسببية
+
+إذا ظهر أن ظاهرتين تحدثان معًا، فقد يكون هناك سبب مشترك أو عامل لم تقسه الدراسة. على سبيل المثال، قد يرتبط استخدام خدمة صحية بنتيجة أفضل لأن الأشخاص الذين يستخدمونها يختلفون أيضًا في العمر أو الدخل أو شدة الحالة. لذلك يسأل الباحثون عن العوامل المربكة، ويستخدمون طرقًا إحصائية وتصميمات بحثية مناسبة، ويقارنون النتائج بأدلة أخرى قبل تقديم تفسير سببي.
+
+## ما معنى المراجعة العلمية؟
+
+تتيح المراجعة من متخصصين فحص المنهج والتحليل والوضوح قبل النشر في كثير من المجلات. لكنها ليست ضمانًا مطلقًا للصحة؛ فقد تمر أخطاء أو تتغير المعرفة لاحقًا أو تسحب دراسة بسبب مشكلة في البيانات. من الأفضل النظر إلى المراجعة بوصفها طبقة من طبقات الفحص، إلى جانب شفافية البيانات وإمكانية إعادة التحليل وتكرار النتائج وتقييم الأدلة المتراكمة.
+
+## اقرأ النتيجة وحدودها
+
+ابحث في ملخص الدراسة عن عدد المشاركين والفترة الزمنية ومقياس النتيجة وحجم الأثر، لا عن قيمة إحصائية منفردة فقط. اقرأ قسم القيود لمعرفة ما لا تستطيع الدراسة إثباته. وإذا كانت النتيجة أولية أو منشورة في صورة مسودة غير محكمة، فيجب التصريح بذلك عند نقلها وعدم تقديمها كإجماع علمي مستقر.
+
+## قارن أكثر من مصدر
+
+قد تساعد المراجعات المنهجية والتقارير العلمية الصادرة عن جهات مستقلة على معرفة ما إذا كانت النتيجة متسقة مع بقية الأدلة. تأكد من أن المصادر تتناول السؤال نفسه، وأنها لا تكرر البيان الصحفي ذاته. وإذا تعارضت النتائج، فافحص اختلاف المنهج أو السكان أو تعريف المتغيرات بدل اختيار النتيجة الأكثر إثارة.
+
+## خلاصة قابلة للتطبيق
+
+اسأل ما الذي قيس فعلًا، وكيف قيس، وما التفسيرات البديلة، وهل أمكن تكرار النتيجة. افصل بين بيانات الدراسة واستنتاج مؤلفيها والعناوين الإعلامية. بهذه الخطوات لا تحتاج إلى أن تصبح متخصصًا في كل مجال كي تكتشف المبالغة، بل يمكنك تقييم درجة الثقة بصورة منصفة والاعتراف بما لا تحسمه الأدلة بعد.','[{"title":"Understanding Science","publisher":"University of California Museum of Paleontology","url":"https://undsci.berkeley.edu/"},{"title":"Science and Engineering Indicators","publisher":"National Science Foundation","url":"https://ncses.nsf.gov/indicators"}]','PUBLISHED','https://commons.wikimedia.org/wiki/Special:FilePath/Microscope.jpg?width=1200','مجهر يستخدم في البحث العلمي',strftime('%Y-%m-%dT%H:%M:%fZ','now'),strftime('%Y-%m-%dT%H:%M:%fZ','now'));
