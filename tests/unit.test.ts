@@ -20,6 +20,13 @@ describe("exact person identity isolation",()=>{
     expect(result).toHaveLength(1);
     expect(result[0].title).toBe("محمد صلاح");
   });
+  it("rejects an exact-name disambiguation page whose summary lists several people",()=>{
+    const items=[
+      {title:"محمد صلاح",summary:"محمد صلاح لاعب كرة قدم مصري. محمد صلاح دندراوي كاتب سعودي. محمد صلاح (توضيح) يشير إلى عدة أشخاص.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح",provider:"Wikipedia",score:90,sources:[{title:"محمد صلاح",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح"}]},
+      {title:"محمد صلاح دندراوي",summary:"كاتب وأديب سعودي.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي",provider:"Wikipedia",score:70,sources:[{title:"محمد صلاح دندراوي",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي"}]}
+    ] as any;
+    expect(isolateExactPerson("محمد صلاح",items)).toHaveLength(0);
+  });
   it("does not discard ordinary topic search results when there is no exact person biography",()=>{
     const items=[{title:"تغير المناخ",summary:"شرح علمي للتغير المناخي.",url:"https://ar.wikipedia.org/wiki/تغير_المناخ",provider:"Wikipedia",score:80,sources:[{title:"تغير المناخ",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/تغير_المناخ"}]}] as any;
     expect(isolateExactPerson("تغير المناخ",items)).toHaveLength(1);
