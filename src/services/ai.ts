@@ -39,7 +39,7 @@ export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[
       const itemNumbers=new Set(normalizeDigits(itemText).match(/[0-9]+/g)||[]);
       const namesSupported=names.every(name=>itemTokens.has(name.toLowerCase()));
       const numbersSupported=numbers.every(number=>itemNumbers.has(number));
-      const subjectSupported=!subjectTokens.length||subjectTokens.every(token=>itemTokens.has(token));
+      const subjectSupported=!arabicEntities.length||!subjectTokens.length||subjectTokens.every(token=>itemTokens.has(token));
       const arabicEntitiesSupported=arabicEntities.every(entity=>entity.hasAlias||entity.phrase.split(/\s+/).every(token=>itemTokens.has(token.toLowerCase())));
       return namesSupported&&numbersSupported&&subjectSupported&&arabicEntitiesSupported;
     });
