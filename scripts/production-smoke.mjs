@@ -114,11 +114,11 @@ try{
   if(/[\u0600-\u06ff]/.test(String(d.answer)))throw new Error("ask_en_language_mismatch");
 }catch(e){console.error("ASK_EN",e);bad++}
 try{
-  const x=await fetch(origin+"/api/admin/ai-repair",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({problem:"production smoke authorization test"})});
+  const x=await fetch(origin+"/api/admin/ai-repair",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({problem:"production smoke authorization test"}),signal:AbortSignal.timeout(10000)});
   if(x.status!==401)throw new Error("ai_repair_auth_not_enforced");
-  const telegram=await fetch(origin+"/api/admin/telegram-test",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({})});
+  const telegram=await fetch(origin+"/api/admin/telegram-test",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({}),signal:AbortSignal.timeout(10000)});
   if(telegram.status!==401)throw new Error("telegram_test_auth_not_enforced");
-  const expand=await fetch(origin+"/api/admin/article/expand",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({slug:"smoke-test",language:"ar"})});
+  const expand=await fetch(origin+"/api/admin/article/expand",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({slug:"smoke-test",language:"ar"}),signal:AbortSignal.timeout(10000)});
   if(expand.status!==401)throw new Error("article_expand_auth_not_enforced");
 }catch(e){console.error("ADMIN_AUTH",e);bad++}
 try{
@@ -214,6 +214,6 @@ try{
   const css=await get("/styles.css?v="+encodeURIComponent(bundleVersion));
   if(!css.text.includes(".prices-refresh")||!css.text.includes("@media(max-width:360px)"))throw new Error("responsive_prices_styles_missing");
 }catch(e){console.error("LIVE_DATA",e);bad++}
-try{const a=await fetch(origin+"/api/admin/analytics",{headers:{accept:"application/json"}});if(a.status!==401)throw new Error("admin_auth_not_enforced")}catch(e){console.error("ADMIN_AUTH",e);bad++}
+try{const a=await fetch(origin+"/api/admin/analytics",{headers:{accept:"application/json"},signal:AbortSignal.timeout(10000)});if(a.status!==401)throw new Error("admin_auth_not_enforced")}catch(e){console.error("ADMIN_AUTH",e);bad++}
 if(bad)process.exit(1);
 console.log("BAYAN production smoke passed");
