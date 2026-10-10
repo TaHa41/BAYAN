@@ -97,7 +97,7 @@ for (const row of rows) {
   }));
   if (publishers.size < 2 || hosts.size < 2) fail("requires two independent publishers and HTTPS hosts");
 }
-if (rows.length !== 28) failures.push("expected 28 seeded article rows, got " + rows.length);
+if (rows.length !== 30) failures.push("expected 28 seeded article rows, got " + rows.length);
 for (const section of ["health", "history", "economy", "world", "art", "arab", "science", "technology"]) {
   for (const language of ["ar", "en"]) {
     const count = rows.filter(row => row[1] === section && row[2] === language).length;
@@ -106,4 +106,4 @@ for (const section of ["health", "history", "economy", "world", "art", "arab", "
 }
 for (const failure of failures) console.error("FAIL " + failure);
 if (failures.length) process.exit(1);
-console.log("PASS all 28 bilingual health/history/economy/global/art/Arab/science/technology seed articles meet publication-quality contracts");
+console.log("PASS all 30 bilingual health/history/economy/global/art/Arab/science/technology seed articles meet publication-quality contracts");
