@@ -1,12 +1,30 @@
 import {describe,it,expect} from "vitest";
 import {SECTIONS} from "../src/config";
 import {answerHasUnsupportedSpecifics} from "../src/services/ai";
+import {isolateExactPerson} from "../src/services/search";
 
 describe("BAYAN product foundation",()=>{
   it("has all required sections",()=>expect(SECTIONS.length).toBe(16));
   it("has bilingual labels",()=>expect(SECTIONS.every(x=>x[1]&&x[2])).toBe(true));
 });
 
+describe("exact person identity isolation",()=>{
+  it("keeps only the exact biography page when multiple people share the same Arabic name",()=>{
+    const items=[
+      {title:"محمد صلاح",summary:"محمد صلاح لاعب كرة قدم مصري محترف.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح",provider:"Wikipedia",score:90,sources:[{title:"محمد صلاح",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح"}]},
+      {title:"محمد صلاح دندراوي",summary:"كاتب وأديب سعودي.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي",provider:"Wikipedia",score:70,sources:[{title:"محمد صلاح دندراوي",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي"}]},
+      {title:"محمد صلاح (توضيح)",summary:"صفحة توضيح لأشخاص يحملون الاسم.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_(توضيح)",provider:"Wikipedia",score:60,sources:[{title:"محمد صلاح (توضيح)",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_(توضيح)"}]},
+      {title:"محمد صلاح زكريا",summary:"كاتب قصص وروائي مصري.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_زكريا",provider:"Wikipedia REST Search",score:55,sources:[{title:"محمد صلاح زكريا",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_زكريا"}]}
+    ] as any;
+    const result=isolateExactPerson("محمد صلاح",items);
+    expect(result).toHaveLength(1);
+    expect(result[0].title).toBe("محمد صلاح");
+  });
+  it("does not discard ordinary topic search results when there is no exact person biography",()=>{
+    const items=[{title:"تغير المناخ",summary:"شرح علمي للتغير المناخي.",url:"https://ar.wikipedia.org/wiki/تغير_المناخ",provider:"Wikipedia",score:80,sources:[{title:"تغير المناخ",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/تغير_المناخ"}]}] as any;
+    expect(isolateExactPerson("تغير المناخ",items)).toHaveLength(1);
+  });
+});
 describe("evidence-backed AI answer validation",()=>{
   const evidence=[{
     title:"Mohamed Salah scored 7 goals for Liverpool in 2025",
