@@ -162,8 +162,10 @@ const wikidataImage = async (query: string): Promise<string | undefined> => {
         const label = normalize(item.label || "");
         return label === requested;
       });
-      const ids = matches.map((item: any) => item.id).filter(Boolean).slice(0, 5);
-      if (!ids.length) continue;
+      const ids = matches.map((item: any) => item.id).filter(Boolean);
+      // If an exact label resolves to multiple Wikidata entities, the name is ambiguous.
+      // Refuse to pick an arbitrary person and let the neutral image fallback handle it.
+      if (ids.length !== 1) continue;
 
       const entityUrl =
         "https://www.wikidata.org/w/api.php?action=wbgetentities&ids=" +
