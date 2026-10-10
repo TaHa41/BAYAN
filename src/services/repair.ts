@@ -175,13 +175,18 @@ async function repairRuntime(env:Env,failures:string[]){
   // any historical news refresh ever happened. A historical count caused image-only
   // repair to repeat forever and starved news-cache recovery.
   const imageOnlyPass=failures.includes("news_cache")&&failures.includes("images")&&previousAction.includes("image repair deferred until the next run");
-  if(failures.includes("news_cache")&&!imageOnlyPass){
+  // Rotate section-content recovery into the existing news/image cycle. Without
+  // this bounded slot, persistent cache/image failures can starve every section.
+  const sectionOnlyPass=failures.includes("news_cache")&&failures.includes("images")&&failures.includes("sections")&&imageOnlyPass&&previousAction.includes("live news refresh attempted for both locales")&&!previousAction.includes("section content repair pass selected");
+  if(failures.includes("news_cache")&&!imageOnlyPass&&!sectionOnlyPass){
     const refreshed:string[]=[];
     for(const language of ["ar","en"] as const){
       try{const result=await news(env,language);refreshed.push(language+":"+result.items.length)}catch(error){refreshed.push(language+":failed");await record(env,"warn","self_heal_news_refresh",language+" "+String(error).slice(0,300))}
     }
     actions.push("live news refresh attempted for both locales ("+refreshed.join(", ")+"); no news content fabricated");
 
+  }else if(sectionOnlyPass){
+    actions.push("section content repair pass selected; news refresh and image repair deferred until the next run");
   }else if(imageOnlyPass){
     actions.push("bounded image-only repair pass selected because the previous run deferred images");
   }
@@ -192,10 +197,10 @@ async function repairRuntime(env:Env,failures:string[]){
   if(failures.includes("sections"))try{
     const missing=await sectionHealth(env);
     if(missing.length)actions.push("section coverage failure: fewer than 2 complete, locale-pure, source-backed, imaged articles: "+missing.join(", "));
-    if(missing.length&&!failures.includes("news_cache")&&!failures.includes("images"))actions.push(await attemptSectionContentRepair(env,missing));
+    if(missing.length&&(!failures.includes("news_cache")&&!failures.includes("images")||sectionOnlyPass))actions.push(await attemptSectionContentRepair(env,missing));
     else if(missing.length)actions.push("Evidence-backed section repair deferred while news/image recovery is active, to preserve Worker subrequest budget.");
   }catch(error){actions.push("section content audit failed: "+String(error).slice(0,250))}
-  if(failures.includes("images")&&failures.includes("news_cache")&&!imageOnlyPass){actions.push("image repair deferred until the next run to preserve Worker subrequest budget after news refresh")}else if(failures.includes("images"))try{
+  if(failures.includes("images")&&sectionOnlyPass){actions.push("image repair deferred until the next run after section content repair pass")}else if(failures.includes("images")&&failures.includes("news_cache")&&!imageOnlyPass){actions.push("image repair deferred until the next run to preserve Worker subrequest budget after news refresh")}else if(failures.includes("images"))try{
     const rows=await env.DB.prepare("SELECT id,title,summary,sources_json FROM articles WHERE status='PUBLISHED' AND (image_url IS NULL OR trim(image_url)='') ORDER BY updated_at DESC LIMIT 4").all<any>();
     let filledArticles=0;
     for(const row of rows.results||[])try{let sourceUrl="";try{const sources=JSON.parse(String(row.sources_json||"[]"));sourceUrl=String(sources.find((item:any)=>String(item.url||"").startsWith("https://"))?.url||"")}catch{}const url=await findRelatedImage(String(row.title||""),sourceUrl||undefined);if(url){await env.DB.prepare("UPDATE articles SET image_url=?,updated_at=? WHERE id=? AND (image_url IS NULL OR trim(image_url)='')").bind(url,now(),row.id).run();filledArticles++}else await record(env,"warn","image_repair_no_match","No topic-matched image found for article "+String(row.id)+" ("+String(row.title||"").slice(0,180)+")")}catch(error){await record(env,"warn","image_repair_article_error","Article "+String(row.id)+": "+String(error).slice(0,300))}
