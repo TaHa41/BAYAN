@@ -155,18 +155,18 @@ const sectionPatterns:Record<string,RegExp>={
 const sectionTerms:Record<string,string[]>={
  science:["science","scientific","space","nasa","physics","chemistry","biology","astronomy","discovery","discoveries","علم","علوم","العلوم","علمي","علمية","فضاء","الفضاء","ناسا","فيزياء","كيمياء","أحياء","فلك","اكتشاف","اكتشافات"],
  technology:["technology","technologies","artificial","intelligence","software","computing","cybersecurity","computer","تقنية","تقنيات","تكنولوجيا","الذكاء","اصطناعي","برمجيات","حوسبة","حاسوب","سيبراني","معلومات"],
- economy:["economy","economic","inflation","market","markets","finance","financial","currency","bank","trade","gdp","unemployment","اقتصاد","اقتصادي","اقتصادية","تضخم","التضخم","سوق","السوق","أسواق","تمويل","مالي","مالية","عملة","العملة","بنك","البنوك","تجارة","ناتج","بطالة"],
+ economy:["economy","economic","inflation","market","markets","finance","financial","currency","bank","trade","gdp","unemployment","اقتصاد","الاقتصاد","اقتصادي","الاقتصادي","اقتصادية","الاقتصادية","تضخم","التضخم","سوق","السوق","أسواق","تمويل","التمويل","مالي","المالي","مالية","المالية","عملة","العملة","بنك","البنوك","تجارة","التجارة","ناتج","بطالة","البطالة"],
  politics:["politics","political","government","election","elections","parliament","constitution","diplomacy","president","minister","policy","سياسة","السياسة","سياسي","سياسية","حكومة","الحكومة","انتخابات","الانتخابات","برلمان","البرلمان","دستور","دبلوماسية","رئيس","وزير"],
  health:["health","medical","medicine","disease","hospital","drug","treatment","prevention","صحة","الصحة","طب","الطب","طبي","طبية","مرض","المرض","مستشفى","دواء","علاج","وقاية"],
  history:["history","historical","civilization","civilizations","ancient","archaeology","تاريخ","التاريخ","تاريخي","تاريخية","حضارة","حضارات","آثار","قديم","قديمة"],
- people:["biography","biographical","writer","author","novelist","player","scientist","president","poet","artist","inventor","actor","personality","شخصية","شخصيات","سيرة","كاتب","الكاتب","روائي","لاعب","عالم","شاعر","فنان","مؤلف","أديب","رئيس","ممثل","مخترع"],
+ people:["biography","biographical","writer","author","novelist","player","scientist","president","poet","artist","inventor","actor","personality","life","legacy","career","works","شخصية","الشخصية","شخصيات","سيرة","السيرة","كاتب","الكاتب","روائي","الروائية","روائية","لاعب","عالم","شاعر","فنان","الفنان","الفنانة","مؤلف","أديب","رئيس","ممثل","مخترع","حياة","حياته","حياتها","مسيرة","مسيرته","مسيرتها","أعمال","أعماله","أعمالها","النشأة","نجيب","محفوظ","مغني","مغنية","مطرب","مطربة"],
  sports:["sport","sports","football","soccer","basketball","tennis","league","championship","match","athlete","رياضة","رياضي","كرة","دوري","بطولة","مباراة","لاعب","فريق"],
- travel:["travel","tourism","destination","airport","hotel","visa","trip","سفر","سياحة","سياحي","سياحية","وجهة","مطار","فندق","تأشيرة","رحلة"],
- art:["art","arts","film","cinema","music","theatre","theater","song","literature","museum","فن","الفن","سينما","موسيقى","مسرح","فيلم","أغنية","أدب","ثقافة","فنان"],
+ travel:["travel","tourism","destination","airport","hotel","visa","trip","سفر","السفر","سياحة","السياحة","سياحي","السياحي","سياحية","السياحية","وجهة","الوجهة","وجهات","الوجهات","مطار","المطار","فندق","الفندق","فنادق","الفنادق","تأشيرة","التأشيرة","تأشيرات","رحلة","رحلات"],
+ art:["art","arts","film","cinema","music","theatre","theater","song","literature","museum","فن","الفن","سينما","السينما","موسيقى","الموسيقى","مسرح","المسرح","فيلم","أغنية","أغاني","غناء","مغني","مغنية","مطرب","مطربة","ممثلة","فنان","الفنان","الفنانة","فنانين","أدب","الأدب","ثقافة","الثقافة"],
  trends:["trend","trends","viral","popular","social","media","survey","poll","data","اتجاه","اتجاهات","ترند","متداول","رائج","استطلاع","استطلاعات","بيانات","اجتماعي","اجتماعية","التواصل","رأي","آراء"],
  egypt:["egypt","egyptian","cairo","alexandria","nile","aswan","luxor","suez","sinai","مصر","المصري","المصرية","القاهرة","الإسكندرية","النيل","أسوان","الأقصر","السويس","سيناء","البحر","الأحمر"],
- arab:["arab","arabic","arabian","league","العرب","عربي","العربية","عربيّة","الجامعة","الدول","العربية"],
- world:["world","global","international","united","nations","war","conflict","عالمي","عالمية","دولي","دولية","العالم","الأمم","المتحدة","علاقات","حرب","نزاع","سوريا","العراق","أوكرانيا","غزة","إيران","اليمن"]
+ arab:["arab","arabic","arabian","العرب","عربي","العربية","عربيّة","الجامعة","الدول"],
+ world:["world","global","international","united","nations","war","conflict","عالمي","عالمية","دولي","دولية","العالم","الأمم","المتحدة","علاقات","حرب","نزاع","سوريا","العراق","أوكرانيا","غزة","إيران","اليمن","داعش","تنظيم","الدولة","الإرهاب","الإرهابي","إقليمية","دول"]
 };
 const sectionRelevant=(x:any)=>{
  const title=String(x?.title||""),summary=String(x?.summary||"");
