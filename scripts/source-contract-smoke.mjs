@@ -18,7 +18,7 @@ const checks = [
   ["asset build version matches production smoke contract", /const BUILD="[^"]+"/.test(index) && index.includes("app-20261009-01.js?v=${BUILD}") && read("scripts/production-smoke.mjs").includes("bundleMatch")],
   ["article drafting uses one source summary instead of concatenating unrelated result snippets", api.includes('const evidenceBody=String(found.results[0]?.summary||"").trim()') && !api.includes('found.results.slice(0,8).map((x:any)=>x.title+"\\n"+x.summary)')],
   ["article retrieval allows expanded evidence search to finish before falling back", api.includes('images:false}),10000)') && app.includes("timeoutMs:36000")],
-  ["article drafting enriches search snippets with original-source text when available", api.includes("articleEvidenceText=await Promise.all") && api.includes("bounded(sourceArticleText(url,lang),4500).catch(()=> \"\" )") && api.includes("const mainMatch=html.match(/<(article|main)")],
+  ["article drafting enriches search snippets with original-source text when available", api.includes("articleEvidenceText=await Promise.all") && api.includes("bounded(sourceArticleText(url,lang),4500).catch(()=> \"\"))") && api.includes("const mainMatch=html.match(/<(article|main)")],
   ["Telegram contribution notification uses real line break", !/BAYAN: مساهمة جديدة للمراجعة\\\\n/.test(api) && /BAYAN: مساهمة جديدة للمراجعة\\n/.test(api)],
   ["explicit lang query overrides browser language", read("src/http.ts").includes('if(requested==="ar")return"ar"')],
   ["section fallback content is filtered by locale", api.includes('lang==="ar"?hasArabic(title)&&hasArabic(summary)') && api.includes('!hasArabic(title)&&!hasArabic(summary)')],
