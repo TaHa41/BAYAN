@@ -152,7 +152,33 @@ const sectionPatterns:Record<string,RegExp>={
  arab:/(arab|arabic|arab league|العرب|عربي|العالم العربي|جامعة الدول العربية)/i,
  world:/(world|global|international|united nations|international relations|global risk|عالمي|دولي|العالم|الأمم المتحدة|علاقات دولية|حرب|نزاع|داعش|تنظيم الدولة|سوريا|العراق|أوكرانيا|غزة|إيران|اليمن|الحوثيين|كييف|دولية)/i
 };
-const sectionRelevant=(x:any)=>{const text=String(x?.title||"")+" "+String(x?.summary||"");if(section==="sports"&&/(video game|لعبة فيديو|ألعاب فيديو)/i.test(text))return false;const pattern=sectionPatterns[section];return !pattern||pattern.test(text);};
+const sectionTerms:Record<string,string[]>={
+ science:["science","scientific","space","nasa","physics","chemistry","biology","astronomy","discovery","discoveries","علم","علوم","العلوم","علمي","علمية","فضاء","الفضاء","ناسا","فيزياء","كيمياء","أحياء","فلك","اكتشاف","اكتشافات"],
+ technology:["technology","technologies","artificial","intelligence","software","computing","cybersecurity","computer","تقنية","تقنيات","تكنولوجيا","الذكاء","اصطناعي","برمجيات","حوسبة","حاسوب","سيبراني","معلومات"],
+ economy:["economy","economic","inflation","market","markets","finance","financial","currency","bank","trade","gdp","unemployment","اقتصاد","اقتصادي","اقتصادية","تضخم","التضخم","سوق","السوق","أسواق","تمويل","مالي","مالية","عملة","العملة","بنك","البنوك","تجارة","ناتج","بطالة"],
+ politics:["politics","political","government","election","elections","parliament","constitution","diplomacy","president","minister","policy","سياسة","السياسة","سياسي","سياسية","حكومة","الحكومة","انتخابات","الانتخابات","برلمان","البرلمان","دستور","دبلوماسية","رئيس","وزير"],
+ health:["health","medical","medicine","disease","hospital","drug","treatment","prevention","صحة","الصحة","طب","الطب","طبي","طبية","مرض","المرض","مستشفى","دواء","علاج","وقاية"],
+ history:["history","historical","civilization","civilizations","ancient","archaeology","تاريخ","التاريخ","تاريخي","تاريخية","حضارة","حضارات","آثار","قديم","قديمة"],
+ people:["biography","biographical","writer","author","novelist","player","scientist","president","poet","artist","inventor","actor","personality","شخصية","شخصيات","سيرة","كاتب","الكاتب","روائي","لاعب","عالم","شاعر","فنان","مؤلف","أديب","رئيس","ممثل","مخترع"],
+ sports:["sport","sports","football","soccer","basketball","tennis","league","championship","match","athlete","رياضة","رياضي","كرة","دوري","بطولة","مباراة","لاعب","فريق"],
+ travel:["travel","tourism","destination","airport","hotel","visa","trip","سفر","سياحة","سياحي","سياحية","وجهة","مطار","فندق","تأشيرة","رحلة"],
+ art:["art","arts","film","cinema","music","theatre","theater","song","literature","museum","فن","الفن","سينما","موسيقى","مسرح","فيلم","أغنية","أدب","ثقافة","فنان"],
+ trends:["trend","trends","viral","popular","social","media","survey","poll","data","اتجاه","اتجاهات","ترند","متداول","رائج","استطلاع","استطلاعات","بيانات","اجتماعي","اجتماعية","التواصل","رأي","آراء"],
+ egypt:["egypt","egyptian","cairo","alexandria","nile","aswan","luxor","suez","sinai","مصر","المصري","المصرية","القاهرة","الإسكندرية","النيل","أسوان","الأقصر","السويس","سيناء","البحر","الأحمر"],
+ arab:["arab","arabic","arabian","league","العرب","عربي","العربية","عربيّة","الجامعة","الدول","العربية"],
+ world:["world","global","international","united","nations","war","conflict","عالمي","عالمية","دولي","دولية","العالم","الأمم","المتحدة","علاقات","حرب","نزاع","سوريا","العراق","أوكرانيا","غزة","إيران","اليمن"]
+};
+const sectionRelevant=(x:any)=>{
+ const title=String(x?.title||""),summary=String(x?.summary||"");
+ const text=title+" "+summary;
+ if(section==="sports"&&/(video game|لعبة فيديو|ألعاب فيديو)/i.test(text))return false;
+ const terms=sectionTerms[section],pattern=sectionPatterns[section];
+ if(!terms)return !pattern||pattern.test(text);
+ const words=(value:string)=>new Set(value.normalize("NFKC").toLowerCase().replace(/[\\u064B-\\u065F\\u0670]/g,"").split(/[^\\p{L}\\p{N}]+/u).filter(Boolean));
+ const titleWords=words(title),summaryWords=words(summary);
+ if(terms.some(term=>titleWords.has(term)))return true;
+ return terms.filter(term=>summaryWords.has(term)).length>=2;
+};
 items=items.filter((x:any)=>sectionRelevant(x)&&(x.kind==="evidence"||(articleBodyQuality(String(x.body||"")).ok&&articleEvidenceQuality(x.sources)))).filter(localeSafeItem);
 const imageCandidates=items.filter((x:any)=>x.slug&&!/^https:\/\//i.test(String(x.imageUrl||""))).slice(0,3);
 await Promise.all(imageCandidates.map(async(item:any)=>{try{const imageUrl=await bounded(findRelatedImage(String(item.title||"")),2000);if(imageUrl&&/^https:\/\//i.test(imageUrl)){item.imageUrl=imageUrl;item.imageAlt=String(item.title||"");await env.DB.prepare("UPDATE articles SET image_url=?,image_alt=?,updated_at=? WHERE slug=? AND language=? AND (image_url IS NULL OR trim(image_url)='')").bind(imageUrl,item.imageAlt,new Date().toISOString(),item.slug,lang).run();}}catch{}}));
