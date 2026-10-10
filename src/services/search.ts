@@ -20,7 +20,7 @@ const scoreSource=(publisher:string, title:string, q:string) => {
   const p=publisher.toLowerCase(), t=title.toLowerCase(), terms=q.toLowerCase().split(/\s+/).filter(x=>x.length>2);
   let score=0;
   if(/wikipedia|wikidata/.test(p))score+=72;
-  if(/pubmed|ncbi|crossref|openalex|nih|cdc|world health organization|who\\.int|nature\\.com|science\\.org|gov\\b/.test(p))score+=82;
+  if(/pubmed|ncbi|crossref|openalex|nih|cdc|world health organization|who\.int|nature\.com|science\.org|gov\b/.test(p))score+=82;
   if(/bbc|reuters|ap|associated press|france 24|dw|al jazeera|sky news/.test(p))score+=78;
   if(terms.filter(x=>t.includes(x)).length)score+=Math.min(20,terms.filter(x=>t.includes(x)).length*6);
   return Math.min(100,score);
@@ -279,7 +279,7 @@ const personLookup=(q:string)=>{
 async function expandedSearch(env:Env,q:string,language:Locale,person=false):Promise<Candidate[]>{
   // Recovery uses distinct query formulations, not just the same phrase with a suffix.
   // Keep the fan-out bounded so broader recall does not create unbounded latency/subrequests.
-  const normalized=q.normalize("NFKC").replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/[“”‘’]/g,'"').replace(/[؟?!،,;；]+/g," ").replace(/\\s+/g," ").trim();
+  const normalized=q.normalize("NFKC").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[“”‘’]/g,'"').replace(/[؟?!،,;；]+/g," ").replace(/\s+/g," ").trim();
   const compact=searchTerms(normalized).slice(0,6).join(" ");
   const variants=person
     ? (language==="ar" ? [q+" سيرة ذاتية",normalized,q+" مصدر رسمي"] : [q+" biography",normalized,q+" official profile"])
@@ -323,7 +323,7 @@ const usefulDraft=(answer:string,language:Locale)=>{
 const localizedSource=(value:string,language:Locale)=>{
   const name=String(value||"").trim(),lower=name.toLowerCase();
   if(language==="ar"){
-    if(/youtube|youtu\\.be|vimeo/.test(lower))return "فيديو على YouTube";
+    if(/youtube|youtu\.be|vimeo/.test(lower))return "فيديو على YouTube";
     if(/wikipedia/.test(lower))return "ويكيبيديا";
     if(/wikidata/.test(lower))return "ويكي بيانات";
     if(/openalex/.test(lower))return "أوبن أليكس للأبحاث";
@@ -337,7 +337,7 @@ const localizedSource=(value:string,language:Locale)=>{
     return /[\u0600-\u06ff]/.test(name)?name:"مصدر بحث";
   }
   if(/فيديو على youtube/i.test(name))return "YouTube video";
-  if(/youtube|youtu\\.be|vimeo/.test(lower))return "YouTube video";
+  if(/youtube|youtu\.be|vimeo/.test(lower))return "YouTube video";
   if(/ويكيبيديا/.test(name))return "Wikipedia";
   if(/ويكي بيانات/.test(name))return "Wikidata";
   if(/أوبن أليكس/.test(name))return "OpenAlex";
