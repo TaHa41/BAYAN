@@ -3,6 +3,7 @@ import fs from "node:fs";
 const migrationPaths = [
   "migrations_v1/0023_seed_complete_health_history_economy_articles.sql",
   "migrations_v1/0024_seed_global_knowledge_articles.sql",
+  "migrations_v1/0025_seed_complete_art_arab_articles.sql",
 ];
 const parseMigration = (migrationPath) => {
   const sql = fs.readFileSync(migrationPath, "utf8");
@@ -70,7 +71,7 @@ for (const row of rows) {
   if (row.length !== 12) { fail("expected 12 columns, got " + row.length); continue; }
   if (seen.has(slug)) fail("duplicate slug");
   seen.add(slug);
-  if (!["health", "history", "economy", "world"].includes(section)) fail("unexpected section");
+  if (!["health", "history", "economy", "world", "art", "arab"].includes(section)) fail("unexpected section");
   if (!["ar", "en"].includes(language)) fail("unexpected language");
   if (status !== "PUBLISHED") fail("not marked PUBLISHED");
   if (!/^https:\/\//i.test(imageUrl)) fail("missing HTTPS topic image");
@@ -95,8 +96,8 @@ for (const row of rows) {
   }));
   if (publishers.size < 2 || hosts.size < 2) fail("requires two independent publishers and HTTPS hosts");
 }
-if (rows.length !== 14) failures.push("expected 14 seeded article rows, got " + rows.length);
-for (const section of ["health", "history", "economy", "world"]) {
+if (rows.length !== 22) failures.push("expected 22 seeded article rows, got " + rows.length);
+for (const section of ["health", "history", "economy", "world", "art", "arab"]) {
   for (const language of ["ar", "en"]) {
     const count = rows.filter(row => row[1] === section && row[2] === language).length;
     if (count < (section === "economy" ? 1 : 2)) failures.push(section + "/" + language + " has only " + count + " seeded articles");
@@ -104,4 +105,4 @@ for (const section of ["health", "history", "economy", "world"]) {
 }
 for (const failure of failures) console.error("FAIL " + failure);
 if (failures.length) process.exit(1);
-console.log("PASS all 14 bilingual health/history/economy/global seed articles meet publication-quality contracts");
+console.log("PASS all 22 bilingual health/history/economy/global/art/Arab seed articles meet publication-quality contracts");
