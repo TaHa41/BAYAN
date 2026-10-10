@@ -129,7 +129,7 @@ try{
   const en=await get("/api/search?q=NASA%20Artemis%20mission&lang=en"); const ed=JSON.parse(en.text);
   if(!Array.isArray(ed.results)||ed.results.length<1)throw new Error("english_topic_search_empty");
   if(!Array.isArray(ed.providerAttempted)||ed.providerAttempted.length<5)throw new Error("english_provider_coverage_missing");
-  if(ed.results.some(x=>/[\\u0600-\\u06ff]/.test(String(x.title||""))))throw new Error("english_topic_result_language_mismatch");
+  if(ed.results.some(x=>/[\u0600-\u06ff]/.test(String(x.title||""))))throw new Error("english_topic_result_language_mismatch");
 }catch(e){console.error("SEARCH",e);bad++}
 for(const section of sections.filter(section=>section!=="prices")){
   for(const language of ["ar","en"]){
@@ -150,8 +150,8 @@ try{
     if(live.endsWith("/gold")&&Array.isArray(payload.markets)&&payload.markets.some(item=>!Number(item.price)||!item.provider||!Date.parse(String(item.updatedAt||""))))throw new Error("market_quote_missing_price_provider_or_timestamp");
   }
   const page=await get("/prices?lang=ar");
-  if(!bundleText.includes('id="pricesRefresh"')||bundleVersion!=="2026.10.09.46")throw new Error("prices_page_assets_not_updated");
-  const css=await get("/styles.css?v=2026.10.09.46");
+  if(!bundleText.includes('id="pricesRefresh"')||bundleVersion!=="2026.10.10.02")throw new Error("prices_page_assets_not_updated");
+  const css=await get("/styles.css?v=2026.10.10.02");
   if(!css.text.includes(".prices-refresh")||!css.text.includes("@media(max-width:360px)"))throw new Error("responsive_prices_styles_missing");
 }catch(e){console.error("LIVE_DATA",e);bad++}
 try{const a=await fetch(origin+"/api/admin/analytics",{headers:{accept:"application/json"}});if(a.status!==401)throw new Error("admin_auth_not_enforced")}catch(e){console.error("ADMIN_AUTH",e);bad++}

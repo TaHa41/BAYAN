@@ -107,7 +107,7 @@
   const imageHtml = (item, className = "article-card-image") => {
     const url = safeImageUrl(item.imageUrl);
     return url
-      ? '<img loading="lazy" class="' + className + '" src="' + escapeHtml(url) + '" alt="' + escapeHtml(item.imageAlt || item.title || "") + '" data-image-query="' + escapeHtml(String(item.title || "") + " " + String(item.summary || "")) + '" onerror="window.BAYAN_IMAGE_RETRY(this)">'
+      ? '<img loading="lazy" class="' + className + '" src="' + escapeHtml(url) + '" alt="' + escapeHtml(item.imageAlt || item.title || "") + '" data-image-query="' + escapeHtml(String(item.title || "")) + '" onerror="window.BAYAN_IMAGE_RETRY(this)">'
       : '<div class="image-placeholder">BAYAN</div>';
   };
 
@@ -126,7 +126,7 @@
     placeholder.textContent = t("جاري تجهيز صورة المقال…", "Loading article image…");
     container.insertBefore(placeholder, container.firstChild);
     try {
-      const data = await api("/api/image?q=" + encodeURIComponent(String(title || "") + " " + String(summary || "")), {timeoutMs: 18000});
+      const data = await api("/api/image?q=" + encodeURIComponent(String(title || "").trim() || String(summary || "").trim()), {timeoutMs: 18000});
       if (data?.imageUrl && /^https:\/\//i.test(data.imageUrl) && placeholder.isConnected) {
         const img = document.createElement("img");
         img.className = "article-hero-image";
@@ -135,21 +135,89 @@
         img.src = data.imageUrl;
         img.onerror = () => {
           img.remove();
-          placeholder.textContent = t("صورة المقال غير متاحة حاليًا", "Article image is temporarily unavailable");
+          placeholder.textContent = t("بيان · صورة توضيحية", "BAYAN · subject visual");
           placeholder.classList.add("is-unavailable");
         };
         placeholder.replaceWith(img);
       } else {
-        placeholder.textContent = t("صورة المقال غير متاحة حاليًا", "Article image is temporarily unavailable");
+        placeholder.textContent = t("بيان · صورة توضيحية", "BAYAN · subject visual");
         placeholder.classList.add("is-unavailable");
       }
     } catch {
       if (placeholder.isConnected) {
-        placeholder.textContent = t("صورة المقال غير متاحة حاليًا", "Article image is temporarily unavailable");
+        placeholder.textContent = t("بيان · صورة توضيحية", "BAYAN · subject visual");
         placeholder.classList.add("is-unavailable");
       }
     }
   }
+
+  // Render article Markdown as semantic, readable HTML instead of wrapping every
+  // source line in a paragraph (which made headings and lists appear as raw text).
+  const renderArticleBody = (value) => {
+    const lines = String(value || "").replace(/\r/g, "").split("\n");
+    const out = [];
+    let paragraph = [];
+    let listType = "";
+    let listItems = [];
+    const flushParagraph = () => {
+      const text = paragraph.join(" ").trim();
+      if (text) out.push("<p>" + escapeHtml(text) + "</p>");
+      paragraph = [];
+    };
+    const flushList = () => {
+      if (!listItems.length) return;
+      const tag = listType === "ol" ? "ol" : "ul";
+      out.push("<" + tag + ">" + listItems.map(item => "<li>" + escapeHtml(item) + "</li>").join("") + "</" + tag + ">");
+      listItems = [];
+      listType = "";
+    };
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line) { flushParagraph(); flushList(); continue; }
+      const heading = line.match(/^(#{1,3})\s+(.+)$/);
+      if (heading) {
+        flushParagraph(); flushList();
+        const level = Math.min(3, heading[1].length + 1);
+        out.push("<h" + level + ">" + escapeHtml(heading[2].replace(/\s+#+\s*$/, "")) + "</h" + level + ">");
+        continue;
+      }
+      const bullet = line.match(/^[-*+]\s+(.+)$/);
+      const numbered = line.match(/^\d+[.)]\s+(.+)$/);
+      if (bullet || numbered) {
+        flushParagraph();
+        const nextType = numbered ? "ol" : "ul";
+        if (listType && listType !== nextType) flushList();
+        listType = nextType;
+        listItems.push((bullet || numbered)[1]);
+        continue;
+      }
+      const quote = line.match(/^>\s?(.*)$/);
+      if (quote) {
+        flushParagraph(); flushList();
+        out.push("<blockquote><p>" + escapeHtml(quote[1]) + "</p></blockquote>");
+        continue;
+      }
+      flushList();
+      paragraph.push(line);
+    }
+    flushParagraph(); flushList();
+    return out.join("");
+  };
+
+  const articleLeadHtml = (summary, body) => {
+    const lead = String(summary || "").trim();
+    if (!lead) return "";
+    const normalize = value => String(value || "").normalize("NFKC").toLowerCase()
+      .replace(/[\u064B-\u065F\u0670]/g, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+    const normalizedLead = normalize(lead);
+    const normalizedBody = normalize(body);
+    // Source-only responses can reuse extracted text as both summary and body.
+    if (normalizedLead && normalizedBody &&
+        (normalizedBody.startsWith(normalizedLead) ||
+         normalizedLead.startsWith(normalizedBody.slice(0, Math.min(160, normalizedBody.length))))) return "";
+    if (lead.length > 420) return "";
+    return '<p class="lead">' + escapeHtml(lead) + '</p>';
+  };
 
   const articleCard = (item) => {
     const sectionMeta = sections.find((section) => section[0] === item.section);
@@ -398,7 +466,7 @@
     const answerText=String(data?.answer||"");
     const answerUsable=Boolean(answerText)&&!/(تعذر تشغيل صياغة BAYAN الذكية الآن|drafting model is temporarily unavailable)/i.test(answerText);
     output.innerHTML = results.length
-      ? ((answerUsable ? '<article class="answer search-answer"><span class="eyebrow">' + t("إجابة بيان","BAYAN answer") + '</span><div class="article-body">' + String(answerText).split(String.fromCharCode(10)).map((line) => "<p>" + escapeHtml(line) + "</p>").join("") + '</div>' + (data.articleSlug ? '<a class="read" href="/article/' + encodeURIComponent(data.articleSlug) + "?lang=" + lang + '">' + t("فتح الملف الكامل داخل بيان","Open the full BAYAN file") + " →</a>" : "") + "</article>" : "") +
+      ? ((answerUsable ? '<article class="answer search-answer"><span class="eyebrow">' + t("إجابة بيان","BAYAN answer") + '</span><div class="article-body">' + renderArticleBody(answerText) + '</div>' + (data.articleSlug ? '<a class="read" href="/article/' + encodeURIComponent(data.articleSlug) + "?lang=" + lang + '">' + t("فتح الملف الكامل داخل بيان","Open the full BAYAN file") + " →</a>" : "") + "</article>" : "") +
       (fallbackUsed ? '<div class="notice">' + t("عرض بيان نتائج من مسار احتياطي؛ يجري توسيع البحث دون اختلاق نتائج.","BAYAN is showing fallback-source results while expanding search without inventing results.") + "</div>" : "") +
       '<div class="result-meta">' + escapeHtml((data.providers || []).join(" · ") || "BAYAN") + "</div>" +
       results.map((item) => {
@@ -429,9 +497,9 @@
       if(!data.ok||!article.title)throw new Error("article_unavailable");
       output.innerHTML='<article class="article-full">'+(article.image?heroImageHtml(article.image,article.title):"")+
         '<span class="eyebrow">'+escapeHtml(article.sources?.[0]?.publisher||publisher||t("بحث موثق","Evidence search"))+'</span><h1>'+escapeHtml(article.title)+'</h1>'+
-        '<p class="lead">'+escapeHtml(article.summary||summary)+'</p>'+(article.savedSlug?'<div class="notice">'+t("تمت إضافة المقال تلقائيًا إلى قسم","Automatically added to section")+' <a href="/'+encodeURIComponent(article.section||"news")+'?lang='+lang+'">'+escapeHtml((sections.find(section=>section[0]===(article.section||"news"))||[])[ar?1:2]||article.section||"news")+'</a></div>':"")+
+        articleLeadHtml(article.summary||summary,article.body||summary)+(article.savedSlug?'<div class="notice">'+t("تمت إضافة المقال تلقائيًا إلى قسم","Automatically added to section")+' <a href="/'+encodeURIComponent(article.section||"news")+'?lang='+lang+'">'+escapeHtml((sections.find(section=>section[0]===(article.section||"news"))||[])[ar?1:2]||article.section||"news")+'</a></div>':"")+
         (article.status==="source_only"?'<div class="notice">'+t("يعرض بيان النص المتاح من المصدر مع الأدلة؛ لم تتوفر معلومات كافية لإعداد تحليل موسع موثوق.","BAYAN is showing the source text available with its evidence; there is not enough information for a reliable expanded analysis.")+'</div>':"")+
-        '<div class="article-body">'+String(article.body||article.summary||summary).split(String.fromCharCode(10)).map(line=>"<p>"+escapeHtml(line)+"</p>").join("")+'</div>'+
+        '<div class="article-body">'+renderArticleBody(article.body||article.summary||summary)+'</div>'+
         '<div class="sources-box"><h2>'+t("الأدلة والمصادر","Evidence & sources")+'</h2>'+
         (article.sources||[]).map(source=>'<div class="source-line">'+escapeHtml(source.publisher||"")+' · '+escapeHtml(source.title||"")+'</div>').join("")+
         '</div>'+socialActions({...article,title:article.title||title,summary:article.summary||summary,href:location.pathname+location.search,_key:"research:"+title})+'</article>';
@@ -451,9 +519,8 @@
       output.innerHTML =
         '<article class="article-full">' + (data.imageUrl ? heroImageHtml(data.imageUrl, data.imageAlt || data.title) : "") +
         '<span class="eyebrow">' + escapeHtml(data.section || "BAYAN") + "</span><h1>" +
-        escapeHtml(data.title) + '</h1><p class="lead">' + escapeHtml(data.summary || "") +
-        '</p><div class="article-body">' + String(data.body || "").split(String.fromCharCode(10)).map((line) =>
-        "<p>" + escapeHtml(line) + "</p>").join("") +
+        escapeHtml(data.title) + '</h1>' + articleLeadHtml(data.summary || "", data.body || "") +
+        '<div class="article-body">' + renderArticleBody(data.body || "") +
         '</div><div class="sources-box"><h2>' + t("الأدلة والمصادر","Evidence & sources") + "</h2>" +
         (data.sources || []).map((source) =>
           '<div class="source-line">' + escapeHtml(source.publisher || "") + " · " + escapeHtml(source.title || "") +
@@ -465,9 +532,14 @@
             "afterbegin", heroImageHtml(image.imageUrl, data.title));
         } catch {}
       }
-    } catch {
-      document.querySelector("#article").innerHTML =
-        '<div class="notice">' + t("تعذر فتح الملف.","The knowledge file could not be opened.") + "</div>";
+    } catch (error) {
+      const output = document.querySelector("#article");
+      if (!output) return;
+      const rejected = String(error || "").includes("http_422");
+      const message = rejected
+        ? t("لم نعرض هذا الملف لأن محتواه أو أدلته لا تستوفي شروط التحقق في بيان.","This file was not shown because its content or evidence does not meet BAYAN's verification standards.")
+        : t("تعذر فتح الملف الآن. يمكنك البحث عن أدلة ومصادر مرتبطة بالموضوع.","The file could not be opened right now. You can search for evidence and sources related to this topic.");
+      output.innerHTML = '<div class="notice"><p>' + message + '</p><a class="primary" href="/search?q=' + encodeURIComponent(slug.replace(/-/g," ")) + '&lang=' + lang + '">' + t("ابحث عن مصادر موثوقة","Search reliable sources") + '</a></div>';
     }
   }
 
@@ -933,8 +1005,8 @@
       content.innerHTML = items.length
         ? items.map(articleCard).join("")
         : '<div class="notice"><h2>' + t("لا توجد مواد منشورة في هذا القسم بعد.","No published material in this section yet.") +
-          '</h2><p>' + t("سيظهر هنا المحتوى بعد مروره بمسار الاسترجاع والتحقق والمراجعة.","Content appears here after retrieval, verification and review.") +
-          "</p></div>";
+          '</h2><p>' + t("لن نعرض مقالات ناقصة أو غير متحققة. يمكنك البحث عن مصادر موثوقة حول موضوع القسم الآن.","We will not display incomplete or unverified articles. You can search reliable sources for this topic now.") +
+          '</p><a class="primary" href="/search?q=' + encodeURIComponent(ar ? section[1] : section[2]) + '&lang=' + lang + '">' + t("ابحث عن مواد موثقة","Search sourced material") + '</a></div>';
       if (items.length) hydrateSectionImages(items).catch(() => {});
     };
 

@@ -20,13 +20,13 @@ const scoreSource=(publisher:string, title:string, q:string) => {
   const p=publisher.toLowerCase(), t=title.toLowerCase(), terms=q.toLowerCase().split(/\s+/).filter(x=>x.length>2);
   let score=0;
   if(/wikipedia|wikidata/.test(p))score+=72;
-  if(/pubmed|ncbi|crossref|openalex|nih|cdc|world health organization|who\\.int|nature\\.com|science\\.org|gov\\b/.test(p))score+=82;
+  if(/pubmed|ncbi|crossref|openalex|nih|cdc|world health organization|who\.int|nature\.com|science\.org|gov\b/.test(p))score+=82;
   if(/bbc|reuters|ap|associated press|france 24|dw|al jazeera|sky news/.test(p))score+=78;
   if(terms.filter(x=>t.includes(x)).length)score+=Math.min(20,terms.filter(x=>t.includes(x)).length*6);
   return Math.min(100,score);
 };
 const source=(title:string,publisher:string,url:string):Source=>({title,publisher,url});
-const classifySection=(q:string,items:SearchResult[],language:Locale)=>{const qTerms=searchTerms(q);if(personLookup(q)&&items.some(x=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test((x.sources||[]).map(source=>source.publisher).join(" "))&&qTerms.some(term=>String(x.title||"").normalize("NFKC").toLowerCase().includes(term))))return"people";const s=(q+" "+items.slice(0,4).map(x=>x.title+" "+x.summary).join(" ")).toLowerCase();if(/\bscientist\b|\bchemist\b|\bwriter\b|\bauthor\b|\bpolitician\b|\bactor\b|\bathlete\b|\bbiography\b|\bnobel prize winner\b|\bphilosopher\b|\bphysicist\b|\bmathematician\b|عالم مصري|عالمة|كيميائي|سيرة ذاتية|شخصية عامة|كاتب|مؤلف|سياسي|ممثل|لاعب|باحث|رئيس سابق|من هو|من هي/.test(s))return"people";if(/gold|dollar|currency|price|inflation|سعر|ذهب|دولار|عملة|تضخم/.test(s))return"economy";if(/weather|طقس|حرارة|rain|temperature/.test(s))return"travel";if(/ai|artificial intelligence|technology|software|programming|ذكاء اصطناعي|تقنية|برمجة/.test(s))return"technology";if(/health|medicine|medical|nutrition|صحة|طب|دواء|تغذية/.test(s))return"health";if(/science|space|nasa|physics|biology|علم|فضاء|اكتشاف/.test(s))return"science";if(/history|historical|ancient|تاريخ|حضارة|قديم|culture|ثقافة/.test(s))return"history";if(/art|film|book|music|فن|سينما|كتاب|موسيقى|ترفيه/.test(s))return"art";if(/sports|football|soccer|basketball|رياضة|مباراة|لاعب/.test(s))return"sports";if(/travel|tourism|destination|سفر|سياحة|وجهة/.test(s))return"travel";if(/economy|business|market|اقتصاد|أعمال|سوق/.test(s))return"economy";if(/politic|government|election|president|سياسة|حكومة|انتخابات|رئيس/.test(s))return"politics";if(/biography|who is|من هو|من هي|سيرة|شخصية/.test(s))return"people";if(/trend|viral|popular|ترند|متداول|رائج/.test(s))return"trends";if(/egypt|مصر|القاهرة|الإسكندرية/.test(s))return"egypt";return"world"};
+const classifySection=(q:string,items:SearchResult[],language:Locale)=>{const qTerms=searchTerms(q);if(personLookup(q)&&items.some(x=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test((x.sources||[]).map(source=>source.publisher).join(" "))&&qTerms.some(term=>String(x.title||"").normalize("NFKC").toLowerCase().includes(term))))return"people";const s=(q+" "+items.slice(0,4).map(x=>x.title+" "+x.summary).join(" ")).toLowerCase();if(/\bscientist\b|\bchemist\b|\bwriter\b|\bauthor\b|\bpolitician\b|\bactor\b|\bathlete\b|\bbiography\b|\bnobel prize winner\b|\bphilosopher\b|\bphysicist\b|\bmathematician\b|عالم مصري|عالمة|كيميائي|سيرة ذاتية|شخصية عامة|كاتب|مؤلف|سياسي|ممثل|لاعب|باحث|رئيس سابق|من هو|من هي/.test(s))return"people";if(/gold|dollar|currency|price|inflation|سعر|ذهب|دولار|عملة|تضخم/.test(s))return"economy";if(/weather|طقس|حرارة|rain|temperature/.test(s))return"travel";if(/ai|artificial intelligence|technology|software|programming|ذكاء اصطناعي|تقنية|برمجة/.test(s))return"technology";if(/health|medicine|medical|nutrition|صحة|طب|دواء|تغذية/.test(s))return"health";if(/science|space|nasa|physics|biology|علم|فضاء|اكتشاف/.test(s))return"science";if(/history|historical|ancient|تاريخ|حضارة|قديم|culture|ثقافة/.test(s))return"history";if(/art|film|book|music|فن|سينما|كتاب|موسيقى|ترفيه/.test(s))return"art";if(/sports|football|soccer|basketball|رياضة|مباراة|لاعب/.test(s))return"sports";if(/travel|tourism|destination|سفر|سياحة|وجهة/.test(s))return"travel";if(/economy|business|market|اقتصاد|أعمال|سوق/.test(s))return"economy";if(/politic|government|election|president|سياسة|حكومة|انتخابات|رئيس/.test(s))return"politics";if(/biography|who is|من هو|من هي|سيرة|شخصية/.test(s))return"people";if(/trend|viral|popular|ترند|متداول|رائج/.test(s))return"trends";if(/egypt|مصر|القاهرة|الإسكندرية/.test(s))return"egypt";if(/arab|العالم العربي|جامعة الدول العربية|العرب|عربي/.test(s))return"arab";return"world"};
 
 const searchTerms=(q:string)=>{const stop=new Set(["the","and","for","with","from","about","what","when","where","who","how","why","are","was","is","من","في","عن","على","الى","إلى","ما","ماذا","كيف","لماذا","هل","هو","هي","هذا","هذه","التي","الذي","مع"]);return String(q||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter(x=>x.length>=2&&!stop.has(x)).slice(0,10)};
 const relevanceScore=(x:Candidate,q:string)=>{const terms=searchTerms(q);if(!terms.length)return 0;const normalize=(v:string)=>String(v||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"");const title=normalize(x.title),summary=normalize(x.summary),combined=title+" "+summary,normalizedQuery=normalize(q).trim(),titleHits=terms.filter(t=>title.includes(t)).length,summaryHits=terms.filter(t=>summary.includes(t)).length,allHits=terms.filter(t=>combined.includes(t)).length,phrase=title.includes(normalizedQuery);const person=personLookup(q);const identityBoost=person?(titleHits===terms.length?90:titleHits>0?titleHits*28:0):0;const authorOnlyPenalty=person&&titleHits===0&&summaryHits>0?35:0;return(phrase?75:0)+identityBoost+titleHits*18+summaryHits*7+allHits*4+Math.min(8,Number(x.score||0)/12)-authorOnlyPenalty};
@@ -279,7 +279,7 @@ const personLookup=(q:string)=>{
 async function expandedSearch(env:Env,q:string,language:Locale,person=false):Promise<Candidate[]>{
   // Recovery uses distinct query formulations, not just the same phrase with a suffix.
   // Keep the fan-out bounded so broader recall does not create unbounded latency/subrequests.
-  const normalized=q.normalize("NFKC").replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/[“”‘’]/g,'"').replace(/[؟?!،,;；]+/g," ").replace(/\\s+/g," ").trim();
+  const normalized=q.normalize("NFKC").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[“”‘’]/g,'"').replace(/[؟?!،,;；]+/g," ").replace(/\s+/g," ").trim();
   const compact=searchTerms(normalized).slice(0,6).join(" ");
   const variants=person
     ? (language==="ar" ? [q+" سيرة ذاتية",normalized,q+" مصدر رسمي"] : [q+" biography",normalized,q+" official profile"])
@@ -323,7 +323,7 @@ const usefulDraft=(answer:string,language:Locale)=>{
 const localizedSource=(value:string,language:Locale)=>{
   const name=String(value||"").trim(),lower=name.toLowerCase();
   if(language==="ar"){
-    if(/youtube|youtu\\.be|vimeo/.test(lower))return "فيديو على YouTube";
+    if(/youtube|youtu\.be|vimeo/.test(lower))return "فيديو على YouTube";
     if(/wikipedia/.test(lower))return "ويكيبيديا";
     if(/wikidata/.test(lower))return "ويكي بيانات";
     if(/openalex/.test(lower))return "أوبن أليكس للأبحاث";
@@ -337,7 +337,7 @@ const localizedSource=(value:string,language:Locale)=>{
     return /[\u0600-\u06ff]/.test(name)?name:"مصدر بحث";
   }
   if(/فيديو على youtube/i.test(name))return "YouTube video";
-  if(/youtube|youtu\\.be|vimeo/.test(lower))return "YouTube video";
+  if(/youtube|youtu\.be|vimeo/.test(lower))return "YouTube video";
   if(/ويكيبيديا/.test(name))return "Wikipedia";
   if(/ويكي بيانات/.test(name))return "Wikidata";
   if(/أوبن أليكس/.test(name))return "OpenAlex";
@@ -391,7 +391,6 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
     candidates.push(...expanded,...web);
   }
   
-  const seen=new Set<string>();
   const safeCandidates=candidates.filter(x=>(language==="ar"?hasArabic(x.title):!hasArabic(x.title))&&!disallowedContent(x.title+" "+x.summary));
   let ranked=safeCandidates.filter(x=>relevantCandidate(x,q)).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
   // If strict matching rejected every result, recover candidates with a real
@@ -410,10 +409,40 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
     }).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
   }
   // Never pad the result list with unrelated items: expand providers first, then report honestly if relevance is still weak.
-  const results=ranked.filter(x=>{
-    const k=x.title.toLowerCase().replace(/\W+/g," ")+"|"+x.summary.toLowerCase().slice(0,160);
-    if(seen.has(k))return false; seen.add(k); return true;
-  }).slice(0,max).map(({score,provider,...x})=>({...x,summary:localeSafeText(x.summary,language)?x.summary:"",sources:(x.sources||[]).map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}));
+  // Merge provider duplicates only when their descriptions support the same entity.
+  // A title-only key can incorrectly merge different people who share a name.
+  const uniqueByTitle = new Map<string,Candidate>();
+  const identityTerms = (value:string) => new Set(String(value||"").normalize("NFKC").toLowerCase()
+    .replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ")
+    .split(/\s+/).filter(term=>term.length>=4&&!/^(the|this|that|with|from|about|news|article|said|says|من|في|على|عن|هذا|هذه|الذي|التي|قال|عنها|عنه)$/.test(term)));
+  const normalizedTitle = (value:string) => String(value||"").normalize("NFKC").toLowerCase()
+    .replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").trim();
+  const sameEntity = (a:Candidate,b:Candidate) => {
+    const left=identityTerms(a.summary),right=identityTerms(b.summary);
+    const common=[...left].filter(term=>right.has(term)).length;
+    const sameUrl=String(a.url||"").trim()===String(b.url||"").trim()&&Boolean(a.url);
+    return sameUrl || (common>=2 && common/Math.max(1,Math.min(left.size,right.size))>=0.18);
+  };
+  for (const candidate of ranked) {
+    const titleKey=normalizedTitle(candidate.title);
+    if (!titleKey) continue;
+    const matching=[...uniqueByTitle.entries()].find(([key,existing])=>key.startsWith(titleKey+"|")&&sameEntity(existing,candidate));
+    const existing=matching?.[1];
+    if (!existing) {
+      const terms=[...identityTerms(candidate.summary)].sort().slice(0,6).join(" ");
+      const fallback=String(candidate.url||candidate.sources?.[0]?.url||candidate.provider||"").toLowerCase();
+      const key=titleKey+"|"+(terms||fallback||String(uniqueByTitle.size));
+      uniqueByTitle.set(key,{...candidate,sources:[...(candidate.sources||[])]});
+      continue;
+    }
+    const sourceKeys = new Set((existing.sources||[]).map(source => String(source.url||"").trim()).filter(Boolean));
+    for (const source of candidate.sources||[]) {
+      const sourceUrl = String(source.url||"").trim();
+      if (sourceUrl && !sourceKeys.has(sourceUrl)) { existing.sources.push(source); sourceKeys.add(sourceUrl); }
+    }
+    if ((!existing.summary || existing.summary.length < 80) && candidate.summary) existing.summary = candidate.summary;
+  }
+  const results=[...uniqueByTitle.values()].slice(0,max).map(({score,provider,...x})=>({...x,summary:localeSafeText(x.summary,language)?x.summary:"",sources:(x.sources||[]).map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}));
   const providers=[...new Set(candidates.map(x=>x.provider))];
   const publishers=[...new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean))];
   const configuredMin=Math.max(2,Math.min(5,Number(s.min_sources||3)));
