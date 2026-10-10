@@ -11,9 +11,9 @@ const languageConsistent=(answer:string,locale:Locale)=>{
 export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[])=>{
   const generic=new Set(["the","this","these","those","according","based","however","therefore","overall","summary","conclusion","answer","key","main","important","first","second","third","one","two","three","it","they","he","she","we","you","and","but","because","during","after","before","global","world","health","history","science","technology","economy","politics","sports","travel","art","bayan"]);
   const normalizeDigits=(value:string)=>value.replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[٬,]/g,"");
-  const sentences=answer.split(/[\\n.!؟?]+/).map(sentence=>sentence.replace(/^\\s*\\d+[.)]\\s/gm,"").trim()).filter(Boolean);
+  const sentences=answer.split(/[\n.!؟?]+/).map(sentence=>sentence.replace(/^\s*\d+[.)]\s/gm,"").trim()).filter(Boolean);
   return sentences.some(sentence=>{
-    const names=(sentence.match(/\\b[A-Z][A-Za-z0-9&.-]{2,}\\b/g)||[]).filter(name=>!generic.has(name.toLowerCase()));
+    const names=(sentence.match(/\b[A-Z][A-Za-z0-9&.-]{2,}\b/g)||[]).filter(name=>!generic.has(name.toLowerCase()));
     const numbers=normalizeDigits(sentence).match(/[0-9]+/g)||[];
     if(!names.length&&!numbers.length)return false;
     return !evidence.some(item=>{
