@@ -16,5 +16,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - name: Production guardian smoke
-        run: node scripts/production-smoke.mjs
+      - name: Lightweight post-deploy health check
+        env:
+          BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
+        run: node scripts/production-health.mjs
