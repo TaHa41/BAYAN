@@ -273,7 +273,7 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
   if(!name)return items;
   const exact=items.filter(item=>normalizedEntityTitle(item.title)===name&&!isDisambiguation(item)&&personEvidence(item));
   if(exact.length){
-    const canonical=exact.sort((a,b)=>relevanceScore(b,query)-relevanceScore(a,query))[0];
+    const canonical=exact.sort((a,b)=>Number(Boolean(b.imageUrl))-Number(Boolean(a.imageUrl))||relevanceScore(b,query)-relevanceScore(a,query))[0];
     const canonicalUrl=String(canonical.url||canonical.sources?.[0]?.url||"");
     // Once an exact biography page exists, never append other people who merely share
     // the name. Keep only the exact subject page and duplicates of that same page.
