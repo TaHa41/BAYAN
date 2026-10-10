@@ -298,11 +298,9 @@ const sanitizePersonProfileSummary=(query:string,value:string)=>{
     const at=summary.toLowerCase().indexOf(marker.toLowerCase());
     if(at>120)summary=summary.slice(0,at).trim();
   }
-  const claims=(summary.match(/currently plays for|current club is|plays for [^,.؛]+|يلعب حاليا مع نادي|يلعب حاليًا مع نادي|ناديه الحالي/gi)||[]).length;
-  if(claims>1){
-    const sentences=summary.split(/(?<=[.!؟?])\s+/);
-    summary=sentences.filter(sentence=>!/(currently plays for|current club is|plays for [^,.؛]+|يلعب حاليا مع نادي|يلعب حاليًا مع نادي|ناديه الحالي)/i.test(sentence)).join(" ").trim();
-  }
+  const currentClaimPattern=/(?:يلعب\s+حالي\S*[^.!؟?؛]*|ناديه\s+الحالي[^.!؟?؛]*|currently\s+plays[^.!?]*|current\s+club[^.!?]*)/gi;
+  const claims=[...summary.matchAll(currentClaimPattern)].length;
+  if(claims>1)summary=summary.replace(currentClaimPattern," ").replace(/\s+/g," ").trim();
   return summary;
 };
 const nameOnlyArabicQuery=(query:string)=>{
@@ -336,6 +334,7 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
     const profilePool=sportsProfiles.length?sportsProfiles:writerProfiles.length?writerProfiles:profile;
     const canonical=profilePool.sort((a,b)=>canonicalRank(b)-canonicalRank(a))[0];
     canonical.summary=sanitizePersonProfileSummary(query,String(canonical.summary||""));
+    canonical.section="people";
    const description=String(canonical.summary||"");
    const sports=/football|soccer|athlete|لاعب كرة قدم|رياضي/i.test(description);
    const medicine=/physician|doctor|surgeon|طبيب|طبيبة/i.test(description);
