@@ -898,7 +898,7 @@
       jobs.push((async()=>{
         const url="https://"+wikiHost+"/w/api.php?action=query&generator=search&gsrsearch="+encodeURIComponent(term)+"&gsrlimit=6&prop=extracts|pageimages&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=900&format=json&origin=*";
         const d=await fetchJson(url);
-        return Object.values(d.query?.pages||{}).map(x=>({title:clean(x.title),summary:clean(x.extract).slice(0,1600),section:looksLikePerson?"people":"world",kind:"web",evidence:"mixed",sources:[{publisher:t("ويكيبيديا","Wikipedia"),title:clean(x.title),url:"https://"+wikiHost+"/wiki/"+encodeURIComponent(String(x.title||"").replace(/ /g,"_"))}],url:"https://"+wikiHost+"/wiki/"+encodeURIComponent(String(x.title||"").replace(/ /g,"_")),provider:"Wikipedia"}));
+        return Object.values(d.query?.pages||{}).map(x=>({title:clean(x.title),summary:clean(x.extract).slice(0,1600),imageUrl:/^https:\/\//i.test(String(x.thumbnail?.source||""))?String(x.thumbnail.source):"",imageAlt:clean(x.title),section:looksLikePerson?"people":"world",kind:"web",evidence:"mixed",sources:[{publisher:t("ويكيبيديا","Wikipedia"),title:clean(x.title),url:"https://"+wikiHost+"/wiki/"+encodeURIComponent(String(x.title||"").replace(/ /g,"_"))}],url:"https://"+wikiHost+"/wiki/"+encodeURIComponent(String(x.title||"").replace(/ /g,"_")),provider:"Wikipedia"}));
       })());
       jobs.push((async()=>{
         const url="https://www.wikidata.org/w/api.php?action=wbsearchentities&search="+encodeURIComponent(term)+"&language="+lang+"&limit=6&format=json&origin=*";
@@ -922,7 +922,11 @@
     const items=settled.flatMap(x=>x.status==="fulfilled"&&Array.isArray(x.value)?x.value:[]);
     const queryTerms=trimmed.normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").split(/\s+/).filter(x=>x.length>=2);
     const seen=new Set();
-    return items.filter(x=>x.title&&/^https:\/\//i.test(String(x.url||"")))
+    const normalizeEntity=value=>String(value||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").trim();
+    const queryName=trimmed.replace(/^(?:who is|who was|biography(?: of)?|profile(?: of)?|من هو|من هي|سيرة(?: ذاتية)?|نبذة عن|شخصية)\s+/i,"").replace(/\s+(?:biography|profile|overview|سيرة ذاتية|شرح)$/i,"").trim();
+    const exactPerson=items.filter(x=>normalizeEntity(x.title)===normalizeEntity(queryName)&&/(footballer|football player|soccer player|athlete|politician|writer|author|actor|actress|scientist|researcher|coach|president|minister|لاعب كرة قدم|لاعب|رياضي|سياسي|كاتب|مؤلف|ممثل|عالم|باحث|مدرب|رئيس|وزير|ولد)/i.test(String(x.title||"")+" "+String(x.summary||""))&&!/(disambiguation|\(توضيح\)|صفحة توضيح)/i.test(String(x.title||"")));
+    const identitySafe=exactPerson.length?items.filter(x=>normalizeEntity(x.title)===normalizeEntity(queryName)&&!/(disambiguation|\(توضيح\)|صفحة توضيح)/i.test(String(x.title||""))&&String(x.url||"")===String(exactPerson[0].url||"")):items.filter(x=>!/(disambiguation|\(توضيح\)|صفحة توضيح)/i.test(String(x.title||"")));
+    return identitySafe.filter(x=>x.title&&/^https:\/\//i.test(String(x.url||"")))
       .filter(x=>ar?/\u0600-\u06ff/.test(x.title):!/[\u0600-\u06ff]/.test(x.title))
       .filter(x=>{
         const searchable=(String(x.title||"")+" "+String(x.summary||"")).normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"");

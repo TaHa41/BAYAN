@@ -48,6 +48,7 @@ async function wikipedia(env:Env,q:string,language:Locale):Promise<Candidate[]>{
       const pages=Object.values(d.query?.pages||{}) as any[];
       return pages.map((x:any)=>({
         title:cleanText(x.title),summary:cleanText(x.extract).slice(0,1800),section:"world",kind:"web" as const,evidence:"mixed" as const,
+        imageUrl:/^https:\/\//i.test(String(x.thumbnail?.source||""))?String(x.thumbnail.source):undefined,imageAlt:cleanText(x.title),
         sources:[source(x.title,language==="ar"?"Wikipedia Arabic":"Wikipedia","https://"+(language==="ar"?"ar":"en")+".wikipedia.org/wiki/"+encodeURIComponent(String(x.title).replace(/ /g,"_")))],
         url:"https://"+(language==="ar"?"ar":"en")+".wikipedia.org/wiki/"+encodeURIComponent(String(x.title).replace(/ /g,"_")),
         score:scoreSource("Wikipedia",x.title,query)+8,provider:"Wikipedia"
@@ -75,7 +76,9 @@ async function wikipediaRestSearch(q:string,language:Locale):Promise<Candidate[]
       const summary=cleanText(x.description||x.excerpt||"").slice(0,1600);
       const key=String(x.key||title).replace(/ /g,"_");
       const url="https://"+code+".wikipedia.org/wiki/"+encodeURIComponent(key);
+      const imageUrl=String(x.thumbnail?.url||x.thumbnail?.source||"");
       return {title,summary,section:"world",kind:"web" as const,evidence:"mixed" as const,
+        imageUrl:/^https:\/\//i.test(imageUrl)?imageUrl:undefined,imageAlt:title,
         sources:[source(title,language==="ar"?"Wikipedia Arabic":"Wikipedia",url)],
         url,score:scoreSource("Wikipedia",title,q)+8,provider:"Wikipedia REST Search"};
     }).filter((x:any)=>x.title&&x.url);
@@ -258,6 +261,28 @@ async function broadGdelt(q:string):Promise<Candidate[]>{
   const batches=await Promise.all(variants.map(v=>gdelt(v).catch(()=>[])));
   return batches.flat().slice(0,12);
 }
+const normalizedEntityTitle=(value:string)=>String(value||"").normalize("NFKC").toLowerCase()
+  .replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").trim();
+const personQueryName=(query:string)=>String(query||"").trim()
+  .replace(/^(?:who is|who was|biography(?: of)?|profile(?: of)?|من هو|من هي|سيرة ذاتية عن|سيرة ذاتية لشخص)\s+/i,"")
+  .replace(/\s+(?:biography|profile|official profile|سيرة ذاتية|مصدر رسمي)$/i,"").trim();
+const personEvidence=(candidate:Candidate)=>/(footballer|football player|soccer player|athlete|politician|writer|author|actor|actress|scientist|researcher|coach|president|minister|born in|is a .*player|لاعب كرة قدم|لاعب|رياضي|سياسي|كاتب|مؤلف|ممثل|عالِم|عالم|باحث|مدرب|رئيس|وزير|وُلد|ولد)/i.test(String(candidate.title||"")+" "+String(candidate.summary||""));
+const isDisambiguation=(candidate:Candidate)=>/(?:disambiguation|\(توضيح\)|صفحة توضيح|معاني الأسماء)/i.test(String(candidate.title||""));
+export const isolateExactPerson=(query:string,items:Candidate[])=>{
+  const name=normalizedEntityTitle(personQueryName(query));
+  if(!name)return items;
+  const exact=items.filter(item=>normalizedEntityTitle(item.title)===name&&!isDisambiguation(item)&&personEvidence(item));
+  if(exact.length){
+    const canonical=exact.sort((a,b)=>relevanceScore(b,query)-relevanceScore(a,query))[0];
+    const canonicalUrl=String(canonical.url||canonical.sources?.[0]?.url||"");
+    // Once an exact biography page exists, never append other people who merely share
+    // the name. Keep only the exact subject page and duplicates of that same page.
+    return items.filter(item=>normalizedEntityTitle(item.title)===name&&!isDisambiguation(item)&&
+      String(item.url||item.sources?.[0]?.url||"")===canonicalUrl);
+  }
+  if(personLookup(query))return items.filter(item=>!isDisambiguation(item));
+  return items;
+};
 const personLookup=(q:string)=>{
   const raw=String(q||"").trim();
   const words=raw.split(/\s+/).filter(Boolean);
@@ -393,6 +418,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   
   const safeCandidates=candidates.filter(x=>(language==="ar"?hasArabic(x.title):!hasArabic(x.title))&&!disallowedContent(x.title+" "+x.summary));
   let ranked=safeCandidates.filter(x=>relevantCandidate(x,q)).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
+  ranked=isolateExactPerson(q,ranked);
   // If strict matching rejected every result, recover candidates with a real
   // query-term match in the headline or at least two matches in the snippet.
   // This is a last-resort relevance tier, not unrelated padding: all candidates
