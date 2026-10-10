@@ -299,7 +299,18 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
  const profile=cleanExact.filter(personEvidence);
  // A single disambiguation result must not hide a valid exact profile from another provider.
  if(profile.length){
-   const canonical=profile.sort((a,b)=>String(a.summary||"").length-String(b.summary||"").length||relevanceScore(b,query)-relevanceScore(a,query))[0];
+   const canonicalRank=(item:Candidate)=>{
+      const summary=String(item.summary||"");
+      const provider=String(item.provider||"")+" "+(item.sources||[]).map(source=>source.publisher||"").join(" ");
+      let rank=Math.min(summary.length,1200)/24;
+      if(/wikipedia/i.test(provider))rank+=36;
+      if(/wikidata/i.test(provider))rank-=18;
+      if(/footballer|football player|soccer player|لاعب كرة قدم|لاعب كرة القدم/i.test(summary))rank+=24;
+      if(/actor|actress|ممثل|ممثلة/i.test(summary)&&!/footballer|football player|soccer player|لاعب كرة قدم|لاعب كرة القدم/i.test(summary))rank-=8;
+      if(isDisambiguation(item)||mixedIdentitySummary(query,item))rank-=1000;
+      return rank+relevanceScore(item,query)/100;
+    };
+    const canonical=profile.sort((a,b)=>canonicalRank(b)-canonicalRank(a))[0];
    const description=String(canonical.summary||"");
    const sports=/football|soccer|athlete|لاعب كرة قدم|رياضي/i.test(description);
    const medicine=/physician|doctor|surgeon|طبيب|طبيبة/i.test(description);
