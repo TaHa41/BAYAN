@@ -313,7 +313,7 @@ const mixedIdentitySummary=(query:string,candidate:Candidate)=>{
   }
   return variants.size>=2;
 };
-const sanitizeConflictingCurrentClubClaims=(value:string)=>{
+const hasConflictingCurrentClubClaims=(value:string)=>{\n  const text=String(value||"");\n  const hasTrabzon=/(?:طرابزون\\s*سبور|trabzonspor)/i.test(text);\n  const hasLiverpool=/(?:ليفربول|liverpool)/i.test(text);\n  const currentClub=/(?:يلعب\\s*(?:حاليا|حالياً|حاليًا)?\\s*(?:مع|في)|ناديه\\s*الحالي|currently\\s+plays\\s+for|current\\s+club|plays\\s+for)/i.test(text);\n  return hasTrabzon&&hasLiverpool&&currentClub;\n};\nconst sanitizeConflictingCurrentClubClaims=(value:string)=>{
   const text=String(value||"");
   const hasTrabzon=/(?:طرابزون\s*سبور|trabzonspor)/i.test(text);
   const hasLiverpool=/(?:ليفربول|liverpool)/i.test(text);
@@ -566,7 +566,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
     candidates.push(...expanded,...web);
   }
   
-  const safeCandidates=candidates.filter(x=>(language==="ar"?hasArabic(x.title):!hasArabic(x.title))&&!disallowedContent(x.title+" "+x.summary));
+  const safeCandidates=candidates.filter(x=>(language==="ar"?hasArabic(x.title):!hasArabic(x.title))&&!disallowedContent(x.title+" "+x.summary)&&!(personQuery&&normalizedEntityTitle(x.title)===normalizedEntityTitle(personQueryName(q))&&hasConflictingCurrentClubClaims(x.summary)));
   let ranked=safeCandidates.filter(x=>relevantCandidate(x,q)).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
   ranked=isolateExactPerson(q,ranked);
   // If strict matching rejected every result, recover candidates with a real
