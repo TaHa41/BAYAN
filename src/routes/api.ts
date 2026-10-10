@@ -89,7 +89,7 @@ const sourceArticleText=async(url:string,lang:"ar"|"en")=>{
     if(!r.ok)return "";
     let html=(await r.text()).slice(0,800000);
     html=html.replace(/<(script|style|nav|header|footer|aside|form)\b[\s\S]*?<\/\1>/gi," ");
-    const main=html.match(/<(?:article|main)\b[^>]*>([\s\S]*?)<\/(?:article|main)>/i)?.[1]||html;
+    const mainMatch=html.match(/<(article|main)\b[^>]*>([\s\S]*?)<\/\1>/i);const main=mainMatch?.[2]||html;
     const paragraphs=[...main.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map(m=>String(m[1]||"").replace(/<[^>]+>/g," ").replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&").replace(/&quot;/gi,'"').replace(/&#39;|&apos;/gi,"'").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/&#x([0-9a-f]+);/gi,(_,n)=>String.fromCodePoint(parseInt(n,16))).replace(/\s+/g," ").trim()).filter(p=>p.length>=70);
     const relevant=paragraphs.filter(p=>lang==="ar"?/[\u0600-\u06ff]/.test(p):! /[\u0600-\u06ff]/.test(p));
     return relevant.slice(0,10).join("\n\n").slice(0,7000);
@@ -139,7 +139,7 @@ export async function api(request:Request,env:Env){const u=new URL(request.url),
   if(isVideoUrl(storyUrl))return json({error:"video_source_not_article",kind:"video",message:lang==="ar"?"هذا رابط فيديو، وليس مقالًا مكتوبًا. افتح الفيديو كمصدر منفصل، ولا تُنشئ منه مقالًا دون نص موثوق ومصادر مكتوبة مستقلة.":"This is a video, not a written article. Open it as a separate source; do not draft an article without a reliable transcript and independent written sources."},422);
   try{
     let found:any={results:[],status:"insufficient"};
-    try{found=await bounded(search(env,title,lang,{publish:false,draft:false,images:false}),7000)}catch{}
+    try{found=await bounded(search(env,title,lang,{publish:false,draft:false,images:false}),10000)}catch{}
     found.results=isolateArticleSubject(title,(Array.isArray(found.results)?found.results:[]).filter((candidate:any)=>newsArticleEvidenceRelevant(title,candidate)&&!hasMixedPersonIdentities(title,String(candidate.summary||""))&&!isVideoUrl(String(candidate.url||candidate.sources?.[0]?.url||""))) as any);
     if(!found.results.length&&(summary||storyUrl)){
       const safeUrl=storyUrl.startsWith("https://")?storyUrl:"";
@@ -156,6 +156,29 @@ export async function api(request:Request,env:Env){const u=new URL(request.url),
       if(!image)image=story.imageUrl||await bounded(findRelatedImage(story.title||title),3500).catch(()=>undefined)||"";
       const article={title:story.title,summary:story.summary||"",body:story.summary||story.title,sources:story.sources||[],image:image||null,status:"source_only",providerCount:1,publishedAt:story.publishedAt};const savedSlug=await persistOpenedNewsArticle(env,article,lang);return json({ok:true,article:{...article,section:sectionForOpenedStory(story.title,story.summary||""),savedSlug}});
     }
+    // Enrich short snippets with readable text from a few independent, allow-listed source pages.
+    // Publisher failures remain non-fatal; a failed fetch falls back to the original search snippet.
+    const articleEvidenceUrls:string[]=[];
+    const articleEvidenceHosts=new Set<string>();
+    for(const candidate of found.results as any[]){
+      const candidateUrls=[candidate.url,...(Array.isArray(candidate.sources)?candidate.sources.map((item:any)=>item?.url):[])];
+      for(const candidateUrl of candidateUrls){
+        try{
+          const parsed=new URL(String(candidateUrl||""));
+          const host=parsed.hostname.toLowerCase().replace(/^www\\./,"");
+          if(parsed.protocol!=="https:"||articleEvidenceHosts.has(host)||articleEvidenceUrls.includes(parsed.toString()))continue;
+          articleEvidenceHosts.add(host);articleEvidenceUrls.push(parsed.toString());break;
+        }catch{}
+      }
+      if(articleEvidenceUrls.length>=3)break;
+    }
+    const articleEvidenceText=await Promise.all(articleEvidenceUrls.map(url=>bounded(sourceArticleText(url,lang),4500).catch(()=> "")));
+    const evidenceByUrl=new Map(articleEvidenceUrls.map((url,index)=>[url,articleEvidenceText[index]]));
+    found.results=found.results.map((candidate:any)=>{
+      const candidateUrls=[candidate.url,...(Array.isArray(candidate.sources)?candidate.sources.map((item:any)=>item?.url):[])].map((value:any)=>String(value||""));
+      const extra=candidateUrls.map(url=>evidenceByUrl.get(url)||"").find(value=>value.length>=160)||"";
+      return extra?{...candidate,summary:[String(candidate.summary||"").trim(),extra].filter(Boolean).join("\\n\\n").slice(0,5000)}:candidate;
+    });
     let generated:{status:string;answer?:string;sources?:Source[]}={status:"mixed"};
     try{generated=await bounded(ask(env,articlePrompt(title,lang),lang,found.results),8000)}catch{}
     const evidenceBody=String(found.results[0]?.summary||"").trim();
