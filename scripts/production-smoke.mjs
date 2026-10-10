@@ -126,6 +126,7 @@ try{
   const s=await get("/api/search?q=%D9%86%D8%AC%D9%8A%D8%A8%20%D9%85%D8%AD%D9%81%D9%88%D8%B8&lang=ar"); const d=JSON.parse(s.text);
   if(!Array.isArray(d.results)||d.results.length<1)throw new Error("person_search_empty");
   const salah=await get("/api/search?q=%D9%85%D8%AD%D9%85%D8%AF%20%D8%B5%D9%84%D8%A7%D8%AD&lang=ar"); const sd=JSON.parse(salah.text);
+  console.log("PERSON_SEARCH_DIAGNOSTICS",JSON.stringify({titles:(sd.results||[]).map(x=>({title:x.title,section:x.section,sources:(x.sources||[]).map(source=>({publisher:source.publisher,url:source.url}))})),providers:sd.providers,providerAttempted:sd.providerAttempted}));
   if(!Array.isArray(sd.results)||!sd.results.some(x=>String(x.title||"").trim()==="محمد صلاح"))throw new Error("exact_person_subject_missing");
   const profile=sd.results.find(x=>String(x.title||"").trim()==="محمد صلاح");
   const related=sd.results.filter(x=>String(x.title||"").trim()!=="محمد صلاح");
