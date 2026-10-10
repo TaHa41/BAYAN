@@ -16,6 +16,14 @@ describe("evidence-backed AI answer validation",()=>{
   it("rejects a club name absent from the retrieved evidence",()=>{
     expect(answerHasUnsupportedSpecifics("Mohamed Salah plays for Trabzonspor.",evidence)).toBe(true);
   });
+  it("rejects an unsupported Arabic club name when unrelated sources mention it",()=>{
+    const arabicEvidence=[
+      {title:"محمد صلاح لاعب ليفربول",summary:"محمد صلاح يلعب مع ليفربول.",sources:[{title:"ملف اللاعب",publisher:"مصدر رياضي",url:"https://example.com/player"}]},
+      {title:"طرابزون سبور يتعاقد مع لاعب جديد",summary:"أعلن النادي التركي ضم لاعب جديد.",sources:[{title:"أخبار النادي",publisher:"مصدر آخر",url:"https://example.com/club"}]}
+    ] as any;
+    expect(answerHasUnsupportedSpecifics("محمد صلاح يلعب لنادي طرابزون سبور.",arabicEvidence,"محمد صلاح")).toBe(true);
+    expect(answerHasUnsupportedSpecifics("محمد صلاح يلعب لنادي ليفربول.",arabicEvidence,"محمد صلاح")).toBe(false);
+  });
   it("does not combine unrelated sources to validate a wrong club name",()=>{
     const mixedEvidence=[...evidence,{title:"Trabzonspor signs a midfielder",summary:"The Turkish club announced a new midfielder.",sources:[{title:"Club news",publisher:"Sports Wire",url:"https://example.com"}]}] as any;
     expect(answerHasUnsupportedSpecifics("Mohamed Salah plays for Trabzonspor.",mixedEvidence)).toBe(true);
