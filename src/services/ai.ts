@@ -20,13 +20,7 @@ const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[])=>{
   const unsupportedNumber=answerNumbers.some(number=>!corpusNumbers.has(number));
   return unsupportedName||unsupportedNumber;
 };
-export async function ask(env:Env,question:string,locale:Locale,evidence:SearchResult[]){")+"\\\\b","i").test(corpus));
-  const normalizeDigits=(value:string)=>value.replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[٬,]/g,"");
-  const corpusNumbers=new Set(normalizeDigits(corpus).match(/\\d+(?:\\.\\d+)?/g)||[]);
-  const answerNumbers=normalizeDigits(answer).match(/[0-9٠-٩]+(?:[.,٫٬][0-9٠-٩]+)*/g)||[];
-  const unsupportedNumber=answerNumbers.some(number=>!corpusNumbers.has(number.replace(/[.,٫٬]/g,"")));
-  return unsupportedName||unsupportedNumber;
-};
+
 export async function ask(env:Env,question:string,locale:Locale,evidence:SearchResult[]){
   const publishers=new Set(evidence.flatMap(x=>x.sources||[]).map(s=>s.publisher).filter(Boolean));
   if(!evidence.length)return{status:"insufficient" as const,answer:locale==="ar"?"لا أملك أدلة موثقة كافية للإجابة بثقة.":"I do not have enough verified evidence to answer confidently.",sources:[]};
