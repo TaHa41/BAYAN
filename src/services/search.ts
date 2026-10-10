@@ -268,24 +268,38 @@ const personQueryName=(query:string)=>String(query||"").trim()
   .replace(/\s+(?:biography|profile|official profile|سيرة ذاتية|مصدر رسمي)$/i,"").trim();
 const personEvidence=(candidate:Candidate)=>/(footballer|football player|soccer player|athlete|politician|writer|author|actor|actress|scientist|researcher|coach|president|minister|born in|is a .*player|لاعب كرة قدم|لاعب|رياضي|سياسي|كاتب|مؤلف|ممثل|عالِم|عالم|باحث|مدرب|رئيس|وزير|وُلد|ولد)/i.test(String(candidate.title||"")+" "+String(candidate.summary||""));
 const isDisambiguation=(candidate:Candidate)=>/(?:disambiguation|\(توضيح\)|صفحة توضيح|معاني الأسماء|قد يشير إلى|قد تشير إلى|may refer to|people with the name)/i.test(String(candidate.title||"")+" "+String(candidate.summary||""));
+const identityText=(value:string)=>String(value||"").normalize("NFKC").toLowerCase()
+  .replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").replace(/\s+/g," ").trim();
+const mixedIdentitySummary=(query:string,candidate:Candidate)=>{
+  const name=identityText(personQueryName(query));
+  const summary=identityText(candidate.summary||"");
+  if(!name||!summary)return false;
+  const explicitMarker=/(?:may refer to|people with the name|صفحة توضيح|قد يشير إلى|قد تشير إلى)/i.test(String(candidate.summary||""))||
+    summary.includes(name+" توضيح");
+  if(!explicitMarker)return false;
+  const escaped=name.split(" ").map(part=>part.replace(/[.*+?^$\\{\\}()|[\\]\\\\]/g,"\\\\$&")).join("\\\\s+");
+  const variants=new Set<string>();
+  const re=new RegExp(escaped+"\\\\s+([\\\\p{L}]{2,})","giu");
+  for(const match of summary.matchAll(re)){
+    const suffix=String(match[1]||"");
+    if(suffix&&!new Set(["محمد","صلاح","حامد","محروس","غالي","لاعب","اللاعب","من","هو","هي","الذي","التي"]).has(suffix))variants.add(suffix);
+  }
+  return variants.size>=2;
+};
 export const isolateExactPerson=(query:string,items:Candidate[])=>{
   const name=normalizedEntityTitle(personQueryName(query));
   if(!name)return items;
   const exactTitle=items.filter(item=>normalizedEntityTitle(item.title)===name);
-  const exact=exactTitle.filter(item=>!isDisambiguation(item)&&personEvidence(item));
+  if(exactTitle.some(item=>isDisambiguation(item)||mixedIdentitySummary(query,item)))return [];
+  const exact=exactTitle.filter(item=>personEvidence(item));
   if(exact.length){
     const canonical=exact.sort((a,b)=>relevanceScore(b,query)-relevanceScore(a,query))[0];
     const canonicalUrl=String(canonical.url||canonical.sources?.[0]?.url||"");
-    // Once an exact biography page exists, never append other people who merely share
-    // the name. Keep only the exact subject page and duplicates of that same page.
-    return items.filter(item=>normalizedEntityTitle(item.title)===name&&!isDisambiguation(item)&&
+    return items.filter(item=>normalizedEntityTitle(item.title)===name&&!isDisambiguation(item)&&!mixedIdentitySummary(query,item)&&
       String(item.url||item.sources?.[0]?.url||"")===canonicalUrl);
   }
-  // An exact-name page whose own text is a disambiguation list is not a biography.
-  // Do not fall back to concatenating every similarly named person as one article.
-  if(exactTitle.some(isDisambiguation))return [];
-  if(personLookup(query))return items.filter(item=>!isDisambiguation(item));
-  return items;
+  if(personLookup(query))return items.filter(item=>!isDisambiguation(item)&&!mixedIdentitySummary(query,item));
+  return items.filter(item=>!mixedIdentitySummary(query,item));
 };
 const personLookup=(q:string)=>{
   const raw=String(q||"").trim();
