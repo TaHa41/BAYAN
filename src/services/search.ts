@@ -437,8 +437,8 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   const writerProfile=/(writer|author|novelist|poet|كاتب|مؤلف|روائي|شاعر)/i.test(identity);
   const variants=person
     ? (language==="ar"
-      ? (sportsProfile ? [q+" لاعب كرة قدم",q+" مسيرته الرياضية",q+" مصادر رياضية"] : writerProfile ? [q+" كاتب مؤلف",q+" أعماله ومؤلفاته",q+" مصدر رسمي"] : [q+" سيرة ذاتية",normalized,q+" مصدر رسمي"])
-      : (sportsProfile ? [q+" football career",q+" football profile",q+" official club profile"] : writerProfile ? [q+" author bibliography",q+" books and works",q+" official profile"] : [q+" biography",normalized,q+" official profile"]))
+      ? (sportsProfile ? [q+" آخر الأخبار",q+" مسيرته الرياضية",q+" إحصائيات وأرقام"] : writerProfile ? [q+" آخر الأخبار",q+" أعماله ومؤلفاته",q+" مصدر رسمي"] : [q+" آخر الأخبار",q+" سيرة ذاتية",q+" مصدر رسمي"])
+      : (sportsProfile ? [q+" latest news",q+" football career",q+" official club profile"] : writerProfile ? [q+" latest news",q+" author bibliography",q+" official profile"] : [q+" latest news",q+" biography",q+" official profile"]))
     : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,3);
   const batches=await Promise.all(uniqueVariants.map(async variant=>{
