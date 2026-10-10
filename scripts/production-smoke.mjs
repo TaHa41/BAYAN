@@ -158,8 +158,8 @@ try{
     if(live.endsWith("/gold")&&Array.isArray(payload.markets)&&payload.markets.some(item=>!Number(item.price)||!item.provider||!Date.parse(String(item.updatedAt||""))))throw new Error("market_quote_missing_price_provider_or_timestamp");
   }
   const page=await get("/prices?lang=ar");
-  if(!bundleText.includes('id="pricesRefresh"')||bundleVersion!=="2026.10.10.04")throw new Error("prices_page_assets_not_updated");
-  const css=await get("/styles.css?v=2026.10.10.04");
+  if(!bundleText.includes('id="pricesRefresh"')||bundleVersion!=="2026.10.11.01")throw new Error("prices_page_assets_not_updated");
+  const css=await get("/styles.css?v=2026.10.11.01");
   if(!css.text.includes(".prices-refresh")||!css.text.includes("@media(max-width:360px)"))throw new Error("responsive_prices_styles_missing");
 }catch(e){console.error("LIVE_DATA",e);bad++}
 try{const a=await fetch(origin+"/api/admin/analytics",{headers:{accept:"application/json"}});if(a.status!==401)throw new Error("admin_auth_not_enforced")}catch(e){console.error("ADMIN_AUTH",e);bad++}
