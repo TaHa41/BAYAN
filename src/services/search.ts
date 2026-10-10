@@ -413,10 +413,10 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   // A title-only key can incorrectly merge different people who share a name.
   const uniqueByTitle = new Map<string,Candidate>();
   const identityTerms = (value:string) => new Set(String(value||"").normalize("NFKC").toLowerCase()
-    .replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/[^\\p{L}\\p{N}]+/gu," ")
-    .split(/\\s+/).filter(term=>term.length>=4&&!/^(the|this|that|with|from|about|news|article|said|says|من|في|على|عن|هذا|هذه|الذي|التي|قال|عنها|عنه)$/.test(term)));
+    .replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ")
+    .split(/\s+/).filter(term=>term.length>=4&&!/^(the|this|that|with|from|about|news|article|said|says|من|في|على|عن|هذا|هذه|الذي|التي|قال|عنها|عنه)$/.test(term)));
   const normalizedTitle = (value:string) => String(value||"").normalize("NFKC").toLowerCase()
-    .replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/[^\\p{L}\\p{N}]+/gu," ").trim();
+    .replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").trim();
   const sameEntity = (a:Candidate,b:Candidate) => {
     const left=identityTerms(a.summary),right=identityTerms(b.summary);
     const common=[...left].filter(term=>right.has(term)).length;
