@@ -299,7 +299,20 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
  const profile=cleanExact.filter(personEvidence);
  // A single disambiguation result must not hide a valid exact profile from another provider.
  if(profile.length){
-   const canonical=profile.sort((a,b)=>String(a.summary||"").length-String(b.summary||"").length||relevanceScore(b,query)-relevanceScore(a,query))[0];
+   const canonicalRank=(item:Candidate)=>{
+      const summary=String(item.summary||"");
+      const provider=String(item.provider||"")+" "+(item.sources||[]).map(source=>source.publisher||"").join(" ");
+      let rank=Math.min(summary.length,1200)/24;
+      if(/wikipedia/i.test(provider))rank+=36;
+      if(/wikidata/i.test(provider))rank-=18;
+      if(/footballer|football player|soccer player|لاعب كرة قدم|لاعب كرة القدم/i.test(summary))rank+=24;
+      if(/actor|actress|ممثل|ممثلة/i.test(summary)&&!/footballer|football player|soccer player|لاعب كرة قدم|لاعب كرة القدم/i.test(summary))rank-=8;
+      const currentClubClaims=(summary.match(/currently plays for|current club is|plays for [^,.؛]+|يلعب حاليا مع نادي|يلعب حاليًا مع نادي|ناديه الحالي/gi)||[]).length;
+      if(currentClubClaims>1)rank-=140;
+      if(isDisambiguation(item)||mixedIdentitySummary(query,item))rank-=1000;
+      return rank+relevanceScore(item,query)/100;
+    };
+    const canonical=profile.sort((a,b)=>canonicalRank(b)-canonicalRank(a))[0];
    const description=String(canonical.summary||"");
    const sports=/football|soccer|athlete|لاعب كرة قدم|رياضي/i.test(description);
    const medicine=/physician|doctor|surgeon|طبيب|طبيبة/i.test(description);
@@ -373,13 +386,18 @@ const personLookup=(q:string)=>{
   // explicitly asks "من هو/من هي", avoiding the restrictive person-only filter.
   return /^[A-Z][a-z]+(?:[ '-]+[A-Z][a-z]+){1,3}$/.test(raw);
 };
-async function expandedSearch(env:Env,q:string,language:Locale,person=false):Promise<Candidate[]>{
+async function expandedSearch(env:Env,q:string,language:Locale,person=false,identitySummary=""):Promise<Candidate[]>{
   // Recovery uses distinct query formulations, not just the same phrase with a suffix.
   // Keep the fan-out bounded so broader recall does not create unbounded latency/subrequests.
   const normalized=q.normalize("NFKC").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[“”‘’]/g,'"').replace(/[؟?!،,;；]+/g," ").replace(/\s+/g," ").trim();
   const compact=searchTerms(normalized).slice(0,6).join(" ");
+  const identity=String(identitySummary||"");
+  const sportsProfile=/(footballer|soccer player|football player|لاعب كرة قدم|لاعب كرة القدم)/i.test(identity);
+  const writerProfile=/(writer|author|novelist|poet|كاتب|مؤلف|روائي|شاعر)/i.test(identity);
   const variants=person
-    ? (language==="ar" ? [q+" سيرة ذاتية",normalized,q+" مصدر رسمي"] : [q+" biography",normalized,q+" official profile"])
+    ? (language==="ar"
+      ? (sportsProfile ? [q+" لاعب كرة قدم",q+" مسيرته الرياضية",q+" مصادر رياضية"] : writerProfile ? [q+" كاتب مؤلف",q+" أعماله ومؤلفاته",q+" مصدر رسمي"] : [q+" سيرة ذاتية",normalized,q+" مصدر رسمي"])
+      : (sportsProfile ? [q+" football career",q+" football profile",q+" official club profile"] : writerProfile ? [q+" author bibliography",q+" books and works",q+" official profile"] : [q+" biography",normalized,q+" official profile"]))
     : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,3);
   const batches=await Promise.all(uniqueVariants.map(async variant=>{
@@ -506,7 +524,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   if(firstPassCount()<expansionThreshold){
     providerAttempted.push("Expanded topic variants: Wikipedia, Wikipedia REST Search, Wikidata, GDELT, DuckDuckGo Web Search, Bing Web Search, Google News Search, Bing News RSS","OpenAI Web Search (fallback)");
     const [expanded,web]=await Promise.all([
-      safe(expandedSearch(env,q,language,personQuery),[]),
+      safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||"")),[]),
       safe(openAiWebSearch(env,q,language),[])
     ]);
     candidates.push(...expanded,...web);
@@ -568,6 +586,15 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
     if ((!existing.summary || existing.summary.length < 80) && candidate.summary) existing.summary = candidate.summary;
   }
   const results=[...uniqueByTitle.values()].slice(0,max).map(({score,provider,...x})=>({...x,summary:localeSafeText(x.summary,language)?x.summary:(personQuery&&normalizedEntityTitle(x.title)===normalizedEntityTitle(q)?localizedPersonDescription(x.summary,language):""),sources:(x.sources||[]).map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}));
+  // Resolve a subject-specific image for the canonical person result before returning
+  // cards, so the exact image can also be carried into the opened article.
+  if(personQuery){
+    const canonical=results.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
+    if(canonical&&!/^https:\/\//i.test(String(canonical.imageUrl||""))){
+      const image=await Promise.race([findRelatedImage(String(canonical.title||q),String(canonical.url||canonical.sources?.[0]?.url||""),String(canonical.summary||"")),new Promise<undefined>(resolve=>setTimeout(()=>resolve(undefined),4500))]).catch(()=>undefined);
+      if(image&&/^https:\/\//i.test(image)){canonical.imageUrl=image;canonical.imageAlt=String(canonical.title||q);}
+    }
+  }
   const providers=[...new Set(candidates.map(x=>x.provider))];
   const publishers=[...new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean))];
   const configuredMin=Math.max(2,Math.min(5,Number(s.min_sources||3)));
