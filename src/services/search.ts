@@ -464,7 +464,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   }
   // Person/name lookups should return a useful collection, not stop after the first matching page.
   const personQuery=personLookup(q)||(nameOnlyArabicQuery(q)&&candidates.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(q)&&personEvidence(item)));
-  const firstPassCount=()=>candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q)).length;
+  const firstPassCount=()=>{const matching=candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q));return personQuery?isolateExactPerson(q,matching).length:matching.length;};
   // Expand when the first pass is merely sparse, not only when it is empty.
   // People searches need several independent identity clues; general searches need
   // enough relevant evidence to produce a useful answer rather than a thin snippet.
