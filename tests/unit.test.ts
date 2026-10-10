@@ -21,7 +21,7 @@ describe("evidence-backed AI answer validation",()=>{
       {title:"محمد صلاح لاعب ليفربول",summary:"محمد صلاح يلعب مع ليفربول.",sources:[{title:"ملف اللاعب",publisher:"مصدر رياضي",url:"https://example.com/player"}]},
       {title:"طرابزون سبور يتعاقد مع لاعب جديد",summary:"أعلن النادي التركي ضم لاعب جديد.",sources:[{title:"أخبار النادي",publisher:"مصدر آخر",url:"https://example.com/club"}]}
     ] as any;
-    expect(answerHasUnsupportedSpecifics("محمد صلاح يلعب لنادي طرابزون سبور.","" ? arabicEvidence : arabicEvidence,"محمد صلاح")).toBe(true);
+    expect(answerHasUnsupportedSpecifics("محمد صلاح يلعب لنادي طرابزون سبور.",arabicEvidence,"محمد صلاح")).toBe(true);
     expect(answerHasUnsupportedSpecifics("محمد صلاح يلعب لنادي ليفربول.",arabicEvidence,"محمد صلاح")).toBe(false);
   });
   it("does not combine unrelated sources to validate a wrong club name",()=>{
