@@ -89,7 +89,7 @@ const sourceArticleText=async(url:string,lang:"ar"|"en")=>{
     if(!r.ok)return "";
     let html=(await r.text()).slice(0,800000);
     html=html.replace(/<(script|style|nav|header|footer|aside|form)\b[\s\S]*?<\/\1>/gi," ");
-    const main=html.match(/<(?:article|main)\b[^>]*>([\s\S]*?)<\/(?:article|main)>/i)?.[1]||html;
+    const mainMatch=html.match(/<(article|main)\b[^>]*>([\s\S]*?)<\/\1>/i);const main=mainMatch?.[2]||html;
     const paragraphs=[...main.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map(m=>String(m[1]||"").replace(/<[^>]+>/g," ").replace(/&nbsp;/gi," ").replace(/&amp;/gi,"&").replace(/&quot;/gi,'"').replace(/&#39;|&apos;/gi,"'").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/&#x([0-9a-f]+);/gi,(_,n)=>String.fromCodePoint(parseInt(n,16))).replace(/\s+/g," ").trim()).filter(p=>p.length>=70);
     const relevant=paragraphs.filter(p=>lang==="ar"?/[\u0600-\u06ff]/.test(p):! /[\u0600-\u06ff]/.test(p));
     return relevant.slice(0,10).join("\n\n").slice(0,7000);
@@ -139,9 +139,16 @@ export async function api(request:Request,env:Env){const u=new URL(request.url),
   if(isVideoUrl(storyUrl))return json({error:"video_source_not_article",kind:"video",message:lang==="ar"?"هذا رابط فيديو، وليس مقالًا مكتوبًا. افتح الفيديو كمصدر منفصل، ولا تُنشئ منه مقالًا دون نص موثوق ومصادر مكتوبة مستقلة.":"This is a video, not a written article. Open it as a separate source; do not draft an article without a reliable transcript and independent written sources."},422);
   try{
     let found:any={results:[],status:"insufficient"};
-    try{found=await bounded(search(env,title,lang),7000)}catch{}
+    try{found=await bounded(search(env,title,lang,{publish:false,draft:false,images:false}),10000)}catch{}
     found.results=isolateArticleSubject(title,(Array.isArray(found.results)?found.results:[]).filter((candidate:any)=>newsArticleEvidenceRelevant(title,candidate)&&!hasMixedPersonIdentities(title,String(candidate.summary||""))&&!isVideoUrl(String(candidate.url||candidate.sources?.[0]?.url||""))) as any);
-    if(!found.results.length&&(summary||storyUrl)){const extracted=storyUrl?await bounded(sourceArticleText(storyUrl,lang),5000).catch(()=> ""):"";const description=summary||await bounded(sourceDescription(storyUrl,lang),3500).catch(()=> "")||title;const articleSummary=(lang==="ar"?/[\u0600-\u06ff]/.test(description):!/[\u0600-\u06ff]/.test(description))?description:title;if(!image)image=await bounded(findRelatedImage(title,storyUrl||undefined,summary),3500).catch(()=>undefined)||"";const evidenceText=(lang==="ar"?/[\u0600-\u06ff]/.test(extracted):!/[\u0600-\u06ff]/.test(extracted))?extracted:articleSummary;const safeUrl=storyUrl.startsWith("https://")?storyUrl:"";const sources=safeUrl?[{title,publisher:publisher||(lang==="ar"?"مصدر إخباري":"News source"),url:safeUrl,publishedAt,imageUrl:image||undefined} as Source]:[];let generated:any={};try{generated=await bounded(ask(env,articlePrompt(title,lang),lang,[{title,summary:evidenceText,section:"news",kind:"web",evidence:"mixed",sources} as any]),7500)}catch{}const rawGeneratedBody=String(generated.answer||"").trim();const quality=articleBodyQuality(rawGeneratedBody);let generatedBody=quality.body;let hasFullAnalysis=quality.ok&&generated.status==="verified"&&new Set(sources.map((source:any)=>String(source.publisher||"").trim().toLowerCase()).filter(Boolean)).size>=2;if(!hasFullAnalysis&&generatedBody.length>0){try{const stricter=await bounded(ask(env,articlePrompt(title,lang)+"\n\n"+(lang==="ar"?"مراجعة تحريرية إلزامية: احذف التكرار، تأكد من ترابط الفقرات، واستخدم أربعة عناوين فرعية على الأقل.":"Mandatory editorial pass: remove repetition, ensure logical transitions, and use at least four subheadings."),lang,[{title,summary:evidenceText,section:"news",kind:"web",evidence:"mixed",sources} as any]),6500);const retry=articleBodyQuality(String(stricter.answer||""));if(retry.ok&&stricter.status==="verified"&&new Set(sources.map((source:any)=>String(source.publisher||"").trim().toLowerCase()).filter(Boolean)).size>=2){generatedBody=retry.body;hasFullAnalysis=true;generated= stricter as any;}}catch{}}if(!hasFullAnalysis)return json({error:"article_evidence_insufficient",status:"insufficient",message:lang==="ar"?"لم تتوفر مصادر مستقلة ونص موثوق كافٍ لإعداد مقال كامل؛ لم نعرض ملخص المصدر على أنه مقال.":"There is not enough independent evidence and source text for a complete article; the source snippet was not presented as an article."},422);const articleBody=generatedBody;const article={title,summary:articleSummary,body:articleBody,sources,image:image||null,status:generated.status,providerCount:sources.length?1:0,publishedAt};const savedSlug=await persistOpenedNewsArticle(env,article,lang);return json({ok:true,article:{...article,section:sectionForOpenedStory(title,articleSummary),savedSlug}})}
+    if(!found.results.length&&(summary||storyUrl)){
+      const safeUrl=storyUrl.startsWith("https://")?storyUrl:"";
+      const sourceSummary=(lang==="ar"?/[؀-ۿ]/.test(summary):!/[؀-ۿ]/.test(summary))?summary:"";
+      if(!image&&safeUrl){image=await bounded(findRelatedImage(title,safeUrl,sourceSummary),2200).catch(()=>undefined)||"";}
+      const sources=safeUrl?[{title,publisher:publisher||(lang==="ar"?"مصدر إخباري":"News source"),url:safeUrl,publishedAt,imageUrl:image||undefined} as Source]:[];
+      const article={title,summary:sourceSummary||title,body:sourceSummary||title,sources,image:image||null,status:"source_only",providerCount:sources.length?1:0,publishedAt};
+      return json({ok:true,article:{...article,section:sectionForOpenedStory(title,article.summary)}});
+    }
     if(!found.results.length){
       const live=await bounded(news(env,lang),7000);
       const story=live.items?.find((x:any)=>String(x.title).trim()===title.trim())||live.items?.find((x:any)=>String(x.title).includes(title.slice(0,80)));
@@ -149,16 +156,41 @@ export async function api(request:Request,env:Env){const u=new URL(request.url),
       if(!image)image=story.imageUrl||await bounded(findRelatedImage(story.title||title),3500).catch(()=>undefined)||"";
       const article={title:story.title,summary:story.summary||"",body:story.summary||story.title,sources:story.sources||[],image:image||null,status:"source_only",providerCount:1,publishedAt:story.publishedAt};const savedSlug=await persistOpenedNewsArticle(env,article,lang);return json({ok:true,article:{...article,section:sectionForOpenedStory(story.title,story.summary||""),savedSlug}});
     }
+    // Enrich short snippets with readable text from a few independent, allow-listed source pages.
+    // Publisher failures remain non-fatal; a failed fetch falls back to the original search snippet.
+    const articleEvidenceUrls:string[]=[];
+    const articleEvidenceHosts=new Set<string>();
+    const articleReadableHosts=["aljazeera.net","aljazeera.com","bbc.com","bbc.co.uk","france24.com","dw.com","apnews.com","reuters.com","theguardian.com","skynewsarabia.com","independentarabia.com","aawsat.com","news.google.com","wikipedia.org","wikidata.org","openalex.org","who.int","un.org","worldbank.org","imf.org","ourworldindata.org","britannica.com","nature.com","science.org"];
+    for(const candidate of found.results as any[]){
+      const candidateUrls=[candidate.url,...(Array.isArray(candidate.sources)?candidate.sources.map((item:any)=>item?.url):[])];
+      for(const candidateUrl of candidateUrls){
+        try{
+          const parsed=new URL(String(candidateUrl||""));
+          const host=parsed.hostname.toLowerCase().replace(/^www\./,"");
+          const readable=articleReadableHosts.some(allowed=>host===allowed||host.endsWith("."+allowed));
+          if(parsed.protocol!=="https:"||!readable||articleEvidenceHosts.has(host)||articleEvidenceUrls.includes(parsed.toString()))continue;
+          articleEvidenceHosts.add(host);articleEvidenceUrls.push(parsed.toString());break;
+        }catch{}
+      }
+      if(articleEvidenceUrls.length>=3)break;
+    }
+    const articleEvidenceText=await Promise.all(articleEvidenceUrls.map(url=>bounded(sourceArticleText(url,lang),4500).catch(()=> "")));
+    const evidenceByUrl=new Map(articleEvidenceUrls.map((url,index)=>[url,articleEvidenceText[index]]));
+    found.results=found.results.map((candidate:any)=>{
+      const candidateUrls=[candidate.url,...(Array.isArray(candidate.sources)?candidate.sources.map((item:any)=>item?.url):[])].map((value:any)=>String(value||""));
+      const extra=candidateUrls.map(url=>evidenceByUrl.get(url)||"").find(value=>value.length>=160)||"";
+      return extra?{...candidate,summary:[String(candidate.summary||"").trim(),extra].filter(Boolean).join("\n\n").slice(0,5000)}:candidate;
+    });
     let generated:{status:string;answer?:string;sources?:Source[]}={status:"mixed"};
     try{generated=await bounded(ask(env,articlePrompt(title,lang),lang,found.results),8000)}catch{}
     const evidenceBody=String(found.results[0]?.summary||"").trim();
     const evidenceSources=found.results.flatMap((x:any)=>x.sources||[]).filter(Boolean);
-    const independentPublisherCount=new Set(evidenceSources.map((source:any)=>String(source.publisher||"").trim().toLowerCase()).filter(Boolean)).size;
+    const hasIndependentSources=articleEvidenceQuality(evidenceSources);
     const rawGeneratedBody=String(generated.answer||"").trim();
     const quality=articleBodyQuality(rawGeneratedBody);
     let generatedBody=quality.body;
-    let hasFullAnalysis=quality.ok&&generated.status==="verified"&&independentPublisherCount>=2;
-    if(!hasFullAnalysis&&generatedBody.length>0){try{const stricter=await bounded(ask(env,articlePrompt(title,lang)+"\n\n"+(lang==="ar"?"مراجعة تحريرية إلزامية: احذف التكرار، تأكد من ترابط الفقرات، واستخدم أربعة عناوين فرعية على الأقل.":"Mandatory editorial pass: remove repetition, ensure logical transitions, and use at least four subheadings."),lang,found.results),6500);const retry=articleBodyQuality(String(stricter.answer||""));if(retry.ok&&stricter.status==="verified"&&independentPublisherCount>=2){generatedBody=retry.body;hasFullAnalysis=true;generated=stricter as any;}}catch{}}
+    let hasFullAnalysis=quality.ok&&generated.status==="verified"&&hasIndependentSources;
+    if(!hasFullAnalysis&&hasIndependentSources&&generated.status==="verified"&&!quality.ok&&generatedBody.length>0){try{const stricter=await bounded(ask(env,articlePrompt(title,lang)+"\n\n"+(lang==="ar"?"مراجعة تحريرية إلزامية: احذف التكرار، تأكد من ترابط الفقرات، واستخدم أربعة عناوين فرعية على الأقل.":"Mandatory editorial pass: remove repetition, ensure logical transitions, and use at least four subheadings."),lang,found.results),6500);const retry=articleBodyQuality(String(stricter.answer||""));if(retry.ok&&stricter.status==="verified"&&hasIndependentSources){generatedBody=retry.body;hasFullAnalysis=true;generated=stricter as any;}}catch{}}
     if(!hasFullAnalysis)return json({error:"article_evidence_insufficient",status:"insufficient",message:lang==="ar"?"لم يجتز المقال فحص الاكتمال أو لم تتوفر مصادر مستقلة كافية؛ لم نعرض نصًا ناقصًا كمقال كامل.":"The article did not pass completeness checks or lacked independent sources; incomplete text was not shown as a full article."},422);
     const articleBody=generatedBody;
     const sources=evidenceSources.slice(0,12);const exactSubject=found.results.find((x:any)=>identityNormalized(String(x.title||""))===identityNormalized(title));if(!image)image=exactSubject?.imageUrl||exactSubject?.sources?.find((source:any)=>/^https:\/\//i.test(String(source.imageUrl||"")) )?.imageUrl||found.results.find((x:any)=>/^https:\/\//i.test(String(x.imageUrl||"")) )?.imageUrl||sources.find((source:any)=>/^https:\/\//i.test(String(source.imageUrl||"")) )?.imageUrl||await bounded(findRelatedImage(title,exactSubject?.url||exactSubject?.sources?.[0]?.url,found.results[0]?.summary||""),3500).catch(()=>undefined)||"";

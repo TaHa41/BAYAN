@@ -313,6 +313,13 @@ const mixedIdentitySummary=(query:string,candidate:Candidate)=>{
   }
   return variants.size>=2;
 };
+const hasConflictingCurrentClubClaims=(value:string)=>{
+  const text=String(value||"");
+  const hasTrabzon=/(?:طرابزون\s*سبور|trabzonspor)/i.test(text);
+  const hasLiverpool=/(?:ليفربول|liverpool)/i.test(text);
+  const currentClub=/(?:يلعب\s*(?:حاليا|حالياً|حاليًا)?\s*(?:مع|في)|ناديه\s*الحالي|currently\s+plays\s+for|current\s+club|plays\s+for)/i.test(text);
+  return hasTrabzon&&hasLiverpool&&currentClub;
+};
 const sanitizeConflictingCurrentClubClaims=(value:string)=>{
   const text=String(value||"");
   const hasTrabzon=/(?:طرابزون\s*سبور|trabzonspor)/i.test(text);
@@ -360,11 +367,11 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
      politics?/(government|election|president|minister|politic|حكومة|انتخابات|رئيس|وزير|سياسة)/i:
      arts?/(book|novel|film|movie|writer|author|actor|poet|كتاب|رواية|فيلم|كاتب|مؤلف|ممثل|شاعر)/i:null;
    // Collapse exact-title providers to one canonical identity, but merge their distinct source citations and a safe exact-page image.
-   canonical.sources=(canonical.sources||[]).filter(source=>normalizedEntityTitle(source.title)===name);
+   canonical.sources=(canonical.sources||[]).filter(source=>normalizedEntityTitle(source.title)===name||/wikidata/i.test(String(source.publisher||"")));
    const sourceKeys=new Set((canonical.sources||[]).map(source=>String(source.url||"").trim()).filter(Boolean));
    for(const candidate of cleanExact){
      if(candidate!==canonical){
-       for(const source of candidate.sources||[]){if(normalizedEntityTitle(source.title)!==name)continue;const url=String(source.url||"").trim();if(url&&!sourceKeys.has(url)){canonical.sources=[...(canonical.sources||[]),source];sourceKeys.add(url);}}
+       for(const source of candidate.sources||[]){if(normalizedEntityTitle(source.title)!==name&&!/wikidata/i.test(String(source.publisher||"")))continue;const url=String(source.url||"").trim();if(url&&!sourceKeys.has(url)){canonical.sources=[...(canonical.sources||[]),source];sourceKeys.add(url);}}
        if(!canonical.imageUrl&&/^https:\/\//i.test(String(candidate.imageUrl||""))){canonical.imageUrl=candidate.imageUrl;canonical.imageAlt=candidate.imageAlt||candidate.title;}
      }
    }
@@ -396,10 +403,7 @@ export const isolateArticleSubject=(title:string,items:Candidate[])=>{
  const exact=items.filter(item=>normalizedEntityTitle(item.title)===query);
  const validExact=exact.filter(item=>!isDisambiguation(String(item.title||"")+" "+String(item.summary||"")));
  if(validExact.length){
-  const profile=validExact.find(item=>personEvidence(item));
-  const chosen=profile||validExact[0];
-  const chosenUrl=String(chosen.url||chosen.sources?.[0]?.url||"");
-  return validExact.filter(item=>String(item.url||item.sources?.[0]?.url||"")===chosenUrl);
+  return validExact.filter(item=>!isDisambiguation(String(item.title||"")+" "+String(item.summary||""))&&!mixedIdentitySummary(title,item));
  }
  const arabicName=/^[\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){1,3}$/.test(String(title||"").trim())&&!/(?:ما هو|ما هي|تاريخ|علوم|تقنية|اقتصاد|سياسة|رياضة|ذكاء اصطناعي|تغير المناخ|الفضاء|الطاقة|الصحة|السياحة|البرمجة|مصر|العالم العربي)/.test(title);
  if(arabicName&&items.some(item=>normalizedEntityTitle(item.title).startsWith(query+" ")))return [];
@@ -535,7 +539,7 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   // the mismatched summary below rather than discarding the entire source.
   const title=String(x.title||"");
   return language==="ar" ? hasArabic(title) : !hasArabic(title);
-};export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean}={}):Promise<SearchResponse>{
+};export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean;draft?:boolean;images?:boolean}={}):Promise<SearchResponse>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};const academicQuery=/(research|paper|papers|study|studies|journal|doi|scholar|academic|citation|crossref|openalex|pubmed|clinical trial|systematic review|بحث علمي|أبحاث|دراسة|دراسات|مجلة علمية|ورقة بحثية|مصدر أكاديمي|دراسات سريرية|مراجعة منهجية)/i.test(q);
 const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|medicine|health study|بحث طبي|دراسة طبية|دراسات سريرية|تجربة سريرية|مراجعة منهجية)/i.test(q);
@@ -569,7 +573,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
     candidates.push(...expanded,...web);
   }
   
-  const safeCandidates=candidates.filter(x=>(language==="ar"?hasArabic(x.title):!hasArabic(x.title))&&!disallowedContent(x.title+" "+x.summary));
+  const safeCandidates=candidates.filter(x=>(language==="ar"?hasArabic(x.title):!hasArabic(x.title))&&!disallowedContent(x.title+" "+x.summary)&&!(normalizedEntityTitle(x.title)===normalizedEntityTitle(personQueryName(q))&&hasConflictingCurrentClubClaims(x.summary)));
   let ranked=safeCandidates.filter(x=>relevantCandidate(x,q)).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
   ranked=isolateExactPerson(q,ranked);
   // If strict matching rejected every result, recover candidates with a real
@@ -628,7 +632,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   const results=[...uniqueByTitle.values()].slice(0,max).map(({score,provider,...x})=>({...x,summary:localeSafeText(x.summary,language)?x.summary:(personQuery&&normalizedEntityTitle(x.title)===normalizedEntityTitle(q)?localizedPersonDescription(x.summary,language):""),sources:(x.sources||[]).map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}));
   // Resolve a subject-specific image for the canonical person result before returning
   // cards, so the exact image can also be carried into the opened article.
-  if(personQuery){
+  if(personQuery&&options.images!==false){
     const canonical=results.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
     if(canonical&&!/^https:\/\//i.test(String(canonical.imageUrl||""))){
       const image=await Promise.race([findRelatedImage(String(canonical.title||q),String(canonical.url||canonical.sources?.[0]?.url||""),String(canonical.summary||"")),new Promise<undefined>(resolve=>setTimeout(()=>resolve(undefined),4500))]).catch(()=>undefined);
@@ -643,7 +647,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   let answer:string|undefined;
   let answerStatus:SearchResponse["status"]|undefined;
   const exactPersonConfirmed=!personQuery||results.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
-  if(results.length&&exactPersonConfirmed){
+  if(results.length&&exactPersonConfirmed&&options.draft!==false){
     try{const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),1000))]);if(drafted.answer){answer=drafted.answer;answerStatus=drafted.status;}const independentSources=new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean));const articleTitle=results.find(x=>x.title&&x.summary)?.title||"";const articleSummary=results.find(x=>x.title&&x.summary)?.summary||q;if(options.publish!==false&&drafted.status==="verified"&&usefulDraft(drafted.answer,language)&&independentSources.size>=2&&articleTitle&&!disallowedContent(articleTitle+" "+articleSummary)){const imageUrl=results.find(item=>/^https:\/\//i.test(String(item.imageUrl||""))&&String(item.imageAlt||item.title||"").trim().length>0)?.imageUrl||await findRelatedImage(articleTitle,undefined,articleSummary).catch(()=>undefined);const savedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:drafted.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle});if(savedSlug)publishedSlug=savedSlug;}}catch{}
   }
   const message=results.length?undefined:(language==="ar"?"تعذر العثور على نتيجة من مصادر البحث المتاحة حاليًا. يمكن توسيع البحث لاحقًا عند توفر مزودات إضافية.":"No result was returned by the available search providers right now. The search can be expanded when additional providers are available.");
