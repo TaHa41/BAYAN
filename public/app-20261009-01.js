@@ -492,7 +492,7 @@
     const output=document.querySelector("#researchArticle");
     try{
       if(!title)throw new Error("title_required");
-      const data=await api("/api/news/article?title="+encodeURIComponent(title)+"&summary="+encodeURIComponent(summary)+"&url="+encodeURIComponent(url)+"&publisher="+encodeURIComponent(publisher)+"&image="+encodeURIComponent(p.get("image")||"")+"&lang="+lang,{timeoutMs:26000});
+      const data=await api("/api/news/article?title="+encodeURIComponent(title)+"&summary="+encodeURIComponent(summary)+"&url="+encodeURIComponent(url)+"&publisher="+encodeURIComponent(publisher)+"&image="+encodeURIComponent(p.get("image")||"")+"&lang="+lang,{timeoutMs:36000});
       const article=data.article||{};
       if(!data.ok||!article.title)throw new Error("article_unavailable");
       output.innerHTML='<article class="article-full">'+(article.image?heroImageHtml(article.image,article.title,article.summary||summary):"")+
@@ -576,7 +576,7 @@
             "&summary=" + encodeURIComponent(story.summary || "") +
             "&url=" + encodeURIComponent(story.url || "") +
             "&publisher=" + encodeURIComponent(story.publisher || "") +
-            "&publishedAt=" + encodeURIComponent(story.publishedAt || "") + "&lang=" + lang, { timeoutMs: 26000 });
+            "&publishedAt=" + encodeURIComponent(story.publishedAt || "") + "&lang=" + lang, { timeoutMs:36000 });
           const article = articleData.article;
           output.innerHTML =
             '<article class="article-full">' + (article.image ? heroImageHtml(article.image, article.title, article.summary || "") : "") +
