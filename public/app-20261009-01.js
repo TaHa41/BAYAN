@@ -1000,8 +1000,8 @@
       content.innerHTML = items.length
         ? items.map(articleCard).join("")
         : '<div class="notice"><h2>' + t("لا توجد مواد منشورة في هذا القسم بعد.","No published material in this section yet.") +
-          '</h2><p>' + t("سيظهر هنا المحتوى بعد مروره بمسار الاسترجاع والتحقق والمراجعة.","Content appears here after retrieval, verification and review.") +
-          "</p></div>";
+          '</h2><p>' + t("لن نعرض مقالات ناقصة أو غير متحققة. يمكنك البحث عن مصادر موثوقة حول موضوع القسم الآن.","We will not display incomplete or unverified articles. You can search reliable sources for this topic now.") +
+          '</p><a class="primary" href="/search?q=' + encodeURIComponent(ar ? section[1] : section[2]) + '&lang=' + lang + '">' + t("ابحث عن مواد موثقة","Search sourced material") + '</a></div>';
       if (items.length) hydrateSectionImages(items).catch(() => {});
     };
 
