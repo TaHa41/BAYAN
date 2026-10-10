@@ -170,7 +170,7 @@ if(items.length<2&&section!=="prices"){
    sports:{ar:"كرة القدم والبطولات الرياضية والنتائج والإحصاءات",en:"football leagues sports results and competition statistics"},
    travel:{ar:"السياحة ووجهات السفر وإرشادات التأشيرات الرسمية",en:"travel destinations tourism and official visa guidance"},
    art:{ar:"السينما المصرية والموسيقى العربية والفنون التشكيلية والمسرح",en:"Egyptian cinema Arabic music visual arts and theatre"},
-   trends:{ar:"اتجاهات اجتماعية وبيانات حديثة وكيفية التحقق منها",en:"social trends and current data with methods to verify them"},
+   trends:{ar:"ترندات مواقع التواصل الاجتماعي واستطلاعات الرأي والبيانات الاجتماعية",en:"social media trends public opinion surveys and current data"},
    egypt:{ar:"مصر: الجغرافيا والمدن ونهر النيل والمعلومات العامة",en:"Egypt geography cities the Nile and public information"},
    arab:{ar:"العالم العربي والجامعة العربية والبلدان العربية والثقافة العربية",en:"the Arab world Arab League Arab countries and Arabic culture"},
    world:{ar:"قضايا عالمية وتحولات دولية وتأثيراتها بمصادر موثوقة",en:"global issues international changes and their impacts from reliable sources"}
