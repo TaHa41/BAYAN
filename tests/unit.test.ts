@@ -31,6 +31,7 @@ describe("biography lead sanitation",()=>{
     const result=isolateExactPerson("محمد صلاح",items);
     expect(result).toHaveLength(1);
     expect(result[0].summary).toContain("لاعب كرة قدم");
+    expect(result[0].section).toBe("people");
     expect(result[0].summary).not.toContain("طرابزون");
     expect(result[0].summary).not.toContain("ليفربول");
     expect(result[0].summary).not.toContain("دندراوي");
