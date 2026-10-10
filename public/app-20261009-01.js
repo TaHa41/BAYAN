@@ -337,7 +337,7 @@
     const pending = (items || []).filter((item) => !item.imageUrl).slice(0, 10);
     await Promise.all(pending.map(async (item) => {
       try {
-        const data = await api("/api/image?q=" + encodeURIComponent(item.title + ": " + (item.summary || "")), {timeoutMs: 18000});
+        const data = await api("/api/image?q=" + encodeURIComponent(item.title), {timeoutMs: 18000});
         const cards = Array.from(document.querySelectorAll(".article-card, .evidence-card, .search-result"));
         const card = cards.find((candidate) => {
           const heading = candidate.querySelector("h2,h3");
