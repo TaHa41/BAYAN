@@ -322,6 +322,7 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
    return safe.length?safe:cleanExact;
  }
  // A bare Arabic name becomes a strict person lookup only when an exact profile exists.
+ if(nameOnlyArabicQuery(personQueryName(query))&&exactTitle.length)return [];
  if(personLookup(query)||nameOnlyArabicQuery(query))return items.filter(item=>!isDisambiguation(item)&&!mixedIdentitySummary(query,item));
  return items.filter(item=>!mixedIdentitySummary(query,item));
 };
