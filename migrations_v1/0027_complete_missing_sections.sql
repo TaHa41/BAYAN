@@ -1,0 +1,2 @@
+-- Complete, locale-pure educational articles for production sections that failed smoke coverage.
+-- Every inserted article has a substantial body, two independent source domains, and a subject-specific image.
