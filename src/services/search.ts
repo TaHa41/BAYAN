@@ -35,7 +35,7 @@ const personIdentityConflict=(candidate:Candidate,q:string)=>{
   const query=normalizeEntityText(q), title=normalizeEntityText(candidate.title), summary=normalizeEntityText(candidate.summary);
   const queryTokens=query.split(" ").filter(t=>t.length>1), titleTokens=title.split(" ");
   const identityMatches=queryTokens.filter(token=>titleTokens.includes(token)).length;
-  const disambiguation=/\((?:توضيح|disambiguation|iran|iranian|actor|writer|author|novelist|politician|soldier|footballer|athlete|military|كاتب|روائي|ممثل|جندي|سياسي|عسكري)\)/i.test(candidate.title);
+  const disambiguation=/\((?:توضيح|disambiguation|iran|iranian|actor|writer|author|novelist|politician|soldier|footballer|athlete|military|كاتب|روائي|ممثل|جندي|سياسي|عسكري)\)/i.test(candidate.title)||/(?:صفحة توضيح|صفحة التوضيح|هذه صفحة توضيح|disambiguation)/i.test(candidate.summary)||((candidate.summary.match(new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g,"\\const disambiguation=/\((?:توضيح|disambiguation|iran|iranian|actor|writer|author|novelist|politician|soldier|footballer|athlete|military|كاتب|روائي|ممثل|جندي|سياسي|عسكري)\)/i.test(candidate.title);"),"gi"))||[]).length>2&&/(?:جندي|كاتب|روائي|ممثل|وزير|عسكري|توضيح)/i.test(candidate.summary));
   const ambiguousPersonName=queryTokens.length>=2&&identityMatches<queryTokens.length;
   const unrelatedBiography=/(writer|author|novelist|soldier|politician|minister|actor|footballer|athlete|military officer|كاتب|روائي|جندي|وزير|ممثل|سياسي|عسكري)/i.test(summary)&&identityMatches<queryTokens.length;
   return disambiguation||ambiguousPersonName||unrelatedBiography;
@@ -402,7 +402,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
     candidates.push(...expanded,...web);
   }
   
-  const safeCandidates=candidates.filter(x=>(language==="ar"?hasArabic(x.title):!hasArabic(x.title))&&!disallowedContent(x.title+" "+x.summary));
+  const safeCandidates=candidates.filter(x=>(language==="ar"?hasArabic(x.title):!hasArabic(x.title))&&!disallowedContent(x.title+" "+x.summary)&&!personIdentityConflict(x,q));
   let ranked=safeCandidates.filter(x=>relevantCandidate(x,q)).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
   // If strict matching rejected every result, recover candidates with a real
   // query-term match in the headline or at least two matches in the snippet.
