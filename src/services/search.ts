@@ -542,7 +542,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
     }
   }
   // Person/name lookups should return a useful collection, not stop after the first matching page.
-  const personQuery=personLookup(q)||(nameOnlyArabicQuery(q)&&candidates.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(q)&&personEvidence(item)));
+  const personQuery=personLookup(q)||nameOnlyArabicQuery(q);
   if(personQuery){const exactProfile=await wikipediaExactPersonPage(q,language);if(exactProfile.length)candidates.unshift(...exactProfile);}
   const firstPassCount=()=>{const matching=candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q));return personQuery?isolateExactPerson(q,matching).length:matching.length;};
   // Expand when the first pass is merely sparse, not only when it is empty.
