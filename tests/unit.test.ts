@@ -19,7 +19,7 @@ describe("exact person identity isolation",()=>{
     ] as any;
     const result=isolateExactPerson("محمد صلاح",items);
     expect(result.some((item:any)=>item.title==="محمد صلاح")).toBe(true);
-    expect(result.find((item:any)=>item.title==="محمد صلاح").section).toBe("people");
+    expect(result.find((item:any)=>item.title==="محمد صلاح")?.section).toBe("people");
     expect(result.some((item:any)=>item.title==="محمد صلاح يسجل هدفًا مع ليفربول")).toBe(true);
     expect(result.some((item:any)=>/دندراوي|زكريا|توضيح/.test(item.title))).toBe(false);
   });
