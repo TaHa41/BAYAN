@@ -267,6 +267,33 @@ const personQueryName=(query:string)=>String(query||"").trim()
   .replace(/^(?:who is|who was|biography(?: of)?|profile(?: of)?|من هو|من هي|سيرة ذاتية عن|سيرة ذاتية لشخص)\s+/i,"")
   .replace(/\s+(?:biography|profile|official profile|سيرة ذاتية|مصدر رسمي)$/i,"").trim();
 const personEvidence=(candidate:SearchResult)=>/(footballer|football player|soccer player|athlete|politician|writer|author|actor|actress|scientist|researcher|coach|president|minister|born in|is a .*player|لاعب كرة قدم|لاعب|رياضي|سياسي|كاتب|مؤلف|ممثل|عالِم|عالم|باحث|مدرب|رئيس|وزير|وُلد|ولد)/i.test(String(candidate.title||"")+" "+String(candidate.summary||""));
+const wikipediaExactPersonPage=async(query:string,language:Locale):Promise<Candidate[]>=>{
+  const title=personQueryName(query).trim();
+  if(!title||title.length>100)return[];
+  const code=language==="ar"?"ar":"en";
+  try{
+    const url="https://"+code+".wikipedia.org/w/api.php?action=query&titles="+encodeURIComponent(title)+
+      "&prop=extracts|pageimages|pageprops&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=1200&format=json&origin=*";
+    const response=await timeout(url,2800);
+    if(!response.ok)return[];
+    const data=await response.json<any>();
+    const pages=Object.values(data.query?.pages||{}) as any[];
+    const page=pages.find((item:any)=>!item.missing&&normalizedEntityTitle(item.title)===normalizedEntityTitle(title));
+    if(!page||page.pageprops?.disambiguation!==undefined||isDisambiguation({title:page.title,summary:page.extract} as Candidate))return[];
+    const summary=cleanText(page.extract||"").slice(0,1800);
+    if(!summary||!personEvidence({title:page.title,summary} as SearchResult))return[];
+    if(mixedIdentitySummary(title,{title:page.title,summary} as Candidate))return[];
+    const pageUrl="https://"+code+".wikipedia.org/wiki/"+encodeURIComponent(String(page.title).replace(/ /g,"_"));
+    const imageUrl=String(page.thumbnail?.source||"");
+    return [{
+      title:cleanText(page.title),summary,section:"people",kind:"web",evidence:"mixed",
+      imageUrl:imageUrl.startsWith("https://")?imageUrl:undefined,imageAlt:cleanText(page.title),
+      sources:[source(cleanText(page.title),language==="ar"?"Wikipedia Arabic":"Wikipedia",pageUrl)],
+      url:pageUrl,score:100,provider:"Wikipedia Exact Page"
+    } as Candidate];
+  }catch{return[]}
+};
+
 const isDisambiguation=(candidate:Candidate|string)=>{const value=typeof candidate==="string"?candidate:String(candidate.title||"")+" "+String(candidate.summary||"");return /(?:disambiguation|\(توضيح\)|صفحة توضيح|معاني الأسماء|قد يشير إلى|قد تشير إلى|may refer to|people with the name)/i.test(value);};
 const identityText=(value:string)=>String(value||"").normalize("NFKC").toLowerCase()
   .replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").replace(/\s+/g," ").trim();
@@ -516,6 +543,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   }
   // Person/name lookups should return a useful collection, not stop after the first matching page.
   const personQuery=personLookup(q)||(nameOnlyArabicQuery(q)&&candidates.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(q)&&personEvidence(item)));
+  if(personQuery){const exactProfile=await wikipediaExactPersonPage(q,language);if(exactProfile.length)candidates.unshift(...exactProfile);}
   const firstPassCount=()=>{const matching=candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q));return personQuery?isolateExactPerson(q,matching).length:matching.length;};
   // Expand when the first pass is merely sparse, not only when it is empty.
   // People searches need several independent identity clues; general searches need
@@ -551,6 +579,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   // Re-apply identity isolation after recovery: fallback must never reintroduce
   // unrelated people after the strict ranking tier rejected every candidate.
   ranked=isolateExactPerson(q,ranked);
+  if(personQuery){const exactTitle=normalizedEntityTitle(personQueryName(q));ranked.sort((a,b)=>Number(normalizedEntityTitle(a.title)!==exactTitle)-Number(normalizedEntityTitle(b.title)!==exactTitle));}
   // Never pad the result list with unrelated items: expand providers first, then report honestly if relevance is still weak.
   // Merge provider duplicates only when their descriptions support the same entity.
   // A title-only key can incorrectly merge different people who share a name.
@@ -602,7 +631,8 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   let publishedSlug:string|undefined;
   let answer:string|undefined;
   let answerStatus:SearchResponse["status"]|undefined;
-  if(results.length){
+  const exactPersonConfirmed=!personQuery||results.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
+  if(results.length&&exactPersonConfirmed){
     try{const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),1000))]);if(drafted.answer){answer=drafted.answer;answerStatus=drafted.status;}const independentSources=new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean));const articleTitle=results.find(x=>x.title&&x.summary)?.title||"";const articleSummary=results.find(x=>x.title&&x.summary)?.summary||q;if(options.publish!==false&&drafted.status==="verified"&&usefulDraft(drafted.answer,language)&&independentSources.size>=2&&articleTitle&&!disallowedContent(articleTitle+" "+articleSummary)){const imageUrl=results.find(item=>/^https:\/\//i.test(String(item.imageUrl||""))&&String(item.imageAlt||item.title||"").trim().length>0)?.imageUrl||await findRelatedImage(articleTitle,undefined,articleSummary).catch(()=>undefined);const savedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:drafted.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle});if(savedSlug)publishedSlug=savedSlug;}}catch{}
   }
   const message=results.length?undefined:(language==="ar"?"تعذر العثور على نتيجة من مصادر البحث المتاحة حاليًا. يمكن توسيع البحث لاحقًا عند توفر مزودات إضافية.":"No result was returned by the available search providers right now. The search can be expanded when additional providers are available.");
