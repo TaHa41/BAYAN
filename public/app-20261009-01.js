@@ -107,15 +107,15 @@
   const imageHtml = (item, className = "article-card-image") => {
     const url = safeImageUrl(item.imageUrl);
     return url
-      ? '<img loading="lazy" class="' + className + '" src="' + escapeHtml(url) + '" alt="' + escapeHtml(item.imageAlt || item.title || "") + '" data-image-query="' + escapeHtml(String(item.title || "")) + '" onerror="window.BAYAN_IMAGE_RETRY(this)">'
+      ? '<img loading="lazy" class="' + className + '" src="' + escapeHtml(url) + '" alt="' + escapeHtml(item.imageAlt || item.title || "") + '" data-image-query="' + escapeHtml(String(item.title || "") + ": " + String(item.summary || "")) + '" onerror="window.BAYAN_IMAGE_RETRY(this)">'
       : '<div class="image-placeholder">BAYAN</div>';
   };
 
-  const heroImageHtml = (url, alt) => {
+  const heroImageHtml = (url, alt, query = alt) => {
     const safeUrl = safeImageUrl(url);
     return safeUrl
       ? '<img class="article-hero-image" src="' + escapeHtml(safeUrl) + '" alt="' + escapeHtml(alt || "") +
-        '" data-image-query="' + escapeHtml(alt || "") + '" onerror="window.BAYAN_IMAGE_RETRY(this)">'
+        '" data-image-query="' + escapeHtml(query || alt || "") + '" onerror="window.BAYAN_IMAGE_RETRY(this)">'
       : "";
   };
 
@@ -126,7 +126,7 @@
     placeholder.textContent = t("جاري تجهيز صورة المقال…", "Loading article image…");
     container.insertBefore(placeholder, container.firstChild);
     try {
-      const data = await api("/api/image?q=" + encodeURIComponent(String(title || "").trim() || String(summary || "").trim()), {timeoutMs: 18000});
+      const data = await api("/api/image?q=" + encodeURIComponent(String(title || "").trim() + ": " + String(summary || "").trim()), {timeoutMs: 18000});
       if (data?.imageUrl && /^https:\/\//i.test(data.imageUrl) && placeholder.isConnected) {
         const img = document.createElement("img");
         img.className = "article-hero-image";
@@ -495,7 +495,7 @@
       const data=await api("/api/news/article?title="+encodeURIComponent(title)+"&summary="+encodeURIComponent(summary)+"&url="+encodeURIComponent(url)+"&publisher="+encodeURIComponent(publisher)+"&lang="+lang,{timeoutMs:22000});
       const article=data.article||{};
       if(!data.ok||!article.title)throw new Error("article_unavailable");
-      output.innerHTML='<article class="article-full">'+(article.image?heroImageHtml(article.image,article.title):"")+
+      output.innerHTML='<article class="article-full">'+(article.image?heroImageHtml(article.image,article.title,article.summary||summary):"")+
         '<span class="eyebrow">'+escapeHtml(article.sources?.[0]?.publisher||publisher||t("بحث موثق","Evidence search"))+'</span><h1>'+escapeHtml(article.title)+'</h1>'+
         articleLeadHtml(article.summary||summary,article.body||summary)+(article.savedSlug?'<div class="notice">'+t("تمت إضافة المقال تلقائيًا إلى قسم","Automatically added to section")+' <a href="/'+encodeURIComponent(article.section||"news")+'?lang='+lang+'">'+escapeHtml((sections.find(section=>section[0]===(article.section||"news"))||[])[ar?1:2]||article.section||"news")+'</a></div>':"")+
         (article.status==="source_only"?'<div class="notice">'+t("يعرض بيان النص المتاح من المصدر مع الأدلة؛ لم تتوفر معلومات كافية لإعداد تحليل موسع موثوق.","BAYAN is showing the source text available with its evidence; there is not enough information for a reliable expanded analysis.")+'</div>':"")+
@@ -517,7 +517,7 @@
       const data = await api("/api/article?slug=" + encodeURIComponent(slug) + "&lang=" + lang);
       const output = document.querySelector("#article");
       output.innerHTML =
-        '<article class="article-full">' + (data.imageUrl ? heroImageHtml(data.imageUrl, data.imageAlt || data.title) : "") +
+        '<article class="article-full">' + (data.imageUrl ? heroImageHtml(data.imageUrl, data.imageAlt || data.title, data.summary || "") : "") +
         '<span class="eyebrow">' + escapeHtml(data.section || "BAYAN") + "</span><h1>" +
         escapeHtml(data.title) + '</h1>' + articleLeadHtml(data.summary || "", data.body || "") +
         '<div class="article-body">' + renderArticleBody(data.body || "") +
@@ -527,9 +527,9 @@
           "</div>").join("") + "</div>" + socialActions({...data, _key:data.slug || slug, slug}) + "</article>";
       if (!data.imageUrl) {
         try {
-          const image = await api("/api/image?q=" + encodeURIComponent(data.title + " " + (data.summary || "")));
+          const image = await api("/api/image?q=" + encodeURIComponent(data.title + ": " + (data.summary || "")));
           if (image.imageUrl) document.querySelector(".article-full")?.insertAdjacentHTML(
-            "afterbegin", heroImageHtml(image.imageUrl, data.title));
+            "afterbegin", heroImageHtml(image.imageUrl, data.title, data.summary || ""));
         } catch {}
       }
     } catch (error) {
@@ -577,7 +577,7 @@
             "&publishedAt=" + encodeURIComponent(story.publishedAt || "") + "&lang=" + lang);
           const article = articleData.article;
           output.innerHTML =
-            '<article class="article-full">' + (article.image ? heroImageHtml(article.image, article.title) : "") +
+            '<article class="article-full">' + (article.image ? heroImageHtml(article.image, article.title, article.summary || "") : "") +
             '<span class="eyebrow">' + escapeHtml(story.publisher || t("الأخبار","News")) + "</span><h1>" +
             escapeHtml(article.title) + '</h1><p class="lead">' + escapeHtml(article.summary || story.summary || "") +
             '</p>' + (article.savedSlug ? '<div class="notice">' + t("تمت إضافة المقال تلقائيًا إلى قسم", "Automatically added to section") + ' <a href="/' + encodeURIComponent(article.section || "news") + '?lang=' + lang + '">' + escapeHtml((sections.find(section => section[0] === (article.section || "news")) || [])[ar ? 1 : 2] || article.section || "news") + '</a></div>' : "") + (article.status === "source_only" ? '<div class="notice">' + t("هذا ملخص المصدر المتاح؛ لم تتوفر أدلة كافية لإعداد عرض تحليلي كامل بعد.","This is the available source summary; there is not enough evidence to prepare a full analysis yet.") + '</div>' : "") +
