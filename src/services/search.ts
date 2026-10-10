@@ -266,7 +266,7 @@ const normalizedEntityTitle=(value:string)=>String(value||"").normalize("NFKC").
 const personQueryName=(query:string)=>String(query||"").trim()
   .replace(/^(?:who is|who was|biography(?: of)?|profile(?: of)?|من هو|من هي|سيرة ذاتية عن|سيرة ذاتية لشخص)\s+/i,"")
   .replace(/\s+(?:biography|profile|official profile|سيرة ذاتية|مصدر رسمي)$/i,"").trim();
-const personEvidence=(candidate:Candidate)=>/(footballer|football player|soccer player|athlete|politician|writer|author|actor|actress|scientist|researcher|coach|president|minister|born in|is a .*player|لاعب كرة قدم|لاعب|رياضي|سياسي|كاتب|مؤلف|ممثل|عالِم|عالم|باحث|مدرب|رئيس|وزير|وُلد|ولد)/i.test(String(candidate.title||"")+" "+String(candidate.summary||""));
+const personEvidence=(candidate:SearchResult)=>/(footballer|football player|soccer player|athlete|politician|writer|author|actor|actress|scientist|researcher|coach|president|minister|born in|is a .*player|لاعب كرة قدم|لاعب|رياضي|سياسي|كاتب|مؤلف|ممثل|عالِم|عالم|باحث|مدرب|رئيس|وزير|وُلد|ولد)/i.test(String(candidate.title||"")+" "+String(candidate.summary||""));
 const isDisambiguation=(candidate:Candidate|string)=>{const value=typeof candidate==="string"?candidate:String(candidate.title||"")+" "+String(candidate.summary||"");return /(?:disambiguation|\(توضيح\)|صفحة توضيح|معاني الأسماء|قد يشير إلى|قد تشير إلى|may refer to|people with the name)/i.test(value);};
 const identityText=(value:string)=>String(value||"").normalize("NFKC").toLowerCase()
   .replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").replace(/\s+/g," ").trim();
