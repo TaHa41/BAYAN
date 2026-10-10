@@ -264,7 +264,7 @@ async function broadGdelt(q:string):Promise<Candidate[]>{
 const normalizedEntityTitle=(value:string)=>String(value||"").normalize("NFKC").toLowerCase()
   .replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").trim();
 const personQueryName=(query:string)=>String(query||"").trim()
-  .replace(/^(?:who is|who was|biography(?: of)?|profile(?: of)?|من هو|من هي|نبذة عن|معلومات عن|شخصية|سيرة ذاتية عن|سيرة ذاتية لشخص)\s+/i,"")
+  .replace(/^(?:who is|who was|biography(?: of)?|profile(?: of)?|من هو|من هي|سيرة ذاتية عن|سيرة ذاتية لشخص)\s+/i,"")
   .replace(/\s+(?:biography|profile|official profile|سيرة ذاتية|مصدر رسمي)$/i,"").trim();
 const personEvidence=(candidate:Candidate)=>/(footballer|football player|soccer player|athlete|politician|writer|author|actor|actress|scientist|researcher|coach|president|minister|born in|is a .*player|لاعب كرة قدم|لاعب|رياضي|سياسي|كاتب|مؤلف|ممثل|عالِم|عالم|باحث|مدرب|رئيس|وزير|وُلد|ولد)/i.test(String(candidate.title||"")+" "+String(candidate.summary||""));
 const isDisambiguation=(candidate:Candidate)=>/(?:disambiguation|\(توضيح\)|صفحة توضيح|معاني الأسماء)/i.test(String(candidate.title||""));
