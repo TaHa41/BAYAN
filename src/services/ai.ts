@@ -8,7 +8,7 @@ const languageConsistent=(answer:string,locale:Locale)=>{
   const sentences=answer.split(/[\n.!؟?]+/).map(x=>x.trim()).filter(Boolean);
   return sentences.every(sentence=>/[\u0600-\u06ff]/.test(sentence)||!/[A-Za-z]{5,}/.test(sentence));
 };
-const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[])=>{
+export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[])=>{
   const corpus=evidence.map(item=>[item.title,item.summary,...(item.sources||[]).flatMap(source=>[source.title,source.publisher])].filter(Boolean).join(" ")).join(" ").normalize("NFKC").toLowerCase();
   const generic=new Set(["the","this","these","those","according","based","however","therefore","overall","summary","conclusion","answer","key","main","important","first","second","third","one","two","three","it","they","he","she","we","you","and","but","because","during","after","before","global","world","health","history","science","technology","economy","politics","sports","travel","art","bayan"]);
   const corpusTokens=new Set(corpus.match(/[a-z0-9&.-]+/g)||[]);
