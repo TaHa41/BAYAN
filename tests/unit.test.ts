@@ -8,6 +8,19 @@ describe("BAYAN product foundation",()=>{
   it("has bilingual labels",()=>expect(SECTIONS.every(x=>x[1]&&x[2])).toBe(true));
 });
 
+describe("canonical same-name profile selection",()=>{
+  it("prefers a rich exact Wikipedia biography over a short conflicting Wikidata label",()=>{
+    const items=[
+      {title:"محمد صلاح",summary:"ممثل.",url:"https://www.wikidata.org/wiki/Q999",provider:"Wikidata",score:90,sources:[{title:"محمد صلاح",publisher:"ويكي بيانات",url:"https://www.wikidata.org/wiki/Q999"}]},
+      {title:"محمد صلاح",summary:"محمد صلاح حامد محروس غالي لاعب كرة قدم مصري محترف يلعب في مركز الجناح، وقائد منتخب مصر، وبدأ مسيرته مع المقاولون العرب ثم احترف في أوروبا.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح",provider:"Wikipedia",score:80,sources:[{title:"محمد صلاح",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح"}]},
+      {title:"محمد صلاح دندراوي",summary:"كاتب وأديب سعودي.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي",provider:"Wikipedia",score:70,sources:[{title:"محمد صلاح دندراوي",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي"}]}
+    ] as any;
+    const result=isolateExactPerson("محمد صلاح",items);
+    expect(result).toHaveLength(1);
+    expect(result[0].summary).toContain("لاعب كرة قدم");
+    expect(result[0].sources.every((source:any)=>source.title==="محمد صلاح")).toBe(true);
+  });
+});
 describe("exact person identity isolation",()=>{
   it("keeps only the exact biography page when multiple people share the same Arabic name",()=>{
     const items=[
