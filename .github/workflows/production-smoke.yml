@@ -16,7 +16,7 @@ jobs:
   production-smoke:
     name: Verify deployed BAYAN
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - name: Check out monitoring scripts
         uses: actions/checkout@v5
@@ -27,4 +27,5 @@ jobs:
       - name: Run deployed-site smoke tests
         env:
           BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
-        run: node scripts/production-smoke.mjs
+          BAYAN_AI_MANAGER_TOKEN: ${{ secrets.BAYAN_AI_MANAGER_TOKEN }}
+        run: node scripts/production-self-heal.mjs
