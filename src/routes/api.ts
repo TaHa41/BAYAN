@@ -172,7 +172,7 @@ export async function api(request:Request,env:Env){const u=new URL(request.url),
           articleEvidenceHosts.add(host);articleEvidenceUrls.push(parsed.toString());break;
         }catch{}
       }
-      if(articleEvidenceUrls.length>=3)break;
+      if(articleEvidenceUrls.length>=2)break;
     }
     const articleEvidenceText=await Promise.all(articleEvidenceUrls.map(url=>bounded(sourceArticleText(url,lang),4500).catch(()=> "")));
     const evidenceByUrl=new Map(articleEvidenceUrls.map((url,index)=>[url,articleEvidenceText[index]]));
