@@ -532,9 +532,14 @@
             "afterbegin", heroImageHtml(image.imageUrl, data.title));
         } catch {}
       }
-    } catch {
-      document.querySelector("#article").innerHTML =
-        '<div class="notice">' + t("تعذر فتح الملف.","The knowledge file could not be opened.") + "</div>";
+    } catch (error) {
+      const output = document.querySelector("#article");
+      if (!output) return;
+      const rejected = String(error || "").includes("http_422");
+      const message = rejected
+        ? t("لم نعرض هذا الملف لأن محتواه أو أدلته لا تستوفي شروط التحقق في بيان.","This file was not shown because its content or evidence does not meet BAYAN's verification standards.")
+        : t("تعذر فتح الملف الآن. يمكنك البحث عن أدلة ومصادر مرتبطة بالموضوع.","The file could not be opened right now. You can search for evidence and sources related to this topic.");
+      output.innerHTML = '<div class="notice"><p>' + message + '</p><a class="primary" href="/search?q=' + encodeURIComponent(slug.replace(/-/g," ")) + '&lang=' + lang + '">' + t("ابحث عن مصادر موثوقة","Search reliable sources") + '</a></div>';
     }
   }
 
