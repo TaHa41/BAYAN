@@ -321,6 +321,7 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
    const safe=items.filter(item=>{
      if(isDisambiguation(item)||mixedIdentitySummary(query,item))return false;
      if(normalizedEntityTitle(item.title)===name)return item===canonical;
+     if((item.sources||[]).some(source=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(source.publisher||""))))return false;
      const title=normalizedEntityTitle(item.title);
      // Exclude encyclopedia pages whose titles append a second person's identity.
      if(title.startsWith(name+" ")&&/(?:دندراوي|زكريا|مصطفى|العزب|جندي|ممثل|مدرب|توضيح|تشالدران|denrawi|zakaria|mustafa|al.?azab|soldier|actor|disambiguation)/i.test(title.slice(name.length)))return false;
