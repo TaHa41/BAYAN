@@ -1,4 +1,4 @@
-import type{Env}from"../types";import{now}from"../config";import{notify}from"./telegram";import{findRelatedImage,news}from"./news";
+import type{Env}from"../types";import{now}from"../config";import{notify}from"./telegram";import{findRelatedImage,news}from"./news";import{search}from"./search";
 async function newsCacheHealthy(env:Env){
   const rows=await env.DB.prepare("SELECT language,payload FROM news_cache WHERE language IN ('ar','en')").all<any>();
   const cache=rows.results||[];
@@ -115,6 +115,44 @@ async function repairTaxonomy(env:Env){
   return actions;
 }
 
+const SECTION_REPAIR_QUERIES:Record<string,{ar:string;en:string}>={
+  science:{ar:"اكتشافات علمية حديثة وأبحاث علمية موثوقة",en:"recent scientific discoveries and evidence-based research"},
+  technology:{ar:"تقنيات حديثة وأمن رقمي وذكاء اصطناعي من مصادر موثوقة",en:"technology, digital security and artificial intelligence from reliable sources"},
+  economy:{ar:"مؤشرات اقتصادية وأسواق وتضخم من مصادر مستقلة",en:"economic indicators, markets and inflation from independent sources"},
+  politics:{ar:"تحليل موثق للسياسات العامة والانتخابات والحكومات",en:"evidence-backed analysis of public policy, elections and governments"},
+  health:{ar:"أبحاث صحية وإرشادات طبية من المؤسسات العلمية",en:"health research and medical guidance from scientific institutions"},
+  history:{ar:"أحداث تاريخية موثقة وأرشيفات ومصادر أولية",en:"documented historical events, archives and primary sources"},
+  people:{ar:"سيرة موثقة لشخصية تاريخية أو ثقافية معروفة",en:"documented biography of a notable historical or cultural figure"},
+  sports:{ar:"أخبار رياضية ونتائج وتحليلات من مصادر مستقلة",en:"sports news, results and analysis from independent sources"},
+  travel:{ar:"وجهات سياحية وثقافات وأدلة سفر موثوقة",en:"travel destinations, cultures and reliable travel guides"},
+  art:{ar:"أدب وفنون وموسيقى وأعمال ثقافية موثقة",en:"literature, arts, music and documented cultural works"},
+  trends:{ar:"اتجاهات حديثة موثقة وأسباب انتشارها",en:"documented current trends and evidence explaining their spread"},
+  egypt:{ar:"معلومات موثقة عن مصر وتاريخها ومؤسساتها",en:"evidence-backed information about Egypt, its history and institutions"},
+  arab:{ar:"قضايا ومعلومات موثقة عن البلدان العربية والثقافة العربية",en:"evidence-backed topics about Arab countries and Arab culture"},
+  world:{ar:"قضايا دولية موثقة من مصادر مستقلة ومتعددة",en:"documented international affairs from multiple independent sources"}
+};
+async function attemptSectionContentRepair(env:Env,missing:string[]){
+  if(!missing.length)return "No section content repair target was available.";
+  let cursor=0;
+  try{const row=await env.DB.prepare("SELECT value FROM admin_settings WHERE key='section_repair_cursor'").first<any>();cursor=Math.max(0,Number(row?.value||0)||0)}catch{}
+  const target=missing[cursor%missing.length];
+  try{await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES('section_repair_cursor',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(String(cursor+1),now()).run()}catch{}
+  const match=String(target).match(/^([a-z]+)_(ar|en)=/);
+  if(!match)return "Section content repair skipped because the gap signature was not recognized: "+target;
+  const section=match[1],language=match[2] as "ar"|"en";
+  const query=SECTION_REPAIR_QUERIES[section]?.[language];
+  if(!query)return "No safe evidence-search query is configured for section "+section+".";
+  // Do not compete with news/image recovery for the Worker subrequest budget.
+  // Search publishes only when independent evidence, article structure and an image pass its existing gates.
+  const result=await search(env,query,language,{publish:true,draft:true,images:true});
+  if(!result.articleSlug)return "Evidence-backed content repair attempted for "+target+"; no article passed publication gates, so no content was fabricated.";
+  const row=await env.DB.prepare("SELECT title,summary,body,sources_json,image_url FROM articles WHERE slug=? AND language=? AND status='PUBLISHED' LIMIT 1").bind(result.articleSlug,language).first<any>();
+  if(!row||!completeSectionArticle(row,language))return "Candidate article for "+target+" failed the complete-article recheck; section assignment was not changed.";
+  await env.DB.prepare("UPDATE articles SET section=?,updated_at=? WHERE slug=? AND language=? AND status='PUBLISHED'").bind(section,now(),result.articleSlug,language).run();
+  const remaining=await sectionHealth(env);
+  return "Evidence-backed article repair verified for "+section+"_"+language+"; remaining section gaps: "+remaining.length+".";
+}
+
 async function repairRuntime(env:Env,failures:string[]){
   const actions:string[]=[];
   try{await env.DB.prepare("SELECT 1").first();actions.push("database verified")}catch{
@@ -154,7 +192,8 @@ async function repairRuntime(env:Env,failures:string[]){
   if(failures.includes("sections"))try{
     const missing=await sectionHealth(env);
     if(missing.length)actions.push("section coverage failure: fewer than 2 complete, locale-pure, source-backed, imaged articles: "+missing.join(", "));
-    actions.push("No incomplete search snippet was promoted to a published article; missing coverage remains flagged for evidence-backed content repair.");
+    if(missing.length&&!failures.includes("news_cache")&&!failures.includes("images"))actions.push(await attemptSectionContentRepair(env,missing));
+    else if(missing.length)actions.push("Evidence-backed section repair deferred while news/image recovery is active, to preserve Worker subrequest budget.");
   }catch(error){actions.push("section content audit failed: "+String(error).slice(0,250))}
   if(failures.includes("images")&&failures.includes("news_cache")&&!imageOnlyPass){actions.push("image repair deferred until the next run to preserve Worker subrequest budget after news refresh")}else if(failures.includes("images"))try{
     const rows=await env.DB.prepare("SELECT id,title,summary,sources_json FROM articles WHERE status='PUBLISHED' AND (image_url IS NULL OR trim(image_url)='') ORDER BY updated_at DESC LIMIT 4").all<any>();
