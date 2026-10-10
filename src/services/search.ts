@@ -310,10 +310,11 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
      politics?/(government|election|president|minister|politic|حكومة|انتخابات|رئيس|وزير|سياسة)/i:
      arts?/(book|novel|film|movie|writer|author|actor|poet|كتاب|رواية|فيلم|كاتب|مؤلف|ممثل|شاعر)/i:null;
    // Collapse exact-title providers to one canonical identity, but merge their distinct source citations and a safe exact-page image.
+   canonical.sources=(canonical.sources||[]).filter(source=>normalizedTitle(source.title)===name);
    const sourceKeys=new Set((canonical.sources||[]).map(source=>String(source.url||"").trim()).filter(Boolean));
    for(const candidate of cleanExact){
      if(candidate!==canonical){
-       for(const source of candidate.sources||[]){const url=String(source.url||"").trim();if(url&&!sourceKeys.has(url)){canonical.sources=[...(canonical.sources||[]),source];sourceKeys.add(url);}}
+       for(const source of candidate.sources||[]){if(normalizedTitle(source.title)!==name)continue;const url=String(source.url||"").trim();if(url&&!sourceKeys.has(url)){canonical.sources=[...(canonical.sources||[]),source];sourceKeys.add(url);}}
        if(!canonical.imageUrl&&/^https:\/\//i.test(String(candidate.imageUrl||""))){canonical.imageUrl=candidate.imageUrl;canonical.imageAlt=candidate.imageAlt||candidate.title;}
      }
    }
