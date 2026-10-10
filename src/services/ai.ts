@@ -10,9 +10,17 @@ const languageConsistent=(answer:string,locale:Locale)=>{
 };
 const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[])=>{
   const corpus=evidence.map(item=>[item.title,item.summary,...(item.sources||[]).flatMap(source=>[source.title,source.publisher])].filter(Boolean).join(" ")).join(" ").normalize("NFKC").toLowerCase();
-  const generic=new Set(["the","this","these","those","according","based","however","therefore","overall","summary","conclusion","answer","key","main","important","first","second","third","one","two","three","it","they","he","she","we","you","a","an","and","but","if","when","while","because","to","of","with","without","about","in","on","at","for","by","from","during","after","before","as","is","are","was","were","be","been","being","has","have","had","can","could","may","might","will","would","should","not","also","more","most","some","many","new","current","recent","early","life","career","background","profile","sources","evidence","research","article","details","facts","section","global","world","health","history","science","technology","economy","politics","sports","travel","art","bayan"]);
-  const names=answer.match(/\\b[A-Z][A-Za-z0-9&.-]{2,}\\b/g)||[];
-  const unsupportedName=names.some(name=>!generic.has(name.toLowerCase())&&!new RegExp("\\\\b"+name.replace(/[.*+?^${}()|[\\]\\\\]/g,"\\\\export async function ask(env:Env,question:string,locale:Locale,evidence:SearchResult[]){")+"\\\\b","i").test(corpus));
+  const generic=new Set(["the","this","these","those","according","based","however","therefore","overall","summary","conclusion","answer","key","main","important","first","second","third","one","two","three","it","they","he","she","we","you","and","but","because","during","after","before","global","world","health","history","science","technology","economy","politics","sports","travel","art","bayan"]);
+  const corpusTokens=new Set(corpus.match(/[a-z0-9&.-]+/g)||[]);
+  const names=answer.match(/\b[A-Z][A-Za-z0-9&.-]{2,}\b/g)||[];
+  const unsupportedName=names.some(name=>!generic.has(name.toLowerCase())&&!corpusTokens.has(name.toLowerCase()));
+  const normalizeDigits=(value:string)=>value.replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[٬,]/g,"");
+  const corpusNumbers=new Set(normalizeDigits(corpus).match(/[0-9]+/g)||[]);
+  const answerNumbers=normalizeDigits(answer).match(/[0-9]+/g)||[];
+  const unsupportedNumber=answerNumbers.some(number=>!corpusNumbers.has(number));
+  return unsupportedName||unsupportedNumber;
+};
+export async function ask(env:Env,question:string,locale:Locale,evidence:SearchResult[]){")+"\\\\b","i").test(corpus));
   const normalizeDigits=(value:string)=>value.replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[٬,]/g,"");
   const corpusNumbers=new Set(normalizeDigits(corpus).match(/\\d+(?:\\.\\d+)?/g)||[]);
   const answerNumbers=normalizeDigits(answer).match(/[0-9٠-٩]+(?:[.,٫٬][0-9٠-٩]+)*/g)||[];
