@@ -31,6 +31,21 @@ describe("exact person identity isolation",()=>{
     expect(result.some((item:any)=>item.title==="محمد صلاح يسجل هدفًا لليفربول")).toBe(true);
     expect(result.some((item:any)=>item.title==="محمد صلاح دندراوي")).toBe(false);
   });
+  it("keeps the concise canonical biography and its exact-page image when a provider has a contradictory long summary",()=>{
+    const items=[
+      {title:"محمد صلاح",summary:"محمد صلاح لاعب كرة قدم مصري محترف، يلعب حاليا مع نادي طرابزون سبور. ناديه الحالي ليفربول.",imageUrl:"https://upload.wikimedia.org/exact-person.jpg",imageAlt:"محمد صلاح",url:"https://ar.wikipedia.org/wiki/محمد_صلاح",provider:"Wikipedia",score:95,sources:[{title:"محمد صلاح",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح"},{title:"محمد صلاح دندراوي",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي"}]},
+      {title:"محمد صلاح",summary:"لاعب كرة قدم مصري.",url:"https://www.wikidata.org/wiki/Q",provider:"Wikidata",score:70,sources:[{title:"محمد صلاح",publisher:"Wikidata",url:"https://www.wikidata.org/wiki/Q"}]},
+      {title:"محمد صلاح يسجل هدفًا لليفربول",summary:"لاعب كرة القدم المصري سجل هدفا مع ليفربول.",url:"https://www.bbc.com/sport/football/123",provider:"BBC Web Search",score:65,sources:[{title:"خبر رياضي",publisher:"BBC Sport",url:"https://www.bbc.com/sport/football/123"}]}
+    ] as any;
+    const result=isolateExactPerson("محمد صلاح",items);
+    const exact=result.filter((item:any)=>item.title==="محمد صلاح");
+    expect(exact).toHaveLength(1);
+    expect(exact[0].summary).toBe("لاعب كرة قدم مصري.");
+    expect(exact[0].imageUrl).toBe("https://upload.wikimedia.org/exact-person.jpg");
+    expect(exact[0].sources.some((source:any)=>source.publisher==="Wikipedia Arabic")).toBe(true);
+    expect(exact[0].sources.some((source:any)=>source.publisher==="Wikidata")).toBe(true);
+    expect(exact[0].sources.some((source:any)=>source.title==="محمد صلاح دندراوي")).toBe(false);
+  });
   it("rejects an exact-name disambiguation page whose summary lists several people",()=>{
     const items=[
       {title:"محمد صلاح",summary:"محمد صلاح لاعب كرة قدم مصري. محمد صلاح دندراوي كاتب سعودي. محمد صلاح (توضيح) يشير إلى عدة أشخاص.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح",provider:"Wikipedia",score:90,sources:[{title:"محمد صلاح",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح"}]},

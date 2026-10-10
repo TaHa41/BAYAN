@@ -60,8 +60,10 @@ try{
   const first=d.items[0];
   const storyPage=await get("/news?story="+encodeURIComponent(first.title)+"&lang=ar");
   if(!storyPage.text.includes('property="og:title"')||!storyPage.text.includes('application/ld+json')||!storyPage.text.includes("story="))throw new Error("news_story_seo_metadata_missing");
-  const a=await get("/api/news/article?title="+encodeURIComponent(first.title)+"&image="+encodeURIComponent(first.imageUrl||"")+"&summary="+encodeURIComponent(first.summary||"")+"&url="+encodeURIComponent(first.url||"")+"&publisher="+encodeURIComponent(first.publisher||"")+"&publishedAt="+encodeURIComponent(first.publishedAt||"")+"&lang=ar");
-  const ad=JSON.parse(a.text); if(!ad.ok||!ad.article?.title||!ad.article?.body)throw new Error("news_article_incomplete");
+  const articlePath="/api/news/article?title="+encodeURIComponent(first.title)+"&image="+encodeURIComponent(first.imageUrl||"")+"&summary="+encodeURIComponent(first.summary||"")+"&url="+encodeURIComponent(first.url||"")+"&publisher="+encodeURIComponent(first.publisher||"")+"&publishedAt="+encodeURIComponent(first.publishedAt||"")+"&lang=ar";
+  const a=await fetch(origin+articlePath,{headers:{accept:"application/json"},signal:AbortSignal.timeout(30000)}); const articleText=await a.text(); const ad=JSON.parse(articleText);
+  if(a.status===422&&["article_evidence_insufficient","article_identity_ambiguous"].includes(String(ad.error||""))){console.log("SAFE ARTICLE WITHHELD",ad.error);}
+  else if(!a.ok||!ad.article?.title||!ad.article?.body)throw new Error("news_article_incomplete");
   if(/[A-Za-z]{5,}/.test(String(first.title))&&!/[\u0600-\u06ff]/.test(String(first.title)))throw new Error("arabic_news_title_missing");
 }catch(e){console.error("NEWS",e);bad++}
 try{
