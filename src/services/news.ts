@@ -135,56 +135,48 @@ const terms = (value: string) =>
     .split(/\s+/)
     .filter((term) => term.length > 2);
 
-const wikidataImage = async (query: string): Promise<string | undefined> => {
-  // Never use the first fuzzy Wikidata result for a person: common names can
-  // resolve to a different person. Only accept a label that matches the requested
-  // subject exactly after Unicode/diacritic normalization.
+const wikidataImage = async (query: string, context = ""): Promise<string | undefined> => {
   const normalize = (value: string) => String(value || "").normalize("NFKC").toLowerCase()
-    .replace(/[\\u064B-\\u065F\\u0670]/g, "")
-    .replace(/[^\\p{L}\\p{N}]+/gu, " ").trim();
+    .replace(/[\u064B-\u065F\u0670]/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ").trim();
   const requested = normalize(query);
   if (!requested || requested.length > 100) return;
+  const hint=String(context||"").toLowerCase();
+  const intentTerms = /football|soccer|premier league|liverpool|لاعب كرة قدم|كرة القدم|الدوري|ليفربول/.test(hint)
+    ? /footballer|soccer player|association football|لاعب كرة قدم|لاعب كرة القدم/
+    : /scientist|researcher|physics|chemist|عالم|باحث|فيزيائي|كيميائي/.test(hint)
+      ? /scientist|researcher|physicist|chemist|عالم|باحث|فيزيائي|كيميائي/
+      : /politician|president|minister|سياسي|رئيس|وزير/.test(hint)
+        ? /politician|president|minister|سياسي|رئيس|وزير/
+        : /writer|author|novelist|poet|كاتب|مؤلف|روائي|شاعر/.test(hint)
+          ? /writer|author|novelist|poet|كاتب|مؤلف|روائي|شاعر/
+          : null;
   try {
     for (const language of ["ar", "en"]) {
-      const searchUrl =
-        "https://www.wikidata.org/w/api.php?action=wbsearchentities&search=" +
-        encodeURIComponent(query) +
-        "&language=" +
-        language +
-        "&limit=5&format=json&origin=*";
+      const searchUrl = "https://www.wikidata.org/w/api.php?action=wbsearchentities&search=" +
+        encodeURIComponent(query) + "&language=" + language + "&limit=8&format=json&origin=*";
       const searchResponse = await fetch(searchUrl, {
-        signal: AbortSignal.timeout(2500),
-        headers: { accept: "application/json" },
+        signal: AbortSignal.timeout(2500), headers: { accept: "application/json" },
       });
       if (!searchResponse.ok) continue;
       const searchData = await searchResponse.json<any>();
-      const matches = (searchData.search || []).filter((item: any) => {
-        const label = normalize(item.label || "");
-        return label === requested;
-      });
-      const ids = matches.map((item: any) => item.id).filter(Boolean);
-      // If an exact label resolves to multiple Wikidata entities, the name is ambiguous.
-      // Refuse to pick an arbitrary person and let the neutral image fallback handle it.
+      let matches = (searchData.search || []).filter((item: any) => normalize(item.label || "") === requested);
+      if (matches.length > 1 && intentTerms) {
+        const contextual = matches.filter((item: any) => intentTerms.test(String(item.description || "")));
+        if (contextual.length === 1) matches = contextual;
+      }
+      // Do not choose an arbitrary person when multiple exact-name entities remain.
+      const ids = matches.length === 1 ? matches.map((item: any) => item.id).filter(Boolean) : [];
       if (ids.length !== 1) continue;
-
-      const entityUrl =
-        "https://www.wikidata.org/w/api.php?action=wbgetentities&ids=" +
-        ids.join("|") +
-        "&props=claims&format=json&origin=*";
+      const entityUrl = "https://www.wikidata.org/w/api.php?action=wbgetentities&ids=" +
+        ids.join("|") + "&props=claims&format=json&origin=*";
       const entityResponse = await fetch(entityUrl, {
-        signal: AbortSignal.timeout(2500),
-        headers: { accept: "application/json" },
+        signal: AbortSignal.timeout(2500), headers: { accept: "application/json" },
       });
       if (!entityResponse.ok) continue;
       const entityData = await entityResponse.json<any>();
-
-      for (const id of ids) {
-        const filename =
-          entityData.entities?.[id]?.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
-        if (filename) {
-          return "https://commons.wikimedia.org/wiki/Special:Redirect/file/" + encodeURIComponent(filename);
-        }
-      }
+      const filename = entityData.entities?.[ids[0]]?.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
+      if (filename) return "https://commons.wikimedia.org/wiki/Special:Redirect/file/" + encodeURIComponent(filename);
     }
   } catch {}
   return;
@@ -243,7 +235,7 @@ const wikipediaExactImage=async(query:string):Promise<string|undefined>=>{
   return images.find((image)=>Boolean(image));
 };
 
-export async function findRelatedImage(query: string, sourceUrl?: string): Promise<string | undefined> {
+export async function findRelatedImage(query: string, sourceUrl?: string, context = ""): Promise<string | undefined> {
   // Prefer the publisher article image when the URL is a normal public HTTPS host.
   if (sourceUrl) {
     try {
@@ -278,7 +270,7 @@ export async function findRelatedImage(query: string, sourceUrl?: string): Promi
 
   // Wikidata is a separate subject-image provider and can recover biographies/topics
   // whose localized Wikipedia pages have no thumbnail. Keep it behind exact page lookups.
-  const structuredSubjectImage = await wikidataImage(headline);
+  const structuredSubjectImage = await wikidataImage(headline, context || cleanQuery.slice(headline.length));
   if (structuredSubjectImage && /^https:\/\//i.test(structuredSubjectImage)) return structuredSubjectImage;
 
   // Headlines identify the subject better than long summaries. Search Commons
