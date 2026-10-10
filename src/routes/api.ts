@@ -153,7 +153,7 @@ const sectionPatterns:Record<string,RegExp>={
  world:/(world|global|international|united nations|international relations|global risk|عالمي|دولي|العالم|الأمم المتحدة|علاقات دولية|حرب|نزاع)/i
 };
 const sectionRelevant=(x:any)=>{const text=String(x?.title||"")+" "+String(x?.summary||"");if(section==="sports"&&/(video game|لعبة فيديو|ألعاب فيديو)/i.test(text))return false;const pattern=sectionPatterns[section];return !pattern||pattern.test(text);};
-items=items.filter((x:any)=>x.kind==="evidence"||(articleBodyQuality(String(x.body||"")).ok&&articleEvidenceQuality(x.sources))).filter(localeSafeItem);
+items=items.filter((x:any)=>sectionRelevant(x)&&(x.kind==="evidence"||(articleBodyQuality(String(x.body||"")).ok&&articleEvidenceQuality(x.sources)))).filter(localeSafeItem);
 const imageCandidates=items.filter((x:any)=>x.slug&&!/^https:\/\//i.test(String(x.imageUrl||""))).slice(0,3);
 await Promise.all(imageCandidates.map(async(item:any)=>{try{const imageUrl=await bounded(findRelatedImage(String(item.title||"")),3500);if(imageUrl&&/^https:\/\//i.test(imageUrl)){item.imageUrl=imageUrl;item.imageAlt=String(item.title||"");await env.DB.prepare("UPDATE articles SET image_url=?,image_alt=?,updated_at=? WHERE slug=? AND language=? AND (image_url IS NULL OR trim(image_url)='')").bind(imageUrl,item.imageAlt,new Date().toISOString(),item.slug,lang).run();}}catch{}}));
 items=items.filter((x:any)=>x.kind==="evidence"||/^https:\/\//i.test(String(x.imageUrl||"")));
