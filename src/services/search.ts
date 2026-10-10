@@ -301,6 +301,23 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
   if(personLookup(query))return items.filter(item=>!isDisambiguation(item)&&!mixedIdentitySummary(query,item));
   return items.filter(item=>!mixedIdentitySummary(query,item));
 };
+export const isolateArticleSubject=(title:string,items:Candidate[])=>{
+ const query=normalizedEntityTitle(title);
+ if(!query||!Array.isArray(items))return [];
+ const isolated=isolateExactPerson(title,items);
+ if(isolated.length<items.length)return isolated.filter(item=>!isDisambiguation(String(item.title||"")+" "+String(item.summary||"")));
+ const exact=items.filter(item=>normalizedEntityTitle(item.title)===query);
+ const validExact=exact.filter(item=>!isDisambiguation(String(item.title||"")+" "+String(item.summary||"")));
+ if(validExact.length){
+  const profile=validExact.find(item=>personEvidence(item));
+  const chosen=profile||validExact[0];
+  const chosenUrl=String(chosen.url||chosen.sources?.[0]?.url||"");
+  return validExact.filter(item=>String(item.url||item.sources?.[0]?.url||"")===chosenUrl);
+ }
+ const arabicName=/^[\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){1,3}$/.test(String(title||"").trim())&&!/(?:ما هو|ما هي|تاريخ|علوم|تقنية|اقتصاد|سياسة|رياضة|ذكاء اصطناعي|تغير المناخ|الفضاء|الطاقة|الصحة|السياحة|البرمجة|مصر|العالم العربي)/.test(title);
+ if(arabicName&&items.some(item=>normalizedEntityTitle(item.title).startsWith(query+" ")))return [];
+ return items.filter(item=>!isDisambiguation(String(item.title||"")+" "+String(item.summary||"")));
+};
 const personLookup=(q:string)=>{
   const raw=String(q||"").trim();
   const words=raw.split(/\s+/).filter(Boolean);
