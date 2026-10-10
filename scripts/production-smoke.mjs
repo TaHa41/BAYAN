@@ -1,5 +1,5 @@
 const origin=process.env.BAYAN_ORIGIN||"https://bayan.tahaomar411.workers.dev";
-const checks=["/","/saved?lang=ar","/tools?lang=ar","/about?lang=ar","/methodology?lang=ar","/privacy?lang=ar","/terms?lang=ar","/api/health","/api/features","/api/live/weather","/api/live/fx","/api/live/gold","/news?lang=ar","/news?lang=en","/prices?lang=ar","/art?lang=ar","/trends?lang=ar","/robots.txt","/sitemap.xml","/news-sitemap.xml"];
+const checks=["/","/saved?lang=ar","/tools?lang=ar","/about?lang=ar","/methodology?lang=ar","/privacy?lang=ar","/terms?lang=ar","/api/health","/api/features","/api/live/weather","/api/live/fx","/api/live/gold","/news?lang=ar","/news?lang=en","/prices?lang=ar","/art?lang=ar","/trends?lang=ar","/robots.txt","/sitemap.xml","/news-sitemap.xml","/llms.txt","/.well-known/ai-catalog.json","/ai-catalog.json"];
 const sections=["science","technology","economy","politics","health","history","people","sports","travel","art","news","trends","prices","egypt","arab","world"];
 let bad=0;
 let bundleText="";
@@ -20,6 +20,15 @@ try{
   if(!sitemap.text.includes("?lang=ar")||!sitemap.text.includes("?lang=en")||!sitemap.text.includes("<lastmod>"))throw new Error("localized_sitemap_or_lastmod_missing");
   const robots=await get("/robots.txt");
   if(!robots.text.includes("Sitemap:")||!robots.text.includes("Disallow: /admin"))throw new Error("robots_policy_missing");
+  if(!robots.text.includes("Agentmap: "+origin+"/.well-known/ai-catalog.json"))throw new Error("robots_agentmap_missing");
+  const llms=await get("/llms.txt");
+  if(!/^#\\s+.+/m.test(llms.text)||!llms.text.includes(origin+"/search?lang=ar")||!llms.text.includes("## Public pages"))throw new Error("llms_txt_structure_or_links_missing");
+  for(const path of ["/.well-known/ai-catalog.json","/ai-catalog.json"]){
+    const response=await get(path);
+    if(!/json/i.test(response.headers.get("content-type")||""))throw new Error(path+" content_type_not_json");
+    const catalog=JSON.parse(response.text);
+    if(catalog.specVersion!=="1.0"||!catalog.host||!Array.isArray(catalog.entries))throw new Error(path+" invalid_ai_catalog_schema");
+  }
 }catch(e){console.error("SEO",e);bad++}
 try{
   const h=await get("/?lang=en");
