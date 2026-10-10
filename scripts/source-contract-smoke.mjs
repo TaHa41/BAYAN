@@ -155,6 +155,7 @@ const checks = [
   ["legacy biographies with mixed identities are archived so they cannot keep resurfacing", read("src/routes/api.ts").includes("status='ARCHIVED'") && read("src/routes/api.ts").includes("article_identity_ambiguous") && read("src/routes/api.ts").includes("article_subject_mismatch")],
   ["missing card images use the exact result title and ignore disambiguation-page thumbnails", read("public/app-20261009-01.js").includes('encodeURIComponent(item.title), {timeoutMs: 18000}') && read("src/services/news.ts").includes("pageprops?.disambiguation")],
 ];
+  ["science and technology have complete bilingual articles with independent sources and images", ["science-read-space-observations-en","science-test-scientific-claims-en","technology-understand-generative-ai-ar","technology-protect-online-accounts-ar","technology-understand-generative-ai-en","technology-protect-online-accounts-en"].every(slug=>read("migrations_v1/0026_seed_science_technology_articles.sql").includes(slug)) && read("scripts/seed-article-quality-smoke.mjs").includes("rows.length !== 28") && read("src/routes/api.ts").includes('"technology":["technology"')],
 let failed = 0;
 for (const [name, ok] of checks) {
   console.log((ok ? "PASS " : "FAIL ") + name);
