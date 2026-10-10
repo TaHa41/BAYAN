@@ -299,7 +299,7 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
  const profile=cleanExact.filter(personEvidence);
  // A single disambiguation result must not hide a valid exact profile from another provider.
  if(profile.length){
-   const canonical=profile.sort((a,b)=>{const concise=(value:string)=>String(value||"").length<=320?1:0;return concise(String(b.summary||""))-concise(String(a.summary||""))||relevanceScore(b,query)-relevanceScore(a,query);})[0];
+   const canonical=profile.sort((a,b)=>String(a.summary||"").length-String(b.summary||"").length||relevanceScore(b,query)-relevanceScore(a,query))[0];
    const description=String(canonical.summary||"");
    const sports=/football|soccer|athlete|لاعب كرة قدم|رياضي/i.test(description);
    const medicine=/physician|doctor|surgeon|طبيب|طبيبة/i.test(description);
