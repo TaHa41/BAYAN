@@ -155,7 +155,7 @@ const sectionPatterns:Record<string,RegExp>={
 const sectionRelevant=(x:any)=>{const text=String(x?.title||"")+" "+String(x?.summary||"");if(section==="sports"&&/(video game|لعبة فيديو|ألعاب فيديو)/i.test(text))return false;const pattern=sectionPatterns[section];return !pattern||pattern.test(text);};
 items=items.filter((x:any)=>sectionRelevant(x)&&(x.kind==="evidence"||(articleBodyQuality(String(x.body||"")).ok&&articleEvidenceQuality(x.sources)))).filter(localeSafeItem);
 const imageCandidates=items.filter((x:any)=>x.slug&&!/^https:\/\//i.test(String(x.imageUrl||""))).slice(0,3);
-await Promise.all(imageCandidates.map(async(item:any)=>{try{const imageUrl=await bounded(findRelatedImage(String(item.title||"")),3500);if(imageUrl&&/^https:\/\//i.test(imageUrl)){item.imageUrl=imageUrl;item.imageAlt=String(item.title||"");await env.DB.prepare("UPDATE articles SET image_url=?,image_alt=?,updated_at=? WHERE slug=? AND language=? AND (image_url IS NULL OR trim(image_url)='')").bind(imageUrl,item.imageAlt,new Date().toISOString(),item.slug,lang).run();}}catch{}}));
+await Promise.all(imageCandidates.map(async(item:any)=>{try{const imageUrl=await bounded(findRelatedImage(String(item.title||"")),2000);if(imageUrl&&/^https:\/\//i.test(imageUrl)){item.imageUrl=imageUrl;item.imageAlt=String(item.title||"");await env.DB.prepare("UPDATE articles SET image_url=?,image_alt=?,updated_at=? WHERE slug=? AND language=? AND (image_url IS NULL OR trim(image_url)='')").bind(imageUrl,item.imageAlt,new Date().toISOString(),item.slug,lang).run();}}catch{}}));
 items=items.filter((x:any)=>x.kind==="evidence"||/^https:\/\//i.test(String(x.imageUrl||"")));
 if(items.length<2&&section!=="prices"){
  try{
@@ -199,7 +199,7 @@ if(items.length<2&&section!=="prices"){
   }catch{}
   items=[...items,...cachedEvidence];
   if(cachedEvidence.length<2){
-   try{found=await bounded(search(env,q,lang),6500);}catch{found={results:[]};}
+   try{found=await bounded(search(env,q,lang),5500);}catch{found={results:[]};}
   }
   const refreshed=await listArticles(env,section,lang,24);
   const existingSlugs=new Set(items.map((x:any)=>String(x.slug||"")).filter(Boolean));
