@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "build": "wrangler deploy --dry-run --outdir .wrangler-build",
-    "check": "npm run typecheck && npm test && node --check public/app-20261009-01.js && node --check scripts/production-smoke.mjs && node scripts/source-contract-smoke.mjs && node scripts/seed-article-quality-smoke.mjs && npm run build"
+    "check": "npm run typecheck && npm test && node --check public/app-20261009-01.js && node --check scripts/production-smoke.mjs && node --check scripts/source-contract-smoke.mjs && node --check scripts/seed-article-quality-smoke.mjs && node scripts/source-contract-smoke.mjs && node scripts/seed-article-quality-smoke.mjs && npm run build",
+    "smoke:production": "node scripts/production-smoke.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261003.1",
