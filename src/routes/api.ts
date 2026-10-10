@@ -150,7 +150,7 @@ const sectionPatterns:Record<string,RegExp>={
  trends:/(trend|viral|popular|social media|survey|poll|data|اتجاه|ترند|متداول|رائج|استطلاع|بيانات|شبكات اجتماعية)/i,
  egypt:/(egypt|egyptian|cairo|alexandria|nile|aswan|luxor|suez|sinai|red sea|مصر|المصري|القاهرة|الإسكندرية|النيل|أسوان|الأقصر|السويس|سيناء|البحر الأحمر)/i,
  arab:/(arab|arabic|arab league|العرب|عربي|العالم العربي|جامعة الدول العربية)/i,
- world:/(world|global|international|united nations|international relations|global risk|عالمي|دولي|العالم|الأمم المتحدة|علاقات دولية|حرب|نزاع)/i
+ world:/(world|global|international|united nations|international relations|global risk|عالمي|دولي|العالم|الأمم المتحدة|علاقات دولية|حرب|نزاع|داعش|تنظيم الدولة|سوريا|العراق|أوكرانيا|غزة|إيران|اليمن|الحوثيين|كييف|دولية)/i
 };
 const sectionRelevant=(x:any)=>{const text=String(x?.title||"")+" "+String(x?.summary||"");if(section==="sports"&&/(video game|لعبة فيديو|ألعاب فيديو)/i.test(text))return false;const pattern=sectionPatterns[section];return !pattern||pattern.test(text);};
 items=items.filter((x:any)=>sectionRelevant(x)&&(x.kind==="evidence"||(articleBodyQuality(String(x.body||"")).ok&&articleEvidenceQuality(x.sources)))).filter(localeSafeItem);
@@ -163,16 +163,16 @@ if(items.length<2&&section!=="prices"){
    science:{ar:"اكتشافات علمية وشرح مبادئ العلوم من مصادر موثوقة",en:"science discoveries and evidence-based explanations of science"},
    technology:{ar:"تقنيات الذكاء الاصطناعي والحوسبة وأمن المعلومات",en:"artificial intelligence computing and information security explained"},
    economy:{ar:"شرح التضخم والأسواق والاقتصاد من مصادر موثوقة",en:"economics inflation markets and financial systems explained"},
-   politics:{ar:"سياسة عامة وحكومة ودستور وانتخابات من مصادر موثوقة",en:"politics, elections, constitutions and public institutions from reliable sources"},
+   politics:{ar:"الانتخابات والبرلمان والحكومة والسياسة العامة في مصر والعالم العربي",en:"politics elections parliaments and government policy in Egypt and the Arab world"},
    health:{ar:"الصحة العامة والطب المبني على الأدلة من مصادر طبية",en:"public health and evidence-based medicine from medical sources"},
    history:{ar:"أحداث تاريخية وحضارات وسياق تاريخي من مصادر موثوقة",en:"historical events civilizations and historical context from reliable sources"},
    people:{ar:"سيرة ذاتية لشخصيات عامة موثقة وحياتهم وأعمالهم",en:"biography and life stories of public figures from reliable sources"},
-   sports:{ar:"قواعد الرياضة والإحصاءات الرياضية وتاريخ المنافسات",en:"sports rules statistics and competition history"},
+   sports:{ar:"كرة القدم والبطولات الرياضية والنتائج والإحصاءات",en:"football leagues sports results and competition statistics"},
    travel:{ar:"السياحة ووجهات السفر وإرشادات التأشيرات الرسمية",en:"travel destinations tourism and official visa guidance"},
-   art:{ar:"الفنون والسينما والموسيقى والمسرح من مصادر موثوقة",en:"arts film music theatre and literature from reliable sources"},
+   art:{ar:"السينما المصرية والموسيقى العربية والفنون التشكيلية والمسرح",en:"Egyptian cinema Arabic music visual arts and theatre"},
    trends:{ar:"اتجاهات اجتماعية وبيانات حديثة وكيفية التحقق منها",en:"social trends and current data with methods to verify them"},
    egypt:{ar:"مصر: الجغرافيا والمدن ونهر النيل والمعلومات العامة",en:"Egypt geography cities the Nile and public information"},
-   arab:{ar:"المنظمات العربية والمجتمعات والقضايا الفكرية بمصادر موثوقة",en:"Arab organizations societies and public ideas with reliable sources"},
+   arab:{ar:"العالم العربي والجامعة العربية والبلدان العربية والثقافة العربية",en:"the Arab world Arab League Arab countries and Arabic culture"},
    world:{ar:"قضايا عالمية وتحولات دولية وتأثيراتها بمصادر موثوقة",en:"global issues international changes and their impacts from reliable sources"}
   };
   const meta=sectionBySlug(section)!;
