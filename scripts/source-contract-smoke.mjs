@@ -134,6 +134,7 @@ const checks = [
   ["empty external fallback preserves server diagnostics instead of silently replacing them", app.includes("const serverData = data || {}") && app.includes("External search providers did not return accessible results")],
   ["section relevance matches whole normalized title tokens and needs two summary terms", read("src/routes/api.ts").includes("const sectionTerms:Record<string,string[]>") && read("src/routes/api.ts").includes("titleWords.has(term)") && read("src/routes/api.ts").includes("summaryWords.has(term)).length>=2")],
   ["all curated trends articles have verified topic-matched image fallbacks", read("migrations_v1/0021_reliable_trends_article_images.sql").includes("Social_media_icons_%28rubin-Social-media-icons-2x%29.jpg") && read("migrations_v1/0021_reliable_trends_article_images.sql").includes("Opinion_survey_exemple_1.jpg") && ["trends-verify-social-media-trends-ar","trends-read-public-opinion-polls-ar","trends-verify-social-media-trends-en","trends-read-public-opinion-polls-en"].every(slug=>read("migrations_v1/0020_seed_complete_trends_articles.sql").includes(slug))],
+  ["section relevance preserves Arabic definite forms for economy, travel, art, people and world", ["الاقتصاد","السياحة","مغنية","محفوظ","داعش"].every(term=>read("src/routes/api.ts").includes(term))],
   ["site shell and production smoke agree on the cache-busted build marker", read("src/index.ts").includes('const BUILD="2026.10.10.02";') && read("scripts/production-smoke.mjs").includes("2026.10.10.02")],
 ];
 let failed = 0;
