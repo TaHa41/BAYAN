@@ -534,6 +534,18 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
     if ((!existing.summary || existing.summary.length < 80) && candidate.summary) existing.summary = candidate.summary;
   }
   const results=[...uniqueByTitle.values()].slice(0,max).map(({score,provider,...x})=>({...x,summary:localeSafeText(x.summary,language)?x.summary:"",sources:(x.sources||[]).map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}));
+  // Server-rendered person results need a real subject image before the client hydrator runs.
+  // Resolve only the exact profile; never borrow an image from a namesake result.
+  if(personQuery){
+    const exactSubject=results.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(q));
+    if(exactSubject&&!/^https:\/\//i.test(String(exactSubject.imageUrl||""))){
+      const image=await Promise.race([
+        findRelatedImage(exactSubject.title,undefined,exactSubject.summary||"").catch(()=>undefined),
+        new Promise<string|undefined>(resolve=>setTimeout(()=>resolve(undefined),4500))
+      ]);
+      if(image&&/^https:\/\//i.test(image)){exactSubject.imageUrl=image;exactSubject.imageAlt=exactSubject.title;}
+    }
+  }
   const providers=[...new Set(candidates.map(x=>x.provider))];
   const publishers=[...new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean))];
   const configuredMin=Math.max(2,Math.min(5,Number(s.min_sources||3)));
