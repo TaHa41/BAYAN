@@ -161,9 +161,11 @@ const wikidataImage = async (query: string, context = ""): Promise<string | unde
       if (!searchResponse.ok) continue;
       const searchData = await searchResponse.json<any>();
       let matches = (searchData.search || []).filter((item: any) => normalize(item.label || "") === requested);
-      if (matches.length > 1 && intentTerms) {
+      if (intentTerms) {
+        // Never use a same-label entity whose structured description contradicts
+        // the requested subject context. If the context is ambiguous, return no image.
         const contextual = matches.filter((item: any) => intentTerms.test(String(item.description || "")));
-        if (contextual.length === 1) matches = contextual;
+        matches = contextual;
       }
       // Do not choose an arbitrary person when multiple exact-name entities remain.
       const ids = matches.length === 1 ? matches.map((item: any) => item.id).filter(Boolean) : [];
@@ -259,16 +261,28 @@ export async function findRelatedImage(query: string, sourceUrl?: string, contex
   // fallback even when the publisher has no usable og:image metadata.
   const headline = cleanQuery.split(/[.!؟?\n:؛|—–]/)[0].trim();
   const imageQueries = [...new Set([headline, cleanQuery.slice(0, 180)].filter(Boolean))].slice(0, 2);
+  const bareName = /^[\p{L}\p{M}]+(?:['’ -]+[\p{L}\p{M}]+){1,3}$/u.test(headline) &&
+    !/(weather|temperature|price|gold|dollar|currency|history|science|technology|economy|politics|football|sports|climate|energy|space|travel|health|art|طقس|حرارة|سعر|ذهب|دولار|عملة|تاريخ|علوم|تقنية|اقتصاد|سياسة|رياضة|مناخ|طاقة|فضاء|سفر|صحة|فن|شرح|مفهوم|تعريف)/i.test(headline);
+  const personContext = /footballer|soccer player|football player|athlete|politician|writer|author|novelist|poet|actor|actress|scientist|researcher|coach|president|minister|لاعب كرة قدم|لاعب كرة القدم|رياضي|سياسي|كاتب|مؤلف|روائي|شاعر|ممثل|ممثلة|عالم|باحث|مدرب|رئيس|وزير/i.test(context);
   for (const candidate of imageQueries) {
     const exact = await wikipediaExactImage(candidate);
     if (exact && /^https:\/\//i.test(exact)) return exact;
     const summaryImage = await wikipediaSummaryImage(candidate);
     if (summaryImage && /^https:\/\//i.test(summaryImage)) return summaryImage;
   }
+  // For people, never fall through to broad search results: another person with
+  // the same name is not an acceptable portrait. Exact page lookups and context-
+  // matched Wikidata are the only person-image providers.
+  if (bareName || personContext) {
+    const structuredSubjectImage = await wikidataImage(headline, context || cleanQuery.slice(headline.length));
+    if (structuredSubjectImage && /^https:\/\//i.test(structuredSubjectImage)) return structuredSubjectImage;
+    return undefined;
+  }
+
   const relatedWikipediaImage = await wikipediaImage(headline);
   if (relatedWikipediaImage && /^https:\/\//i.test(relatedWikipediaImage)) return relatedWikipediaImage;
 
-  // Wikidata is a separate subject-image provider and can recover biographies/topics
+  // Wikidata is a separate subject-image provider and can recover non-person topics
   // whose localized Wikipedia pages have no thumbnail. Keep it behind exact page lookups.
   const structuredSubjectImage = await wikidataImage(headline, context || cleanQuery.slice(headline.length));
   if (structuredSubjectImage && /^https:\/\//i.test(structuredSubjectImage)) return structuredSubjectImage;
