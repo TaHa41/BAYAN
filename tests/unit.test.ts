@@ -1,7 +1,7 @@
 import {describe,it,expect} from "vitest";
 import {SECTIONS} from "../src/config";
 import {answerHasUnsupportedSpecifics} from "../src/services/ai";
-import {isolateExactPerson} from "../src/services/search";
+import {hasConflictingCurrentAffiliations,isolateExactPerson} from "../src/services/search";
 
 describe("BAYAN product foundation",()=>{
   it("has all required sections",()=>expect(SECTIONS.length).toBe(16));
@@ -11,18 +11,31 @@ describe("BAYAN product foundation",()=>{
 describe("exact person identity isolation",()=>{
   it("keeps only the exact biography page when multiple people share the same Arabic name",()=>{
     const items=[
-      {title:"محمد صلاح",summary:"محمد صلاح لاعب كرة قدم مصري محترف.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح",provider:"Wikipedia",score:90,sources:[{title:"محمد صلاح",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح"}]},
+      {title:"محمد صلاح",summary:"محمد صلاح لاعب كرة قدم مصري محترف يلعب مع ليفربول في الدوري الإنجليزي.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح",provider:"Wikipedia",score:90,imageUrl:"https://upload.wikimedia.org/example.jpg",sources:[{title:"محمد صلاح",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح"}]},
       {title:"محمد صلاح دندراوي",summary:"كاتب وأديب سعودي.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي",provider:"Wikipedia",score:70,sources:[{title:"محمد صلاح دندراوي",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي"}]},
       {title:"محمد صلاح (توضيح)",summary:"صفحة توضيح لأشخاص يحملون الاسم.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_(توضيح)",provider:"Wikipedia",score:60,sources:[{title:"محمد صلاح (توضيح)",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_(توضيح)"}]},
-      {title:"محمد صلاح زكريا",summary:"كاتب قصص وروائي مصري.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_زكريا",provider:"Wikipedia REST Search",score:55,sources:[{title:"محمد صلاح زكريا",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_زكريا"}]}
+      {title:"محمد صلاح زكريا",summary:"كاتب قصص وروائي مصري.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_زكريا",provider:"Wikipedia REST Search",score:55,sources:[{title:"محمد صلاح زكريا",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_زكريا"}]},
+      {title:"محمد صلاح يسجل هدفًا مع ليفربول",summary:"تقرير رياضي عن لاعب ليفربول ومشاركته في الدوري الإنجليزي.",url:"https://sports.example/news/salah",provider:"Arabic News Search",score:72,sources:[{title:"محمد صلاح يسجل هدفًا مع ليفربول",publisher:"Sports News",url:"https://sports.example/news/salah"}]}
     ] as any;
     const result=isolateExactPerson("محمد صلاح",items);
-    expect(result).toHaveLength(1);
-    expect(result[0].title).toBe("محمد صلاح");
+    expect(result.some((item:any)=>item.title==="محمد صلاح")).toBe(true);
+    expect(result.some((item:any)=>item.title==="محمد صلاح يسجل هدفًا مع ليفربول")).toBe(true);
+    expect(result.some((item:any)=>/دندراوي|زكريا|توضيح/.test(item.title))).toBe(false);
   });
   it("does not discard ordinary topic search results when there is no exact person biography",()=>{
     const items=[{title:"تغير المناخ",summary:"شرح علمي للتغير المناخي.",url:"https://ar.wikipedia.org/wiki/تغير_المناخ",provider:"Wikipedia",score:80,sources:[{title:"تغير المناخ",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/تغير_المناخ"}]}] as any;
     expect(isolateExactPerson("تغير المناخ",items)).toHaveLength(1);
+  });
+});
+describe("contradictory current-affiliation claims",()=>{
+  it("detects conflicting current club claims inside one source snippet",()=>{
+    expect(hasConflictingCurrentAffiliations("يلعب حالياً مع نادي طرابزون سبور، وناديه الحالي ليفربول الإنجليزي.")).toBe(true);
+  });
+  it("does not flag one consistent current club claim",()=>{
+    expect(hasConflictingCurrentAffiliations("يلعب حالياً مع نادي ليفربول الإنجليزي.")).toBe(false);
+  });
+  it("detects conflicting English current-club claims",()=>{
+    expect(hasConflictingCurrentAffiliations("He currently plays for Trabzonspor. His current club is Liverpool.")).toBe(true);
   });
 });
 describe("evidence-backed AI answer validation",()=>{
