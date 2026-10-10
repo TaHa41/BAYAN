@@ -1,62 +1,67 @@
 import fs from "node:fs";
 
-const migrationPath = "migrations_v1/0023_seed_complete_health_history_economy_articles.sql";
-const sql = fs.readFileSync(migrationPath, "utf8");
-const valuesStart = sql.indexOf("VALUES");
-if (valuesStart < 0) throw new Error("seed migration has no VALUES clause");
-
-const rows = [];
-let i = valuesStart + "VALUES".length;
-while (i < sql.length) {
-  while (/\s|,/.test(sql[i] || "")) i++;
-  if (sql[i] !== "(") break;
-  i++;
-  const fields = [];
+const migrationPaths = [
+  "migrations_v1/0023_seed_complete_health_history_economy_articles.sql",
+  "migrations_v1/0024_seed_global_knowledge_articles.sql",
+];
+const parseMigration = (migrationPath) => {
+  const sql = fs.readFileSync(migrationPath, "utf8");
+  const valuesStart = sql.indexOf("VALUES");
+  if (valuesStart < 0) throw new Error(migrationPath + " has no VALUES clause");
+  const parsedRows = [];
+  let i = valuesStart + "VALUES".length;
   while (i < sql.length) {
-    while (/\s/.test(sql[i] || "")) i++;
-    if (sql[i] === "'") {
-      i++;
-      let value = "";
-      while (i < sql.length) {
-        if (sql[i] === "'") {
-          if (sql[i + 1] === "'") { value += "'"; i += 2; continue; }
-          i++;
-          break;
-        }
-        value += sql[i++];
-      }
-      fields.push(value);
-    } else {
-      const start = i;
-      let depth = 0;
-      let quoted = false;
-      while (i < sql.length) {
-        const ch = sql[i];
-        if (ch === "'") {
-          if (quoted && sql[i + 1] === "'") { i += 2; continue; }
-          quoted = !quoted;
-          i++;
-          continue;
-        }
-        if (!quoted) {
-          if (ch === "(") depth++;
-          else if (ch === ")") {
-            if (depth === 0) break;
-            depth--;
-          } else if (ch === "," && depth === 0) break;
-        }
+    while (/\\s|,/.test(sql[i] || "")) i++;
+    if (sql[i] !== "(") break;
+    i++;
+    const fields = [];
+    while (i < sql.length) {
+      while (/\\s/.test(sql[i] || "")) i++;
+      if (sql[i] === "'") {
         i++;
+        let value = "";
+        while (i < sql.length) {
+          if (sql[i] === "'") {
+            if (sql[i + 1] === "'") { value += "'"; i += 2; continue; }
+            i++;
+            break;
+          }
+          value += sql[i++];
+        }
+        fields.push(value);
+      } else {
+        const start = i;
+        let depth = 0;
+        let quoted = false;
+        while (i < sql.length) {
+          const ch = sql[i];
+          if (ch === "'") {
+            if (quoted && sql[i + 1] === "'") { i += 2; continue; }
+            quoted = !quoted;
+            i++;
+            continue;
+          }
+          if (!quoted) {
+            if (ch === "(") depth++;
+            else if (ch === ")") {
+              if (depth === 0) break;
+              depth--;
+            } else if (ch === "," && depth === 0) break;
+          }
+          i++;
+        }
+        fields.push(sql.slice(start, i).trim());
       }
-      fields.push(sql.slice(start, i).trim());
+      while (/\\s/.test(sql[i] || "")) i++;
+      if (sql[i] === ",") { i++; continue; }
+      if (sql[i] === ")") { i++; break; }
+      throw new Error("could not parse " + migrationPath + " near offset " + i);
     }
-    while (/\s/.test(sql[i] || "")) i++;
-    if (sql[i] === ",") { i++; continue; }
-    if (sql[i] === ")") { i++; break; }
-    throw new Error("could not parse seed row near offset " + i);
+    parsedRows.push(fields);
   }
-  rows.push(fields);
-}
-
+  return parsedRows;
+};
+const rows = migrationPaths.flatMap(parseMigration);
 const failures = [];
 const seen = new Set();
 for (const row of rows) {
@@ -90,8 +95,8 @@ for (const row of rows) {
   }));
   if (publishers.size < 2 || hosts.size < 2) fail("requires two independent publishers and HTTPS hosts");
 }
-if (rows.length !== 10) failures.push("expected 10 seeded article rows, got " + rows.length);
-for (const section of ["health", "history", "economy"]) {
+if (rows.length !== 14) failures.push("expected 14 seeded article rows, got " + rows.length);
+for (const section of ["health", "history", "economy", "world"]) {
   for (const language of ["ar", "en"]) {
     const count = rows.filter(row => row[1] === section && row[2] === language).length;
     if (count < (section === "economy" ? 1 : 2)) failures.push(section + "/" + language + " has only " + count + " seeded articles");
@@ -99,4 +104,4 @@ for (const section of ["health", "history", "economy"]) {
 }
 for (const failure of failures) console.error("FAIL " + failure);
 if (failures.length) process.exit(1);
-console.log("PASS all 10 bilingual health/history/economy seed articles meet publication-quality contracts");
+console.log("PASS all 14 bilingual health/history/economy/global seed articles meet publication-quality contracts");
