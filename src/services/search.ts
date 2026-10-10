@@ -313,7 +313,14 @@ const mixedIdentitySummary=(query:string,candidate:Candidate)=>{
   }
   return variants.size>=2;
 };
-const hasConflictingCurrentClubClaims=(value:string)=>{\n  const text=String(value||"");\n  const hasTrabzon=/(?:طرابزون\\s*سبور|trabzonspor)/i.test(text);\n  const hasLiverpool=/(?:ليفربول|liverpool)/i.test(text);\n  const currentClub=/(?:يلعب\\s*(?:حاليا|حالياً|حاليًا)?\\s*(?:مع|في)|ناديه\\s*الحالي|currently\\s+plays\\s+for|current\\s+club|plays\\s+for)/i.test(text);\n  return hasTrabzon&&hasLiverpool&&currentClub;\n};\nconst sanitizeConflictingCurrentClubClaims=(value:string)=>{
+const hasConflictingCurrentClubClaims=(value:string)=>{
+  const text=String(value||"");
+  const hasTrabzon=/(?:طرابزون\s*سبور|trabzonspor)/i.test(text);
+  const hasLiverpool=/(?:ليفربول|liverpool)/i.test(text);
+  const currentClub=/(?:يلعب\s*(?:حاليا|حالياً|حاليًا)?\s*(?:مع|في)|ناديه\s*الحالي|currently\s+plays\s+for|current\s+club|plays\s+for)/i.test(text);
+  return hasTrabzon&&hasLiverpool&&currentClub;
+};
+const sanitizeConflictingCurrentClubClaims=(value:string)=>{
   const text=String(value||"");
   const hasTrabzon=/(?:طرابزون\s*سبور|trabzonspor)/i.test(text);
   const hasLiverpool=/(?:ليفربول|liverpool)/i.test(text);
