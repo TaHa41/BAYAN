@@ -50,17 +50,17 @@ const articleBodyQuality=(value:string)=>{
 };
 const identityNormalized=(value:string)=>String(value||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").replace(/\s+/g," ").trim();
 const hasMixedPersonIdentities=(title:string,body:string)=>{
- const name=identityNormalized(title),text=identityNormalized(body);
- const words=name.split(" ").filter(Boolean);
- if(words.length<2||words.length>4||!text.includes(name+" توضيح"))return false;
- const variants=new Set<string>();
+ const name=identityNormalized(title),text=identityNormalized(body),words=name.split(" ").filter(Boolean);
+ if(words.length<2||words.length>4)return false;
+ const explicit=/(?:صفحة توضيح|قد يشير إلى عدة أشخاص|قد تشير إلى عدة أشخاص|people with the name|disambiguation)/i.test(String(body||""));
+ const variants=new Set<string>(),ignored=new Set(["محمد","صلاح","حامد","محروس","غالي","لاعب","اللاعب","من","هو","هي","الذي","التي","توضيح","في","على","عن","إلى","الى","مع","ثم","بدأ","بدأت","انتقل","انتقلت","حقق","يعد","كان","كانت","يلعب","لعب","حصل","فاز","شار","انضم","سجل","قاد","قائد","مصري","المصري","كرة","قدم","نادي","الفريق","منتخب","الموسم","عام","حيث","كما","بعد","قبل","وهو","وهي","له","لها","ولد","مواليد","أحد","أبرز","مسيرته"]);
  let pos=text.indexOf(name);
  while(pos>=0){
   const suffix=text.slice(pos+name.length).trim().split(" ")[0]||"";
-  if(suffix&&!new Set(["محمد","صلاح","حامد","محروس","غالي","لاعب","اللاعب","من","هو","هي","الذي","التي","توضيح"]).has(suffix))variants.add(suffix);
+  if(suffix&&!ignored.has(suffix)&&/^[\u0600-\u06FF]{3,}$/.test(suffix))variants.add(suffix);
   pos=text.indexOf(name,pos+name.length);
  }
- return variants.size>=2;
+ return (explicit&&variants.size>=2)||variants.size>=3;
 };
 const isVideoUrl=(value:string)=>{
  try{return /(^|\.)((youtube\.com)|(youtu\.be)|(vimeo\.com))$/i.test(new URL(value).hostname.replace(/^www\./i,""))||/^(www\.)?(youtube\.com|youtu\.be|vimeo\.com)$/i.test(new URL(value).hostname)}catch{return false}
