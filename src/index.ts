@@ -40,7 +40,7 @@ let canonical=ORIGIN+u.pathname+(u.searchParams.has("lang")?"?lang="+encodeURICo
 const escapeMeta=(value:string)=>String(value||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const ensureMeta=(attribute:"name"|"property",name:string,value:string)=>{
   const tag='<meta '+attribute+'="'+name+'" content="'+escapeMeta(value)+'">';
-  const pattern=new RegExp("<meta\\s+"+attribute+"=[\\"']"+name+"[\\"'][^>]*>","i");
+  const pattern=new RegExp('<meta\\s+'+attribute+'="'+name+'"[^>]*>','i');
   if(pattern.test(html))html=html.replace(pattern,tag);
   else html=html.replace("</head>",tag+"</head>");
 };
@@ -54,7 +54,7 @@ ensureMeta("name","twitter:card","summary_large_image");
 ensureMeta("name","twitter:title",title);
 ensureMeta("name","twitter:description",description);
 const websiteSchema={"@context":"https://schema.org","@type":"WebSite","name":"BAYAN | بيان","url":ORIGIN,"inLanguage":lang,"potentialAction":{"@type":"SearchAction","target":ORIGIN+"/search?q={search_term_string}&lang="+lang,"query-input":"required name=search_term_string"}};
-const schemaTag='<script type="application/ld+json">'+JSON.stringify(websiteSchema).replace(/</g,"\\\\u003c")+'</script>';
+const schemaTag='<script type="application/ld+json">'+JSON.stringify(websiteSchema).replace(/</g,"\\u003c")+'</script>';
 if(!html.includes('"@type":"WebSite"'))html=html.replace("</head>",schemaTag+"</head>");
 const headers=new Headers(asset.headers);headers.set("Cache-Control","no-store");headers.set("X-Content-Type-Options","nosniff");headers.set("Referrer-Policy","strict-origin-when-cross-origin");headers.set("X-Frame-Options","DENY");headers.set("Permissions-Policy","camera=(), microphone=(), geolocation=()");
 headers.set("CDN-Cache-Control","no-store");headers.set("X-BAYAN-Build",BUILD);if(u.searchParams.get("bayan_owner")==="1")headers.append("Set-Cookie","bayan_exclude_analytics=1; Max-Age=31536000; Path=/; SameSite=Lax; Secure");if(u.searchParams.get("bayan_owner")==="0")headers.append("Set-Cookie","bayan_exclude_analytics=; Max-Age=0; Path=/; SameSite=Lax; Secure");return new Response(html,{status:asset.status,headers});}
