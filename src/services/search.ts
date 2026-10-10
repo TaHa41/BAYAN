@@ -264,7 +264,7 @@ async function broadGdelt(q:string):Promise<Candidate[]>{
 const normalizedEntityTitle=(value:string)=>String(value||"").normalize("NFKC").toLowerCase()
   .replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").trim();
 const personQueryName=(query:string)=>String(query||"").trim()
-  .replace(/^(?:who is|who was|biography(?: of)?|profile(?: of)?|من هو|من هي|سيرة ذاتية عن|سيرة ذاتية لشخص)\s+/i,"")
+  .replace(/^(?:who is|who was|biography(?: of)?|profile(?: of)?|من هو|من هي|نبذة عن|معلومات عن|شخصية|سيرة ذاتية عن|سيرة ذاتية لشخص)\s+/i,"")
   .replace(/\s+(?:biography|profile|official profile|سيرة ذاتية|مصدر رسمي)$/i,"").trim();
 const personEvidence=(candidate:Candidate)=>/(footballer|football player|soccer player|athlete|politician|writer|author|actor|actress|scientist|researcher|coach|president|minister|born in|is a .*player|لاعب كرة قدم|لاعب|رياضي|سياسي|كاتب|مؤلف|ممثل|عالِم|عالم|باحث|مدرب|رئيس|وزير|وُلد|ولد)/i.test(String(candidate.title||"")+" "+String(candidate.summary||""));
 const isDisambiguation=(candidate:Candidate)=>/(?:disambiguation|\(توضيح\)|صفحة توضيح|معاني الأسماء)/i.test(String(candidate.title||""));
@@ -273,7 +273,7 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
   if(!name)return items;
   const exact=items.filter(item=>normalizedEntityTitle(item.title)===name&&!isDisambiguation(item)&&personEvidence(item));
   if(exact.length){
-    const canonical=exact.sort((a,b)=>relevanceScore(b,query)-relevanceScore(a,query))[0];
+    const canonical=exact.sort((a,b)=>Number(Boolean(b.imageUrl))-Number(Boolean(a.imageUrl))||relevanceScore(b,query)-relevanceScore(a,query))[0];
     const canonicalUrl=String(canonical.url||canonical.sources?.[0]?.url||"");
     // Once an exact biography page exists, never append other people who merely share
     // the name. Keep only the exact subject page and duplicates of that same page.
