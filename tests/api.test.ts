@@ -1,13 +1,14 @@
 import {describe,it,expect} from "vitest";
 import worker from "../src/index";
 import {body,json,text} from "../src/http";
-const env={ASSETS:{fetch:async()=>new Response("asset")},DB:{prepare:()=>({bind:()=>({all:async()=>({results:[]}),first:async()=>null,run:async()=>({})})}),batch:async()=>[]}} as any;
+const env={ASSETS:{fetch:async()=>new Response("asset")},DB:{prepare:(sql:string)=>({bind:()=>({all:async()=>({results:[]}),first:async()=>null,run:async()=>({})}),all:async()=>({results:[]}),first:async()=>sql.trim().startsWith("SELECT 1 AS ready")?{ready:1}:null,run:async()=>({})}),batch:async()=>[]}} as any;
 describe("BAYAN API",()=>{
   it("health",async()=>{
     const r=await worker.fetch(new Request("https://bayan.test/api/health"),env);
     const d=await r.json() as any;
     expect(r.status).toBe(200);
     expect(d.ok).toBe(true);
+    expect(d.database).toBe(true);
   });
   it("JSON API responses include browser security headers",()=>{
     const r=json({ok:true});
