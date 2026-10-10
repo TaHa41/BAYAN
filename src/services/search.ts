@@ -468,21 +468,25 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
       ? (sportsProfile ? [q+" آخر الأخبار",q+" ليفربول",q+" منتخب مصر"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
       : (sportsProfile ? [q+" latest news",q+" Liverpool",q+" Egypt national team"] : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
     : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
-  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,3);
-  const batches=await Promise.all(uniqueVariants.map(async variant=>{
+  // The first pass already contacts many providers. A 3-variant x 9-provider
+  // recovery fan-out can exhaust Cloudflare Worker subrequests and make every
+  // provider appear unavailable. Keep recovery independent but bounded.
+  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,2);
+  const batches:Candidate[][]=[];
+  for(const variant of uniqueVariants){
     const results=await Promise.all([
-      wikipedia(env,variant,language).catch(()=>[]),
       wikipediaRestSearch(variant,language).catch(()=>[]),
-      wikidata(variant,language).catch(()=>[]),
       gdelt(variant).catch(()=>[]),
       googleNewsSearch(variant,language).catch(()=>[]),
-      bingNewsSearch(variant,language).catch(()=>[]),
-      duck(variant,language).catch(()=>[]),
       duckWebSearch(variant,language).catch(()=>[]),
       bingWebSearch(variant,language).catch(()=>[])
     ]);
-    return results.flat();
-  }));
+    batches.push(results.flat());
+    // Stop spending subrequests once the recovery pass has usable relevant hits.
+    const recovered=batches.flat().filter(item=>relevantCandidate(item,q)&&languageSafe(item,language));
+    const hosts=new Set(recovered.flatMap(item=>(item.sources||[]).map(src=>{try{return new URL(String(src.url||"")).hostname.toLowerCase().replace(/^www\\./,"")}catch{return""}})).filter(Boolean));
+    if(recovered.length>=6&&hosts.size>=3)break;
+  }
   return batches.flat();
 }
 async function settings(env:Env){try{const r=await env.DB.prepare("SELECT key,value FROM admin_settings").all<any>();return Object.fromEntries((r.results||[]).map((x:any)=>[x.key,x.value]))}catch{return{}}}
