@@ -571,7 +571,7 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};const academicQuery=/(research|paper|papers|study|studies|journal|doi|scholar|academic|citation|crossref|openalex|pubmed|clinical trial|systematic review|بحث علمي|أبحاث|دراسة|دراسات|مجلة علمية|ورقة بحثية|مصدر أكاديمي|دراسات سريرية|مراجعة منهجية)/i.test(q);
 const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|medicine|health study|بحث طبي|دراسة طبية|دراسات سريرية|تجربة سريرية|مراجعة منهجية)/i.test(q);
-const gnewsEnabled=Boolean(env.GNEWS_API_KEY)&&(personLookup(q)||nameOnlyArabicQuery(q)||/(news|latest|headline|أخبار|خبر|اليوم|آخر الأخبار)/i.test(q));
+// GNews is a general news-search provider, not a person-only fallback. Include it for every query when configured so topic, event, science, economy, and other searches receive the same source coverage.\nconst gnewsEnabled=Boolean(env.GNEWS_API_KEY);
 let [local, wiki, wikiRest, wd, gd, oa, remote, dd, duckWeb, bingWeb, google, bing, gnews, crossref, pubmed] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipediaRestSearch(q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[]),safe(duckWebSearch(q,language),[]),safe(bingWebSearch(q,language),[]),safe(googleNewsSearch(q,language),[]),safe(bingNewsSearch(q,language),[]),safe(gnewsEnabled?gnewsSearch(env,q,language):Promise.resolve([]),[]),safe((academicQuery&&!personLookup(q))?crossrefSearch(q):Promise.resolve([]),[]),safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language),[])]);
 const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...(s.source_gdelt==="0"?[]:["GDELT"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(gnewsEnabled?["GNews Search"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers","DuckDuckGo Web Search","Bing Web Search","Google News Search","Bing News RSS"];const candidates:Candidate[]=[
     ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wikiRest,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...duckWeb,...bingWeb,...google,...bing,...gnews
@@ -588,12 +588,27 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   const personQuery=personLookup(q)||nameOnlyArabicQuery(q);
   if(personQuery){const exactName=normalizedEntityTitle(personQueryName(q));for(const item of candidates){if(normalizedEntityTitle(item.title)===exactName){item.summary=sanitizeConflictingCurrentClubClaims(item.summary||"");item.section="people";}}}
   if(personQuery){const exactProfile=await wikipediaExactPersonPage(q,language);if(exactProfile.length)candidates.unshift(...exactProfile);}
-  const firstPassCount=()=>{const matching=candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q));return personQuery?isolateExactPerson(q,matching).length:matching.length;};
-  // Expand when the first pass is merely sparse, not only when it is empty.
-  // People searches need several independent identity clues; general searches need
-  // enough relevant evidence to produce a useful answer rather than a thin snippet.
+  const firstPassMatches=()=>candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q));
+  const firstPassCount=()=>{const matching=firstPassMatches();return personQuery?isolateExactPerson(q,matching).length:matching.length;};
+  // Count evidence diversity, not just result cards. Duplicate hits from Wikipedia
+  // or one publisher must not suppress the broader search pass for any query type.
+  const firstPassHasDiverseEvidence=()=>{
+    const matching=personQuery?isolateExactPerson(q,firstPassMatches()):firstPassMatches();
+    const publishers=new Set<string>(),hosts=new Set<string>();
+    for(const item of matching){
+      for(const src of item.sources||[]){
+        const publisher=String(src.publisher||"").trim().toLowerCase();
+        if(publisher&&!/wikipedia|wikidata|ويكيبيديا|ويكي بيانات|google news|bing news|duckduckgo/i.test(publisher))publishers.add(publisher);
+        try{const url=new URL(String(src.url||item.url||""));if(url.protocol==="https:"&&!/wikipedia.org|wikidata.org|news.google.com/i.test(url.hostname))hosts.add(url.hostname.toLowerCase().replace(/^www\\./,""));}catch{}
+      }
+    }
+    const substantive=matching.filter(item=>String(item.summary||"").trim().length>=100).length;
+    return publishers.size>=2&&hosts.size>=2&&substantive>=Math.min(3,Math.max(2,Number(s.min_sources||3)));
+  };
+  // Expand when sparse OR when the first pass is dominated by duplicates, a
+  // single publisher, encyclopedia-only results, or very thin snippets.
   const expansionThreshold=personQuery?Math.min(6,Math.max(3,Number(s.min_sources||3))):Math.max(3,Number(s.min_sources||3));
-  if(firstPassCount()<expansionThreshold){
+  if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
     providerAttempted.push("Expanded topic variants: Wikipedia, Wikipedia REST Search, Wikidata, GDELT, DuckDuckGo Web Search, Bing Web Search, Google News Search, Bing News RSS","OpenAI Web Search (fallback)");
     const [expanded,web]=await Promise.all([
       safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||"")),[]),
