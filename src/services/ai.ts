@@ -9,18 +9,22 @@ const languageConsistent=(answer:string,locale:Locale)=>{
   return sentences.every(sentence=>/[\u0600-\u06ff]/.test(sentence)||!/[A-Za-z]{5,}/.test(sentence));
 };
 export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[])=>{
-  const corpus=evidence.map(item=>[item.title,item.summary,...(item.sources||[]).flatMap(source=>[source.title,source.publisher])].filter(Boolean).join(" ")).join(" ").normalize("NFKC").toLowerCase();
   const generic=new Set(["the","this","these","those","according","based","however","therefore","overall","summary","conclusion","answer","key","main","important","first","second","third","one","two","three","it","they","he","she","we","you","and","but","because","during","after","before","global","world","health","history","science","technology","economy","politics","sports","travel","art","bayan"]);
-  const corpusTokens=new Set(corpus.match(/[a-z0-9&.-]+/g)||[]);
-  const names=answer.match(/\b[A-Z][A-Za-z0-9&.-]{2,}\b/g)||[];
-  const unsupportedName=names.some(name=>!generic.has(name.toLowerCase())&&!corpusTokens.has(name.toLowerCase()));
   const normalizeDigits=(value:string)=>value.replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[٬,]/g,"");
-  const corpusNumbers=new Set(normalizeDigits(corpus).match(/[0-9]+/g)||[]);
-  const answerNumbers=normalizeDigits(answer.replace(/^\s*\d+[.)]\s/gm,"")).match(/[0-9]+/g)||[];
-  const unsupportedNumber=answerNumbers.some(number=>!corpusNumbers.has(number));
-  return unsupportedName||unsupportedNumber;
+  const cleanAnswer=answer.replace(/^\s*\d+[.)]\s/gm,"");
+  const sentences=cleanAnswer.split(/[\n.!؟?]+/).map(sentence=>sentence.trim()).filter(Boolean);
+  return sentences.some(sentence=>{
+    const names=(sentence.match(/\b[A-Z][A-Za-z0-9&.-]{2,}\b/g)||[]).filter(name=>!generic.has(name.toLowerCase()));
+    const numbers=normalizeDigits(sentence).match(/[0-9]+/g)||[];
+    if(!names.length&&!numbers.length)return false;
+    return !evidence.some(item=>{
+      const itemText=[item.title,item.summary,...(item.sources||[]).flatMap(source=>[source.title,source.publisher])].filter(Boolean).join(" ").normalize("NFKC").toLowerCase();
+      const itemTokens=new Set(itemText.match(/[a-z0-9&.-]+/g)||[]);
+      const itemNumbers=new Set(normalizeDigits(itemText).match(/[0-9]+/g)||[]);
+      return names.every(name=>itemTokens.has(name.toLowerCase()))&&numbers.every(number=>itemNumbers.has(number));
+    });
+  });
 };
-
 export async function ask(env:Env,question:string,locale:Locale,evidence:SearchResult[]){
   const publishers=new Set(evidence.flatMap(x=>x.sources||[]).map(s=>s.publisher).filter(Boolean));
   if(!evidence.length)return{status:"insufficient" as const,answer:locale==="ar"?"لا أملك أدلة موثقة كافية للإجابة بثقة.":"I do not have enough verified evidence to answer confidently.",sources:[]};
