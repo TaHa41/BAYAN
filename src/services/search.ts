@@ -589,7 +589,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   if(personQuery){
     const canonical=results.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
     if(canonical&&!/^https:\/\//i.test(String(canonical.imageUrl||""))){
-      const image=await Promise.race([findRelatedImage(String(canonical.title||q),String(canonical.url||canonical.sources?.[0]?.url||""),String(canonical.summary||"")),new Promise<undefined>(resolve=>setTimeout(()=>resolve(undefined),2200))]).catch(()=>undefined);
+      const image=await Promise.race([findRelatedImage(String(canonical.title||q),String(canonical.url||canonical.sources?.[0]?.url||""),String(canonical.summary||"")),new Promise<undefined>(resolve=>setTimeout(()=>resolve(undefined),4500))]).catch(()=>undefined);
       if(image&&/^https:\/\//i.test(image)){canonical.imageUrl=image;canonical.imageAlt=String(canonical.title||q);}
     }
   }
