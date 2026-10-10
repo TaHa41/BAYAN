@@ -289,7 +289,7 @@ const wikipediaExactPersonPage=async(query:string,language:Locale):Promise<Candi
     const imageUrl=String(page.thumbnail?.source||"");
     return [{
       title:cleanText(page.title),summary,section:"people",kind:"web",evidence:"mixed",
-      imageUrl:/^https:\\/\\//i.test(imageUrl)?imageUrl:undefined,imageAlt:cleanText(page.title),
+      imageUrl:imageUrl.startsWith("https://")?imageUrl:undefined,imageAlt:cleanText(page.title),
       sources:[source(cleanText(page.title),language==="ar"?"Wikipedia Arabic":"Wikipedia",urlForPage)],
       url:urlForPage,score:100,provider:"Wikipedia Exact Page"
     } as Candidate];
