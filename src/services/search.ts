@@ -305,11 +305,12 @@ const subjectContextMatches=(canonical:Candidate,candidate:Candidate,name:string
   return overlap.length>=2||(overlap.length>=1&&sharedRole);
 };
 const personEvidence=(candidate:Candidate)=>/(footballer|football player|soccer player|athlete|politician|writer|author|actor|actress|scientist|researcher|coach|president|minister|born in|is a .*player|لاعب كرة قدم|لاعب|رياضي|سياسي|كاتب|مؤلف|ممثل|عالِم|عالم|باحث|مدرب|رئيس|وزير|وُلد|ولد)/i.test(String(candidate.title||"")+" "+String(candidate.summary||""));
-const isDisambiguation=(candidate:Candidate)=>/(?:disambiguation|\(توضيح\)|صفحة توضيح|معاني الأسماء)/i.test(String(candidate.title||""));
+const isDisambiguation=(candidate:Candidate)=>/(?:disambiguation|\(توضيح\)|صفحة توضيح|معاني الأسماء|قد يشير إلى|قد تشير إلى|may refer to|people with the name)/i.test(String(candidate.title||"")+" "+String(candidate.summary||""));
 export const isolateExactPerson=(query:string,items:Candidate[])=>{
   const name=normalizedEntityTitle(personQueryName(query));
   if(!name)return items;
-  const exact=items.filter(item=>normalizedEntityTitle(item.title)===name&&!isDisambiguation(item)&&personEvidence(item));
+  const exactTitle=items.filter(item=>normalizedEntityTitle(item.title)===name);
+  const exact=exactTitle.filter(item=>!isDisambiguation(item)&&personEvidence(item));
   if(exact.length){
     const canonical=exact.sort((a,b)=>Number(Boolean(b.imageUrl))-Number(Boolean(a.imageUrl))||relevanceScore(b,query)-relevanceScore(a,query))[0];
     const canonicalUrl=String(canonical.url||canonical.sources?.[0]?.url||"");
@@ -323,6 +324,9 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
       ? {...item,section:"people"}
       : item);
   }
+  // An exact-name page whose own text is a disambiguation list is not a biography.
+  // Do not fall back to concatenating every similarly named person as one article.
+  if(exactTitle.some(isDisambiguation))return [];
   if(personLookup(query))return items.filter(item=>!isDisambiguation(item));
   return items;
 };
@@ -477,6 +481,9 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
       return terms.length>0&&(titleHits>=1||totalHits>=2);
     }).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
   }
+  // Re-apply identity isolation after recovery: fallback must never reintroduce
+  // unrelated people after the strict ranking tier rejected every candidate.
+  ranked=isolateExactPerson(q,ranked);
   // Never pad the result list with unrelated items: expand providers first, then report honestly if relevance is still weak.
   // Merge provider duplicates only when their descriptions support the same entity.
   // A title-only key can incorrectly merge different people who share a name.
