@@ -145,7 +145,7 @@ const sourceImage = async (url: string): Promise<string | undefined> => {
     );
     let absolute: string | undefined;
     try { absolute = candidate ? new URL(candidate, url).toString() : undefined; } catch {}
-    return isUsableNewsImage(absolute);
+    return isUsableNewsImage(absolute) ? absolute : undefined;
   } catch {
     return;
   }
