@@ -272,9 +272,12 @@ const identityText=(value:string)=>String(value||"").normalize("NFKC").toLowerCa
   .replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").replace(/\s+/g," ").trim();
 const mixedIdentitySummary=(query:string,candidate:Candidate)=>{
   const name=identityText(personQueryName(query));
-  const summary=identityText(candidate.summary||"");
+  // Inspect the lead first: encyclopedia search extracts can append disambiguation
+  // entries after a valid biography. A late namesake list must not erase the real profile.
+  const rawLead=String(candidate.summary||"").slice(0,420);
+  const summary=identityText(rawLead);
   if(!name||!summary)return false;
-  const explicitMarker=/(?:may refer to|people with the name|صفحة توضيح|قد يشير إلى|قد تشير إلى)/i.test(String(candidate.summary||""))||
+  const explicitMarker=/(?:may refer to|people with the name|صفحة توضيح|قد يشير إلى|قد تشير إلى)/i.test(rawLead)||
     summary.includes(name+" توضيح");
   if(!explicitMarker)return false;
   const variants=new Set<string>();
@@ -285,6 +288,22 @@ const mixedIdentitySummary=(query:string,candidate:Candidate)=>{
     pos=summary.indexOf(name,pos+name.length);
   }
   return variants.size>=2;
+};
+const sanitizePersonProfileSummary=(query:string,value:string)=>{
+  const name=String(personQueryName(query)||"").trim();
+  let summary=String(value||"").trim();
+  if(!name||!summary)return summary;
+  const tailMarkers=[name+" (توضيح)",name+" (جندي)",name+" دندراوي",name+" زكريا",name+" مصطفى",name+" العزب","قد يشير إلى عدة أشخاص","قد تشير إلى عدة أشخاص","people with the name","disambiguation"];
+  for(const marker of tailMarkers){
+    const at=summary.toLowerCase().indexOf(marker.toLowerCase());
+    if(at>120)summary=summary.slice(0,at).trim();
+  }
+  const claims=(summary.match(/currently plays for|current club is|plays for [^,.؛]+|يلعب حاليا مع نادي|يلعب حاليًا مع نادي|ناديه الحالي/gi)||[]).length;
+  if(claims>1){
+    const sentences=summary.split(/(?<=[.!؟?])\s+/);
+    summary=sentences.filter(sentence=>!/(currently plays for|current club is|plays for [^,.؛]+|يلعب حاليا مع نادي|يلعب حاليًا مع نادي|ناديه الحالي)/i.test(sentence)).join(" ").trim();
+  }
+  return summary;
 };
 const nameOnlyArabicQuery=(query:string)=>{
  const raw=String(query||"").trim();
@@ -312,7 +331,11 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
       if(isDisambiguation(item)||mixedIdentitySummary(query,item))rank-=1000;
       return rank+relevanceScore(item,query)/100;
     };
-    const canonical=profile.sort((a,b)=>canonicalRank(b)-canonicalRank(a))[0];
+    const sportsProfiles=profile.filter(item=>/(footballer|football player|soccer player|لاعب كرة قدم|لاعب كرة القدم)/i.test(String(item.summary||"")));
+    const writerProfiles=profile.filter(item=>/(writer|author|novelist|poet|كاتب|مؤلف|روائي|شاعر)/i.test(String(item.summary||"")));
+    const profilePool=sportsProfiles.length?sportsProfiles:writerProfiles.length?writerProfiles:profile;
+    const canonical=profilePool.sort((a,b)=>canonicalRank(b)-canonicalRank(a))[0];
+    canonical.summary=sanitizePersonProfileSummary(query,String(canonical.summary||""));
    const description=String(canonical.summary||"");
    const sports=/football|soccer|athlete|لاعب كرة قدم|رياضي/i.test(description);
    const medicine=/physician|doctor|surgeon|طبيب|طبيبة/i.test(description);
