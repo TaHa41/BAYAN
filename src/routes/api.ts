@@ -242,7 +242,7 @@ const sectionRelevant=(x:any)=>{
  if(terms.some(term=>titleWords.has(term)))return true;
  return terms.filter(term=>summaryWords.has(term)).length>=2;
 };
-items=items.filter((x:any)=>sectionRelevant(x)&&(x.kind==="evidence"||(articleBodyQuality(String(x.body||"")).ok&&articleEvidenceQuality(x.sources)))).filter(localeSafeItem);
+items=items.filter((x:any)=>(x.slug?String(x.section||"")===section:sectionRelevant(x))&&(x.kind==="evidence"||(articleBodyQuality(String(x.body||"")).ok&&articleEvidenceQuality(x.sources)))).filter(localeSafeItem);
 const imageCandidates=items.filter((x:any)=>x.slug&&!/^https:\/\//i.test(String(x.imageUrl||""))).slice(0,3);
 await Promise.all(imageCandidates.map(async(item:any)=>{try{const imageUrl=await bounded(findRelatedImage(String(item.title||"")),2000);if(imageUrl&&/^https:\/\//i.test(imageUrl)){item.imageUrl=imageUrl;item.imageAlt=String(item.title||"");await env.DB.prepare("UPDATE articles SET image_url=?,image_alt=?,updated_at=? WHERE slug=? AND language=? AND (image_url IS NULL OR trim(image_url)='')").bind(imageUrl,item.imageAlt,new Date().toISOString(),item.slug,lang).run();}}catch{}}));
 items=items.filter((x:any)=>x.kind==="evidence"||/^https:\/\//i.test(String(x.imageUrl||"")));
@@ -292,7 +292,7 @@ if(items.length<2&&section!=="prices"){
   }
   const refreshed=await listArticles(env,section,lang,24);
   const existingSlugs=new Set(items.map((x:any)=>String(x.slug||"")).filter(Boolean));
-  const refreshedComplete=refreshed.filter((x:any)=>x.slug&&!existingSlugs.has(String(x.slug))&&articleBodyQuality(String(x.body||"")).ok&&localeSafeItem(x)&&sectionRelevant(x)&&/^https:\/\//i.test(String(x.imageUrl||"")));
+  const refreshedComplete=refreshed.filter((x:any)=>x.slug&&!existingSlugs.has(String(x.slug))&&articleBodyQuality(String(x.body||"")).ok&&localeSafeItem(x)&&(x.slug?String(x.section||"")===section:sectionRelevant(x))&&/^https:\/\//i.test(String(x.imageUrl||"")));
   items=[...items,...refreshedComplete];
   const completeCount=items.filter((x:any)=>x.slug&&articleBodyQuality(String(x.body||"")).ok&&/^https:\/\//i.test(String(x.imageUrl||""))).length;
   if(completeCount<2){
