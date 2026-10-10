@@ -152,10 +152,10 @@ async function repairRuntime(env:Env,failures:string[]){
     if(Number(row?.count||0)===0)actions.push("no published articles; deployment/content seed review required");
   }catch{}
   if(failures.includes("sections"))try{
-    const rows=await env.DB.prepare("SELECT section,language,COUNT(*) count FROM articles WHERE status='PUBLISHED' GROUP BY section,language").all<any>();
-    const missing=CONTENT_SECTIONS.flatMap(section=>["ar","en"].filter(language=>!Number((rows.results||[]).find((r:any)=>r.section===section&&r.language===language)?.count||0)).map(language=>section+"_"+language));
-    if(missing.length)actions.push("missing section content: "+missing.join(", "));
-  }catch{}
+    const missing=await sectionHealth(env);
+    if(missing.length)actions.push("section coverage failure: fewer than 2 complete, locale-pure, source-backed, imaged articles: "+missing.join(", "));
+    actions.push("No incomplete search snippet was promoted to a published article; missing coverage remains flagged for evidence-backed content repair.");
+  }catch(error){actions.push("section content audit failed: "+String(error).slice(0,250))}
   if(failures.includes("images")&&failures.includes("news_cache")&&!imageOnlyPass){actions.push("image repair deferred until the next run to preserve Worker subrequest budget after news refresh")}else if(failures.includes("images"))try{
     const rows=await env.DB.prepare("SELECT id,title,summary,sources_json FROM articles WHERE status='PUBLISHED' AND (image_url IS NULL OR trim(image_url)='') ORDER BY updated_at DESC LIMIT 4").all<any>();
     let filledArticles=0;
@@ -197,9 +197,32 @@ async function imageHealth(env:Env){
   return true;
 }
 
+const completeSectionArticle=(row:any,language:string)=>{
+  const title=String(row?.title||""),summary=String(row?.summary||""),body=String(row?.body||"").trim(),image=String(row?.image_url||"").trim();
+  if(title.length<8||summary.length<40||body.length<1800||!/^https:\/\//i.test(image))return false;
+  const headings=(body.match(/^#{1,3}\\s+.+$/gm)||[]).length;
+  const paragraphs=body.split(/\\n\\s*\\n/).map((part:string)=>part.trim()).filter((part:string)=>part.length>=65&&!/^#{1,4}\\s/.test(part)&&!/^([-*+] |\\d+[.)] )/.test(part));
+  const normalized=(value:string)=>value.normalize("NFKC").toLowerCase().replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/[^\\p{L}\\p{N}]+/gu," ").trim();
+  if(headings<4||paragraphs.length<5||new Set(paragraphs.map(normalized)).size<5)return false;
+  const arabic=/[\\u0600-\\u06ff]/.test(title+" "+summary+" "+body);
+  if(language==="ar"?!(/[\\u0600-\\u06ff]/.test(title)&&/[\\u0600-\\u06ff]/.test(summary)&&/[\\u0600-\\u06ff]/.test(body)):arabic)return false;
+  let sources:any[]=[];try{sources=JSON.parse(String(row?.sources_json||"[]"))}catch{return false}
+  if(!Array.isArray(sources))return false;
+  const hosts=new Set<string>(),publishers=new Set<string>();
+  for(const source of sources){try{const url=new URL(String(source?.url||""));if(url.protocol!=="https:")continue;hosts.add(url.hostname.toLowerCase().replace(/^www\\./,""));const publisher=String(source?.publisher||"").trim().toLowerCase();if(publisher)publishers.add(publisher)}catch{}}
+  return hosts.size>=2&&publishers.size>=2;
+};
+
 async function sectionHealth(env:Env){
-  const rows=await env.DB.prepare("SELECT section,language,COUNT(*) count FROM articles WHERE status='PUBLISHED' GROUP BY section,language").all<any>();
-  return CONTENT_SECTIONS.flatMap(section=>["ar","en"].filter(language=>!Number((rows.results||[]).find((r:any)=>r.section===section&&r.language===language)?.count||0)).map(language=>section+"_"+language));
+  const rows=await env.DB.prepare("SELECT section,language,title,summary,body,sources_json,image_url FROM articles WHERE status='PUBLISHED'").all<any>();
+  const counts=new Map<string,number>();
+  for(const row of rows.results||[]){
+    const section=String(row.section||""),language=String(row.language||"");
+    if(!CONTENT_SECTIONS.includes(section as any)||!(["ar","en"] as string[]).includes(language))continue;
+    if(!completeSectionArticle(row,language))continue;
+    const key=section+"_"+language;counts.set(key,(counts.get(key)||0)+1);
+  }
+  return CONTENT_SECTIONS.flatMap(section=>["ar","en"].filter(language=>(counts.get(section+"_"+language)||0)<2).map(language=>section+"_"+language+"="+(counts.get(section+"_"+language)||0)+"/2_complete"));
 }
 
 async function resolveVerifiedLegacyJobs(env:Env){try{await env.DB.prepare("UPDATE repair_jobs SET status='RESOLVED',diagnosis=COALESCE(diagnosis,'')||' | Closed as historical after current runtime checks passed',action='No runtime mutation required; current runtime checks passed; historical signature not reproduced',verification='verified_in_current_release',updated_at=? WHERE status='WAITING_AI' AND (signature LIKE '%generated is not defined%' OR signature LIKE '%resolveWikimediaEditorialImage is not defined%' OR signature LIKE '%manual Telegram diagnostic report%' OR signature LIKE '%predictive runtime degradation: /search%')").bind(now()).run()}catch{}}
