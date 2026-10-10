@@ -160,7 +160,30 @@ if(items.length<2&&section!=="prices"){
   };
   const meta=sectionBySlug(section)!;
   const q=queries[section]?.[lang]||(lang==="ar"?meta.descriptionAr:meta.descriptionEn);
-  const found=await search(env,q,lang);
+  let found:any={results:[]};
+  let cachedEvidence:any[]=[];
+  try{
+   const since=new Date(Date.now()-7*86400000).toISOString();
+   const cached=await env.DB.prepare("SELECT results_json FROM searches WHERE language=? AND topic_section=? AND created_at>=? ORDER BY created_at DESC LIMIT 4").bind(lang,section,since).all<any>();
+   const seenCached=new Set<string>();
+   for(const row of cached.results||[]){
+    let parsed:any[]=[];try{const value=JSON.parse(String(row.results_json||"[]"));if(Array.isArray(value))parsed=value;}catch{}
+    for(const item of parsed){
+     const title=String(item?.title||""),summary=String(item?.summary||"");
+     const key=title.normalize("NFKC").toLowerCase().trim();
+     if(!title||!summary||!key||seenCached.has(key))continue;
+     const safe=lang==="ar"?hasArabic(title)&&hasArabic(summary):!hasArabic(title)&&!hasArabic(summary);
+     if(!safe)continue;
+     seenCached.add(key);cachedEvidence.push({...item,section,kind:"evidence"});
+     if(cachedEvidence.length>=8)break;
+    }
+    if(cachedEvidence.length>=8)break;
+   }
+  }catch{}
+  items=[...items,...cachedEvidence];
+  if(cachedEvidence.length<2){
+   try{found=await bounded(search(env,q,lang),6500);}catch{found={results:[]};}
+  }
   const refreshed=await listArticles(env,section,lang,24);
   const existingSlugs=new Set(items.map((x:any)=>String(x.slug||"")).filter(Boolean));
   const refreshedComplete=refreshed.filter((x:any)=>x.slug&&!existingSlugs.has(String(x.slug))&&articleBodyQuality(String(x.body||"")).ok&&localeSafeItem(x)&&/^https:\/\//i.test(String(x.imageUrl||"")));
