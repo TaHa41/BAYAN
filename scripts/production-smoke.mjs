@@ -22,7 +22,7 @@ try{
   if(!robots.text.includes("Sitemap:")||!robots.text.includes("Disallow: /admin"))throw new Error("robots_policy_missing");
   if(!robots.text.includes("Agentmap: "+origin+"/.well-known/ai-catalog.json"))throw new Error("robots_agentmap_missing");
   const llms=await get("/llms.txt");
-  if(!/^#\\s+.+/m.test(llms.text)||!llms.text.includes(origin+"/search?lang=ar")||!llms.text.includes("## Public pages"))throw new Error("llms_txt_structure_or_links_missing");
+  if(!/^#\s+.+/m.test(llms.text)||!llms.text.includes(origin+"/search?lang=ar")||!llms.text.includes("## Public pages"))throw new Error("llms_txt_structure_or_links_missing");
   for(const path of ["/.well-known/ai-catalog.json","/ai-catalog.json"]){
     const response=await get(path);
     if(!/json/i.test(response.headers.get("content-type")||""))throw new Error(path+" content_type_not_json");
