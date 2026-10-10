@@ -1,7 +1,7 @@
 import {describe,it,expect} from "vitest";
 import {SECTIONS} from "../src/config";
 import {answerHasUnsupportedSpecifics} from "../src/services/ai";
-import {isolateExactPerson} from "../src/services/search";
+import {isolateExactPerson,isolateArticleSubject} from "../src/services/search";
 
 describe("BAYAN product foundation",()=>{
   it("has all required sections",()=>expect(SECTIONS.length).toBe(16));
@@ -30,6 +30,33 @@ describe("exact person identity isolation",()=>{
   it("does not discard ordinary topic search results when there is no exact person biography",()=>{
     const items=[{title:"تغير المناخ",summary:"شرح علمي للتغير المناخي.",url:"https://ar.wikipedia.org/wiki/تغير_المناخ",provider:"Wikipedia",score:80,sources:[{title:"تغير المناخ",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/تغير_المناخ"}]}] as any;
     expect(isolateExactPerson("تغير المناخ",items)).toHaveLength(1);
+  });
+});
+describe("article subject isolation",()=>{
+  it("keeps the exact Mohamed Salah football profile and drops namesakes",()=>{
+    const items=[
+      {title:"محمد صلاح",summary:"محمد صلاح لاعب كرة قدم مصري محترف.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح",provider:"Wikipedia",score:90,sources:[{title:"محمد صلاح",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح"}]},
+      {title:"محمد صلاح دندراوي",summary:"كاتب وأديب سعودي.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي",provider:"Wikipedia",score:70,sources:[{title:"محمد صلاح دندراوي",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي"}]},
+      {title:"محمد صلاح (توضيح)",summary:"صفحة توضيح لأشخاص يحملون الاسم.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_(توضيح)",provider:"Wikipedia",score:60,sources:[{title:"محمد صلاح (توضيح)",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_(توضيح)"}]},
+      {title:"محمد صلاح زكريا",summary:"كاتب قصص وروائي مصري.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_زكريا",provider:"Wikipedia",score:55,sources:[{title:"محمد صلاح زكريا",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_زكريا"}]}
+    ] as any;
+    const result=isolateArticleSubject("محمد صلاح",items);
+    expect(result).toHaveLength(1);
+    expect(result[0].title).toBe("محمد صلاح");
+  });
+  it("does not create a biography from a disambiguation page",()=>{
+    const items=[
+      {title:"محمد صلاح",summary:"صفحة توضيح قد تشير إلى عدة أشخاص يحملون الاسم.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح",provider:"Wikipedia",score:90,sources:[{title:"محمد صلاح",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح"}]},
+      {title:"محمد صلاح دندراوي",summary:"كاتب وأديب سعودي.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي",provider:"Wikipedia",score:70,sources:[{title:"محمد صلاح دندراوي",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي"}]}
+    ] as any;
+    expect(isolateArticleSubject("محمد صلاح",items)).toHaveLength(0);
+  });
+  it("does not merge different namesakes when no exact biography exists",()=>{
+    const items=[
+      {title:"محمد صلاح دندراوي",summary:"كاتب وأديب سعودي.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي",provider:"Wikipedia",score:70,sources:[{title:"محمد صلاح دندراوي",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_دندراوي"}]},
+      {title:"محمد صلاح زكريا",summary:"كاتب قصص وروائي مصري.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_زكريا",provider:"Wikipedia",score:55,sources:[{title:"محمد صلاح زكريا",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح_زكريا"}]}
+    ] as any;
+    expect(isolateArticleSubject("محمد صلاح",items)).toHaveLength(0);
   });
 });
 describe("evidence-backed AI answer validation",()=>{
