@@ -350,8 +350,14 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
    // Collapse exact-title providers to one canonical identity, but merge their distinct source citations and a safe exact-page image.
    canonical.sources=(canonical.sources||[]).filter(source=>normalizedEntityTitle(source.title)===name);
    const sourceKeys=new Set((canonical.sources||[]).map(source=>String(source.url||"").trim()).filter(Boolean));
+   const canonicalIsSports=/(footballer|football player|soccer player|لاعب كرة قدم|لاعب كرة القدم)/i.test(String(canonical.summary||""));
+   const canonicalIsWriter=/(writer|author|novelist|poet|كاتب|مؤلف|روائي|شاعر)/i.test(String(canonical.summary||""));
    for(const candidate of cleanExact){
      if(candidate!==canonical){
+       const candidateSummary=String(candidate.summary||"");
+       const conflictsWithCanonical=(canonicalIsSports&&/(actor|actress|ممثل|ممثلة)/i.test(candidateSummary)&&!/(footballer|football player|soccer player|لاعب كرة قدم|لاعب كرة القدم)/i.test(candidateSummary))||
+         (canonicalIsWriter&&/(actor|actress|ممثل|ممثلة)/i.test(candidateSummary)&&!/(writer|author|novelist|poet|كاتب|مؤلف|روائي|شاعر)/i.test(candidateSummary));
+       if(conflictsWithCanonical)continue;
        for(const source of candidate.sources||[]){if(normalizedEntityTitle(source.title)!==name)continue;const url=String(source.url||"").trim();if(url&&!sourceKeys.has(url)){canonical.sources=[...(canonical.sources||[]),source];sourceKeys.add(url);}}
        if(!canonical.imageUrl&&/^https:\/\//i.test(String(candidate.imageUrl||""))){canonical.imageUrl=candidate.imageUrl;canonical.imageAlt=candidate.imageAlt||candidate.title;}
      }
