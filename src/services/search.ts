@@ -266,6 +266,44 @@ const normalizedEntityTitle=(value:string)=>String(value||"").normalize("NFKC").
 const personQueryName=(query:string)=>String(query||"").trim()
   .replace(/^(?:who is|who was|biography(?: of)?|profile(?: of)?|من هو|من هي|سيرة ذاتية عن|سيرة ذاتية لشخص)\s+/i,"")
   .replace(/\s+(?:biography|profile|official profile|سيرة ذاتية|مصدر رسمي)$/i,"").trim();
+export const hasConflictingCurrentAffiliations=(value:string)=>{
+  const text=String(value||"");
+  const claims:string[]=[];
+  const patterns=[
+    /(?:يلعب\s+(?:حالياً|حاليًا)?[^،؛.\n]{0,100}?(?:مع نادي|لنادي|في نادي)\s+)([^،؛.\n]+)/gi,
+    /(?:ناديه الحالي|فريقه الحالي|يلعب حالياً مع|يلعب حاليًا مع)\s+([^،؛.\n]+)/gi,
+    /(?:currently plays for|current (?:club|team) is|his current club is|plays for)\s+([^,;.\n]+)/gi
+  ];
+  for(const pattern of patterns)for(const match of text.matchAll(pattern)){
+    let value=String(match[1]||"").split(/\s+(?:الذي|التي|الذين|which|who|that)\s+/i)[0].trim();
+    value=value.replace(/^(?:نادي|فريق|club|team)\s+/i,"").replace(/\s+(?:الإنجليزي|الإنجليزية|التركي|التركية|المصري|المصرية|الاسباني|الإسباني|الإيطالي|الفرنسي|الألماني|fc|football club)$/i,"").trim();
+    const key=normalizedEntityTitle(value);
+    if(key.length>=3)claims.push(key);
+  }
+  return new Set(claims).size>1;
+};
+const isEncyclopediaCandidate=(candidate:Candidate)=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(candidate.provider||"")+" "+(candidate.sources||[]).map(source=>source.publisher+" "+source.url).join(" "));
+const subjectContextMatches=(canonical:Candidate,candidate:Candidate,name:string)=>{
+  if(isDisambiguation(candidate)||isEncyclopediaCandidate(candidate))return false;
+  const candidateText=normalizedEntityTitle(String(candidate.title||"")+" "+String(candidate.summary||""));
+  const nameTokens=name.split(/\s+/).filter(Boolean);
+  if(!nameTokens.length||!nameTokens.every(token=>candidateText.includes(token)))return false;
+  const base=normalizedEntityTitle(canonical.summary);
+  const stop=new Set(["محمد","صلاح","the","and","for","with","from","about","his","her","was","has","have","had","is","are","was","were","this","that","player","football","soccer","egyptian","egypt","egyptian","لاعب","كرة","قدم","مصري","مصر","محترف","يلعب","حالياً","حاليا","مركز","الجناح","الأيمن","مع","نادي","الدوري","التركي","الممتاز","قائد","منتخب","أبرز","اللاعبين","حصل","حصد","جائزة","جوائز","عام","موسم","في","من","على","عن","إلى","الذي","التي"]);
+  const baseTokens=new Set(base.split(/\s+/).filter(token=>token.length>=4&&!stop.has(token)&&!nameTokens.includes(token)));
+  const candidateTokens=new Set(candidateText.split(/\s+/).filter(Boolean));
+  const overlap=[...baseTokens].filter(token=>candidateTokens.has(token));
+  const rolePatterns=[
+    /كرة قدم|لاعب|ليفربول|الدوري|مباراة|هدف|مهاجم|منتخب|football|soccer|liverpool|premier league|goal|striker/i,
+    /كاتب|روائي|مؤلف|أدب|كتاب|writer|author|novel|literature|book/i,
+    /ممثل|ممثلة|فيلم|سينما|actor|actress|film|cinema/i,
+    /عالم|باحث|بحث|دراسة|scientist|researcher|research|study/i,
+    /سياسي|رئيس|وزير|انتخابات|politician|president|minister|election/i
+  ];
+  const canonicalText=String(canonical.title||"")+" "+String(canonical.summary||"");
+  const sharedRole=rolePatterns.some(pattern=>pattern.test(canonicalText)&&pattern.test(String(candidate.title||"")+" "+String(candidate.summary||"")));
+  return overlap.length>=2||(overlap.length>=1&&sharedRole);
+};
 const personEvidence=(candidate:Candidate)=>/(footballer|football player|soccer player|athlete|politician|writer|author|actor|actress|scientist|researcher|coach|president|minister|born in|is a .*player|لاعب كرة قدم|لاعب|رياضي|سياسي|كاتب|مؤلف|ممثل|عالِم|عالم|باحث|مدرب|رئيس|وزير|وُلد|ولد)/i.test(String(candidate.title||"")+" "+String(candidate.summary||""));
 const isDisambiguation=(candidate:Candidate)=>/(?:disambiguation|\(توضيح\)|صفحة توضيح|معاني الأسماء)/i.test(String(candidate.title||""));
 export const isolateExactPerson=(query:string,items:Candidate[])=>{
@@ -275,10 +313,13 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
   if(exact.length){
     const canonical=exact.sort((a,b)=>Number(Boolean(b.imageUrl))-Number(Boolean(a.imageUrl))||relevanceScore(b,query)-relevanceScore(a,query))[0];
     const canonicalUrl=String(canonical.url||canonical.sources?.[0]?.url||"");
-    // Once an exact biography page exists, never append other people who merely share
-    // the name. Keep only the exact subject page and duplicates of that same page.
-    return items.filter(item=>normalizedEntityTitle(item.title)===name&&!isDisambiguation(item)&&
-      String(item.url||item.sources?.[0]?.url||"")===canonicalUrl);
+    // Keep the exact biography page, relevant non-encyclopedia evidence about that same subject,
+    // and never other encyclopedia biographies or disambiguation pages sharing the name.
+    return items.filter(item=>{
+      if(isDisambiguation(item))return false;
+      if(normalizedEntityTitle(item.title)===name&&String(item.url||item.sources?.[0]?.url||"")===canonicalUrl)return true;
+      return subjectContextMatches(canonical,item,name);
+    });
   }
   if(personLookup(query))return items.filter(item=>!isDisambiguation(item));
   return items;
@@ -468,7 +509,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
     }
     if ((!existing.summary || existing.summary.length < 80) && candidate.summary) existing.summary = candidate.summary;
   }
-  const results=[...uniqueByTitle.values()].slice(0,max).map(({score,provider,...x})=>({...x,summary:localeSafeText(x.summary,language)?x.summary:"",sources:(x.sources||[]).map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}));
+  const results=[...uniqueByTitle.values()].slice(0,max).map(({score,provider,...x})=>({...x,summary:localeSafeText(x.summary,language)&&!hasConflictingCurrentAffiliations(x.summary)?x.summary:"",sources:(x.sources||[]).map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}));
   const providers=[...new Set(candidates.map(x=>x.provider))];
   const publishers=[...new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean))];
   const configuredMin=Math.max(2,Math.min(5,Number(s.min_sources||3)));
@@ -477,7 +518,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   let answer:string|undefined;
   let answerStatus:SearchResponse["status"]|undefined;
   if(results.length){
-    try{const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),1000))]);if(drafted.answer){answer=drafted.answer;answerStatus=drafted.status;}const independentSources=new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean));const articleTitle=results.find(x=>x.title&&x.summary)?.title||"";const articleSummary=results.find(x=>x.title&&x.summary)?.summary||q;if(options.publish!==false&&drafted.status==="verified"&&usefulDraft(drafted.answer,language)&&independentSources.size>=2&&articleTitle&&!disallowedContent(articleTitle+" "+articleSummary)){const imageUrl=await findRelatedImage(articleTitle+" "+articleSummary).catch(()=>undefined);const savedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:drafted.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle});if(savedSlug)publishedSlug=savedSlug;}}catch{}
+    try{const draftingEvidence=results.filter(x=>String(x.summary||"").trim());const drafted=draftingEvidence.length?await Promise.race([ask(env,q,language,draftingEvidence),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),1000))]):{status:"insufficient",answer:""};if(drafted.answer){answer=drafted.answer;answerStatus=drafted.status;}const independentSources=new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean));const exactSubject=results.find(x=>normalizedEntityTitle(x.title)===normalizedEntityTitle(personQueryName(q))&&Boolean(x.imageUrl));const articleTitle=exactSubject?.title||results.find(x=>x.title&&x.summary)?.title||"";const articleSummary=results.find(x=>x.summary)?.summary||q;if(options.publish!==false&&drafted.status==="verified"&&usefulDraft(drafted.answer,language)&&independentSources.size>=2&&articleTitle&&!disallowedContent(articleTitle+" "+articleSummary)){const imageUrl=exactSubject?.imageUrl||await findRelatedImage(articleTitle).catch(()=>undefined);const savedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:drafted.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle});if(savedSlug)publishedSlug=savedSlug;}}catch{}
   }
   const message=results.length?undefined:(language==="ar"?"تعذر العثور على نتيجة من مصادر البحث المتاحة حاليًا. يمكن توسيع البحث لاحقًا عند توفر مزودات إضافية.":"No result was returned by the available search providers right now. The search can be expanded when additional providers are available.");
   try{await saveSearch(env,q,language,intent(q),status,results.length,classifySection(q,results,language),results)}catch{}
