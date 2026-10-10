@@ -40,4 +40,24 @@ let canonical=ORIGIN+u.pathname+(u.searchParams.has("lang")?"?lang="+encodeURICo
 headers.set("CDN-Cache-Control","no-store");headers.set("X-BAYAN-Build",BUILD);if(u.searchParams.get("bayan_owner")==="1")headers.append("Set-Cookie","bayan_exclude_analytics=1; Max-Age=31536000; Path=/; SameSite=Lax; Secure");if(u.searchParams.get("bayan_owner")==="0")headers.append("Set-Cookie","bayan_exclude_analytics=; Max-Age=0; Path=/; SameSite=Lax; Secure");return new Response(html,{status:asset.status,headers});}
 export default{async fetch(request:Request,env:Env){const u=new URL(request.url);if(u.pathname.startsWith("/api/")){try{await ensureSchema(env)}catch{return new Response(JSON.stringify({error:"database_unavailable"}),{status:503,headers:{"content-type":"application/json;charset=utf-8","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})}try{return await api(request,env)}catch(error){const message=String(error).slice(0,800);try{await notify(env,"BAYAN API ERROR\
 Path: "+u.pathname+"\
-Error: "+message)}catch{}return new Response(JSON.stringify({error:"internal_error"}),{status:500,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})}}if(u.pathname==="/robots.txt")return robots();if(u.pathname==="/sitemap.xml")return sitemap(env);if(u.pathname==="/news-sitemap.xml")return newsSitemap(env);return page(request,env)},async scheduled(_event:ScheduledEvent,env:Env){try{await ensureSchema(env)}catch{}await selfHeal(env)}};
+Error: "+message)}catch{}return new Response(JSON.stringify({error:"internal_error"}),{status:500,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})}}const seoPath=u.pathname.replace(/\\/+$/,"")||"/";
+if(seoPath==="/robots.txt")return robots();
+if(seoPath==="/sitemap.xml"||seoPath==="/news-sitemap.xml"){
+  try{
+    const response=seoPath==="/sitemap.xml"?await sitemap(env):await newsSitemap(env);
+    const headers=new Headers(response.headers);
+    headers.set("Content-Type","application/xml; charset=utf-8");
+    headers.set("Cache-Control","public, max-age=300, s-maxage=300, stale-while-revalidate=3600");
+    headers.set("X-Content-Type-Options","nosniff");
+    headers.set("X-BAYAN-SEO","sitemap-v1");
+    return new Response(response.body,{status:200,headers});
+  }catch(error){
+    try{await notify(env,"BAYAN SITEMAP ERROR\\nPath: "+seoPath+"\\nError: "+String(error).slice(0,300))}catch{}
+    const origin=ORIGIN;
+    const minimal=seoPath==="/sitemap.xml"
+      ?'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>'+origin+'/?lang=ar</loc></url><url><loc>'+origin+'/?lang=en</loc></url></urlset>'
+      :'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>';
+    return new Response(minimal,{status:200,headers:{"Content-Type":"application/xml; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff","X-BAYAN-SEO":"sitemap-fallback"}});
+  }
+}
+return page(request,env)},async scheduled(_event:ScheduledEvent,env:Env){try{await ensureSchema(env)}catch{}await selfHeal(env)}};
