@@ -492,7 +492,7 @@
     const output=document.querySelector("#researchArticle");
     try{
       if(!title)throw new Error("title_required");
-      const data=await api("/api/news/article?title="+encodeURIComponent(title)+"&summary="+encodeURIComponent(summary)+"&url="+encodeURIComponent(url)+"&publisher="+encodeURIComponent(publisher)+"&lang="+lang,{timeoutMs:22000});
+      const data=await api("/api/news/article?title="+encodeURIComponent(title)+"&summary="+encodeURIComponent(summary)+"&url="+encodeURIComponent(url)+"&publisher="+encodeURIComponent(publisher)+"&image="+encodeURIComponent(p.get("image")||"")+"&lang="+lang,{timeoutMs:26000});
       const article=data.article||{};
       if(!data.ok||!article.title)throw new Error("article_unavailable");
       output.innerHTML='<article class="article-full">'+(article.image?heroImageHtml(article.image,article.title,article.summary||summary):"")+
@@ -505,7 +505,9 @@
         '</div>'+socialActions({...article,title:article.title||title,summary:article.summary||summary,href:location.pathname+location.search,_key:"research:"+title})+'</article>';
       if (!article.image) ensureHeroImage(output.querySelector(".article-full"), article.title || title, article.summary || summary);
     }catch{
-      output.innerHTML='<div class="notice"><h2>'+t("تعذر تجهيز المقال من المصادر المتاحة الآن","Could not prepare the article from available sources")+'</h2><p>'+t("حاول إعادة البحث أو اختيار نتيجة أخرى. لن يعرض بيان نصًا مختلقًا على أنه مقال موثق.","Try searching again or choose another result. BAYAN will not present invented text as a sourced article.")+'</p><a class="read" href="/search?q='+encodeURIComponent(title)+'&lang='+lang+'">'+t("العودة إلى البحث","Back to search")+' →</a></div>';
+      const fallbackSummary=String(summary||"").trim();
+      output.innerHTML='<article class="article-full"><span class="eyebrow">'+escapeHtml(publisher||t("نتيجة بحث","Search result"))+'</span><h1>'+escapeHtml(title)+'</h1>'+(fallbackSummary?'<p class="lead">'+escapeHtml(fallbackSummary)+'</p>':'')+'<div class="notice"><p>'+t("تعذر إكمال التحقق من المصادر المستقلة هذه المرة. أبقينا معلومات نتيجة البحث ظاهرة بدلًا من عرض مقال غير مكتمل.","Independent-source verification could not be completed this time. The available search result is shown instead of an incomplete article.")+'</p><button class="primary" id="research-retry">'+t("إعادة المحاولة","Retry")+'</button> <a class="read" href="/search?q='+encodeURIComponent(title)+'&lang='+lang+'">'+t("العودة إلى البحث","Back to search")+' →</a></div></article>';
+      document.querySelector("#research-retry")?.addEventListener("click",()=>renderResearchArticle());
     }
   }
 
@@ -574,7 +576,7 @@
             "&summary=" + encodeURIComponent(story.summary || "") +
             "&url=" + encodeURIComponent(story.url || "") +
             "&publisher=" + encodeURIComponent(story.publisher || "") +
-            "&publishedAt=" + encodeURIComponent(story.publishedAt || "") + "&lang=" + lang);
+            "&publishedAt=" + encodeURIComponent(story.publishedAt || "") + "&lang=" + lang, { timeoutMs: 26000 });
           const article = articleData.article;
           output.innerHTML =
             '<article class="article-full">' + (article.image ? heroImageHtml(article.image, article.title, article.summary || "") : "") +
@@ -589,8 +591,10 @@
               "</div>").join("") + "</div>" + socialActions({...article, title:article.title||story.title, summary:article.summary||story.summary, href:"/news?story="+encodeURIComponent(story.title)+"&lang="+lang, _key:"news:"+story.title}) + "</article>";
           if (!article.image) ensureHeroImage(output.querySelector(".article-full"), article.title || story.title, article.summary || story.summary);
         } catch {
-          output.innerHTML = '<div class="notice">' +
-            t("تعذر تجهيز المقال الكامل من الأدلة الآن.","The full evidence-based article could not be prepared right now.") + "</div>";
+          const safeSummary=String(story.summary||"").trim();
+          output.innerHTML = '<article class="article-full">' + (story.imageUrl ? heroImageHtml(story.imageUrl,story.title,safeSummary) : imageHtml(story)) + '<span class="eyebrow">' + escapeHtml(story.publisher||t("مصدر إخباري","News source")) + '</span><h1>' + escapeHtml(story.title||"") + '</h1>' + (safeSummary ? '<p class="lead">' + escapeHtml(safeSummary) + '</p>' : '') + '<div class="source-line">' + escapeHtml(formatDate(story.publishedAt)) + '</div><div class="notice">' + t("هذه هي المعلومات المتاحة من الخبر الأصلي حاليًا. لم يكتمل التحقق من مصادر مستقلة لإعداد مقال موسع؛ أبقينا الملخص ظاهرًا بدلًا من عرض نص غير موثق.","This is the information available from the original story. Independent-source verification did not finish, so the summary remains visible instead of an unsupported long article.") + '</div><button class="primary" id="news-article-retry">' + t("إعادة المحاولة","Retry") + '</button></article><div class="section-intro"><h2>' + t("أخبار أخرى","More news") + '</h2></div><div class="article-grid">' + items.filter(item=>item.title!==story.title).slice(0,8).map(item=>'<article class="article-card"><a class="article-card-link" href="/news?story=' + encodeURIComponent(item.title) + '&lang=' + lang + '">' + imageHtml(item) + '<div class="article-card-body"><span class="kicker">' + escapeHtml(item.publisher||t("مصدر إخباري","News source")) + '</span><h2>' + escapeHtml(item.title) + '</h2><p>' + escapeHtml(item.summary||"") + '</p><div class="source-line">' + escapeHtml(formatDate(item.publishedAt)) + '</div></div></a></article>').join("") + '</div>';
+          document.querySelector("#news-article-retry")?.addEventListener("click",()=>renderNews());
+          if(!story.imageUrl)ensureHeroImage(output.querySelector(".article-full"),story.title,safeSummary);
         }
         return;
       }
