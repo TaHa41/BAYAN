@@ -99,7 +99,7 @@ async function googleNewsSearch(q:string,language:Locale):Promise<Candidate[]>{
   try{
     const hl=language==="ar"?"ar":"en-US",gl=language==="ar"?"EG":"US",ceid=language==="ar"?"EG:ar":"US:en";
     const url="https://news.google.com/rss/search?q="+encodeURIComponent(q)+"&hl="+hl+"&gl="+gl+"&ceid="+ceid;
-    const response=await timeout(url,2600);if(!response.ok)return[];
+    const response=await timeout(url,5000);if(!response.ok)return[];
     const xml=await response.text();const out:Candidate[]=[];
     for(const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
       const block=match[1];const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
@@ -437,8 +437,8 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   const writerProfile=/(writer|author|novelist|poet|كاتب|مؤلف|روائي|شاعر)/i.test(identity);
   const variants=person
     ? (language==="ar"
-      ? (sportsProfile ? [q+" آخر الأخبار",q+" مسيرته الرياضية",q+" إحصائيات وأرقام"] : writerProfile ? [q+" آخر الأخبار",q+" أعماله ومؤلفاته",q+" مصدر رسمي"] : [q+" آخر الأخبار",q+" سيرة ذاتية",q+" مصدر رسمي"])
-      : (sportsProfile ? [q+" latest news",q+" football career",q+" official club profile"] : writerProfile ? [q+" latest news",q+" author bibliography",q+" official profile"] : [q+" latest news",q+" biography",q+" official profile"]))
+      ? (sportsProfile ? [q+" آخر الأخبار",q+" ليفربول",q+" منتخب مصر"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
+      : (sportsProfile ? [q+" latest news",q+" Liverpool",q+" Egypt national team"] : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
     : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,3);
   const batches=await Promise.all(uniqueVariants.map(async variant=>{
