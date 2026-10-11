@@ -472,9 +472,9 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
     batches.push(results.flat());
     const recovered=batches.flat().filter(item=>relevantCandidate(item,q)&&languageSafe(item,language));
     const hosts=new Set(recovered.flatMap(item=>(item.sources||[]).map(src=>{
-      try{return new URL(String(src.url||"")).hostname.toLowerCase().replace(/^www\\./,"")}
+      try{return new URL(String(src.url||"")).hostname.toLowerCase().replace(/^www\./,"")}
       catch{return ""}
-    })).filter(host=>host&&!/wikipedia\\.org|wikidata\\.org|news\\.google\\.com|bing\\.com|duckduckgo\\.com/.test(host)));
+    })).filter(host=>host&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/.test(host)));
     if(recovered.length>=6&&hosts.size>=3)break;
   }
   return batches.flat();
