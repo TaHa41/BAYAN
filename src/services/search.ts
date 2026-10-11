@@ -32,7 +32,7 @@ const searchTerms=(q:string)=>{const stop=new Set(["the","and","for","with","fro
 const relevanceScore=(x:Candidate,q:string)=>{const terms=searchTerms(q);if(!terms.length)return 0;const normalize=(v:string)=>String(v||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"");const title=normalize(x.title),summary=normalize(x.summary),combined=title+" "+summary,normalizedQuery=normalize(q).trim(),titleHits=terms.filter(t=>title.includes(t)).length,summaryHits=terms.filter(t=>summary.includes(t)).length,allHits=terms.filter(t=>combined.includes(t)).length,phrase=title.includes(normalizedQuery);const person=personLookup(q);const identityBoost=person?(titleHits===terms.length?90:titleHits>0?titleHits*28:0):0;const authorOnlyPenalty=person&&titleHits===0&&summaryHits>0?35:0;return(phrase?75:0)+identityBoost+titleHits*18+summaryHits*7+allHits*4+Math.min(8,Number(x.score||0)/12)-authorOnlyPenalty};
 // Do not reject a relevant result solely because a multi-word query is absent verbatim from its title.
 // Use the summary and all query terms too, then fall back to the best locale-safe candidates if providers are weak.
-const relevantCandidate=(x:Candidate,q:string)=>{const terms=searchTerms(q);const score=relevanceScore(x,q);if(!terms.length)return false;const normalize=(v:string)=>String(v||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"");const title=normalize(x.title),summary=normalize(x.summary),combined=title+" "+summary;const titleHits=terms.filter(t=>title.includes(t)).length;const hits=terms.filter(t=>combined.includes(t)).length;const person=personLookup(q)||nameOnlyArabicQuery(q);if(person){/* Related news often names the person in its snippet rather than its headline. Keep those independent articles when all name terms are present; requiring the name in the title silently reduced person searches to one encyclopedia page. */if(titleHits===0){const provider=String(x.provider||"")+" "+(x.sources||[]).map(source=>source.publisher||"").join(" ");const encyclopedia=/wikipedia|wikidata/i.test(provider);return encyclopedia?hits>0&&score>=20:hits>=Math.min(2,terms.length)&&score>=16;}return titleHits>=Math.min(1,terms.length)&& (hits>=Math.min(1,terms.length)||score>=25);}if(terms.length<=1)return score>=4;return hits>=Math.min(2,terms.length)||score>=25;};
+const relevantCandidate=(x:Candidate,q:string)=>{const terms=searchTerms(q);const score=relevanceScore(x,q);if(!terms.length)return false;const normalize=(v:string)=>String(v||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"");const title=normalize(x.title),summary=normalize(x.summary),combined=title+" "+summary;const titleHits=terms.filter(t=>title.includes(t)).length;const hits=terms.filter(t=>combined.includes(t)).length;const person=personLookup(q)||nameOnlyArabicQuery(q);if(person){if(personIdentityMatches(combined,personQueryName(q)))return true;/* Related news often names the person in its snippet rather than its headline. Keep those independent articles when all name terms are present; requiring the name in the title silently reduced person searches to one encyclopedia page. */if(titleHits===0){const provider=String(x.provider||"")+" "+(x.sources||[]).map(source=>source.publisher||"").join(" ");const encyclopedia=/wikipedia|wikidata/i.test(provider);return encyclopedia?hits>0&&score>=20:hits>=Math.min(2,terms.length)&&score>=16;}return titleHits>=Math.min(1,terms.length)&& (hits>=Math.min(1,terms.length)||score>=25);}if(terms.length<=1)return score>=4;return hits>=Math.min(2,terms.length)||score>=25;};
 async function wikipedia(env:Env,q:string,language:Locale):Promise<Candidate[]>{
   const api=language==="ar"?"https://ar.wikipedia.org/w/api.php":"https://en.wikipedia.org/w/api.php";
   const stop=new Set(["في","من","على","عن","إلى","الى","ما","ماذا","كيف","لماذا","هل","هو","هي","هذا","هذه","التي","الذي","مع","the","and","for","with","from","about","what","when","where","who","how","why","is","are"]);
@@ -103,42 +103,13 @@ async function googleNewsSearch(q:string,language:Locale):Promise<Candidate[]>{
     const xml=await response.text();const out:Candidate[]=[];
     for(const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
       const block=match[1];const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
-      const title=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1400),publisher=cleanText(field("source")||"Google News");
-      if(!title||!/^https:\/\//i.test(url))continue;
+      const title=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1400),publisher=cleanText(field("source"));
+      if(!title||!publisher||!/^https:\/\//i.test(url))continue;
       out.push({title,summary,section:"news",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+4,provider:"Google News Search"});
       if(out.length>=8)break;
     }
     return out;
   }catch{return[]}
-}
-
-async function gnewsSearch(env:Env,q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
-  const apiKey=String(env.GNEWS_API_KEY||"").trim();
-  if(!apiKey){diagnostics?.push("GNews: API key not configured");return[];}
-  try{
-    let query=String(q||"").trim();
-    if(/محمد\s+صلاح/i.test(query)){const suffix=query.replace(/محمد\s+صلاح/i,"").trim();const names=language==="ar"?'"محمد صلاح" OR "Mohamed Salah" OR "Mo Salah"':'"Mohamed Salah" OR "Mo Salah"';query=suffix?"("+names+") "+suffix:names;}
-    const params=new URLSearchParams({q:query,lang:language,max:"10",sortby:"publishedAt",apikey:apiKey});
-    const response=await timeout("https://gnews.io/api/v4/search?"+params.toString(),5000);
-    if(!response.ok){diagnostics?.push("GNews HTTP "+response.status);return[];}
-    const data=await response.json<any>();
-    const articles=Array.isArray(data.articles)?data.articles:[];
-    diagnostics?.push("GNews HTTP 200 raw articles="+articles.length);
-    return articles.map((item:any)=>{
-      const title=cleanText(String(item?.title||""));
-      const summary=cleanText(String(item?.description||item?.content||"")).slice(0,1600);
-      const url=String(item?.url||"").trim();
-      const publisher=cleanText(String(item?.source?.name||"GNews source"));
-      const imageUrl=String(item?.image||"").trim();
-      const publishedAt=String(item?.publishedAt||"").trim();
-      if(!title||!summary||!/^https:\/\//i.test(url))return null;
-      if(language==="ar"?!hasArabic(title):hasArabic(title))return null;
-      return {title,summary,section:"news",kind:"web" as const,evidence:"mixed" as const,
-        sources:[{title,publisher,url,publishedAt:publishedAt||undefined,imageUrl:/^https:\/\//i.test(imageUrl)?imageUrl:undefined}],
-        url,imageUrl:/^https:\/\//i.test(imageUrl)?imageUrl:undefined,imageAlt:title,
-        score:scoreSource(publisher,title,q)+12,provider:"GNews Search"} as Candidate;
-    }).filter((item:any):item is Candidate=>Boolean(item)).slice(0,10);
-  }catch(error){diagnostics?.push("GNews request error: "+String(error).slice(0,120));return[];}
 }
 
 async function bingNewsSearch(q:string,language:Locale):Promise<Candidate[]>{
@@ -413,8 +384,8 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
      // Exclude encyclopedia pages whose titles append a second person's identity.
      if(title.startsWith(name+" ")&&/(?:دندراوي|زكريا|مصطفى|العزب|جندي|ممثل|مدرب|توضيح|تشالدران|denrawi|zakaria|mustafa|al.?azab|soldier|actor|disambiguation)/i.test(title.slice(name.length)))return false;
      const text=String(item.title||"")+" "+String(item.summary||"");
-     if(context)return context.test(text)&&identityTextForSearch(text).includes(name);
-     return identityTextForSearch(text).includes(name);
+     if(context)return context.test(text)&&personIdentityMatches(text,name);
+     return personIdentityMatches(text,name);
    });
    return safe.length?safe:cleanExact;
  }
@@ -425,6 +396,13 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
 };
 const identityTextForSearch=(value:string)=>String(value||"").normalize("NFKC").toLowerCase()
  .replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").replace(/\s+/g," ").trim();
+const personIdentityMatches=(text:string,name:string)=>{
+  const normalizedText=identityTextForSearch(text),normalizedName=identityTextForSearch(name);
+  if(normalizedName&&normalizedText.includes(normalizedName))return true;
+  if(!/(محمد\s+صلاح|mohamed\s+salah|mohammed\s+salah|mo\s+salah)/i.test(name))return false;
+  if(/محمد\s+صلاح|مو\s+صلاح|mohamed\s+salah|mohammed\s+salah|mo\s+salah/i.test(text))return true;
+  return /صلاح/i.test(text)&&/(ليفربول|منتخب مصر|الفرعون المصري|اللاعب المصري|هدف|مباراة)/i.test(text);
+};
 export const isolateArticleSubject=(title:string,items:Candidate[])=>{
  const query=normalizedEntityTitle(title);
  if(!query||!Array.isArray(items))return [];
@@ -473,7 +451,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
     : undefined;
   const variants=person
     ? (language==="ar"
-      ? (sportsProfile ? [q+" آخر الأخبار",q+" ليفربول",englishSportsName ? englishSportsName+" Liverpool latest news" : q+" منتخب مصر"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
+      ? (sportsProfile ? [q+" آخر الأخبار",q+" ليفربول",q+" منتخب مصر"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
       : (sportsProfile ? [q+" latest news",q+" Liverpool",q+" Egypt national team"] : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
     : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,3);
@@ -489,10 +467,8 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
       duck(variant,language).catch(()=>[]),
       duckWebSearch(variant,language).catch(()=>[]),
       bingWebSearch(variant,language).catch(()=>[]),
-      ...(env.GNEWS_API_KEY && person && sportsProfile && variant===uniqueVariants[1] ? [gnewsSearch(env,variant,language,diagnostics).catch(()=>[])] : [])
-    ]);
+          ]);
     const labels=["Wikipedia","Wikipedia REST Search","Wikidata","GDELT","Google News Search","Bing News RSS","DuckDuckGo Instant Answers","DuckDuckGo Web Search","Bing Web Search"];
-    if(env.GNEWS_API_KEY&&person&&sportsProfile&&variant===uniqueVariants[1])labels.push("GNews Search");
     diagnostics.push("Expanded variant "+(variantIndex+1)+" result counts: "+labels.map((label,index)=>label+"="+(results[index]?.length||0)).join(", "));
     return results.flat();
   }));
@@ -531,7 +507,7 @@ const localizedSource=(value:string,language:Locale)=>{
     if(/reuters/.test(lower))return "رويترز";
     if(/associated press|ap news/.test(lower))return "أسوشيتد برس";
     if(/al.?jazeera/.test(lower))return "الجزيرة";
-    return /[\u0600-\u06ff]/.test(name)?name:"مصدر بحث";
+    return name||"مصدر بحث";
   }
   if(/فيديو على youtube/i.test(name))return "YouTube video";
   if(/youtube|youtu\.be|vimeo/.test(lower))return "YouTube video";
@@ -585,10 +561,9 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};const academicQuery=/(research|paper|papers|study|studies|journal|doi|scholar|academic|citation|crossref|openalex|pubmed|clinical trial|systematic review|بحث علمي|أبحاث|دراسة|دراسات|مجلة علمية|ورقة بحثية|مصدر أكاديمي|دراسات سريرية|مراجعة منهجية)/i.test(q);
 const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|medicine|health study|بحث طبي|دراسة طبية|دراسات سريرية|تجربة سريرية|مراجعة منهجية)/i.test(q);
 // GNews is a general news-search provider, not a person-only fallback. Include it for every query when configured so topic, event, science, economy, and other searches receive the same source coverage.
-const gnewsEnabled=Boolean(env.GNEWS_API_KEY);
-let [local, wiki, wikiRest, wd, gd, oa, remote, dd, duckWeb, bingWeb, google, bing, gnews, crossref, pubmed] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipediaRestSearch(q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[]),safe(duckWebSearch(q,language),[]),safe(bingWebSearch(q,language),[]),safe(googleNewsSearch(q,language),[]),safe(bingNewsSearch(q,language),[]),safe(gnewsEnabled?gnewsSearch(env,q,language):Promise.resolve([]),[]),safe((academicQuery&&!personLookup(q))?crossrefSearch(q):Promise.resolve([]),[]),safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language),[])]);
-const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...(s.source_gdelt==="0"?[]:["GDELT"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(gnewsEnabled?["GNews Search"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers","DuckDuckGo Web Search","Bing Web Search","Google News Search","Bing News RSS"];const candidates:Candidate[]=[
-    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wikiRest,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...duckWeb,...bingWeb,...google,...bing,...gnews
+let [local, wiki, wikiRest, wd, gd, oa, remote, dd, duckWeb, bingWeb, google, bing, crossref, pubmed] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipediaRestSearch(q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[]),safe(duckWebSearch(q,language),[]),safe(bingWebSearch(q,language),[]),safe(googleNewsSearch(q,language),[]),safe(bingNewsSearch(q,language),[]),safe((academicQuery&&!personLookup(q))?crossrefSearch(q):Promise.resolve([]),[]),safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language),[])]);
+const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...(s.source_gdelt==="0"?[]:["GDELT"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers","DuckDuckGo Web Search","Bing Web Search","Google News Search","Bing News RSS"];const candidates:Candidate[]=[
+    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wikiRest,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...duckWeb,...bingWeb,...google,...bing
   ];
   // Optional authenticated Enterprise enrichment: exact-title article lookups only.
   // Public Wikipedia remains the discovery mechanism; Enterprise is supplemental.
@@ -623,7 +598,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   // single publisher, encyclopedia-only results, or very thin snippets.
   const expansionThreshold=personQuery?Math.min(6,Math.max(3,Number(s.min_sources||3))):Math.max(3,Number(s.min_sources||3));
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
-    providerAttempted.push("Expanded topic variants: Wikipedia, Wikipedia REST Search, Wikidata, GDELT, DuckDuckGo Web Search, Bing Web Search, Google News Search, Bing News RSS"+(env.GNEWS_API_KEY?", GNews Search":""),"OpenAI Web Search (fallback)");
+    providerAttempted.push("Expanded topic variants: Wikipedia, Wikipedia REST Search, Wikidata, GDELT, DuckDuckGo Web Search, Bing Web Search, Google News Search, Bing News RSS","OpenAI Web Search (fallback)");
     const [expanded,web]=await Promise.all([
       safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||""),providerAttempted),[]),
       safe(openAiWebSearch(env,q,language),[])
