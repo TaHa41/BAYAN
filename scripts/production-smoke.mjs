@@ -26,7 +26,7 @@ try{
   if(!sitemap.text.includes("<loc>"+origin+"/</loc>")||sitemap.text.includes("<loc>"+origin+"/?lang=ar</loc>"))throw new Error("homepage_canonical_sitemap_mismatch");
   const newsMap=await get("/news-sitemap.xml");
   if(newsMap.text.includes("/news?story="))throw new Error("news_sitemap_contains_summary_only_pages");
-  const newsLocs=[...newsMap.text.matchAll(/<loc>(.*?)<\\/loc>/g)].map(match=>match[1]);
+  const newsLocs=[...newsMap.text.matchAll(/<loc>(.*?)<\/loc>/g)].map(match=>match[1]);
   if(newsLocs.some(url=>!url.includes("/article/")))throw new Error("news_sitemap_url_is_not_full_article");
   if(newsLocs.length>0&&!newsMap.text.includes("<news:news>"))throw new Error("news_sitemap_news_metadata_missing");
   const homeAr=await get("/?lang=ar"); if(!homeAr.text.includes('<link rel="canonical" href="'+origin+'/">'))throw new Error("arabic_homepage_canonical_mismatch");
