@@ -465,10 +465,15 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   const identity=String(identitySummary||"");
   const sportsProfile=isSportsPersonProfile(identity);
   const writerProfile=/(writer|author|novelist|poet|كاتب|مؤلف|روائي|شاعر)/i.test(identity);
-  // Keep sports queries club-agnostic: encyclopedia summaries may lag transfers.
+  // Arabic sports queries can miss current coverage when providers index the
+  // player's Latin-script name. Add an English-name query without assuming a club;
+  // the result-language and relevance gates still enforce locale and identity.
+  const englishSportsName=person&&language==="ar"&&sportsProfile
+    ? (await wikidata(q,"en").catch(()=>[])).find(item=>!hasArabic(item.title)&&/(footballer|football player|soccer player|athlete)/i.test(String(item.summary||"")) )?.title
+    : undefined;
   const variants=person
     ? (language==="ar"
-      ? (sportsProfile ? [q+" آخر الأخبار",q+" انتقال",q+" المنتخب المصري"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
+      ? (sportsProfile ? [q+" آخر الأخبار",q+" انتقال",englishSportsName ? englishSportsName+" latest news" : q+" منتخب مصر"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
       : (sportsProfile ? [q+" latest news",q+" transfer news",q+" Egypt national team"] : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
     : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,3);
