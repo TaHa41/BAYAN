@@ -102,14 +102,14 @@ async function googleNewsSearch(q:string,language:Locale):Promise<Candidate[]>{
     const response=await timeout(url,5000);if(!response.ok)return[];
     const xml=await response.text();const out:Candidate[]=[];
     for(const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
-      const block=match[1];const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
+      const block=match[1];const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
       const rawTitle=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1400),sourceTag=cleanText(field("source"));
       // Google News RSS occasionally omits <source>. Recover the publisher from its
       // conventional “headline - Publisher” title suffix before falling back to host.
-      const titleParts=rawTitle.match(/^(.*?)\\s+-\\s+([^\\-]+)$/);
+      const titleParts=rawTitle.match(/^(.*?)\s+-\s+([^\-]+)$/);
       const title=sourceTag?rawTitle:(titleParts?.[1]?.trim()||rawTitle);
       let publisher=sourceTag||(titleParts?.[2]?.trim()||"");
-      if(!publisher){try{publisher=new URL(url).hostname.replace(/^www\\./i,"")}catch{publisher="Google News RSS"}}
+      if(!publisher){try{publisher=new URL(url).hostname.replace(/^www\./i,"")}catch{publisher="Google News RSS"}}
       if(!title||!/^https:\/\//i.test(url))continue;
       out.push({title,summary,section:"news",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+4,provider:"Google News Search"});
       if(out.length>=8)break;
@@ -126,7 +126,7 @@ async function bingNewsSearch(q:string,language:Locale):Promise<Candidate[]>{
     const xml=await response.text();const out:Candidate[]=[];
     for(const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
       const block=match[1];
-      const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
+      const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
       const title=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1200);
       if(!title||!/^https:\/\//i.test(url))continue;
       const publisher=cleanText(field("source")||"Bing News");
