@@ -1,7 +1,7 @@
 import {describe,it,expect} from "vitest";
 import {SECTIONS} from "../src/config";
 import {answerHasUnsupportedSpecifics} from "../src/services/ai";
-import {isolateExactPerson,isolateArticleSubject,isSportsPersonProfile} from "../src/services/search";
+import {isolateExactPerson,isolateArticleSubject,isSportsPersonProfile,personIdentityMatches} from "../src/services/search";
 
 describe("BAYAN product foundation",()=>{
   it("has all required sections",()=>expect(SECTIONS.length).toBe(16));
@@ -144,5 +144,14 @@ describe("club-agnostic sports news identity",()=>{
     ] as any;
     const result=isolateExactPerson("محمد صلاح",items);
     expect(result.some(item=>item.title.includes("طرابزون"))).toBe(true);
+  });
+});
+
+
+describe("person identity aliases",()=>{
+  it("matches known Arabic and Latin spellings without requiring a stale club name",()=>{
+    expect(personIdentityMatches("Mohamed Salah signs a new contract","محمد صلاح")).toBe(true);
+    expect(personIdentityMatches("محمد صلاح يوقع عقدًا جديدًا","Mohamed Salah")).toBe(true);
+    expect(personIdentityMatches("Unrelated player signs a contract","محمد صلاح")).toBe(false);
   });
 });
