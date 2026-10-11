@@ -27,30 +27,50 @@ if(!token){
   process.exit(1);
 }
 
-try{
-  const response=await fetch(origin+"/api/admin/repair",{
-    method:"POST",
-    headers:{
-      "authorization":"Bearer "+token,
-      "accept":"application/json",
-      "content-type":"application/json"
-    },
-    body:"{}",
-    signal:AbortSignal.timeout(25000)
-  });
-  const body=await response.text();
-  console.log("Authenticated runtime repair endpoint returned HTTP "+response.status+".");
+// Each repair pass is intentionally bounded. Persistent failures should make
+// progress across passes without allowing an unbounded deploy job.
+const maxRepairPasses=4;
+for(let attempt=1;attempt<=maxRepairPasses;attempt++){
   try{
-    const result=JSON.parse(body);
-    console.log("Repair verification:",String(result.verification||result.health?.verification||"not reported"));
-    console.log("Repair actions:",JSON.stringify(result.actions||result.health?.actions||[]).slice(0,2500));
-    console.log("Remaining failures:",JSON.stringify(result.failures||result.health?.failures||[]).slice(0,1000));
-  }catch{
-    console.log("Repair response was not JSON:",body.slice(0,500));
+    const response=await fetch(origin+"/api/admin/repair",{
+      method:"POST",
+      headers:{
+        "authorization":"Bearer "+token,
+        "accept":"application/json",
+        "content-type":"application/json"
+      },
+      body:"{}",
+      signal:AbortSignal.timeout(25000)
+    });
+    const body=await response.text();
+    console.log("Authenticated runtime repair pass "+attempt+"/"+maxRepairPasses+" returned HTTP "+response.status+".");
+    let result:any;
+    try{result=JSON.parse(body)}catch{
+      console.log("Repair response was not JSON:",body.slice(0,500));
+      break;
+    }
+    const verification=String(result.verification||result.health?.verification||"not reported");
+    const actions=result.actions||result.health?.actions||[];
+    const failures=result.failures||result.health?.failures||[];
+    console.log("Repair verification:",verification);
+    console.log("Repair actions:",JSON.stringify(actions).slice(0,2500));
+    console.log("Remaining failures:",JSON.stringify(failures).slice(0,1000));
+    if(!response.ok){
+      console.error("The repair endpoint did not report HTTP success; stopping repair retries.");
+      break;
+    }
+    if(verification==="verified_runtime"||(result.ok===true&&Array.isArray(failures)&&failures.length===0)){
+      console.log("Runtime health verified; no additional repair pass is needed.");
+      break;
+    }
+    if(!Array.isArray(failures)||failures.length===0){
+      console.log("The repair endpoint did not provide remaining failures; stopping instead of guessing.");
+      break;
+    }
+  }catch(error){
+    console.error("Could not complete authenticated runtime repair pass "+attempt+":",String(error));
+    break;
   }
-  if(!response.ok)console.error("The repair endpoint did not report HTTP success; a final smoke test will still run.");
-}catch(error){
-  console.error("Could not invoke the runtime repair endpoint:",String(error));
 }
 
 if(smoke("Post-repair production verification")){
