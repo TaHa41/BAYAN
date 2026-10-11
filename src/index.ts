@@ -160,7 +160,7 @@ const ensureMeta=(attribute:"name"|"property",name:string,value:string)=>{
   if(pattern.test(html))html=html.replace(pattern,tag);
   else html=html.replace("</head>",tag+"</head>");
 };
-ensureMeta("name","robots","index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1");
+const noindexRoute=path.startsWith("/review")||path.startsWith("/admin")||/<meta\s+name="robots"\s+content="noindex/i.test(headExtras);ensureMeta("name","robots",noindexRoute?"noindex,follow":"index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1");
 ensureMeta("property","og:title",title);
 ensureMeta("property","og:description",description);
 ensureMeta("property","og:url",canonical);
