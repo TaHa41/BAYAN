@@ -44,7 +44,7 @@ for(let attempt=1;attempt<=maxRepairPasses;attempt++){
     });
     const body=await response.text();
     console.log("Authenticated runtime repair pass "+attempt+"/"+maxRepairPasses+" returned HTTP "+response.status+".");
-    let result:any;
+    let result;
     try{result=JSON.parse(body)}catch{
       console.log("Repair response was not JSON:",body.slice(0,500));
       break;
