@@ -135,3 +135,14 @@ describe("evidence-backed AI answer validation",()=>{
     expect(answerHasUnsupportedSpecifics("Mohamed Salah scored 18 goals for Liverpool in 2025.",evidence)).toBe(true);
   });
 });
+
+describe("club-agnostic sports news identity",()=>{
+  it("keeps a relevant transfer story when a footballer's club changes",()=>{
+    const items=[
+      {title:"محمد صلاح",summary:"محمد صلاح لاعب كرة قدم مصري محترف وقائد منتخب مصر.",url:"https://ar.wikipedia.org/wiki/محمد_صلاح",provider:"Wikipedia",score:90,sources:[{title:"محمد صلاح",publisher:"Wikipedia Arabic",url:"https://ar.wikipedia.org/wiki/محمد_صلاح"}]},
+      {title:"محمد صلاح يوقع عقدًا مع طرابزون سبور",summary:"أفادت رويترز بأن محمد صلاح وقع عقدًا لمدة عامين مع طرابزون سبور بعد رحيله عن ليفربول.",url:"https://www.reuters.com/sports/soccer/soccer-mohamed-salah-signs-two-year-deal-with-trabzonspor-2026-08-06/",provider:"Google News Search",score:80,sources:[{title:"محمد صلاح يوقع عقدًا مع طرابزون سبور",publisher:"Reuters",url:"https://www.reuters.com/sports/soccer/soccer-mohamed-salah-signs-two-year-deal-with-trabzonspor-2026-08-06/"}]}
+    ] as any;
+    const result=isolateExactPerson("محمد صلاح",items);
+    expect(result.some(item=>item.title.includes("طرابزون"))).toBe(true);
+  });
+});
