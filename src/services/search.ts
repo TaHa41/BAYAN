@@ -113,7 +113,11 @@ async function googleNewsSearch(q:string,language:Locale,diagnostics?:string[]):
     for(const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
       rawItems++;
       const block=match[1];const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
-      const title=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1400),publisher=cleanText(field("source")||"Google News");
+      const rawTitle=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1400),sourceTag=cleanText(field("source"));
+      const titleParts=rawTitle.match(/^(.*?)\\s+-\\s+([^\\-]+)$/);
+      const title=sourceTag?rawTitle:(titleParts?.[1]?.trim()||rawTitle);
+      let publisher=sourceTag||(titleParts?.[2]?.trim()||"");
+      if(!publisher){try{publisher=new URL(url).hostname.replace(/^www\\./i,"")}catch{publisher="Google News RSS"}}
       if(!title||!/^https:\/\//i.test(url))continue;
       out.push({title,summary,section:"news",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+4,provider:"Google News Search"});
       if(out.length>=8)break;
