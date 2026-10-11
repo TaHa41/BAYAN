@@ -40,47 +40,47 @@ if(section&&path!=="/"){
   seoFallback='<section class="seo-content-fallback"><h1>'+seoEscape(sectionTitle)+'</h1><p>'+seoEscape(sectionDescription)+'</p>'+(itemsHtml||'<p>'+(lang==="en"?"New evidence-checked content is being prepared for this section.":"يجري تجهيز محتوى موثق لهذا القسم.")+'</p>')+'</section>';
   headExtras+='<script type="application/ld+json">'+JSON.stringify({"@context":"https://schema.org","@type":"CollectionPage","name":sectionTitle,"description":sectionDescription,"inLanguage":lang,"url":ORIGIN+path+"?lang="+lang,"mainEntity":{"@type":"ItemList","itemListElement":cards.filter(item=>item.slug).map((item,index)=>({"@type":"ListItem","position":index+1,"url":ORIGIN+"/article/"+encodeURIComponent(item.slug)+"?lang="+lang,"name":item.title}))}}).replace(/</g,"\\u003c")+'</script>';
 }
-const staticPageContent:Record<string,{title:string;description:string;paragraphs:string[]}>={
+const staticPageContent:Record<string,{title:string;metaTitle?:string;description:string;paragraphs:string[]}>={
   "/about":lang==="en"?{
-    title:"About BAYAN",
-    description:"BAYAN is a knowledge, news and live-data service built around evidence and verification.",
-    paragraphs:["BAYAN is an Arabic and English knowledge, news and live-data service built around evidence and verification.","The goal is to help readers understand a topic and its context, distinguish sourced evidence from summaries, and recognize when available information is incomplete.","BAYAN aims to avoid presenting guesses as facts and to make information clearer without replacing original sources or professional advice."]
+    title:"About BAYAN",metaTitle:"About BAYAN: Evidence-Based Knowledge and News",
+    description:"Discover BAYAN, an Arabic and English knowledge platform for sourced explainers, verified news, research context and live data, with a focus on evidence and transparency.",
+    paragraphs:["BAYAN is an Arabic and English knowledge, news and live-data service built around evidence and verification.","The goal is to help readers understand a topic and its context, distinguish sourced evidence from summaries, and recognize when available information is incomplete.","BAYAN aims to avoid presenting guesses as facts and to make information clearer without replacing original sources or professional advice. The platform is designed to make source context clearer, not to replace the work of journalists, researchers or data providers."]
   }:{
-    title:"عن بيان",
-    description:"بيان مركز معرفة وأخبار وبيانات مبني على الأدلة والتحقق قبل الادعاء.",
-    paragraphs:["بيان مركز معرفة وأخبار وبيانات عربية وإنجليزية يركز على الأدلة والتحقق قبل الادعاء.","يهدف بيان إلى مساعدة القارئ على فهم الموضوع وسياقه، والتمييز بين الأدلة المستندة إلى مصادر والملخصات، ومعرفة متى تكون المعلومات المتاحة غير مكتملة.","يسعى بيان إلى عدم تقديم التخمين باعتباره حقيقة، وتوضيح المعلومات دون أن يحل محل المصادر الأصلية أو المشورة المتخصصة."]
+    title:"عن بيان",metaTitle:"عن بيان: مركز المعرفة والأخبار الموثقة",
+    description:"تعرّف على بيان، مركز معرفة عربي وإنجليزي يجمع البحث والشروحات والأخبار والبيانات المباشرة مع التركيز على الأدلة ووضوح المصادر وسياق المعلومات.",
+    paragraphs:["بيان مركز معرفة وأخبار وبيانات عربية وإنجليزية يركز على الأدلة والتحقق قبل الادعاء.","يهدف بيان إلى مساعدة القارئ على فهم الموضوع وسياقه، والتمييز بين الأدلة المستندة إلى مصادر والملخصات، ومعرفة متى تكون المعلومات المتاحة غير مكتملة.","يسعى بيان إلى عدم تقديم التخمين باعتباره حقيقة، وتوضيح المعلومات دون أن يحل محل المصادر الأصلية أو المشورة المتخصصة. ويهدف الموقع إلى توضيح سياق المعلومة، لا إلى استبدال عمل الصحفيين أو الباحثين أو مزودي البيانات."]
   },
   "/methodology":lang==="en"?{
-    title:"Methodology",
-    description:"How BAYAN retrieves evidence, compares sources and communicates uncertainty.",
-    paragraphs:["BAYAN aims to retrieve relevant evidence before drafting an answer, then compare identifiable sources when available.","Claims should be separated from interpretation, and the date and relevance of sources should be considered. Independent corroboration can increase confidence, while conflicting or missing evidence should remain visible.","When evidence is insufficient, ambiguous or outdated, BAYAN should explain the limitation rather than invent details or imply certainty."]
+    title:"Methodology",metaTitle:"BAYAN Methodology: Evidence and Verification",
+    description:"Learn how BAYAN searches for relevant evidence, compares identifiable sources, checks dates and context, and communicates uncertainty instead of inventing unsupported details.",
+    paragraphs:["BAYAN aims to retrieve relevant evidence before drafting an answer, then compare identifiable sources when available.","Claims should be separated from interpretation, and the date and relevance of sources should be considered. Independent corroboration can increase confidence, while conflicting or missing evidence should remain visible.","When evidence is insufficient, ambiguous or outdated, BAYAN should explain the limitation rather than invent details or imply certainty. The strength of a conclusion should remain proportional to the quality, independence and relevance of the available evidence."]
   }:{
-    title:"المنهجية",
-    description:"كيف يسترجع بيان الأدلة ويقارن المصادر ويوضح حدود المعلومات وعدم اليقين.",
-    paragraphs:["يهدف بيان إلى استرجاع الأدلة ذات الصلة قبل صياغة الإجابة، ثم مقارنة المصادر التي يمكن تحديد هويتها متى توفرت.","ينبغي التمييز بين الادعاء والتفسير، ومراعاة تاريخ المصدر وصلته بالموضوع. وقد يزيد التأييد المستقل من قوة الاستنتاج، بينما يجب توضيح تعارض الأدلة أو غيابها.","عندما تكون الأدلة غير كافية أو ملتبسة أو قديمة، ينبغي لبيان توضيح هذا القيد بدل اختلاق تفاصيل أو الإيحاء باليقين."]
+    title:"المنهجية",metaTitle:"منهجية بيان في البحث والأدلة والتحقق",
+    description:"تعرّف على كيفية بحث بيان عن الأدلة ومقارنة المصادر وتدقيق التواريخ والسياق وتوضيح عدم اليقين بدل اختلاق معلومات لا تدعمها المصادر.",
+    paragraphs:["يهدف بيان إلى استرجاع الأدلة ذات الصلة قبل صياغة الإجابة، ثم مقارنة المصادر التي يمكن تحديد هويتها متى توفرت.","ينبغي التمييز بين الادعاء والتفسير، ومراعاة تاريخ المصدر وصلته بالموضوع. وقد يزيد التأييد المستقل من قوة الاستنتاج، بينما يجب توضيح تعارض الأدلة أو غيابها.","عندما تكون الأدلة غير كافية أو ملتبسة أو قديمة، ينبغي لبيان توضيح هذا القيد بدل اختلاق تفاصيل أو الإيحاء باليقين. وينبغي أن تتناسب قوة الاستنتاج مع جودة الأدلة المتاحة واستقلال مصادرها وصلتها بالسؤال."]
   },
   "/privacy":lang==="en"?{
-    title:"Privacy",
-    description:"BAYAN privacy information about operational data and private administrator analytics.",
-    paragraphs:["BAYAN uses technical information needed to operate, secure and improve the service.","Usage analytics intended for site administration are private and are not displayed as public visitor information.","Do not submit passwords, payment details or other sensitive personal information through general search or contribution forms."]
+    title:"Privacy",metaTitle:"BAYAN Privacy Policy and Data Use",
+    description:"Read how BAYAN may process technical and usage information to operate, secure and improve the service, and how administrative visit analytics are kept private.",
+    paragraphs:["BAYAN uses technical information needed to operate, secure and improve the service.","Usage analytics intended for site administration are private and are not displayed as public visitor information.","Do not submit passwords, payment details or other sensitive personal information through general search or contribution forms. This notice should be reviewed if the service adds new data collection or connects additional third-party providers."]
   }:{
-    title:"الخصوصية",
-    description:"معلومات الخصوصية في بيان واستخدام البيانات التشغيلية وإحصاءات الإدارة الخاصة.",
-    paragraphs:["يستخدم بيان المعلومات التقنية اللازمة لتشغيل الخدمة وتأمينها وتحسينها.","إحصاءات الاستخدام المخصصة لإدارة الموقع خاصة، ولا تُعرض باعتبارها معلومات عامة عن الزوار.","يرجى عدم إرسال كلمات المرور أو بيانات الدفع أو غيرها من المعلومات الشخصية الحساسة عبر البحث العام أو نماذج المساهمات."]
+    title:"الخصوصية",metaTitle:"سياسة خصوصية بيان واستخدام البيانات",
+    description:"اقرأ كيف قد يعالج بيان البيانات التقنية ومعلومات الاستخدام لتشغيل الخدمة وتأمينها وتحسينها، وكيف تُحفظ إحصاءات الزيارات الإدارية بصورة خاصة.",
+    paragraphs:["يستخدم بيان المعلومات التقنية اللازمة لتشغيل الخدمة وتأمينها وتحسينها.","إحصاءات الاستخدام المخصصة لإدارة الموقع خاصة، ولا تُعرض باعتبارها معلومات عامة عن الزوار.","يرجى عدم إرسال كلمات المرور أو بيانات الدفع أو غيرها من المعلومات الشخصية الحساسة عبر البحث العام أو نماذج المساهمات. وينبغي مراجعة هذا الإشعار عند إضافة طرق جديدة لجمع البيانات أو ربط مزودي خدمات خارجيين."]
   },
   "/terms":lang==="en"?{
-    title:"Terms of Use",
-    description:"Terms for using BAYAN information services and the limits of informational content.",
-    paragraphs:["BAYAN content is provided for general informational and educational purposes.","Readers should check important claims against original sources and seek qualified professional advice where appropriate. News summaries and AI-generated explanations may be incomplete or change as new evidence becomes available.","Do not use BAYAN as the sole basis for urgent, legal, medical or financial decisions."]
+    title:"Terms of Use",metaTitle:"BAYAN Terms of Use and Information Limits",
+    description:"Understand the intended use of BAYAN knowledge, news and live-data features, the limits of summaries, and why important claims should be checked against original sources.",
+    paragraphs:["BAYAN content is provided for general informational and educational purposes.","Readers should check important claims against original sources and seek qualified professional advice where appropriate. News summaries and AI-generated explanations may be incomplete or change as new evidence becomes available.","Do not use BAYAN as the sole basis for urgent, legal, medical or financial decisions. Use the service lawfully, do not attempt to disrupt it, and do not misuse other people’s information."]
   }:{
-    title:"شروط الاستخدام",
-    description:"شروط استخدام خدمات بيان وحدود الاعتماد على المحتوى المعلوماتي.",
-    paragraphs:["يُقدَّم محتوى بيان لأغراض المعرفة والتثقيف العام.","ينبغي للقارئ مراجعة الادعاءات المهمة بالرجوع إلى المصادر الأصلية وطلب المشورة المتخصصة عند الحاجة. وقد تكون الملخصات الإخبارية والشروحات المولدة بالذكاء الاصطناعي غير مكتملة أو تتغير عند ظهور أدلة جديدة.","لا تعتمد على بيان وحده لاتخاذ قرارات عاجلة أو قانونية أو طبية أو مالية."]
+    title:"شروط الاستخدام",metaTitle:"شروط استخدام خدمات بيان وحدود المعلومات",
+    description:"تعرّف على الاستخدام المقصود لخدمات المعرفة والأخبار والبيانات المباشرة في بيان وحدود الملخصات وأهمية مراجعة المصادر الأصلية.",
+    paragraphs:["يُقدَّم محتوى بيان لأغراض المعرفة والتثقيف العام.","ينبغي للقارئ مراجعة الادعاءات المهمة بالرجوع إلى المصادر الأصلية وطلب المشورة المتخصصة عند الحاجة. وقد تكون الملخصات الإخبارية والشروحات المولدة بالذكاء الاصطناعي غير مكتملة أو تتغير عند ظهور أدلة جديدة.","لا تعتمد على بيان وحده لاتخاذ قرارات عاجلة أو قانونية أو طبية أو مالية. استخدم الخدمة وفق القانون، ولا تحاول تعطيلها أو إساءة استخدام معلومات الآخرين."]
   }
 };
 const staticPage=staticPageContent[path];
 if(staticPage){
-  title=staticPage.title+" | BAYAN";
+  title=(staticPage.metaTitle||staticPage.title)+" | BAYAN";
   description=staticPage.description;
   seoFallback='<section class="page narrow seo-static-page"><div class="page-head"><span class="eyebrow">BAYAN</span><h1>'+seoEscape(staticPage.title)+'</h1></div><article class="answer">'+staticPage.paragraphs.map((paragraph)=>'<p>'+seoEscape(paragraph)+'</p>').join("")+'</article></section>';
   headExtras+='<script type="application/ld+json">'+JSON.stringify({"@context":"https://schema.org","@type":"WebPage","name":staticPage.title,"description":staticPage.description,"inLanguage":lang,"url":ORIGIN+path+"?lang="+lang,"isPartOf":{"@type":"WebSite","name":"BAYAN","url":ORIGIN}}).replace(/</g,"\\u003c")+'</script>';
