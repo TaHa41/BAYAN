@@ -1,7 +1,7 @@
 import {ORIGIN,SECTIONS} from "./config";
 import type {Env,Locale} from "./types";
 import {text}from"./http";
-import {latestNewsForSitemap} from "./services/news";
+
 
 export function robots(){
   // Keep robots.txt limited to directives recognized by crawlers.
@@ -28,19 +28,26 @@ export async function sitemap(env:Env){
     return '<url><loc>'+xml(item.url)+'</loc>'+lastmod+'</url>';
   }).join("")+"</urlset>","application/xml;charset=utf-8");
 }
-export async function newsSitemap(_env:Env){
-  let items:Array<any>=[];
-  try{
-    const [ar,en]=await Promise.all([latestNewsForSitemap("ar"),latestNewsForSitemap("en")]);
-    items=[...ar.map(x=>({...x,language:"ar" as Locale})),...en.map(x=>({...x,language:"en" as Locale}))];
-  }catch{}
+export async function newsSitemap(env:Env){
   const now=Date.now();
-  items=items.filter(x=>{
-    const published=Date.parse(String(x.publishedAt||""));
-    return Number.isFinite(published)&&published<=now+5*60*1000&&now-published<=48*60*60*1000&&String(x.title||"").length>0;
-  });
+  let items:Array<{slug:string;title:string;language:Locale;publishedAt:string}>=[];
+  try{
+    const r=await env.DB.prepare("SELECT slug,title,language,created_at,body,sources_json FROM articles WHERE status='PUBLISHED' AND section='news' ORDER BY created_at DESC LIMIT 1000").all<any>();
+    items=(r.results||[]).filter((x:any)=>{
+      const published=Date.parse(String(x.created_at||""));
+      const body=String(x.body||"").trim();
+      const headings=(body.match(/^#{1,3}\s+.+$/gm)||[]).length;
+      const paragraphs=body.split(/\n\s*\n/).map((part:string)=>part.trim()).filter((part:string)=>part.length>=65&&!/^#{1,4}\s/.test(part)&&!/^([-*+] |\d+[.)] )/.test(part));
+      const uniqueParagraphs=new Set(paragraphs.map((part:string)=>part.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu," ").trim()));
+      let sources:any[]=[];
+      try{const parsed=JSON.parse(String(x.sources_json||"[]"));sources=Array.isArray(parsed)?parsed:[]}catch{}
+      const hosts=new Set(sources.map((source:any)=>{try{return new URL(String(source.url||"")).hostname.toLowerCase().replace(/^www\./,"")}catch{return""}}).filter(Boolean));
+      const publishers=new Set(sources.map((source:any)=>String(source.publisher||"").trim().toLowerCase()).filter(Boolean));
+      return Boolean(x.slug&&x.title&&(x.language==="ar"||x.language==="en")&&Number.isFinite(published)&&published<=now+5*60*1000&&now-published<=48*60*60*1000&&body.length>=1800&&headings>=4&&paragraphs.length>=5&&uniqueParagraphs.size>=5&&hosts.size>=2&&publishers.size>=2);
+    }).map((x:any)=>({slug:String(x.slug),title:String(x.title),language:x.language as Locale,publishedAt:new Date(String(x.created_at)).toISOString()}));
+  }catch{}
   return text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">'+items.map(x=>{
-    const url=ORIGIN+"/news?story="+encodeURIComponent(String(x.title||""))+"&lang="+x.language;
-    return '<url><loc>'+xml(url)+'</loc><news:news><news:publication><news:name>BAYAN</news:name><news:language>'+xml(x.language)+'</news:language></news:publication><news:publication_date>'+xml(new Date(String(x.publishedAt)).toISOString())+'</news:publication_date><news:title>'+xml(String(x.title||""))+'</news:title></news:news></url>';
+    const url=ORIGIN+"/article/"+encodeURIComponent(x.slug)+"?lang="+x.language;
+    return '<url><loc>'+xml(url)+'</loc><news:news><news:publication><news:name>BAYAN</news:name><news:language>'+xml(x.language)+'</news:language></news:publication><news:publication_date>'+xml(x.publishedAt)+'</news:publication_date><news:title>'+xml(x.title)+'</news:title></news:news></url>';
   }).join("")+"</urlset>","application/xml;charset=utf-8");
 }

@@ -24,6 +24,16 @@ try{
   const sitemap=await get("/sitemap.xml");
   if(!sitemap.text.includes("?lang=ar")||!sitemap.text.includes("?lang=en")||!sitemap.text.includes("<lastmod>"))throw new Error("localized_sitemap_or_lastmod_missing");
   if(!sitemap.text.includes("<loc>"+origin+"/</loc>")||sitemap.text.includes("<loc>"+origin+"/?lang=ar</loc>"))throw new Error("homepage_canonical_sitemap_mismatch");
+  const newsMap=await get("/news-sitemap.xml");
+  if(newsMap.text.includes("/news?story="))throw new Error("news_sitemap_contains_summary_only_pages");
+  const newsLocs=[...newsMap.text.matchAll(/<loc>(.*?)<\/loc>/g)].map(match=>match[1]);
+  if(newsLocs.some(url=>!url.includes("/article/")))throw new Error("news_sitemap_url_is_not_full_article");
+  if(newsLocs.length>0&&!newsMap.text.includes("<news:news>"))throw new Error("news_sitemap_news_metadata_missing");
+  if(newsLocs.length>0){
+    const articleUrl=new URL(newsLocs[0]);
+    const articlePage=await get(articleUrl.pathname+articleUrl.search);
+    if(!articlePage.text.includes("<h1>")||!articlePage.text.includes("<h2>"))throw new Error("news_sitemap_article_not_rendered_as_full_content");
+  }
   const homeAr=await get("/?lang=ar"); if(!homeAr.text.includes('<link rel="canonical" href="'+origin+'/">'))throw new Error("arabic_homepage_canonical_mismatch");
   const homeEn=await get("/?lang=en"); if(!homeEn.text.includes('<link rel="canonical" href="'+origin+'/?lang=en">'))throw new Error("english_homepage_canonical_mismatch");
   const robots=await get("/robots.txt");
