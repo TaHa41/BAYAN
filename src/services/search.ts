@@ -168,7 +168,7 @@ async function openAiWebSearch(env:Env,q:string,language:Locale):Promise<Candida
     const response=await fetch("https://api.openai.com/v1/responses",{
       method:"POST",
       headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},
-      signal:AbortSignal.timeout(3500),
+      signal:AbortSignal.timeout(9000),
       body:JSON.stringify({
         model:env.OPENAI_MODEL||"gpt-5-mini",
         tools:[{type:"web_search"}],
