@@ -8,9 +8,11 @@ on:
 permissions:
   contents: read
 
+# Never cancel a deployment already applying migrations or publishing the Worker.
+# Queue newer main commits so each production deployment finishes verification.
 concurrency:
   group: bayan-production-deploy
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
