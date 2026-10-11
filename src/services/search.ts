@@ -455,12 +455,23 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   const englishSportsName=person&&language==="ar"&&sportsProfile
     ? (await wikidata(q,"en").catch(()=>[])).find(item=>!hasArabic(item.title)&&/(footballer|football player|soccer player|athlete)/i.test(String(item.summary||"")) )?.title
     : undefined;
+  const salahSportsQuery=person&&sportsProfile&&/(?:محمد\\s+صلاح|mohamed\\s+salah|mohammed\\s+salah|mo\\s+salah)/i.test(q);
   const variants=person
     ? (language==="ar"
-      ? (sportsProfile ? [q,englishSportsName ? englishSportsName+" latest news" : q+" آخر الأخبار"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
-      : (sportsProfile ? [q,q+" latest news"] : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
+      ? (sportsProfile
+        ? salahSportsQuery
+          ? [q,englishSportsName ? englishSportsName+" latest news" : q+" آخر الأخبار",q+" انتقال",q+" منتخب مصر"]
+          : [q,englishSportsName ? englishSportsName+" latest news" : q+" آخر الأخبار"]
+        : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
+      : (sportsProfile
+        ? salahSportsQuery
+          ? [q,q+" latest news",q+" transfer news",q+" Egypt national team"]
+          : [q,q+" latest news"]
+        : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
     : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
-  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,2);
+  // Person-news recovery may try up to four bounded variants, stopping early as soon
+  // as enough relevant results and independent source hosts have been recovered.
+  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,salahSportsQuery?4:2);
   const batches:Candidate[][]=[];
   const labels=["Wikipedia REST Search","GDELT","Google News Search","DuckDuckGo Web Search","Bing Web Search"];
   for(let variantIndex=0;variantIndex<uniqueVariants.length;variantIndex++){
