@@ -1,13 +1,20 @@
 import {describe,it,expect} from "vitest";
 import {SECTIONS} from "../src/config";
 import {answerHasUnsupportedSpecifics} from "../src/services/ai";
-import {isolateExactPerson,isolateArticleSubject} from "../src/services/search";
+import {isolateExactPerson,isolateArticleSubject,isSportsPersonProfile} from "../src/services/search";
 
 describe("BAYAN product foundation",()=>{
   it("has all required sections",()=>expect(SECTIONS.length).toBe(16));
   it("has bilingual labels",()=>expect(SECTIONS.every(x=>x[1]&&x[2])).toBe(true));
 });
 
+describe("sports person profile detection",()=>{
+  it("recognizes Arabic plural descriptions of footballers returned by encyclopedia sources",()=>{
+    expect(isSportsPersonProfile("يُعد أحد أبرز اللاعبين العرب والأفارقة، وحصد جوائز فردية معروفة.")).toBe(true);
+    expect(isSportsPersonProfile("Egyptian footballer and athlete.")).toBe(true);
+    expect(isSportsPersonProfile("كاتب وأديب سعودي.")).toBe(false);
+  });
+});
 describe("canonical same-name profile selection",()=>{
   it("prefers a rich exact Wikipedia biography over a short conflicting Wikidata label",()=>{
     const items=[
