@@ -32,7 +32,7 @@ export async function newsSitemap(env:Env){
   const now=Date.now();
   let items:Array<{slug:string;title:string;language:Locale;publishedAt:string}>=[];
   try{
-    const r=await env.DB.prepare("SELECT slug,title,language,created_at,body,sources_json FROM articles WHERE status='PUBLISHED' ORDER BY created_at DESC LIMIT 1000").all<any>();
+    const r=await env.DB.prepare("SELECT slug,title,language,created_at,body,sources_json FROM articles WHERE status='PUBLISHED' AND section='news' ORDER BY created_at DESC LIMIT 1000").all<any>();
     items=(r.results||[]).filter((x:any)=>{
       const published=Date.parse(String(x.created_at||""));
       const body=String(x.body||"").trim();
