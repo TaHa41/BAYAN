@@ -25,9 +25,23 @@ try{
   if(!sitemap.text.includes("?lang=ar")||!sitemap.text.includes("?lang=en")||!sitemap.text.includes("<lastmod>"))throw new Error("localized_sitemap_or_lastmod_missing");
   const robots=await get("/robots.txt");
   if(!robots.text.includes("Sitemap:")||!robots.text.includes("Disallow: /admin"))throw new Error("robots_policy_missing");
-  if(!robots.text.includes("Agentmap: "+origin+"/.well-known/ai-catalog.json"))throw new Error("robots_agentmap_missing");
+  if(robots.text.includes("Agentmap:"))throw new Error("robots_contains_unrecognized_agentmap_directive");
   const llms=await get("/llms.txt");
   if(!/^#\s+.+/m.test(llms.text)||!llms.text.includes(origin+"/search?lang=ar")||!llms.text.includes("## Public pages"))throw new Error("llms_txt_structure_or_links_missing");
+  const staticSeoPages=[
+    ["/about?lang=ar","عن بيان"],
+    ["/about?lang=en","About BAYAN"],
+    ["/methodology?lang=ar","المنهجية"],
+    ["/methodology?lang=en","Methodology"],
+    ["/privacy?lang=ar","الخصوصية"],
+    ["/privacy?lang=en","Privacy"],
+    ["/terms?lang=ar","الشروط"],
+    ["/terms?lang=en","Terms of Use"]
+  ];
+  await inBatches(staticSeoPages,4,async([path,heading])=>{
+    const page=await get(path);
+    if(!page.text.includes("<h1>")||!page.text.includes(heading))throw new Error(path+" server_rendered_seo_content_missing");
+  });
   for(const path of ["/.well-known/ai-catalog.json","/ai-catalog.json"]){
     const response=await get(path);
     if(!/json/i.test(response.headers.get("content-type")||""))throw new Error(path+" content_type_not_json");
