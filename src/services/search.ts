@@ -407,7 +407,7 @@ export const personIdentityMatches=(text:string,name:string)=>{
   if(normalizedName&&normalizedText.includes(normalizedName))return true;
   if(!/(محمد\s+صلاح|mohamed\s+salah|mohammed\s+salah|mo\s+salah)/i.test(name))return false;
   if(/محمد\s+صلاح|مو\s+صلاح|mohamed\s+salah|mohammed\s+salah|mo\s+salah/i.test(text))return true;
-  return /صلاح/i.test(text)&&/(ليفربول|منتخب مصر|الفرعون المصري|اللاعب المصري|هدف|مباراة)/i.test(text);
+  return /صلاح/i.test(text)&&/(ليفربول|طرابزون|منتخب مصر|الفرعون المصري|اللاعب المصري|هدف|مباراة|انتقال|يوقع|وقع|عقد|صفقة|نادي|فريق|كرة قدم|الدوري|مهاجم|liverpool|trabzonspor|transfer|signed|contract|deal|joined|club|team|goal|match|league|striker|forward)/i.test(text);
 };
 export const isolateArticleSubject=(title:string,items:Candidate[])=>{
  const query=normalizedEntityTitle(title);
@@ -457,11 +457,9 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
     : undefined;
   const variants=person
     ? (language==="ar"
-      ? (sportsProfile ? [q+" آخر الأخبار",q+" انتقال",englishSportsName ? englishSportsName+" latest news" : q+" منتخب مصر"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
-      : (sportsProfile ? [q+" latest news",q+" transfer news",q+" Egypt national team"] : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
+      ? (sportsProfile ? [q,englishSportsName ? englishSportsName+" latest news" : q+" آخر الأخبار"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
+      : (sportsProfile ? [q,q+" latest news"] : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
     : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
-  // The first pass already calls many providers. Sequential, bounded recovery prevents
-  // a 3-variant x 9-provider fan-out from exhausting Cloudflare Worker subrequests.
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,2);
   const batches:Candidate[][]=[];
   const labels=["Wikipedia REST Search","GDELT","Google News Search","DuckDuckGo Web Search","Bing Web Search"];
