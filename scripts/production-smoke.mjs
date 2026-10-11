@@ -23,6 +23,9 @@ try{const health=await get("/api/health");const data=JSON.parse(health.text);if(
 try{
   const sitemap=await get("/sitemap.xml");
   if(!sitemap.text.includes("?lang=ar")||!sitemap.text.includes("?lang=en")||!sitemap.text.includes("<lastmod>"))throw new Error("localized_sitemap_or_lastmod_missing");
+  if(!sitemap.text.includes("<loc>"+origin+"/</loc>")||sitemap.text.includes("<loc>"+origin+"/?lang=ar</loc>"))throw new Error("homepage_canonical_sitemap_mismatch");
+  const homeAr=await get("/?lang=ar"); if(!homeAr.text.includes('<link rel="canonical" href="'+origin+'/">'))throw new Error("arabic_homepage_canonical_mismatch");
+  const homeEn=await get("/?lang=en"); if(!homeEn.text.includes('<link rel="canonical" href="'+origin+'/?lang=en">'))throw new Error("english_homepage_canonical_mismatch");
   const robots=await get("/robots.txt");
   if(!robots.text.includes("Sitemap:")||!robots.text.includes("Disallow: /admin"))throw new Error("robots_policy_missing");
   if(robots.text.includes("Agentmap:"))throw new Error("robots_contains_unrecognized_agentmap_directive");
@@ -89,6 +92,8 @@ try{
   const first=d.items[0];
   const storyPage=await get("/news?story="+encodeURIComponent(first.title)+"&lang=ar");
   if(!storyPage.text.includes('property="og:title"')||!storyPage.text.includes('application/ld+json')||!storyPage.text.includes("story="))throw new Error("news_story_seo_metadata_missing");
+  if(!storyPage.text.includes('class="seo-news-story"')||!storyPage.text.includes("<h1>")||!storyPage.text.includes('class="seo-news-summary"'))throw new Error("news_story_server_rendered_content_missing");
+  if(first.imageUrl&&!storyPage.text.includes('class="seo-news-image"'))throw new Error("news_story_server_rendered_image_missing");
   const articlePath="/api/news/article?title="+encodeURIComponent(first.title)+"&image="+encodeURIComponent(first.imageUrl||"")+"&summary="+encodeURIComponent(first.summary||"")+"&url="+encodeURIComponent(first.url||"")+"&publisher="+encodeURIComponent(first.publisher||"")+"&publishedAt="+encodeURIComponent(first.publishedAt||"")+"&lang=ar";
   const a=await fetch(origin+articlePath,{headers:{accept:"application/json"},signal:AbortSignal.timeout(30000)}); const articleText=await a.text(); const ad=JSON.parse(articleText);
   if(a.status===422&&["article_evidence_insufficient","article_identity_ambiguous"].includes(String(ad.error||""))){console.log("SAFE ARTICLE WITHHELD",ad.error);}
