@@ -13,7 +13,12 @@ async function get(path){
   for(const [name,value] of [["x-content-type-options","nosniff"],["x-frame-options","DENY"],["referrer-policy","strict-origin-when-cross-origin"]])if(r.headers.get(name)!==value)throw new Error(path+" missing security header "+name);
   return{text,status:r.status,headers:r.headers};
 }
-for(const path of checks){try{await get(path)}catch(e){console.error(e);bad++}}
+async function inBatches(items,size,fn){
+  for(let i=0;i<items.length;i+=size){
+    await Promise.all(items.slice(i,i+size).map(fn));
+  }
+}
+await inBatches(checks,4,async path=>{try{await get(path)}catch(e){console.error(e);bad++}});
 try{const health=await get("/api/health");const data=JSON.parse(health.text);if(data.ok!==true||data.database!==true||!data.checkedAt)throw new Error("health_endpoint_did_not_confirm_database_readiness")}catch(e){console.error("HEALTH",e);bad++}
 try{
   const sitemap=await get("/sitemap.xml");
@@ -191,16 +196,14 @@ try{
   console.log("GENERAL_SEARCH_MATRIX",JSON.stringify({outcomes,independentSourceHosts:hostCoverage.size}));
   if(hostCoverage.size<4)throw new Error("general_search_source_diversity_too_low");
 }catch(e){console.error("GENERAL_SEARCH_MATRIX",e);bad++}
-for(const section of sections.filter(section=>section!=="prices")){
-  for(const language of ["ar","en"]){
-    try{
-      const x=await get("/api/section?section="+section+"&lang="+language); const d=JSON.parse(x.text);
-      if(!Array.isArray(d.items)||d.items.length<2)throw new Error(section+"_"+language+"_needs_at_least_two_articles");
-      const badLanguage=language==="ar"?d.items.filter(x=>!/[\u0600-\u06ff]/.test(String(x.title))).length:0;
-      const languageMismatch=language==="ar"?d.items.filter(x=>!/[؀-ۿ]/.test(String(x.title))).length:d.items.filter(x=>/[؀-ۿ]/.test(String(x.title))).length; if(languageMismatch>d.items.length/2)throw new Error(section+"_"+language+"_content_language_mismatch"); const bodies=d.items.map(x=>String(x.body||x.summary||"")); if(language==="ar" && bodies.length && bodies.filter(x=>x && /[؀-ۿ]/.test(x)).length < Math.ceil(bodies.length/2)) throw new Error(section+"_"+language+"_body_language_mismatch"); if(language==="en" && bodies.length && bodies.filter(x=>x && !/[؀-ۿ]/.test(x)).length < Math.ceil(bodies.length/2)) throw new Error(section+"_"+language+"_body_language_mismatch");
-    }catch(e){console.error("SECTION",section,language,e);bad++}
-  }
-}
+const sectionChecks=sections.filter(section=>section!=="prices").flatMap(section=>["ar","en"].map(language=>({section,language})));
+await inBatches(sectionChecks,4,async({section,language})=>{
+  try{
+    const x=await get("/api/section?section="+section+"&lang="+language); const d=JSON.parse(x.text);
+    if(!Array.isArray(d.items)||d.items.length<2)throw new Error(section+"_"+language+"_needs_at_least_two_articles");
+    const languageMismatch=language==="ar"?d.items.filter(x=>!/[؀-ۿ]/.test(String(x.title))).length:d.items.filter(x=>/[؀-ۿ]/.test(String(x.title))).length; if(languageMismatch>d.items.length/2)throw new Error(section+"_"+language+"_content_language_mismatch"); const bodies=d.items.map(x=>String(x.body||x.summary||"")); if(language==="ar" && bodies.length && bodies.filter(x=>x && /[؀-ۿ]/.test(x)).length < Math.ceil(bodies.length/2)) throw new Error(section+"_"+language+"_body_language_mismatch"); if(language==="en" && bodies.length && bodies.filter(x=>x && !/[؀-ۿ]/.test(x)).length < Math.ceil(bodies.length/2)) throw new Error(section+"_"+language+"_body_language_mismatch");
+  }catch(e){console.error("SECTION",section,language,e);bad++}
+});
 try{
   for(const live of ["/api/live/weather","/api/live/fx","/api/live/gold"]){
     const z=await get(live);if(!z.text||z.text.length<20)throw new Error("live_data_empty_"+live);
