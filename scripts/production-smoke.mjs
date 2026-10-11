@@ -31,11 +31,11 @@ try{
   const staticSeoPages=[
     ["/about?lang=ar","عن بيان"],
     ["/about?lang=en","About BAYAN"],
-    ["/methodology?lang=ar","المنهجية"],
+    ["/methodology?lang=ar","منهجية بيان"],
     ["/methodology?lang=en","Methodology"],
-    ["/privacy?lang=ar","الخصوصية"],
+    ["/privacy?lang=ar","خصوصية بيان"],
     ["/privacy?lang=en","Privacy"],
-    ["/terms?lang=ar","الشروط"],
+    ["/terms?lang=ar","شروط استخدام"],
     ["/terms?lang=en","Terms of Use"]
   ];
   await inBatches(staticSeoPages,4,async([path,heading])=>{
