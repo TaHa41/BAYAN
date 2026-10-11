@@ -121,8 +121,8 @@ if(path==="/news"&&u.searchParams.has("story")){
   }catch{}
   if(publishedArticle){
     const fullBody=String(publishedArticle.body||"").trim();
-    const headings=(fullBody.match(/^#{1,3}\\s+.+$/gm)||[]).length;
-    const paragraphs=fullBody.split(/\\n\\s*\\n/).map((part:string)=>part.trim()).filter((part:string)=>part.length>=65&&!/^#{1,4}\\s/.test(part));
+    const headings=(fullBody.match(/^#{1,3}\s+.+$/gm)||[]).length;
+    const paragraphs=fullBody.split(/\n\s*\n/).map((part:string)=>part.trim()).filter((part:string)=>part.length>=65&&!/^#{1,4}\s/.test(part));
     if(fullBody.length<1800||headings<4||paragraphs.length<5)publishedArticle=null;
   }
   if(publishedArticle){
@@ -147,7 +147,7 @@ if(path==="/news"&&u.searchParams.has("story")){
     seoFallback='<article class="seo-news-story"><h1>'+seoEscape(headline)+'</h1>'+storyImage+'<p class="seo-news-summary">'+seoEscape(storyDescription)+'</p>'+storyBodyHtml+'<p class="seo-news-meta">'+(lang==="en"?"Publisher: ":"الناشر: ")+seoEscape(storyPublisher)+(storyDateText?" · "+storyDateText:"")+'</p></article>';
     const safeAttr=(value:string)=>String(value||"").replace(/[<>&"]/g,"");
     const structured={"@context":"https://schema.org","@type":"NewsArticle","headline":headline,"description":storyDescription,"datePublished":story?.publishedAt,"image":story?.imageUrl?[story.imageUrl]:undefined,"publisher":{"@type":"Organization","name":"BAYAN","logo":ORIGIN+"/favicon.svg"},"inLanguage":lang};
-    headExtras='<meta property="og:type" content="article"><meta property="og:title" content="'+safeAttr(headline)+'"><meta property="og:description" content="'+safeAttr(storyDescription)+'">'+(story?.imageUrl?'<meta property="og:image" content="'+safeAttr(story.imageUrl)+'">':"")+'<script type="application/ld+json">'+JSON.stringify(structured).replace(/</g,"\\u003c")+'</script>';
+    headExtras='<meta property="og:type" content="article"><meta property="og:title" content="'+safeAttr(headline)+'"><meta property="og:description" content="'+safeAttr(storyDescription)+'">'+(story?.imageUrl?'<meta property="og:image" content="'+safeAttr(story.imageUrl)+'">':"")+'<script type="application/ld+json">'+JSON.stringify(structured).replace(/</g,"\u003c")+'</script>';
     if(!publishedArticle)headExtras+='<meta name="robots" content="noindex,follow">';
   }
 }
