@@ -295,6 +295,7 @@ const personQueryName=(query:string)=>String(query||"").trim()
   .replace(/^(?:who is|who was|biography(?: of)?|profile(?: of)?|من هو|من هي|سيرة ذاتية عن|سيرة ذاتية لشخص)\s+/i,"")
   .replace(/\s+(?:biography|profile|official profile|سيرة ذاتية|مصدر رسمي)$/i,"").trim();
 const personEvidence=(candidate:SearchResult)=>/(footballer|football player|soccer player|athlete|politician|writer|author|actor|actress|scientist|researcher|coach|president|minister|born in|is a .*player|لاعب كرة قدم|لاعب|رياضي|سياسي|كاتب|مؤلف|ممثل|عالِم|عالم|باحث|مدرب|رئيس|وزير|وُلد|ولد)/i.test(String(candidate.title||"")+" "+String(candidate.summary||""));
+export const isSportsPersonProfile=(value:string)=>/(footballer|football player|soccer player|athlete|لاعب(?:\\s+كرة قدم)?|اللاعب(?:ين|ون|ة)?|رياضي)/i.test(String(value||""));
 const wikipediaExactPersonPage=async(query:string,language:Locale):Promise<Candidate[]>=>{
   const title=personQueryName(query).trim();
   if(!title||title.length>100)return[];
@@ -386,11 +387,11 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
     const canonical=profile.sort((a,b)=>canonicalRank(b)-canonicalRank(a))[0];
     canonical.section="people";
    const description=String(canonical.summary||"");
-   const sports=/football|soccer|athlete|لاعب كرة قدم|رياضي/i.test(description);
+   const sports=isSportsPersonProfile(description);
    const medicine=/physician|doctor|surgeon|طبيب|طبيبة/i.test(description);
    const politics=/politician|president|minister|سياسي|رئيس|وزير/i.test(description);
    const arts=/writer|author|poet|actor|actress|كاتب|مؤلف|شاعر|ممثل|ممثلة/i.test(description);
-   const context=sports?/(football|soccer|premier league|liverpool|club|goal|match|team|منتخب|كرة قدم|الدوري|ليفربول|هدف|مباراة|نادي|رياضة)/i:
+   const context=sports?/(football|soccer|premier league|liverpool|club|goal|match|team|منتخب|كرة قدم|الدوري|ليفربول|هدف|مباراة|نادي|رياضة|اللاعب(?:ين|ون|ة)?|لاعب(?:ين|ون|ة)?)/i:
      medicine?/(medical|medicine|hospital|clinical|doctor|طب|طبي|مستشفى|علاج|طبيب)/i:
      politics?/(government|election|president|minister|politic|حكومة|انتخابات|رئيس|وزير|سياسة)/i:
      arts?/(book|novel|film|movie|writer|author|actor|poet|كتاب|رواية|فيلم|كاتب|مؤلف|ممثل|شاعر)/i:null;
@@ -461,7 +462,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   const normalized=q.normalize("NFKC").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[“”‘’]/g,'"').replace(/[؟?!،,;；]+/g," ").replace(/\s+/g," ").trim();
   const compact=searchTerms(normalized).slice(0,6).join(" ");
   const identity=String(identitySummary||"");
-  const sportsProfile=/(footballer|soccer player|football player|لاعب كرة قدم|لاعب كرة القدم)/i.test(identity);
+  const sportsProfile=isSportsPersonProfile(identity);
   const writerProfile=/(writer|author|novelist|poet|كاتب|مؤلف|روائي|شاعر)/i.test(identity);
   // Arabic sports queries often miss current coverage when providers index the
   // player's Latin-script name. Resolve a matching English Wikidata label, then
@@ -485,7 +486,8 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
       bingNewsSearch(variant,language).catch(()=>[]),
       duck(variant,language).catch(()=>[]),
       duckWebSearch(variant,language).catch(()=>[]),
-      bingWebSearch(variant,language).catch(()=>[])
+      bingWebSearch(variant,language).catch(()=>[]),
+      ...(env.GNEWS_API_KEY && variant===uniqueVariants[0] ? [gnewsSearch(env,variant,language).catch(()=>[])] : [])
     ]);
     return results.flat();
   }));
@@ -616,7 +618,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   // single publisher, encyclopedia-only results, or very thin snippets.
   const expansionThreshold=personQuery?Math.min(6,Math.max(3,Number(s.min_sources||3))):Math.max(3,Number(s.min_sources||3));
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
-    providerAttempted.push("Expanded topic variants: Wikipedia, Wikipedia REST Search, Wikidata, GDELT, DuckDuckGo Web Search, Bing Web Search, Google News Search, Bing News RSS","OpenAI Web Search (fallback)");
+    providerAttempted.push("Expanded topic variants: Wikipedia, Wikipedia REST Search, Wikidata, GDELT, DuckDuckGo Web Search, Bing Web Search, Google News Search, Bing News RSS"+(env.GNEWS_API_KEY?", GNews Search":""),"OpenAI Web Search (fallback)");
     const [expanded,web]=await Promise.all([
       safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||"")),[]),
       safe(openAiWebSearch(env,q,language),[])
