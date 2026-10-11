@@ -455,23 +455,22 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   const englishSportsName=person&&language==="ar"&&sportsProfile
     ? (await wikidata(q,"en").catch(()=>[])).find(item=>!hasArabic(item.title)&&/(footballer|football player|soccer player|athlete)/i.test(String(item.summary||"")) )?.title
     : undefined;
-  const salahSportsQuery=person&&sportsProfile&&/(?:محمد\s+صلاح|mohamed\s+salah|mohammed\s+salah|mo\s+salah)/i.test(q);
+  // Query-type-aware recovery applies to every search; no person or topic is hard-coded.
+  // Keep the original intent, then broaden with useful context and source-quality terms.
+  // For Arabic person searches, use a verified Latin-script identity when structured
+  // knowledge can identify it, without assuming a current employer or club.
   const variants=person
     ? (language==="ar"
       ? (sportsProfile
-        ? salahSportsQuery
-          ? [q,englishSportsName ? englishSportsName+" latest news" : q+" آخر الأخبار",q+" انتقال",q+" منتخب مصر"]
-          : [q,englishSportsName ? englishSportsName+" latest news" : q+" آخر الأخبار"]
+        ? [q+" آخر الأخبار",englishSportsName ? englishSportsName+" latest news" : q+" آخر الأخبار",q+" مصدر رسمي"]
         : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
       : (sportsProfile
-        ? salahSportsQuery
-          ? [q,q+" latest news",q+" transfer news",q+" Egypt national team"]
-          : [q,q+" latest news"]
+        ? [q+" latest news",q+" official profile",q+" recent coverage"]
         : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
-    : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
-  // Person-news recovery may try up to four bounded variants, stopping early as soon
-  // as enough relevant results and independent source hosts have been recovered.
-  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,salahSportsQuery?4:2);
+    : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات ومصادر موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
+  // Retry broadly but sequentially: provider calls are bounded, and the loop exits
+  // early when relevance and independent-host diversity are adequate.
+  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,3);
   const batches:Candidate[][]=[];
   const labels=["Wikipedia REST Search","GDELT","Google News Search","DuckDuckGo Web Search","Bing Web Search"];
   for(let variantIndex=0;variantIndex<uniqueVariants.length;variantIndex++){
