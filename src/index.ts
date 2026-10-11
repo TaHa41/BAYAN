@@ -138,7 +138,7 @@ ensureMeta("property","og:site_name","BAYAN | بيان");
 ensureMeta("property","og:locale",lang==="en"?"en_US":"ar_EG");
 ensureMeta("property","og:type",path.startsWith("/article/")||hasNewsStory?"article":"website");
 if(!html.includes('property="og:image"'))ensureMeta("property","og:image",ORIGIN+"/favicon.svg");
-const ogImageMatch=html.match(/<meta\\s+property="og:image"\\s+content="([^"]+)"/i);
+const ogImageMatch=html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i);
 const socialImage=ogImageMatch?.[1]||ORIGIN+"/favicon.svg";
 ensureMeta("name","twitter:card","summary_large_image");
 ensureMeta("name","twitter:title",title);
