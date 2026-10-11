@@ -18,7 +18,7 @@ export async function sitemap(env:Env){
     }));
   }catch{}
   const publicPaths=["/","/news","/about","/methodology","/privacy","/terms",...SECTIONS.map(x=>"/"+x[0])];
-  const localizedUrls=publicPaths.flatMap((path)=>["ar","en"].map((language)=>({url:ORIGIN+path+"?lang="+language})));
+  const localizedUrls=[{url:ORIGIN+"/"},{url:ORIGIN+"/?lang=en"},...publicPaths.filter((path)=>path!=="/").flatMap((path)=>["ar","en"].map((language)=>({url:ORIGIN+path+"?lang="+language})))];
   const urlMap=new Map<string,{url:string;lastmod?:string}>();
   for(const item of [...localizedUrls,...articleUrls])urlMap.set(item.url,item);
   const urls:Array<{url:string;lastmod?:string}>=[...urlMap.values()];
