@@ -454,24 +454,29 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
       ? (sportsProfile ? [q+" آخر الأخبار",q+" انتقال",englishSportsName ? englishSportsName+" latest news" : q+" منتخب مصر"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
       : (sportsProfile ? [q+" latest news",q+" transfer news",q+" Egypt national team"] : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
     : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
-  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,3);
-  diagnostics.push("Expanded search mode: person="+person+", sportsProfile="+sportsProfile+", variants="+uniqueVariants.length);
-  const batches=await Promise.all(uniqueVariants.map(async (variant,variantIndex)=>{
+  // The first pass already calls many providers. Sequential, bounded recovery prevents
+  // a 3-variant x 9-provider fan-out from exhausting Cloudflare Worker subrequests.
+  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,2);
+  const batches:Candidate[][]=[];
+  const labels=["Wikipedia REST Search","GDELT","Google News Search","DuckDuckGo Web Search","Bing Web Search"];
+  for(let variantIndex=0;variantIndex<uniqueVariants.length;variantIndex++){
+    const variant=uniqueVariants[variantIndex];
     const results=await Promise.all([
-      wikipedia(env,variant,language).catch(()=>[]),
       wikipediaRestSearch(variant,language).catch(()=>[]),
-      wikidata(variant,language).catch(()=>[]),
       gdelt(variant).catch(()=>[]),
       googleNewsSearch(variant,language).catch(()=>[]),
-      bingNewsSearch(variant,language).catch(()=>[]),
-      duck(variant,language).catch(()=>[]),
       duckWebSearch(variant,language).catch(()=>[]),
-      bingWebSearch(variant,language).catch(()=>[]),
+      bingWebSearch(variant,language).catch(()=>[])
     ]);
-    const labels=["Wikipedia","Wikipedia REST Search","Wikidata","GDELT","Google News Search","Bing News RSS","DuckDuckGo Instant Answers","DuckDuckGo Web Search","Bing Web Search"];
     diagnostics.push("Expanded variant "+(variantIndex+1)+" result counts: "+labels.map((label,index)=>label+"="+(results[index]?.length||0)).join(", "));
-    return results.flat();
-  }));
+    batches.push(results.flat());
+    const recovered=batches.flat().filter(item=>relevantCandidate(item,q)&&languageSafe(item,language));
+    const hosts=new Set(recovered.flatMap(item=>(item.sources||[]).map(src=>{
+      try{return new URL(String(src.url||"")).hostname.toLowerCase().replace(/^www\\./,"")}
+      catch{return ""}
+    })).filter(host=>host&&!/wikipedia\\.org|wikidata\\.org|news\\.google\\.com|bing\\.com|duckduckgo\\.com/.test(host)));
+    if(recovered.length>=6&&hosts.size>=3)break;
+  }
   return batches.flat();
 }
 async function settings(env:Env){try{const r=await env.DB.prepare("SELECT key,value FROM admin_settings").all<any>();return Object.fromEntries((r.results||[]).map((x:any)=>[x.key,x.value]))}catch{return{}}}
