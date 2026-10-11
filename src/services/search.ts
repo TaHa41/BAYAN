@@ -455,7 +455,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   const englishSportsName=person&&language==="ar"&&sportsProfile
     ? (await wikidata(q,"en").catch(()=>[])).find(item=>!hasArabic(item.title)&&/(footballer|football player|soccer player|athlete)/i.test(String(item.summary||"")) )?.title
     : undefined;
-  const salahSportsQuery=person&&sportsProfile&&/(?:محمد\\s+صلاح|mohamed\\s+salah|mohammed\\s+salah|mo\\s+salah)/i.test(q);
+  const salahSportsQuery=person&&sportsProfile&&/(?:محمد\s+صلاح|mohamed\s+salah|mohammed\s+salah|mo\s+salah)/i.test(q);
   const variants=person
     ? (language==="ar"
       ? (sportsProfile
