@@ -117,6 +117,12 @@ if(path==="/news"&&u.searchParams.has("story")){
     const storyDescription=String(story?.summary||headline);
     title=headline+" | BAYAN";
     description=storyDescription;
+    const storyBody=String(story?.body||story?.content||story?.fullText||story?.summary||"").trim();
+    const storyImage=story?.imageUrl?'<figure class="seo-news-image"><img src="'+String(story.imageUrl).replace(/[<>&"]/g,"")+'" alt="'+String(headline).replace(/[<>&"]/g,"")+'" loading="lazy" decoding="async"></figure>':"";
+    const storyPublisher=String(story?.publisher||"BAYAN");
+    const storyDate=Date.parse(String(story?.publishedAt||""));
+    const storyDateText=Number.isFinite(storyDate)?new Date(storyDate).toISOString():"";
+    seoFallback='<article class="seo-news-story"><h1>'+String(headline).replace(/[<>&"]/g,"")+'</h1>'+storyImage+'<p class="seo-news-summary">'+String(storyDescription).replace(/[<>&"]/g,"")+'</p>'+(storyBody&&storyBody!==storyDescription?'<div class="seo-news-body"><p>'+storyBody.replace(/[<>&"]/g,"")+'</p></div>':"")+'<p class="seo-news-meta">'+(lang==="en"?"Publisher: ":"الناشر: ")+storyPublisher.replace(/[<>&"]/g,"")+(storyDateText?" · "+storyDateText:"")+'</p></article>';
     const safeAttr=(value:string)=>String(value||"").replace(/[<>&"]/g,"");
     const structured={"@context":"https://schema.org","@type":"NewsArticle","headline":headline,"description":storyDescription,"datePublished":story?.publishedAt,"image":story?.imageUrl?[story.imageUrl]:undefined,"publisher":{"@type":"Organization","name":"BAYAN"},"inLanguage":lang};
     headExtras='<meta property="og:type" content="article"><meta property="og:title" content="'+safeAttr(headline)+'"><meta property="og:description" content="'+safeAttr(storyDescription)+'">'+(story?.imageUrl?'<meta property="og:image" content="'+safeAttr(story.imageUrl)+'">':"")+'<script type="application/ld+json">'+JSON.stringify(structured).replace(/</g,"\\u003c")+'</script>';
