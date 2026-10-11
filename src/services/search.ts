@@ -443,12 +443,6 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   const identity=String(identitySummary||"");
   const sportsProfile=isSportsPersonProfile(identity);
   const writerProfile=/(writer|author|novelist|poet|كاتب|مؤلف|روائي|شاعر)/i.test(identity);
-  // Arabic sports queries often miss current coverage when providers index the
-  // player's Latin-script name. Resolve a matching English Wikidata label, then
-  // use it only as an additional query; result-language and relevance gates remain.
-  const englishSportsName=person&&language==="ar"&&sportsProfile
-    ? (await wikidata(q,"en").catch(()=>[])).find(item=>!hasArabic(item.title)&&/(footballer|football player|soccer player|athlete)/i.test(String(item.summary||"")) )?.title
-    : undefined;
   const variants=person
     ? (language==="ar"
       ? (sportsProfile ? [q+" آخر الأخبار",q+" ليفربول",q+" منتخب مصر"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
