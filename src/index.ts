@@ -117,7 +117,7 @@ if(path==="/news"&&u.searchParams.has("story")){
   }catch{}
   let publishedArticle:any=null;
   try{
-    publishedArticle=await env.DB.prepare("SELECT slug,title,summary,body,image_url,image_alt,created_at FROM articles WHERE title=? AND language=? AND status='PUBLISHED' ORDER BY updated_at DESC LIMIT 1").bind(requestedStory,lang).first<any>();
+    publishedArticle=await env.DB.prepare("SELECT slug,title,summary,body,image_url,image_alt,created_at FROM articles WHERE title=? AND language=? AND section='news' AND status='PUBLISHED' ORDER BY updated_at DESC LIMIT 1").bind(requestedStory,lang).first<any>();
   }catch{}
   if(publishedArticle){
     const fullBody=String(publishedArticle.body||"").trim();
