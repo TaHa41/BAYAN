@@ -17,6 +17,40 @@ async function page(request:Request,env:Env){
     return new Response(response.body, {status: response.status, headers});
   }
   let asset:Response;if(u.pathname==="/"||u.pathname==="/index.html"){asset=new Response(SHELL,{status:200,headers:{"content-type":"text/html;charset=UTF-8"}})}else if(/^\/app(?:-[^/]+)?\.js$/.test(u.pathname)){asset=await env.ASSETS.fetch(new Request(new URL("/app-20261009-01.js",request.url),request));}else if(u.pathname==="/styles.css"){asset=await env.ASSETS.fetch(new Request(new URL("/styles.css",request.url),request));}else{asset=await env.ASSETS.fetch(request);if(!asset.ok)asset=new Response(SHELL,{status:200,headers:{"content-type":"text/html;charset=UTF-8"}})}const lang=u.searchParams.get("lang")==="en"?"en":"ar";if((u.pathname==="/"||u.pathname==="/index.html")&&lang==="en")asset=new Response(SHELL_EN,{status:200,headers:{"content-type":"text/html;charset=UTF-8"}});let html=await asset.text();const ownerMode=u.searchParams.get("bayan_owner");const ownerCookie=request.headers.get("cookie")||"";const ownerExcluded=ownerCookie.split(";").some(part=>part.trim()==="bayan_exclude_analytics=1")||ownerMode==="1";if(!ownerExcluded&&ownerMode!=="0"){try{await track(env,await visitorId(request),"page",u.pathname,lang)}catch{}}let title=lang==="en"?"BAYAN | Knowledge, Evidence & Context":"BAYAN | بيان — المعلومة أولًا. الدليل قبل الادعاء.";let description=lang==="en"?"BAYAN — evidence-first knowledge, news and live data.":"BAYAN | بيان — المعلومة أولًا. الدليل قبل الادعاء.";const path=u.pathname.replace(/\/$/,"");const section=SECTIONS.find(x=>x[0]===path.slice(1));if(path==="/news")title=lang==="en"?"BAYAN News":"أخبار بيان";else if(path==="/search")title=lang==="en"?"BAYAN Search":"بحث بيان";else if(path==="/ask")title=lang==="en"?"Ask BAYAN":"اسأل بيان";else if(section)title=(lang==="en"?section[2]:section[1])+" | BAYAN";else if(path.startsWith("/article/")){const slug=decodeURIComponent(path.slice(9));try{const row=await env.DB.prepare("SELECT title,summary FROM articles WHERE slug=? AND language=? AND status='PUBLISHED' LIMIT 1").bind(slug,lang).first<any>();if(row?.title){title=String(row.title)+" | BAYAN";description=String(row.summary||description)}}catch{}}let headExtras="";
+let seoFallback="";
+const seoEscape=(value:unknown)=>String(value??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+if(section&&path!=="/"){
+  const sectionTitle=lang==="en"?section[2]:section[1];
+  const sectionDescription=(SECTIONS.find(x=>x[0]===section[0])? (lang==="en" ? ({"science":"Science, discoveries and evidence-based explanations.","technology":"Technology, artificial intelligence and innovation.","economy":"Economics, markets, money and financial decisions.","politics":"Politics, public policy and public affairs.","health":"Health, medicine and evidence-based health information.","history":"History, culture and heritage.","people":"People, biographies and sourced stories.","sports":"Sports, results, statistics and data.","travel":"Travel, destinations, places and practical information.","art":"Arts, entertainment and popular culture.","news":"Current news presented after source verification.","trends":"What captures attention and discussion trends, kept separate from verified news.","prices":"Prices, weather, currencies and live data.","egypt":"Everyday life, communities, public services and human experiences, grounded in evidence.","arab":"Ideas, viewpoints and public debates presented with context and clear sourcing.","world":"Cross-border changes and their impact on economies, technology and societies."} as Record<string,string>)[section[0]] : "") : ({"science":"علوم واكتشافات وشرح مبني على الأدلة.","technology":"التقنية والذكاء الاصطناعي والابتكار.","economy":"الاقتصاد والأسواق والمال والقرارات المالية.","politics":"السياسات والقرارات والشأن العام.","health":"الصحة والطب والمعلومات الصحية الموثقة.","history":"التاريخ والثقافة والتراث.","people":"الأشخاص والسير والقصص الموثقة.","sports":"الرياضة والنتائج والإحصاءات والبيانات.","travel":"السفر والوجهات والأماكن والمعلومات العملية.","art":"الفن والترفيه والثقافة الشعبية.","news":"أخبار حديثة تُعرض بعد التحقق من مصادرها.","trends":"اهتمامات الناس واتجاهات النقاش، مع فصلها عن الأخبار الموثقة.","prices":"الأسعار والطقس والعملات والبيانات الحية.","egypt":"قضايا الحياة اليومية والمجتمع والخدمات وتجارب الناس، بمعلومات موثقة.","arab":"وجهات نظر وحوارات وقضايا فكرية بسياق ومصادر واضحة.","world":"التغيرات العابرة للحدود وتأثيراتها في الاقتصاد والتقنية والمجتمعات."} as Record<string,string>)[section[0]]);
+  let cards:Array<{slug:string;title:string;summary:string}>=[];
+  try{
+    if(section[0]==="news"){
+      const row=await env.DB.prepare("SELECT payload FROM news_cache WHERE language=? LIMIT 1").bind(lang).first<any>();
+      const cached=JSON.parse(String(row?.payload||"[]"));
+      const items=Array.isArray(cached)?cached:(Array.isArray(cached.items)?cached.items:[]);
+      cards=items.filter((item:any)=>item&&item.title&&item.url&&(!item.language||item.language===lang)).slice(0,8).map((item:any)=>({slug:"",title:String(item.title),summary:String(item.summary||"")}));
+    }else{
+      const rows=await env.DB.prepare("SELECT slug,title,summary FROM articles WHERE section=? AND language=? AND status='PUBLISHED' ORDER BY updated_at DESC LIMIT 8").bind(section[0],lang).all<any>();
+      cards=(rows.results||[]).map((row:any)=>({slug:String(row.slug||""),title:String(row.title||""),summary:String(row.summary||"")}));
+    }
+  }catch{}
+  const itemsHtml=cards.map(item=>'<article class="seo-content-item"><h2>'+seoEscape(item.title)+'</h2><p>'+seoEscape(item.summary)+'</p>'+(item.slug?'<a href="/article/'+encodeURIComponent(item.slug)+'?lang='+lang+'">'+(lang==="en"?"Read article":"اقرأ المقال")+'</a>':"")+'</article>').join("");
+  seoFallback='<section class="seo-content-fallback"><h1>'+seoEscape(sectionTitle)+'</h1><p>'+seoEscape(sectionDescription)+'</p>'+(itemsHtml||'<p>'+(lang==="en"?"New evidence-checked content is being prepared for this section.":"يجري تجهيز محتوى موثق لهذا القسم.")+'</p>')+'</section>';
+  headExtras+='<script type="application/ld+json">'+JSON.stringify({"@context":"https://schema.org","@type":"CollectionPage","name":sectionTitle,"description":sectionDescription,"inLanguage":lang,"url":ORIGIN+path+"?lang="+lang,"mainEntity":{"@type":"ItemList","itemListElement":cards.filter(item=>item.slug).map((item,index)=>({"@type":"ListItem","position":index+1,"url":ORIGIN+"/article/"+encodeURIComponent(item.slug)+"?lang="+lang,"name":item.title}))}}).replace(/</g,"\\u003c")+'</script>';
+}
+if(path.startsWith("/article/")){
+  try{
+    const slug=decodeURIComponent(path.slice(9));
+    const row=await env.DB.prepare("SELECT title,summary,section,body,updated_at FROM articles WHERE slug=? AND language=? AND status='PUBLISHED' LIMIT 1").bind(slug,lang).first<any>();
+    if(row?.title){
+      const articleTitle=String(row.title),articleSummary=String(row.summary||"");
+      seoFallback='<article class="seo-article-fallback"><h1>'+seoEscape(articleTitle)+'</h1><p>'+seoEscape(articleSummary)+'</p><p><a href="/'+encodeURIComponent(String(row.section||"world"))+'?lang='+lang+'">'+(lang==="en"?"Back to section":"العودة إلى القسم")+'</a></p></article>';
+      headExtras+='<script type="application/ld+json">'+JSON.stringify({"@context":"https://schema.org","@type":"Article","headline":articleTitle,"description":articleSummary,"dateModified":row.updated_at,"inLanguage":lang,"mainEntityOfPage":ORIGIN+path+"?lang="+lang,"publisher":{"@type":"Organization","name":"BAYAN"}}).replace(/</g,"\\u003c")+'</script>';
+    }
+  }catch{}
+}
+if(seoFallback)html=html.replace('<main id="app">','<main id="app">'+seoFallback);
+
 if(path==="/news"&&u.searchParams.has("story")){
   const requestedStory=String(u.searchParams.get("story")||"").trim();
   let story:any=null;
