@@ -396,7 +396,7 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
 };
 const identityTextForSearch=(value:string)=>String(value||"").normalize("NFKC").toLowerCase()
  .replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").replace(/\s+/g," ").trim();
-const personIdentityMatches=(text:string,name:string)=>{
+export const personIdentityMatches=(text:string,name:string)=>{
   const normalizedText=identityTextForSearch(text),normalizedName=identityTextForSearch(name);
   if(normalizedName&&normalizedText.includes(normalizedName))return true;
   if(!/(محمد\s+صلاح|mohamed\s+salah|mohammed\s+salah|mo\s+salah)/i.test(name))return false;
