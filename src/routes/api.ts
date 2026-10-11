@@ -266,6 +266,22 @@ if(items.length<2&&section!=="prices"){
   };
   const meta=sectionBySlug(section)!;
   const q=queries[section]?.[lang]||(lang==="ar"?meta.descriptionAr:meta.descriptionEn);
+  const alternateQueries:Record<string,{ar:string;en:string}>={
+   science:{ar:"أبحاث علمية ونتائج دراسات وتجارب منشورة من الجامعات والمؤسسات العلمية",en:"published scientific studies research findings experiments and university research"},
+   technology:{ar:"أخبار التكنولوجيا وأدوات الذكاء الاصطناعي والبرمجيات والأمن السيبراني",en:"technology news artificial intelligence software cybersecurity and computing"},
+   economy:{ar:"مؤشرات الاقتصاد وأسعار الأسواق والبنوك والتجارة والتضخم",en:"economic indicators financial markets banking trade and inflation"},
+   politics:{ar:"البرلمان والحكومة والانتخابات والتشريعات والقرارات السياسية",en:"government decisions legislation elections parliament and public policy"},
+   health:{ar:"إرشادات الصحة العامة والأبحاث الطبية والوقاية والتشخيص من جهات طبية",en:"public health guidance medical research prevention and diagnosis from health authorities"},
+   history:{ar:"وثائق تاريخية وآثار وحضارات وشخصيات وأحداث تاريخية موثقة",en:"historical documents archaeology civilizations and documented historical events"},
+   people:{ar:"الشخصيات العامة والسير الذاتية والإنجازات الموثقة",en:"public figures biographies and documented achievements"},
+   sports:{ar:"نتائج البطولات والمباريات والاتحادات الرياضية والإحصاءات الرسمية",en:"sports tournament match results official leagues and verified statistics"},
+   travel:{ar:"المعالم السياحية والوجهات والحدائق والمتاحف وإرشادات السفر الرسمية",en:"tourism landmarks destinations parks museums and official travel advice"},
+   art:{ar:"الأعمال الفنية والعروض والأفلام والموسيقى والمعارض ومصادرها الرسمية",en:"arts performances films music exhibitions and official cultural sources"},
+   trends:{ar:"بيانات الاتجاهات العامة واستطلاعات الرأي ومؤشرات البحث ومصادر البيانات",en:"public trend data opinion polls search interest and data sources"},
+   egypt:{ar:"محافظات مصر ومعالمها وتاريخها وخدماتها ومعلومات الجهات الرسمية",en:"Egyptian governorates landmarks history services and official information"},
+   arab:{ar:"البلدان العربية وثقافتها واقتصادها ومؤسساتها الإقليمية",en:"Arab countries culture economies and regional institutions"},
+   world:{ar:"التطورات الدولية والمنظمات العالمية والبيئة والتجارة الدولية",en:"international developments global organizations environment and international trade"}
+  };
   let found:any={results:[]};
   let cachedEvidence:any[]=[];
   try{
@@ -288,7 +304,21 @@ if(items.length<2&&section!=="prices"){
   }catch{}
   items=[...items,...cachedEvidence];
   if(cachedEvidence.length<2){
-   try{found=await bounded(search(env,q,lang),5500);}catch{found={results:[]};}
+   try{
+    found=await bounded(search(env,q,lang),5500);
+    const usable=(results:any[])=>results.filter((x:any)=>{
+     const title=String(x?.title||""),summary=String(x?.summary||""),body=String(x?.body||"");
+     return title&&summary&&sectionRelevant(x)&&(lang==="ar"?hasArabic(title)&&hasArabic(summary)&&(!body||hasArabic(body)):!hasArabic(title)&&!hasArabic(summary)&&!hasArabic(body));
+    });
+    const alt=alternateQueries[section]?.[lang];
+    if(usable(found.results||[]).length<2&&alt){
+     try{
+      const more=await bounded(search(env,alt,lang),5500);
+      const seen=new Set((found.results||[]).map((x:any)=>String(x.url||x.title||"").trim().toLowerCase()));
+      found={...found,results:[...(found.results||[]),...(more.results||[]).filter((x:any)=>{const key=String(x.url||x.title||"").trim().toLowerCase();if(!key||seen.has(key))return false;seen.add(key);return true;})]};
+     }catch{}
+    }
+   }catch{found={results:[]};}
   }
   const refreshed=await listArticles(env,section,lang,24);
   const existingSlugs=new Set(items.map((x:any)=>String(x.slug||"")).filter(Boolean));
