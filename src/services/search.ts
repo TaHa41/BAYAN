@@ -103,8 +103,8 @@ async function googleNewsSearch(q:string,language:Locale):Promise<Candidate[]>{
     const xml=await response.text();const out:Candidate[]=[];
     for(const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
       const block=match[1];const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
-      const title=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1400),publisher=cleanText(field("source")||"Google News");
-      if(!title||!/^https:\/\//i.test(url))continue;
+      const title=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1400),publisher=cleanText(field("source"));
+      if(!title||!publisher||!/^https:\/\//i.test(url))continue;
       out.push({title,summary,section:"news",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+4,provider:"Google News Search"});
       if(out.length>=8)break;
     }
@@ -465,15 +465,9 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   const identity=String(identitySummary||"");
   const sportsProfile=isSportsPersonProfile(identity);
   const writerProfile=/(writer|author|novelist|poet|كاتب|مؤلف|روائي|شاعر)/i.test(identity);
-  // Arabic sports queries can miss current coverage when providers index the
-  // player's Latin-script name. Add an English-name query without assuming a club;
-  // the result-language and relevance gates still enforce locale and identity.
-  const englishSportsName=person&&language==="ar"&&sportsProfile
-    ? (await wikidata(q,"en").catch(()=>[])).find(item=>!hasArabic(item.title)&&/(footballer|football player|soccer player|athlete)/i.test(String(item.summary||"")) )?.title
-    : undefined;
   const variants=person
     ? (language==="ar"
-      ? (sportsProfile ? [q+" آخر الأخبار",q+" انتقال",englishSportsName ? englishSportsName+" latest news" : q+" منتخب مصر"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
+      ? (sportsProfile ? [q+" آخر الأخبار",q+" ليفربول",q+" منتخب مصر"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
       : (sportsProfile ? [q+" latest news",q+" transfer news",q+" Egypt national team"] : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
     : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,3);
@@ -531,7 +525,7 @@ const localizedSource=(value:string,language:Locale)=>{
     if(/reuters/.test(lower))return "رويترز";
     if(/associated press|ap news/.test(lower))return "أسوشيتد برس";
     if(/al.?jazeera/.test(lower))return "الجزيرة";
-    return /[\u0600-\u06ff]/.test(name)?name:"مصدر بحث";
+    return name||"مصدر بحث";
   }
   if(/فيديو على youtube/i.test(name))return "YouTube video";
   if(/youtube|youtu\.be|vimeo/.test(lower))return "YouTube video";
