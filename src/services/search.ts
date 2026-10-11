@@ -412,7 +412,7 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
      // Exclude encyclopedia pages whose titles append a second person's identity.
      if(title.startsWith(name+" ")&&/(?:دندراوي|زكريا|مصطفى|العزب|جندي|ممثل|مدرب|توضيح|تشالدران|denrawi|zakaria|mustafa|al.?azab|soldier|actor|disambiguation)/i.test(title.slice(name.length)))return false;
      const text=String(item.title||"")+" "+String(item.summary||"");
-     if(context)return context.test(text);
+     if(context)return context.test(text)&&identityTextForSearch(text).includes(name);
      return identityTextForSearch(text).includes(name);
    });
    return safe.length?safe:cleanExact;
