@@ -46,7 +46,8 @@ if(path.startsWith("/article/")){
     const row=await env.DB.prepare("SELECT title,summary,section,body,updated_at FROM articles WHERE slug=? AND language=? AND status='PUBLISHED' LIMIT 1").bind(slug,lang).first<any>();
     if(row?.title){
       const articleTitle=String(row.title),articleSummary=String(row.summary||"");
-      seoFallback='<article class="seo-article-fallback"><h1>'+seoEscape(articleTitle)+'</h1><p>'+seoEscape(articleSummary)+'</p><p><a href="/'+encodeURIComponent(String(row.section||"world"))+'?lang='+lang+'">'+(lang==="en"?"Back to section":"العودة إلى القسم")+'</a></p></article>';
+      const articleBodyHtml=String(row.body||"").split(/\n\s*\n/).map((block:string)=>{const text=block.trim();if(!text)return "";const heading=text.match(/^#{1,3}\s+(.+)$/);return heading?'<h2>'+seoEscape(heading[1])+'</h2>':'<p>'+seoEscape(text).replace(/\n/g," ")+'</p>';}).join("");
+      seoFallback='<article class="seo-article-fallback"><h1>'+seoEscape(articleTitle)+'</h1><p>'+seoEscape(articleSummary)+'</p>'+articleBodyHtml+'<p><a href="/'+encodeURIComponent(String(row.section||"world"))+'?lang='+lang+'">'+(lang==="en"?"Back to section":"العودة إلى القسم")+'</a></p></article>';
       headExtras+='<script type="application/ld+json">'+JSON.stringify({"@context":"https://schema.org","@type":"Article","headline":articleTitle,"description":articleSummary,"dateModified":row.updated_at,"inLanguage":lang,"mainEntityOfPage":ORIGIN+path+"?lang="+lang,"publisher":{"@type":"Organization","name":"BAYAN"}}).replace(/</g,"\\u003c")+'</script>';
     }
   }catch{}
