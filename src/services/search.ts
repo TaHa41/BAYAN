@@ -91,34 +91,47 @@ async function wikidata(q:string,language:Locale):Promise<Candidate[]>{
     return (d.search||[]).map((x:any)=>({title:cleanText(x.label||x.id),summary:cleanText(x.description||"").slice(0,900),section:"people",kind:"web",evidence:"mixed",sources:[source(x.label||x.id,"Wikidata","https://www.wikidata.org/wiki/"+x.id)],score:scoreSource("Wikidata",x.label||"",q),provider:"Wikidata"}));
   }catch{return[]}
 }
-async function gdelt(q:string):Promise<Candidate[]>{
- try{const u="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(q)+"&mode=artlist&maxrecords=8&format=json&sort=HybridRel";const r=await timeout(u,4000);if(!r.ok)return[];const d=await r.json<any>();return(d.articles||[]).map((x:any)=>({title:cleanText(x.title),summary:cleanText(x.seendate||"")+" "+cleanText(x.domain||""),section:"news",kind:"web",evidence:"mixed",sources:[source(x.title,x.domain||"GDELT",x.url)],url:x.url,score:scoreSource(x.domain||"GDELT",x.title,q),provider:"GDELT"})).filter((x:any)=>x.title&&x.url)}catch{return[]}
+async function gdelt(q:string,diagnostics?:string[]):Promise<Candidate[]>{
+ try{
+  const u="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(q)+"&mode=artlist&maxrecords=8&format=json&sort=HybridRel";
+  const r=await timeout(u,5000);
+  if(!r.ok){diagnostics?.push("GDELT HTTP "+r.status);return[];}
+  const d=await r.json<any>();const articles=d.articles||[];
+  const out=articles.map((x:any)=>({title:cleanText(x.title),summary:cleanText(x.seendate||"")+" "+cleanText(x.domain||""),section:"news",kind:"web",evidence:"mixed",sources:[source(x.title,x.domain||"GDELT",x.url)],url:x.url,score:scoreSource(x.domain||"GDELT",x.title,q),provider:"GDELT"})).filter((x:any)=>x.title&&x.url);
+  diagnostics?.push("GDELT raw="+articles.length+" accepted="+out.length);
+  return out;
+ }catch{diagnostics?.push("GDELT request failed");return[]}
 }
 const decodeXml=(value:string)=>String(value||"").replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,"$1").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n)));
-async function googleNewsSearch(q:string,language:Locale):Promise<Candidate[]>{
+async function googleNewsSearch(q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
   try{
     const hl=language==="ar"?"ar":"en-US",gl=language==="ar"?"EG":"US",ceid=language==="ar"?"EG:ar":"US:en";
     const url="https://news.google.com/rss/search?q="+encodeURIComponent(q)+"&hl="+hl+"&gl="+gl+"&ceid="+ceid;
-    const response=await timeout(url,5000);if(!response.ok)return[];
-    const xml=await response.text();const out:Candidate[]=[];
+    const response=await timeout(url,6000);
+    if(!response.ok){diagnostics?.push("Google News HTTP "+response.status);return[];}
+    const xml=await response.text();const out:Candidate[]=[];let rawItems=0;
     for(const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
+      rawItems++;
       const block=match[1];const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
-      const title=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1400),publisher=cleanText(field("source"));
-      if(!title||!publisher||!/^https:\/\//i.test(url))continue;
+      const title=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1400),publisher=cleanText(field("source")||"Google News");
+      if(!title||!/^https:\/\//i.test(url))continue;
       out.push({title,summary,section:"news",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+4,provider:"Google News Search"});
       if(out.length>=8)break;
     }
+    diagnostics?.push("Google News RSS raw="+rawItems+" accepted="+out.length);
     return out;
-  }catch{return[]}
+  }catch{diagnostics?.push("Google News request failed");return[]}
 }
 
-async function bingNewsSearch(q:string,language:Locale):Promise<Candidate[]>{
+async function bingNewsSearch(q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
   try{
     const setlang=language==="ar"?"ar":"en-US";
     const url="https://www.bing.com/news/search?q="+encodeURIComponent(q)+"&format=rss&setlang="+setlang;
-    const response=await timeout(url,4500);if(!response.ok)return[];
-    const xml=await response.text();const out:Candidate[]=[];
+    const response=await timeout(url,6000);
+    if(!response.ok){diagnostics?.push("Bing News HTTP "+response.status);return[];}
+    const xml=await response.text();const out:Candidate[]=[];let rawItems=0;
     for(const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
+      rawItems++;
       const block=match[1];
       const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
       const title=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1200);
@@ -127,8 +140,9 @@ async function bingNewsSearch(q:string,language:Locale):Promise<Candidate[]>{
       out.push({title,summary,section:"news",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+3,provider:"Bing News RSS"});
       if(out.length>=8)break;
     }
+    diagnostics?.push("Bing News RSS raw="+rawItems+" accepted="+out.length);
     return out;
-  }catch{return[]}
+  }catch{diagnostics?.push("Bing News request failed");return[]}
 }
 async function crossrefSearch(q:string):Promise<Candidate[]>{
   try{
@@ -401,7 +415,7 @@ export const personIdentityMatches=(text:string,name:string)=>{
   if(normalizedName&&normalizedText.includes(normalizedName))return true;
   if(!/(محمد\s+صلاح|mohamed\s+salah|mohammed\s+salah|mo\s+salah)/i.test(name))return false;
   if(/محمد\s+صلاح|مو\s+صلاح|mohamed\s+salah|mohammed\s+salah|mo\s+salah/i.test(text))return true;
-  return /صلاح/i.test(text)&&/(ليفربول|منتخب مصر|الفرعون المصري|اللاعب المصري|هدف|مباراة)/i.test(text);
+  return /صلاح/i.test(text)&&/(ليفربول|طرابزون|منتخب مصر|الفرعون المصري|اللاعب المصري|هدف|مباراة|انتقال|يوقع|وقع|عقد|صفقة|نادي|فريق|كرة قدم|الدوري|مهاجم|liverpool|trabzonspor|transfer|signed|contract|deal|joined|club|team|goal|match|league|striker|forward)/i.test(text);
 };
 export const isolateArticleSubject=(title:string,items:Candidate[])=>{
  const query=normalizedEntityTitle(title);
@@ -451,11 +465,9 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
     : undefined;
   const variants=person
     ? (language==="ar"
-      ? (sportsProfile ? [q+" آخر الأخبار",q+" انتقال",englishSportsName ? englishSportsName+" latest news" : q+" منتخب مصر"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
-      : (sportsProfile ? [q+" latest news",q+" transfer news",q+" Egypt national team"] : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
+      ? (sportsProfile ? [q,englishSportsName ? englishSportsName+" latest news" : q+" آخر الأخبار"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
+      : (sportsProfile ? [q,q+" latest news"] : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
     : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
-  // The first pass already calls many providers. Sequential, bounded recovery prevents
-  // a 3-variant x 9-provider fan-out from exhausting Cloudflare Worker subrequests.
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,2);
   const batches:Candidate[][]=[];
   const labels=["Wikipedia REST Search","GDELT","Google News Search","DuckDuckGo Web Search","Bing Web Search"];
@@ -463,8 +475,8 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
     const variant=uniqueVariants[variantIndex];
     const results=await Promise.all([
       wikipediaRestSearch(variant,language).catch(()=>[]),
-      gdelt(variant).catch(()=>[]),
-      googleNewsSearch(variant,language).catch(()=>[]),
+      gdelt(variant,diagnostics).catch(()=>[]),
+      googleNewsSearch(variant,language,diagnostics).catch(()=>[]),
       duckWebSearch(variant,language).catch(()=>[]),
       bingWebSearch(variant,language).catch(()=>[])
     ]);
@@ -563,10 +575,10 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   return language==="ar" ? hasArabic(title) : !hasArabic(title);
 };export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean;draft?:boolean;images?:boolean}={}):Promise<SearchResponse>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
-  const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};const academicQuery=/(research|paper|papers|study|studies|journal|doi|scholar|academic|citation|crossref|openalex|pubmed|clinical trial|systematic review|بحث علمي|أبحاث|دراسة|دراسات|مجلة علمية|ورقة بحثية|مصدر أكاديمي|دراسات سريرية|مراجعة منهجية)/i.test(q);
+  const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));/* Capture provider status/counts before building the public attempt summary. */const providerDiagnostics:string[]=[];const safe=async<T>(task:Promise<T>,fallback:T):Promise<T>=>{try{return await task}catch{return fallback}};const academicQuery=/(research|paper|papers|study|studies|journal|doi|scholar|academic|citation|crossref|openalex|pubmed|clinical trial|systematic review|بحث علمي|أبحاث|دراسة|دراسات|مجلة علمية|ورقة بحثية|مصدر أكاديمي|دراسات سريرية|مراجعة منهجية)/i.test(q);
 const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|medicine|health study|بحث طبي|دراسة طبية|دراسات سريرية|تجربة سريرية|مراجعة منهجية)/i.test(q);
-let [local, wiki, wikiRest, wd, gd, oa, remote, dd, duckWeb, bingWeb, google, bing, crossref, pubmed] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipediaRestSearch(q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q),[]),safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[]),safe(duckWebSearch(q,language),[]),safe(bingWebSearch(q,language),[]),safe(googleNewsSearch(q,language),[]),safe(bingNewsSearch(q,language),[]),safe((academicQuery&&!personLookup(q))?crossrefSearch(q):Promise.resolve([]),[]),safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language),[])]);
-const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...(s.source_gdelt==="0"?[]:["GDELT"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers","DuckDuckGo Web Search","Bing Web Search","Google News Search","Bing News RSS"];const candidates:Candidate[]=[
+let [local, wiki, wikiRest, wd, gd, oa, remote, dd, duckWeb, bingWeb, google, bing, crossref, pubmed] = await Promise.all([safe(searchArticles(env,q,language,max),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language),[]),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipediaRestSearch(q,language),[]),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language),[]),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q,providerDiagnostics),[]),safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q),[]),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q),[]),safe(duck(q,language),[]),safe(duckWebSearch(q,language),[]),safe(bingWebSearch(q,language),[]),safe(googleNewsSearch(q,language,providerDiagnostics),[]),safe(bingNewsSearch(q,language,providerDiagnostics),[]),safe((academicQuery&&!personLookup(q))?crossrefSearch(q):Promise.resolve([]),[]),safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language),[])]);
+const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...(s.source_gdelt==="0"?[]:["GDELT"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers","DuckDuckGo Web Search","Bing Web Search","Google News Search","Bing News RSS"];providerAttempted.push(...providerDiagnostics);const candidates:Candidate[]=[
     ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wikiRest,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...duckWeb,...bingWeb,...google,...bing
   ];
   // Optional authenticated Enterprise enrichment: exact-title article lookups only.
