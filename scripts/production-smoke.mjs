@@ -38,7 +38,7 @@ try{
     ["/methodology?lang=en","Methodology"],
     ["/privacy?lang=ar","الخصوصية"],
     ["/privacy?lang=en","Privacy"],
-    ["/terms?lang=ar","الشروط"],
+    ["/terms?lang=ar","شروط الاستخدام"],
     ["/terms?lang=en","Terms of Use"]
   ];
   await inBatches(staticSeoPages,4,async([path,heading])=>{

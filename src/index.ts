@@ -101,8 +101,6 @@ if(path==="/"||path==="/index.html"){
   const siteSchema={"@context":"https://schema.org","@graph":[{"@type":"Organization","name":"BAYAN | بيان","url":ORIGIN,"description":description,"logo":ORIGIN+"/favicon.svg"},{"@type":"WebSite","name":"BAYAN | بيان","url":ORIGIN,"inLanguage":["ar","en"],"description":description,"publisher":{"@type":"Organization","name":"BAYAN | بيان","logo":ORIGIN+"/favicon.svg"},"potentialAction":{"@type":"SearchAction","target":ORIGIN+"/search?q={search_term_string}","query-input":"required name=search_term_string"}}]};
   headExtras+='<script type="application/ld+json">'+JSON.stringify(siteSchema).replace(/</g,"\\u003c")+'</script>';
 }
-if(seoFallback)html=html.replace('<main id="app">','<main id="app">'+seoFallback);
-
 if(path==="/news"&&u.searchParams.has("story")){
   const requestedStory=String(u.searchParams.get("story")||"").trim();
   let story:any=null;
@@ -128,6 +126,7 @@ if(path==="/news"&&u.searchParams.has("story")){
     headExtras='<meta property="og:type" content="article"><meta property="og:title" content="'+safeAttr(headline)+'"><meta property="og:description" content="'+safeAttr(storyDescription)+'">'+(story?.imageUrl?'<meta property="og:image" content="'+safeAttr(story.imageUrl)+'">':"")+'<script type="application/ld+json">'+JSON.stringify(structured).replace(/</g,"\\u003c")+'</script>';
   }
 }
+if(seoFallback)html=html.replace('<main id="app">','<main id="app">'+seoFallback);
 let canonical=path==="/"?(lang==="en"?ORIGIN+"/?lang=en":ORIGIN+"/"):ORIGIN+path+"?lang="+lang;if(path==="/news"&&u.searchParams.has("story"))canonical=ORIGIN+"/news?story="+encodeURIComponent(u.searchParams.get("story")||"")+"&lang="+lang;const hasNewsStory=path==="/news"&&u.searchParams.has("story");const alternateAr=path==="/" ? ORIGIN+"/" : ORIGIN+u.pathname+"?lang=ar";const alternateEn=ORIGIN+u.pathname+"?lang=en";const alternateLinks=(!path.startsWith("/article/")&&!hasNewsStory)?'<link rel="alternate" hreflang="ar" href="'+alternateAr+'"><link rel="alternate" hreflang="en" href="'+alternateEn+'"><link rel="alternate" hreflang="x-default" href="'+alternateAr+'">':"";html=html.replace(/<html[^>]*>/i,'<html lang="'+lang+'" dir="'+(lang==="en"?"ltr":"rtl")+'">').replace(/<title>[^<]*<\/title>/i,"<title>"+title.replace(/[<>&"]/g,"")+"</title>").replace(/<meta name="description" content="[^"]*">/i,'<meta name="description" content="'+description.replace(/[<>&"]/g,"")+'">').replace(/<link rel="canonical" href="[^"]*">/i,'<link rel="canonical" href="'+canonical+'">'+alternateLinks);if(!html.includes("G-Y16MK39Q6X"))html=html.replace("</head>",'<script async src="https://www.googletagmanager.com/gtag/js?id=G-Y16MK39Q6X"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config","G-Y16MK39Q6X");</script></head>');if(headExtras)html=html.replace("</head>",headExtras+"</head>");
 const escapeMeta=(value:string)=>String(value||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const ensureMeta=(attribute:"name"|"property",name:string,value:string)=>{
