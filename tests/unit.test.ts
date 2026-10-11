@@ -1,7 +1,7 @@
 import {describe,it,expect} from "vitest";
 import {SECTIONS} from "../src/config";
 import {answerHasUnsupportedSpecifics} from "../src/services/ai";
-import {isolateExactPerson,isolateArticleSubject,isSportsPersonProfile} from "../src/services/search";
+import {isolateExactPerson,isolateArticleSubject,isSportsPersonProfile,personIdentityMatches} from "../src/services/search";
 
 describe("BAYAN product foundation",()=>{
   it("has all required sections",()=>expect(SECTIONS.length).toBe(16));
@@ -13,6 +13,13 @@ describe("sports person profile detection",()=>{
     expect(isSportsPersonProfile("يُعد أحد أبرز اللاعبين العرب والأفارقة، وحصد جوائز فردية معروفة.")).toBe(true);
     expect(isSportsPersonProfile("Egyptian footballer and athlete.")).toBe(true);
     expect(isSportsPersonProfile("كاتب وأديب سعودي.")).toBe(false);
+  });
+});
+describe("person identity aliases",()=>{
+  it("accepts known name variants without matching unrelated sports coverage",()=>{
+    expect(personIdentityMatches("مو صلاح يسجل هدفًا لليفربول","محمد صلاح")).toBe(true);
+    expect(personIdentityMatches("Mohamed Salah scores for Liverpool","محمد صلاح")).toBe(true);
+    expect(personIdentityMatches("ليفربول يفوز في مباراة الدوري","محمد صلاح")).toBe(false);
   });
 });
 describe("canonical same-name profile selection",()=>{
