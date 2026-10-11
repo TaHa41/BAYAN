@@ -59,7 +59,7 @@ Comparisons are meaningful only when the events are sufficiently similar. Teams 
 
 ## Sample size and uncertainty
 
-A short run of results can reflect genuine improvement, a change in opposition or ordinary variation. Small samples are especially unstable: one unusual match can shift a player's average or a team's ranking substantially. Longer records can offer a steadier picture, but they may hide changes in coaching, tactics, fitness or team composition. Avoid treating a few observations as a permanent trend.
+A short run of results can reflect genuine improvement, a change in opposition or ordinary variation. Small samples are especially unstable: one unusual match can shift a player''s average or a team''s ranking substantially. Longer records can offer a steadier picture, but they may hide changes in coaching, tactics, fitness or team composition. Avoid treating a few observations as a permanent trend.
 
 ## Separate official data from interpretation
 
@@ -67,7 +67,7 @@ Competition organizers and governing bodies are usually the first place to check
 
 ## Fairness, health and context
 
-Sports performance is shaped by training, access to facilities, recovery, injury, travel and environmental conditions. A result alone does not establish an athlete's health or explain the reason for a performance change. Claims about doping, misconduct or injury require particularly careful sourcing and should not be inferred from an unusual result. Respect for athletes also means avoiding unsupported personal or medical speculation.
+Sports performance is shaped by training, access to facilities, recovery, injury, travel and environmental conditions. A result alone does not establish an athlete''s health or explain the reason for a performance change. Claims about doping, misconduct or injury require particularly careful sourcing and should not be inferred from an unusual result. Respect for athletes also means avoiding unsupported personal or medical speculation.
 
 ## What the evidence can support
 
