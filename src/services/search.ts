@@ -392,7 +392,7 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
    const medicine=/physician|doctor|surgeon|طبيب|طبيبة/i.test(description);
    const politics=/politician|president|minister|سياسي|رئيس|وزير/i.test(description);
    const arts=/writer|author|poet|actor|actress|كاتب|مؤلف|شاعر|ممثل|ممثلة/i.test(description);
-   const context=sports?/(football|soccer|premier league|liverpool|club|goal|match|team|منتخب|كرة قدم|الدوري|ليفربول|هدف|مباراة|نادي|رياضة|اللاعب(?:ين|ون|ة)?|لاعب(?:ين|ون|ة)?)/i:
+   const context=sports?/(football|soccer|footballer|soccer player|premier league|club|goal|match|team|league|transfer|sign(?:s|ed)?|contract|deal|join(?:s|ed)?|striker|forward|trabzonspor|منتخب|كرة قدم|الدوري|هدف|مباراة|نادي|رياضة|انتقال|يوقع|وقع|ينضم|انضم|عقد|صفقة|طرابزون|اللاعب(?:ين|ون|ة)?|لاعب(?:ين|ون|ة)?)/i:
      medicine?/(medical|medicine|hospital|clinical|doctor|طب|طبي|مستشفى|علاج|طبيب)/i:
      politics?/(government|election|president|minister|politic|حكومة|انتخابات|رئيس|وزير|سياسة)/i:
      arts?/(book|novel|film|movie|writer|author|actor|poet|كتاب|رواية|فيلم|كاتب|مؤلف|ممثل|شاعر)/i:null;
@@ -465,16 +465,11 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   const identity=String(identitySummary||"");
   const sportsProfile=isSportsPersonProfile(identity);
   const writerProfile=/(writer|author|novelist|poet|كاتب|مؤلف|روائي|شاعر)/i.test(identity);
-  // Arabic sports queries often miss current coverage when providers index the
-  // player's Latin-script name. Resolve a matching English Wikidata label, then
-  // use it only as an additional query; result-language and relevance gates remain.
-  const englishSportsName=person&&language==="ar"&&sportsProfile
-    ? (await wikidata(q,"en").catch(()=>[])).find(item=>!hasArabic(item.title)&&/(footballer|football player|soccer player|athlete)/i.test(String(item.summary||"")) )?.title
-    : undefined;
+  // Keep sports queries club-agnostic: encyclopedia summaries may lag transfers.
   const variants=person
     ? (language==="ar"
-      ? (sportsProfile ? [q+" آخر الأخبار",q+" ليفربول",englishSportsName ? englishSportsName+" Liverpool latest news" : q+" منتخب مصر"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
-      : (sportsProfile ? [q+" latest news",q+" Liverpool",q+" Egypt national team"] : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
+      ? (sportsProfile ? [q+" آخر الأخبار",q+" انتقال",q+" المنتخب المصري"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
+      : (sportsProfile ? [q+" latest news",q+" transfer news",q+" Egypt national team"] : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
     : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,3);
   diagnostics.push("Expanded search mode: person="+person+", sportsProfile="+sportsProfile+", variants="+uniqueVariants.length);
@@ -489,10 +484,10 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
       duck(variant,language).catch(()=>[]),
       duckWebSearch(variant,language).catch(()=>[]),
       bingWebSearch(variant,language).catch(()=>[]),
-      ...(env.GNEWS_API_KEY && person && sportsProfile && variant===uniqueVariants[1] ? [gnewsSearch(env,variant,language,diagnostics).catch(()=>[])] : [])
+      ...(env.GNEWS_API_KEY && person && sportsProfile && variantIndex<2 ? [gnewsSearch(env,variant,language,diagnostics).catch(()=>[])] : [])
     ]);
     const labels=["Wikipedia","Wikipedia REST Search","Wikidata","GDELT","Google News Search","Bing News RSS","DuckDuckGo Instant Answers","DuckDuckGo Web Search","Bing Web Search"];
-    if(env.GNEWS_API_KEY&&person&&sportsProfile&&variant===uniqueVariants[1])labels.push("GNews Search");
+    if(env.GNEWS_API_KEY&&person&&sportsProfile&&variantIndex<2)labels.push("GNews Search");
     diagnostics.push("Expanded variant "+(variantIndex+1)+" result counts: "+labels.map((label,index)=>label+"="+(results[index]?.length||0)).join(", "));
     return results.flat();
   }));
