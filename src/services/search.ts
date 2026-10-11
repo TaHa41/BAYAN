@@ -415,7 +415,7 @@ export const personIdentityMatches=(text:string,name:string)=>{
   if(normalizedName&&normalizedText.includes(normalizedName))return true;
   if(!/(محمد\s+صلاح|mohamed\s+salah|mohammed\s+salah|mo\s+salah)/i.test(name))return false;
   if(/محمد\s+صلاح|مو\s+صلاح|mohamed\s+salah|mohammed\s+salah|mo\s+salah/i.test(text))return true;
-  return /صلاح/i.test(text)&&/(ليفربول|منتخب مصر|الفرعون المصري|اللاعب المصري|هدف|مباراة)/i.test(text);
+  return /صلاح/i.test(text)&&/(ليفربول|طرابزون|منتخب مصر|الفرعون المصري|اللاعب المصري|هدف|مباراة|انتقال|يوقع|وقع|عقد|صفقة|نادي|فريق|كرة قدم|الدوري|مهاجم|liverpool|trabzonspor|transfer|signed|contract|deal|joined|club|team|goal|match|league|striker|forward)/i.test(text);
 };
 export const isolateArticleSubject=(title:string,items:Candidate[])=>{
  const query=normalizedEntityTitle(title);
