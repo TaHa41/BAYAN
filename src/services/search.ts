@@ -113,7 +113,8 @@ async function googleNewsSearch(q:string,language:Locale,diagnostics?:string[]):
     for(const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
       rawItems++;
       const block=match[1];const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
-      const rawTitle=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1400),publisher=cleanText(field("source"));
+      const rawTitle=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1400);
+      let publisher=cleanText(field("source"));
       const titleParts=rawTitle.match(/^(.*?)\s+-\s+([^-]+)$/);
       const title=publisher?rawTitle:(titleParts?.[1]?.trim()||rawTitle);
       publisher=publisher||(titleParts?.[2]?.trim()||"");
