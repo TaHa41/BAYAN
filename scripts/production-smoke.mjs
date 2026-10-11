@@ -23,6 +23,9 @@ try{const health=await get("/api/health");const data=JSON.parse(health.text);if(
 try{
   const sitemap=await get("/sitemap.xml");
   if(!sitemap.text.includes("?lang=ar")||!sitemap.text.includes("?lang=en")||!sitemap.text.includes("<lastmod>"))throw new Error("localized_sitemap_or_lastmod_missing");
+  if(!sitemap.text.includes("<loc>"+origin+"/</loc>")||sitemap.text.includes("<loc>"+origin+"/?lang=ar</loc>"))throw new Error("homepage_canonical_sitemap_mismatch");
+  const homeAr=await get("/?lang=ar"); if(!homeAr.text.includes('<link rel="canonical" href="'+origin+'/">'))throw new Error("arabic_homepage_canonical_mismatch");
+  const homeEn=await get("/?lang=en"); if(!homeEn.text.includes('<link rel="canonical" href="'+origin+'/?lang=en">'))throw new Error("english_homepage_canonical_mismatch");
   const robots=await get("/robots.txt");
   if(!robots.text.includes("Sitemap:")||!robots.text.includes("Disallow: /admin"))throw new Error("robots_policy_missing");
   if(robots.text.includes("Agentmap:"))throw new Error("robots_contains_unrecognized_agentmap_directive");
