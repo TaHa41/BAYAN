@@ -112,17 +112,18 @@ async function googleNewsSearch(q:string,language:Locale):Promise<Candidate[]>{
   }catch{return[]}
 }
 
-async function gnewsSearch(env:Env,q:string,language:Locale):Promise<Candidate[]>{
+async function gnewsSearch(env:Env,q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
   const apiKey=String(env.GNEWS_API_KEY||"").trim();
-  if(!apiKey)return[];
+  if(!apiKey){diagnostics?.push("GNews: API key not configured");return[];}
   try{
     let query=String(q||"").trim();
     if(/محمد\s+صلاح/i.test(query)){const suffix=query.replace(/محمد\s+صلاح/i,"").trim();const names=language==="ar"?'"محمد صلاح" OR "Mohamed Salah" OR "Mo Salah"':'"Mohamed Salah" OR "Mo Salah"';query=suffix?"("+names+") "+suffix:names;}
     const params=new URLSearchParams({q:query,lang:language,max:"10",sortby:"publishedAt",apikey:apiKey});
     const response=await timeout("https://gnews.io/api/v4/search?"+params.toString(),5000);
-    if(!response.ok)return[];
+    if(!response.ok){diagnostics?.push("GNews HTTP "+response.status);return[];}
     const data=await response.json<any>();
     const articles=Array.isArray(data.articles)?data.articles:[];
+    diagnostics?.push("GNews HTTP 200 raw articles="+articles.length);
     return articles.map((item:any)=>{
       const title=cleanText(String(item?.title||""));
       const summary=cleanText(String(item?.description||item?.content||"")).slice(0,1600);
@@ -137,7 +138,7 @@ async function gnewsSearch(env:Env,q:string,language:Locale):Promise<Candidate[]
         url,imageUrl:/^https:\/\//i.test(imageUrl)?imageUrl:undefined,imageAlt:title,
         score:scoreSource(publisher,title,q)+12,provider:"GNews Search"} as Candidate;
     }).filter((item:any):item is Candidate=>Boolean(item)).slice(0,10);
-  }catch{return[]}
+  }catch(error){diagnostics?.push("GNews request error: "+String(error).slice(0,120));return[];}
 }
 
 async function bingNewsSearch(q:string,language:Locale):Promise<Candidate[]>{
@@ -456,7 +457,7 @@ const personLookup=(q:string)=>{
   // explicitly asks "من هو/من هي", avoiding the restrictive person-only filter.
   return /^[A-Z][a-z]+(?:[ '-]+[A-Z][a-z]+){1,3}$/.test(raw);
 };
-async function expandedSearch(env:Env,q:string,language:Locale,person=false,identitySummary=""):Promise<Candidate[]>{
+async function expandedSearch(env:Env,q:string,language:Locale,person=false,identitySummary="",diagnostics:string[]=[]):Promise<Candidate[]>{
   // Recovery uses distinct query formulations, not just the same phrase with a suffix.
   // Keep the fan-out bounded so broader recall does not create unbounded latency/subrequests.
   const normalized=q.normalize("NFKC").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[“”‘’]/g,'"').replace(/[؟?!،,;；]+/g," ").replace(/\s+/g," ").trim();
@@ -476,7 +477,8 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
       : (sportsProfile ? [q+" latest news",q+" Liverpool",q+" Egypt national team"] : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
     : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,3);
-  const batches=await Promise.all(uniqueVariants.map(async variant=>{
+  diagnostics.push("Expanded search mode: person="+person+", sportsProfile="+sportsProfile+", variants="+uniqueVariants.length);
+  const batches=await Promise.all(uniqueVariants.map(async (variant,variantIndex)=>{
     const results=await Promise.all([
       wikipedia(env,variant,language).catch(()=>[]),
       wikipediaRestSearch(variant,language).catch(()=>[]),
@@ -487,8 +489,11 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
       duck(variant,language).catch(()=>[]),
       duckWebSearch(variant,language).catch(()=>[]),
       bingWebSearch(variant,language).catch(()=>[]),
-      ...(env.GNEWS_API_KEY && person && sportsProfile && variant===uniqueVariants[1] ? [gnewsSearch(env,variant,language).catch(()=>[])] : [])
+      ...(env.GNEWS_API_KEY && person && sportsProfile && variant===uniqueVariants[1] ? [gnewsSearch(env,variant,language,diagnostics).catch(()=>[])] : [])
     ]);
+    const labels=["Wikipedia","Wikipedia REST Search","Wikidata","GDELT","Google News Search","Bing News RSS","DuckDuckGo Instant Answers","DuckDuckGo Web Search","Bing Web Search"];
+    if(env.GNEWS_API_KEY&&person&&sportsProfile&&variant===uniqueVariants[1])labels.push("GNews Search");
+    diagnostics.push("Expanded variant "+(variantIndex+1)+" result counts: "+labels.map((label,index)=>label+"="+(results[index]?.length||0)).join(", "));
     return results.flat();
   }));
   return batches.flat();
@@ -620,7 +625,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
     providerAttempted.push("Expanded topic variants: Wikipedia, Wikipedia REST Search, Wikidata, GDELT, DuckDuckGo Web Search, Bing Web Search, Google News Search, Bing News RSS"+(env.GNEWS_API_KEY?", GNews Search":""),"OpenAI Web Search (fallback)");
     const [expanded,web]=await Promise.all([
-      safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||"")),[]),
+      safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||""),providerAttempted),[]),
       safe(openAiWebSearch(env,q,language),[])
     ]);
     candidates.push(...expanded,...web);
