@@ -124,7 +124,7 @@ if(path==="/news"&&u.searchParams.has("story")){
     const storyDateText=Number.isFinite(storyDate)?new Date(storyDate).toISOString():"";
     seoFallback='<article class="seo-news-story"><h1>'+seoEscape(headline)+'</h1>'+storyImage+'<p class="seo-news-summary">'+seoEscape(storyDescription)+'</p>'+(storyBody&&storyBody!==storyDescription?'<div class="seo-news-body"><p>'+seoEscape(storyBody)+'</p></div>':"")+'<p class="seo-news-meta">'+(lang==="en"?"Publisher: ":"الناشر: ")+seoEscape(storyPublisher)+(storyDateText?" · "+storyDateText:"")+'</p></article>';
     const safeAttr=(value:string)=>String(value||"").replace(/[<>&"]/g,"");
-    const structured={"@context":"https://schema.org","@type":"NewsArticle","headline":headline,"description":storyDescription,"datePublished":story?.publishedAt,"image":story?.imageUrl?[story.imageUrl]:undefined,"publisher":{"@type":"Organization","name":"BAYAN"},"inLanguage":lang};
+    const structured={"@context":"https://schema.org","@type":"NewsArticle","headline":headline,"description":storyDescription,"datePublished":story?.publishedAt,"image":story?.imageUrl?[story.imageUrl]:undefined,"publisher":{"@type":"Organization","name":"BAYAN","logo":ORIGIN+"/favicon.svg"},"inLanguage":lang};
     headExtras='<meta property="og:type" content="article"><meta property="og:title" content="'+safeAttr(headline)+'"><meta property="og:description" content="'+safeAttr(storyDescription)+'">'+(story?.imageUrl?'<meta property="og:image" content="'+safeAttr(story.imageUrl)+'">':"")+'<script type="application/ld+json">'+JSON.stringify(structured).replace(/</g,"\\u003c")+'</script>';
   }
 }
