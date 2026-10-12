@@ -262,6 +262,25 @@ async function bingWebSearch(q:string,language:Locale):Promise<Candidate[]>{
     return out;
   }catch{return[]}
 }
+async function bingWebRssSearch(q:string,language:Locale):Promise<Candidate[]>{
+  // Bing's RSS endpoint is a lighter fallback than parsing the changing HTML search page.
+  try{
+    const setlang=language==="ar"?"ar":"en-US";
+    const url="https://www.bing.com/search?q="+encodeURIComponent(q)+"&format=rss&setlang="+setlang;
+    const response=await timeout(url,4500);if(!response.ok)return[];
+    const xml=await response.text();const out:Candidate[]=[];
+    for(const match of xml.matchAll(/<item\\b[^>]*>([\\s\\S]*?)<\\/item>/gi)){
+      const block=match[1];
+      const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\\\b[^>]*>([\\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
+      const title=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1200);
+      if(!title||!/^https:\\/\\//i.test(url))continue;
+      let publisher="Bing Web";try{publisher=new URL(url).hostname.replace(/^www\\./i,"")}catch{}
+      out.push({title,summary,section:"world",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+8,provider:"Bing Web RSS"});
+      if(out.length>=8)break;
+    }
+    return out;
+  }catch{return[]}
+}
 async function broadGdelt(q:string):Promise<Candidate[]>{
   const variants=[...new Set([q,q.split(/\s+/).slice(0,6).join(" "),q.split(/\s+/).slice(0,3).join(" ")].filter(Boolean))];
   const batches=await Promise.all(variants.map(v=>gdelt(v).catch(()=>[])));
@@ -457,14 +476,14 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
     : undefined;
   const variants=person
     ? (language==="ar"
-      ? (sportsProfile ? [q+" آخر الأخبار",q+" انتقال",englishSportsName ? englishSportsName+" latest news" : q+" منتخب مصر"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
+      ? (sportsProfile ? [q+" آخر الأخبار",englishSportsName ? englishSportsName+" latest news" : q+" منتخب مصر",q+" انتقال"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
       : (sportsProfile ? [q+" latest news",q+" transfer news",q+" Egypt national team"] : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
     : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
   // The first pass already calls many providers. Sequential, bounded recovery prevents
   // a 3-variant x 9-provider fan-out from exhausting Cloudflare Worker subrequests.
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,2);
   const batches:Candidate[][]=[];
-  const labels=["Wikipedia REST Search","GDELT","Google News Search","DuckDuckGo Web Search","Bing Web Search"];
+  const labels=["Wikipedia REST Search","GDELT","Google News Search","DuckDuckGo Web Search","Bing Web Search","Bing Web RSS"];
   for(let variantIndex=0;variantIndex<uniqueVariants.length;variantIndex++){
     const variant=uniqueVariants[variantIndex];
     const results=await Promise.all([
@@ -472,7 +491,8 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
       gdelt(variant).catch(()=>[]),
       googleNewsSearch(variant,language).catch(()=>[]),
       duckWebSearch(variant,language).catch(()=>[]),
-      bingWebSearch(variant,language).catch(()=>[])
+      bingWebSearch(variant,language).catch(()=>[]),
+      bingWebRssSearch(variant,language).catch(()=>[])
     ]);
     diagnostics.push("Expanded variant "+(variantIndex+1)+" result counts: "+labels.map((label,index)=>label+"="+(results[index]?.length||0)).join(", "));
     batches.push(results.flat());
