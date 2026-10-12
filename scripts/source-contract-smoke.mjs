@@ -175,6 +175,7 @@ const checks = [
   ["search result article URLs keep summaries short instead of embedding entire source excerpts", read("public/app-20261009-01.js").includes('encodeURIComponent(String(item.summary||"").slice(0,240))')],
   ["search failure messages describe completed attempts and do not falsely promise a fallback after a caught exception", read("src/services/search.ts").includes("لم تُرجع محاولات البحث المتاحة نتائج ذات صلة كافية") && read("src/services/search.ts").includes("BAYAN will not show unrelated results") && read("src/routes/api.ts").includes("تعذّر إكمال البحث بسبب خطأ داخلي") && !read("src/routes/api.ts").includes("fallback search paths will be used")],
   ["health endpoint performs a real database probe and returns an unhealthy HTTP status when the database is unavailable", read("src/routes/api.ts").includes('await env.DB.prepare("SELECT 1 AS ready").first()') && read("src/routes/api.ts").includes('return json({ok:false,service:"BAYAN",version:"1.2.0",database:false,error:"database_unavailable"},503)') && !read("src/routes/api.ts").includes('database:!!env.DB')],
+  ["sitemap route preserves retryable failures instead of rewriting them as empty XML with HTTP 200", read("src/index.ts").includes('return new Response(response.body,{status:response.status,headers})') && read("src/index.ts").includes('status:503,headers:{"Content-Type":"text/plain; charset=utf-8","Cache-Control":"no-store","Retry-After":"300"') && !read("src/index.ts").includes("sitemap-fallback")],
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
