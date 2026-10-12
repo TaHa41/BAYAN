@@ -8,10 +8,10 @@ on:
 permissions:
   contents: read
 
-# Never cancel a deployment already applying migrations or publishing the Worker.
-# Queue newer main commits so each production deployment finishes verification.
+# Serialize all new production deploys in a fresh queue generation.
+# This isolates new releases from an older stalled post-deploy verification without cancelling any active deployment.
 concurrency:
-  group: bayan-production-deploy-v2
+  group: bayan-production-deploy-v3
   cancel-in-progress: false
 
 jobs:
