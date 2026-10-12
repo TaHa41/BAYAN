@@ -201,4 +201,5 @@ if(seoPath==="/sitemap.xml"||seoPath==="/news-sitemap.xml"){
     return new Response("Sitemap temporarily unavailable; retry later.",{status:503,headers:{"Content-Type":"text/plain; charset=utf-8","Cache-Control":"no-store","Retry-After":"300","X-Content-Type-Options":"nosniff","X-BAYAN-SEO":"sitemap-unavailable"}});
   }
 }
+return await page(request,env);
 },async scheduled(_event:ScheduledEvent,env:Env){try{await ensureSchema(env)}catch{}await selfHeal(env)}};
