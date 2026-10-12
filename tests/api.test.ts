@@ -5,6 +5,8 @@ const env={ASSETS:{fetch:async()=>new Response("asset")},DB:{prepare:(sql:string
 describe("BAYAN API",()=>{
   it("health",async()=>{
     const r=await worker.fetch(new Request("https://bayan.test/api/health"),env);
+    expect(r).toBeDefined();
+    if(!r) throw new Error("health request returned no response");
     const d=await r.json() as any;
     expect(r.status).toBe(200);
     expect(d.ok).toBe(true);
@@ -32,11 +34,15 @@ describe("BAYAN API",()=>{
   });
   it("search validates query",async()=>{
     const r=await worker.fetch(new Request("https://bayan.test/api/search"),env);
+    expect(r).toBeDefined();
+    if(!r) throw new Error("search request returned no response");
     expect(r.status).toBe(400);
   });
   it("protects all admin routes without a manager token",async()=>{
     for(const path of ["/api/admin/runtime","/api/admin/ai-repair","/api/admin/article","/api/admin/settings"]){
       const r=await worker.fetch(new Request("https://bayan.test"+path,{method:path.endsWith("/ai-repair")||path.endsWith("/article")?"POST":"GET"}),env);
+      expect(r).toBeDefined();
+      if(!r) throw new Error(`admin request returned no response: ${path}`);
       expect(r.status).toBe(401);
     }
   });
