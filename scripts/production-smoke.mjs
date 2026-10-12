@@ -31,6 +31,8 @@ try{
   if(!sitemap.text.includes("?lang=ar")||!sitemap.text.includes("?lang=en")||!sitemap.text.includes("<lastmod>"))throw new Error("localized_sitemap_or_lastmod_missing");
   if(!sitemap.text.includes("<loc>"+origin+"/</loc>")||sitemap.text.includes("<loc>"+origin+"/?lang=ar</loc>"))throw new Error("homepage_canonical_sitemap_mismatch");
   const newsMap=await get("/news-sitemap.xml");
+  const newsLanding=await get("/news?lang=ar");
+  if(!newsLanding.text.includes('class="seo-content-image"'))throw new Error("news_landing_server_rendered_images_missing");
   if(newsMap.text.includes("/news?story="))throw new Error("news_sitemap_contains_summary_only_pages");
   const newsLocs=[...newsMap.text.matchAll(/<loc>(.*?)<\/loc>/g)].map(match=>match[1]);
   if(newsLocs.some(url=>!url.includes("/article/")))throw new Error("news_sitemap_url_is_not_full_article");
