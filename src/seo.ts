@@ -8,6 +8,7 @@ export function robots(){
   return text("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nDisallow: /review\nDisallow: /saved\nSitemap: "+ORIGIN+"/sitemap.xml\nSitemap: "+ORIGIN+"/news-sitemap.xml\n");
 }
 const xml=(s:string)=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
+const retryableUnavailable=(message:string)=>{const response=text(message,"text/plain;charset=utf-8",503);response.headers.set("retry-after","300");return response;};
 export async function sitemap(env:Env){
   let articleUrls:Array<{url:string;lastmod?:string}>=[];
   try{
@@ -19,7 +20,7 @@ export async function sitemap(env:Env){
   }catch(error){
     // Avoid publishing a misleading partial sitemap when article discovery fails.
     console.error("sitemap_database_query_failed", error instanceof Error ? error.message : String(error));
-    return text("Sitemap temporarily unavailable; retry later.", "text/plain;charset=utf-8", 503);
+    return retryableUnavailable("Sitemap temporarily unavailable; retry later.");
   }
   const publicPaths=["/","/news","/about","/methodology","/privacy","/terms",...SECTIONS.map(x=>"/"+x[0])];
   const localizedUrls=publicPaths.flatMap((path)=>["ar","en"].map((language)=>({url:path==="/"&&language==="ar"?ORIGIN+"/":ORIGIN+path+"?lang="+language})));
@@ -52,7 +53,7 @@ export async function newsSitemap(env:Env){
   }catch(error){
     // Do not disguise a database outage as a valid but empty news sitemap.
     console.error("news_sitemap_database_query_failed", error instanceof Error ? error.message : String(error));
-    return text("News sitemap temporarily unavailable; retry later.", "text/plain;charset=utf-8", 503);
+    return retryableUnavailable("News sitemap temporarily unavailable; retry later.");
   }
   return text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">'+items.map(x=>{
     const url=ORIGIN+"/article/"+encodeURIComponent(x.slug)+"?lang="+x.language;
