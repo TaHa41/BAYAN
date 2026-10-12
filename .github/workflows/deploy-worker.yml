@@ -53,7 +53,7 @@ jobs:
     # Verification can be slow; keep it separate so it cannot block the next serialized deployment.
     needs: deploy
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v5
