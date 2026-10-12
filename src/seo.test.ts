@@ -33,7 +33,8 @@ describe("newsSitemap database failure handling", () => {
     const response = await newsSitemap(env);
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("application/xml");
-    expect(await response.text()).toContain("<urlset");
-    expect(await response.text()).toContain("</urlset>");
+    const body = await response.text();
+    expect(body).toContain("<urlset");
+    expect(body).toContain("</urlset>");
   });
 });
