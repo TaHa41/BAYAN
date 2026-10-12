@@ -1,7 +1,7 @@
 import type {Env,Locale,SearchResponse,SearchResult,Source} from "../types";
 import {searchArticles,saveSearch,publishVerifiedResearch} from "../db";
 import {ask} from "./ai";
-import {findRelatedImage} from "./news";
+import {findRelatedImage,searchNewsFeed} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 
 type Candidate = SearchResult & {score:number; provider:string};
@@ -97,24 +97,12 @@ async function gdelt(q:string):Promise<Candidate[]>{
 const decodeXml=(value:string)=>String(value||"").replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,"$1").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n)));
 async function googleNewsSearch(q:string,language:Locale):Promise<Candidate[]>{
   try{
-    const hl=language==="ar"?"ar":"en-US",gl=language==="ar"?"EG":"US",ceid=language==="ar"?"EG:ar":"US:en";
-    const url="https://news.google.com/rss/search?q="+encodeURIComponent(q)+"&hl="+hl+"&gl="+gl+"&ceid="+ceid;
-    const response=await timeout(url,5000);if(!response.ok)return[];
-    const xml=await response.text();const out:Candidate[]=[];
-    for(const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
-      const block=match[1];const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
-      const rawTitle=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1400),sourceTag=cleanText(field("source"));
-      // Google News RSS occasionally omits <source>. Recover the publisher from its
-      // conventional “headline - Publisher” title suffix before falling back to host.
-      const titleParts=rawTitle.match(/^(.*?)\s+-\s+([^\-]+)$/);
-      const title=sourceTag?rawTitle:(titleParts?.[1]?.trim()||rawTitle);
-      let publisher=sourceTag||(titleParts?.[2]?.trim()||"");
-      if(!publisher){try{publisher=new URL(url).hostname.replace(/^www\./i,"")}catch{publisher="Google News RSS"}}
-      if(!title||!/^https:\/\//i.test(url))continue;
-      out.push({title,summary,section:"news",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+4,provider:"Google News Search"});
-      if(out.length>=8)break;
-    }
-    return out;
+    const stories=await searchNewsFeed(q,language);
+    return stories.slice(0,8).map(story=>{
+      const title=cleanText(story.title),url=String(story.url||""),publisher=cleanText(story.publisher||"Google News");
+      const summary=cleanText(story.summary||"").slice(0,1400);
+      return {title,summary,section:"news",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+4,provider:"Google News Search"};
+    }).filter(item=>item.title&&/^https:\/\//i.test(item.url));
   }catch{return[]}
 }
 
