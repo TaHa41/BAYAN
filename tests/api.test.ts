@@ -2,6 +2,19 @@ import {describe,it,expect} from "vitest";
 import worker from "../src/index";
 import {body,json,text} from "../src/http";
 const env={ASSETS:{fetch:async()=>new Response("asset")},DB:{prepare:(sql:string)=>({bind:()=>({all:async()=>({results:[]}),first:async()=>null,run:async()=>({})}),all:async()=>({results:[]}),first:async()=>sql.trim().startsWith("SELECT 1 AS ready")?{ready:1}:null,run:async()=>({})}),batch:async()=>[]}} as any;
+describe("BAYAN public page routing",()=>{
+  it("renders the public homepage instead of returning no response",async()=>{
+    const r=await worker.fetch(new Request("https://bayan.test/"),env);
+    expect(r).toBeDefined();
+    if(!r)throw new Error("homepage request returned no response");
+    expect(r.status).toBe(200);
+    expect(r.headers.get("content-type")).toContain("text/html");
+    const html=await r.text();
+    expect(html).toContain("<html lang=");
+    expect(html).toContain("Evidence before claims");
+  });
+});
+
 describe("BAYAN API",()=>{
   it("health",async()=>{
     const r=await worker.fetch(new Request("https://bayan.test/api/health"),env);
