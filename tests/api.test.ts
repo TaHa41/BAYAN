@@ -11,7 +11,7 @@ describe("BAYAN public page routing",()=>{
     expect(r.headers.get("content-type")).toContain("text/html");
     const html=await r.text();
     expect(html).toContain("<html lang=");
-    expect(html).toContain("Evidence before claims");
+    expect(html).toContain("المعلومة أولًا.");
   });
 });
 
