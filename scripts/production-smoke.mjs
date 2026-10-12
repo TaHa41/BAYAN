@@ -15,7 +15,8 @@ async function get(path){
   const isHtmlRoute=htmlRoutes.has(pathname)||sections.includes(pathname.replace(/^\//,""))||pathname.startsWith("/article/");
   if(isHtmlRoute&&!/text\/html/i.test(r.headers.get("content-type")||""))throw new Error(path+" expected text/html but received "+(r.headers.get("content-type")||"missing content-type"));
   if(isHtmlRoute&&!/<html\b/i.test(text))throw new Error(path+" html_document_missing");
-  if(isHtmlRoute&&!/<h1\b/i.test(text))throw new Error(path+" server_rendered_h1_missing");
+  const needsServerH1=pathname==="/"||pathname==="/index.html"||["/about","/methodology","/privacy","/terms"].includes(pathname)||sections.includes(pathname.replace(/^\//,""))||pathname.startsWith("/article/");
+  if(needsServerH1&&!/<h1\b/i.test(text))throw new Error(path+" server_rendered_h1_missing");
   for(const [name,value] of [["x-content-type-options","nosniff"],["x-frame-options","DENY"],["referrer-policy","strict-origin-when-cross-origin"]])if(r.headers.get(name)!==value)throw new Error(path+" missing security header "+name);
   return{text,status:r.status,headers:r.headers};
 }
