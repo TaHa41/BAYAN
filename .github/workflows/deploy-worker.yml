@@ -11,7 +11,7 @@ permissions:
 # Never cancel a deployment already applying migrations or publishing the Worker.
 # Queue newer main commits so each production deployment finishes verification.
 concurrency:
-  group: bayan-production-deploy
+  group: bayan-production-deploy-v2
   cancel-in-progress: false
 
 jobs:
