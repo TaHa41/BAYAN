@@ -45,7 +45,11 @@ export async function newsSitemap(env:Env){
       const publishers=new Set(sources.map((source:any)=>String(source.publisher||"").trim().toLowerCase()).filter(Boolean));
       return Boolean(x.slug&&x.title&&(x.language==="ar"||x.language==="en")&&Number.isFinite(published)&&published<=now+5*60*1000&&now-published<=48*60*60*1000&&body.length>=1800&&headings>=4&&paragraphs.length>=5&&uniqueParagraphs.size>=5&&hosts.size>=2&&publishers.size>=2);
     }).map((x:any)=>({slug:String(x.slug),title:String(x.title),language:x.language as Locale,publishedAt:new Date(String(x.created_at)).toISOString()}));
-  }catch{}
+  }catch(error){
+    // Do not disguise a database outage as a valid but empty news sitemap.
+    console.error("news_sitemap_database_query_failed", error instanceof Error ? error.message : String(error));
+    return text("News sitemap temporarily unavailable; retry later.", "text/plain;charset=utf-8", 503);
+  }
   return text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">'+items.map(x=>{
     const url=ORIGIN+"/article/"+encodeURIComponent(x.slug)+"?lang="+x.language;
     return '<url><loc>'+xml(url)+'</loc><news:news><news:publication><news:name>BAYAN</news:name><news:language>'+xml(x.language)+'</news:language></news:publication><news:publication_date>'+xml(x.publishedAt)+'</news:publication_date><news:title>'+xml(x.title)+'</news:title></news:news></url>';
