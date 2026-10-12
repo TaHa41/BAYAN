@@ -467,16 +467,16 @@
     const answerUsable=Boolean(answerText)&&!/(تعذر تشغيل صياغة BAYAN الذكية الآن|drafting model is temporarily unavailable)/i.test(answerText);
     output.innerHTML = results.length
       ? ((answerUsable ? '<article class="answer search-answer"><span class="eyebrow">' + t("إجابة بيان","BAYAN answer") + '</span><div class="article-body">' + renderArticleBody(answerText) + '</div>' + (data.articleSlug ? '<a class="read" href="/article/' + encodeURIComponent(data.articleSlug) + "?lang=" + lang + '">' + t("فتح الملف الكامل داخل بيان","Open the full BAYAN file") + " →</a>" : "") + "</article>" : "") +
-      (fallbackUsed ? '<div class="notice">' + t("عرض بيان نتائج من مسار احتياطي؛ يجري توسيع البحث دون اختلاق نتائج.","BAYAN is showing fallback-source results while expanding search without inventing results.") + "</div>" : "") +
+      (fallbackUsed ? '<div class="notice">' + t("هذه نتائج استكشافية من مسار احتياطي؛ لم تُعتبر تحققًا مستقلًا، ويعرض بيان حالة الأدلة بوضوح.","These are exploratory fallback results, not independently verified; BAYAN labels the evidence status explicitly.") + "</div>" : "") +
       '<div class="result-meta">' + escapeHtml((data.providers || []).join(" · ") || "BAYAN") + "</div>" +
       results.map((item) => {
         const key = item.slug || item.url || item.title;
         const sectionMeta=sections.find(section=>section[0]===item.section); const sectionLabel=sectionMeta?(ar?sectionMeta[1]:sectionMeta[2]):t("نتيجة بحث","Search result"); const sourceUrl=String(item.url||(item.sources||[])[0]?.url||""); const videoUrl=/^https:\/\/(www\.)?(youtube\.com|youtu\.be|vimeo\.com)\//i.test(sourceUrl); const videoId=(sourceUrl.match(/[?&]v=([A-Za-z0-9_-]{6,})/)||sourceUrl.match(/youtu\.be\/([A-Za-z0-9_-]{6,})/)||sourceUrl.match(/\/(?:shorts|embed|video)\/([A-Za-z0-9_-]{6,})/))?.[1]; const cardImage=item.imageUrl||(videoId?"https://i.ytimg.com/vi/"+videoId+"/hqdefault.jpg":""); const destination=item.slug?("/article/"+encodeURIComponent(item.slug)+"?lang="+lang):("/research?title="+encodeURIComponent(item.title||query)+"&summary="+encodeURIComponent(String(item.summary||"").slice(0,240))+"&url="+encodeURIComponent(sourceUrl)+"&publisher="+encodeURIComponent((item.sources||[])[0]?.publisher||"")+"&image="+encodeURIComponent(item.imageUrl||"")+"&lang="+lang); return '<article class="search-result search-article-card">' + imageHtml({...item,imageUrl:cardImage}) + '<span class="kicker">' + escapeHtml(videoUrl?t("فيديو — مصدر بحث","Video source"):sectionLabel) + " · " +
-          escapeHtml(item.evidence || "mixed") + "</span><h2>" +
+          escapeHtml(({verified:t("موثق","Verified"),mixed:t("بحاجة إلى تحقق إضافي","Needs more verification"),insufficient:t("أدلة غير كافية","Insufficient evidence"),source_only:t("مرجع تعريفي","Reference only")})[item.evidence]||t("بحاجة إلى تحقق إضافي","Needs more verification")) + "</span><h2>" +
           ('<a href="' + destination + '"' + '>' + escapeHtml(item.title) + "</a>") +
           "</h2><p>" + escapeHtml(item.summary || "") + '</p><div class="source-line">' +
           (item.sources || []).slice(0, 3).map((source) => escapeHtml(source.publisher)).join(" · ") +
-          '</div><a class="read" href="' + destination + '"' + '>' + t("فتح المصدر","Open source") + " →</a>" + socialActions({...item, _key:key}) + "</article>";
+          '</div><a class="read" href="' + destination + '"' + '>' + t("عرض التفاصيل والأدلة","View details and evidence") + " →</a>" + socialActions({...item, _key:key}) + "</article>";
       }).join(""))
       : '<div class="notice"><h2>' + escapeHtml(data?.message || t("لم نعثر على نتيجة مناسبة في المسارات المتاحة الآن.","No suitable result was found in the available search paths.")) +
         '</h2><p>' + t("يمكنك تجربة صياغة أخرى؛ يوسّع بيان البحث عبر المصادر المتاحة دون اختلاق معلومات.","Try another phrasing; BAYAN searches available sources without fabricating information.") + "</p>" +
@@ -495,7 +495,7 @@
       const data=await api("/api/news/article?title="+encodeURIComponent(title)+"&summary="+encodeURIComponent(summary)+"&url="+encodeURIComponent(url)+"&publisher="+encodeURIComponent(publisher)+"&image="+encodeURIComponent(p.get("image")||"")+"&lang="+lang,{timeoutMs:36000});
       const article=data.article||{};
       if(!data.ok||!article.title)throw new Error("article_unavailable");
-      if(article.status!=="verified")throw new Error("article_not_verified");
+      if(article.status!=="verified"&&article.status!=="source_only")throw new Error("article_not_verified");
       output.innerHTML='<article class="article-full">'+(article.image?heroImageHtml(article.image,article.title,article.summary||summary):"")+
         '<span class="eyebrow">'+escapeHtml(article.sources?.[0]?.publisher||publisher||t("بحث موثق","Evidence search"))+'</span><h1>'+escapeHtml(article.title)+'</h1>'+
         articleLeadHtml(article.summary||summary,article.body||summary)+(article.savedSlug?'<div class="notice">'+t("تمت إضافة المقال تلقائيًا إلى قسم","Automatically added to section")+' <a href="/'+encodeURIComponent(article.section||"news")+'?lang='+lang+'">'+escapeHtml((sections.find(section=>section[0]===(article.section||"news"))||[])[ar?1:2]||article.section||"news")+'</a></div>':"")+
