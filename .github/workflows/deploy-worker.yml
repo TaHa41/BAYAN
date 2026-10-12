@@ -50,8 +50,11 @@ jobs:
 
 
   verify-production:
-    # Verification can be slow; keep it separate so it cannot block the next serialized deployment.
+    # Keep only the newest verification active; concurrent full smoke runs can rate-limit public search providers.
     needs: deploy
+    concurrency:
+      group: bayan-production-verify-v1
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
