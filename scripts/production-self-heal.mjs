@@ -2,7 +2,7 @@ import {spawnSync} from "node:child_process";
 
 const origin=(process.env.BAYAN_ORIGIN||"https://bayan.tahaomar411.workers.dev").replace(/\/$/,"");
 const token=String(process.env.BAYAN_AI_MANAGER_TOKEN||"").trim();
-const timeout=18*60*1000;
+const timeout=8*60*1000;
 
 function smoke(label){
   console.log("\n=== "+label+" ===");
