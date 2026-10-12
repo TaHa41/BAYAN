@@ -682,7 +682,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
     }
     if ((!existing.summary || existing.summary.length < 80) && candidate.summary) existing.summary = candidate.summary;
   }
-  const results=[...uniqueByTitle.values()].slice(0,max).map(({score,provider,...x})=>({...x,summary:localeSafeText(x.summary,language)?x.summary:(personQuery&&normalizedEntityTitle(x.title)===normalizedEntityTitle(q)?localizedPersonDescription(x.summary,language):""),sources:(x.sources||[]).map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}));
+  const results=[...uniqueByTitle.values()].slice(0,max).map(({score,provider,...x})=>{const rawSources=Array.isArray(x.sources)?x.sources:[];const hasOnlyReferenceSources=rawSources.length>0&&rawSources.every(src=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(src.publisher||"")));return{...x,evidence:hasOnlyReferenceSources?"source_only":(x.evidence||"mixed"),summary:localeSafeText(x.summary,language)?x.summary:(personQuery&&normalizedEntityTitle(x.title)===normalizedEntityTitle(q)?localizedPersonDescription(x.summary,language):""),sources:rawSources.map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}});
   // Resolve a subject-specific image for the canonical person result before returning
   // cards, so the exact image can also be carried into the opened article.
   if(personQuery&&options.images!==false){
