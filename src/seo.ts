@@ -16,7 +16,11 @@ export async function sitemap(env:Env){
       url:ORIGIN+"/article/"+encodeURIComponent(x.slug)+"?lang="+encodeURIComponent(x.language),
       lastmod:String(x.updated_at||"")
     }));
-  }catch{}
+  }catch(error){
+    // Avoid publishing a misleading partial sitemap when article discovery fails.
+    console.error("sitemap_database_query_failed", error instanceof Error ? error.message : String(error));
+    return text("Sitemap temporarily unavailable; retry later.", "text/plain;charset=utf-8", 503);
+  }
   const publicPaths=["/","/news","/about","/methodology","/privacy","/terms",...SECTIONS.map(x=>"/"+x[0])];
   const localizedUrls=publicPaths.flatMap((path)=>["ar","en"].map((language)=>({url:path==="/"&&language==="ar"?ORIGIN+"/":ORIGIN+path+"?lang="+language})));
   const urlMap=new Map<string,{url:string;lastmod?:string}>();
