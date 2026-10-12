@@ -8,6 +8,7 @@ export function robots(){
   return text("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nDisallow: /review\nDisallow: /saved\nSitemap: "+ORIGIN+"/sitemap.xml\nSitemap: "+ORIGIN+"/news-sitemap.xml\n");
 }
 const xml=(s:string)=>s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
+const retryableUnavailable=(message:string)=>{const response=text(message,"text/plain;charset=utf-8",503);response.headers.set("retry-after","300");return response;};
 export async function sitemap(env:Env){
   let articleUrls:Array<{url:string;lastmod?:string}>=[];
   try{
@@ -16,7 +17,11 @@ export async function sitemap(env:Env){
       url:ORIGIN+"/article/"+encodeURIComponent(x.slug)+"?lang="+encodeURIComponent(x.language),
       lastmod:String(x.updated_at||"")
     }));
-  }catch{}
+  }catch(error){
+    // Avoid publishing a misleading partial sitemap when article discovery fails.
+    console.error("sitemap_database_query_failed", error instanceof Error ? error.message : String(error));
+    return retryableUnavailable("Sitemap temporarily unavailable; retry later.");
+  }
   const publicPaths=["/","/news","/about","/methodology","/privacy","/terms",...SECTIONS.map(x=>"/"+x[0])];
   const localizedUrls=publicPaths.flatMap((path)=>["ar","en"].map((language)=>({url:path==="/"&&language==="ar"?ORIGIN+"/":ORIGIN+path+"?lang="+language})));
   const urlMap=new Map<string,{url:string;lastmod?:string}>();
@@ -45,7 +50,11 @@ export async function newsSitemap(env:Env){
       const publishers=new Set(sources.map((source:any)=>String(source.publisher||"").trim().toLowerCase()).filter(Boolean));
       return Boolean(x.slug&&x.title&&(x.language==="ar"||x.language==="en")&&Number.isFinite(published)&&published<=now+5*60*1000&&now-published<=48*60*60*1000&&body.length>=1800&&headings>=4&&paragraphs.length>=5&&uniqueParagraphs.size>=5&&hosts.size>=2&&publishers.size>=2);
     }).map((x:any)=>({slug:String(x.slug),title:String(x.title),language:x.language as Locale,publishedAt:new Date(String(x.created_at)).toISOString()}));
-  }catch{}
+  }catch(error){
+    // Do not disguise a database outage as a valid but empty news sitemap.
+    console.error("news_sitemap_database_query_failed", error instanceof Error ? error.message : String(error));
+    return retryableUnavailable("News sitemap temporarily unavailable; retry later.");
+  }
   return text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">'+items.map(x=>{
     const url=ORIGIN+"/article/"+encodeURIComponent(x.slug)+"?lang="+x.language;
     return '<url><loc>'+xml(url)+'</loc><news:news><news:publication><news:name>BAYAN</news:name><news:language>'+xml(x.language)+'</news:language></news:publication><news:publication_date>'+xml(x.publishedAt)+'</news:publication_date><news:title>'+xml(x.title)+'</news:title></news:news></url>';
