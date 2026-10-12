@@ -186,18 +186,19 @@ if(seoPath==="/sitemap.xml"||seoPath==="/news-sitemap.xml"){
   try{
     const response=seoPath==="/sitemap.xml"?await sitemap(env):await newsSitemap(env);
     const headers=new Headers(response.headers);
+    headers.set("X-Content-Type-Options","nosniff");
+    headers.set("X-BAYAN-SEO",response.status>=500?"sitemap-unavailable":"sitemap-v1");
+    if(response.status>=500){
+      headers.set("Cache-Control","no-store");
+      headers.set("Retry-After",response.headers.get("Retry-After")||"300");
+      return new Response(response.body,{status:response.status,headers});
+    }
     headers.set("Content-Type","application/xml; charset=utf-8");
     headers.set("Cache-Control","public, max-age=300, s-maxage=300, stale-while-revalidate=3600");
-    headers.set("X-Content-Type-Options","nosniff");
-    headers.set("X-BAYAN-SEO","sitemap-v1");
-    return new Response(response.body,{status:200,headers});
+    return new Response(response.body,{status:response.status,headers});
   }catch(error){
     try{await notify(env,"BAYAN SITEMAP ERROR\\nPath: "+seoPath+"\\nError: "+String(error).slice(0,300))}catch{}
-    const origin=ORIGIN;
-    const minimal=seoPath==="/sitemap.xml"
-      ?'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>'+origin+'/?lang=ar</loc></url><url><loc>'+origin+'/?lang=en</loc></url></urlset>'
-      :'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>';
-    return new Response(minimal,{status:200,headers:{"Content-Type":"application/xml; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff","X-BAYAN-SEO":"sitemap-fallback"}});
+    return new Response("Sitemap temporarily unavailable; retry later.",{status:503,headers:{"Content-Type":"text/plain; charset=utf-8","Cache-Control":"no-store","Retry-After":"300","X-Content-Type-Options":"nosniff","X-BAYAN-SEO":"sitemap-unavailable"}});
   }
 }
-return page(request,env)},async scheduled(_event:ScheduledEvent,env:Env){try{await ensureSchema(env)}catch{}await selfHeal(env)}};
+},async scheduled(_event:ScheduledEvent,env:Env){try{await ensureSchema(env)}catch{}await selfHeal(env)}};
