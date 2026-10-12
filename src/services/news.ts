@@ -150,7 +150,13 @@ export async function searchNewsFeed(query: string, lang: Locale): Promise<Story
   const ceid = lang === "ar" ? "EG:ar" : "US:en";
   const url = "https://news.google.com/rss/search?q=" + encodeURIComponent(query) + "&hl=" + hl + "&gl=" + gl + "&ceid=" + ceid;
   const stories = await readFeed("Google News Search", url);
-  return stories.filter((story) => lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title));
+  return stories.filter((story) => lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title)).map((story) => {
+    const titleParts = story.title.match(/^(.*?)\\s+-\\s+([^\\-]+)$/);
+    if (story.publisher === "Google News Search" && titleParts) {
+      return { ...story, title: titleParts[1].trim(), publisher: titleParts[2].trim() };
+    }
+    return story;
+  });
 }
 
 const sourceImage = async (url: string): Promise<string | undefined> => {
