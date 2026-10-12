@@ -101,7 +101,7 @@ async function googleNewsSearch(q:string,language:Locale):Promise<Candidate[]>{
     return stories.slice(0,8).map(story=>{
       const title=cleanText(story.title),url=String(story.url||""),publisher=cleanText(story.publisher||"Google News");
       const summary=cleanText(story.summary||"").slice(0,1400);
-      return {title,summary,section:"news",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+4,provider:"Google News Search"};
+      return {title,summary,section:"news",kind:"web" as const,evidence:"mixed" as const,sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+4,provider:"Google News Search"};
     }).filter(item=>item.title&&/^https:\/\//i.test(item.url));
   }catch{return[]}
 }
