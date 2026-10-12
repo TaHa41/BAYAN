@@ -22,9 +22,13 @@ const seoEscape=(value:unknown)=>String(value??"").replace(/&/g,"&amp;").replace
 if(path==="/search"){
   const searchTitle=lang==="en"?"Search the web and evidence with BAYAN":"ابحث عن المعلومات والأدلة عبر المصادر المتاحة";
   const searchDescription=lang==="en"?"Search across available web sources, compare evidence, and distinguish independently verified information from reference-only results.":"ابحث عبر المصادر المتاحة، وقارن الأدلة، وميّز بين المعلومات المتحقق منها بصورة مستقلة والنتائج المرجعية فقط.";
+  const extraText=lang==="en"
+    ?"BAYAN searches multiple available providers and keeps relevant results visible when a source is useful but independent confirmation is not available. Each result should be read with its publisher, date, and evidence status in mind. Encyclopedia entries can help identify a subject, but they are not a substitute for independent reporting, official records, or research. Search coverage varies by topic and by the sources reachable at the time of the request; a missing result does not prove that information does not exist."
+    :"يحاول بيان البحث عبر أكثر من مزود ومصدر، ويُبقي النتيجة ذات الصلة ظاهرة عندما يكون المرجع مفيدًا لكن التأكيد المستقل غير متاح. اقرأ كل نتيجة مع مراعاة الجهة الناشرة وتاريخها وحالة أدلتها. تساعد الموسوعات على التعرف إلى الموضوع، لكنها لا تغني عن التغطية المستقلة أو السجلات الرسمية أو الأبحاث. تختلف تغطية البحث بحسب الموضوع والمصادر المتاحة وقت الطلب؛ وعدم ظهور نتيجة لا يعني أن المعلومة غير موجودة.";
   title=searchTitle+(lang==="en"?" | BAYAN":" | بيان");
   description=searchDescription;
-  seoFallback='<section class="seo-content-fallback"><h1>'+seoEscape(searchTitle)+'</h1><p>'+seoEscape(searchDescription)+'</p><p>'+seoEscape(lang==="en"?"BAYAN may show an encyclopedia reference when independent sources are unavailable; such a result is not presented as independently verified.":"قد يعرض بيان مرجعًا موسوعيًا عندما لا تتوفر مصادر مستقلة؛ ولا يُعرض المرجع وحده على أنه معلومة تم التحقق منها بصورة مستقلة.")+'</p></section>';
+  seoFallback='<section class="seo-content-fallback"><h1>'+seoEscape(searchTitle)+'</h1><p>'+seoEscape(searchDescription)+'</p><p>'+seoEscape(extraText)+'</p></section>';
+  headExtras+='<script type="application/ld+json">'+JSON.stringify({"@context":"https://schema.org","@type":"WebPage","name":searchTitle,"description":searchDescription,"inLanguage":lang,"url":ORIGIN+"/search?lang="+lang,"potentialAction":{"@type":"SearchAction","target":ORIGIN+"/search?q={search_term_string}&lang="+lang,"query-input":"required name=search_term_string"}}).replace(/</g,"\\u003c")+'</script>';
 }
 if(path==="/research"){
   const subject=String(u.searchParams.get("title")||"").trim().slice(0,180);
