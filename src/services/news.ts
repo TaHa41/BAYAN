@@ -144,6 +144,15 @@ const readFeed = async (name: string, url: string): Promise<Story[]> => {
     return [];
   }
 };
+export async function searchNewsFeed(query: string, lang: Locale): Promise<Story[]> {
+  const hl = lang === "ar" ? "ar" : "en";
+  const gl = lang === "ar" ? "EG" : "US";
+  const ceid = lang === "ar" ? "EG:ar" : "US:en";
+  const url = "https://news.google.com/rss/search?q=" + encodeURIComponent(query) + "&hl=" + hl + "&gl=" + gl + "&ceid=" + ceid;
+  const stories = await readFeed("Google News Search", url);
+  return stories.filter((story) => lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title));
+}
+
 const sourceImage = async (url: string): Promise<string | undefined> => {
   try {
     const response = await fetch(url, {
