@@ -15,6 +15,7 @@ describe("newsSitemap database failure handling", () => {
       const response = await newsSitemap(env);
       expect(response.status).toBe(503);
       expect(response.headers.get("content-type")).toContain("text/plain");
+      expect(response.headers.get("retry-after")).toBe("300");
       expect(await response.text()).toContain("temporarily unavailable");
       expect(errorSpy).toHaveBeenCalledWith("news_sitemap_database_query_failed", "database unavailable");
     } finally {
@@ -52,6 +53,7 @@ describe("sitemap database failure handling", () => {
     try {
       const response = await sitemap(env);
       expect(response.status).toBe(503);
+      expect(response.headers.get("retry-after")).toBe("300");
       expect(await response.text()).toContain("temporarily unavailable");
       expect(errorSpy).toHaveBeenCalledWith("sitemap_database_query_failed", "database unavailable");
     } finally {
