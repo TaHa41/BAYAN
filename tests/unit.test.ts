@@ -149,9 +149,14 @@ describe("club-agnostic sports news identity",()=>{
 
 
 describe("person identity aliases",()=>{
-  it("matches known Arabic and Latin spellings without requiring a stale club name",()=>{
-    expect(personIdentityMatches("Mohamed Salah signs a new contract","محمد صلاح")).toBe(true);
-    expect(personIdentityMatches("محمد صلاح يوقع عقدًا جديدًا","Mohamed Salah")).toBe(true);
-    expect(personIdentityMatches("Unrelated player signs a contract","محمد صلاح")).toBe(false);
+  it("matches a verified Wikidata alias without requiring a stale club name",()=>{
+    expect(personIdentityMatches("Mohamed Salah signs a new contract","محمد صلاح",["Mohamed Salah"])).toBe(true);
+    expect(personIdentityMatches("محمد صلاح يوقع عقدًا جديدًا","Mohamed Salah",["محمد صلاح"])).toBe(true);
+    expect(personIdentityMatches("Unrelated player signs a contract","محمد صلاح",["Mohamed Salah"])).toBe(false);
+  });
+  it("uses the same alias mechanism for people other than the example footballer",()=>{
+    expect(personIdentityMatches("Marie Curie published new research","ماري كوري",["Marie Curie"])).toBe(true);
+    expect(personIdentityMatches("ماري كوري نشرت أبحاثًا جديدة","Marie Curie",["ماري كوري"])).toBe(true);
+    expect(personIdentityMatches("An unrelated scientist published new research","ماري كوري",["Marie Curie"])).toBe(false);
   });
 });
