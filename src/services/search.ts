@@ -136,7 +136,7 @@ async function googleNewsSearch(q:string,language:Locale,diagnostics?:string[]):
       const summary=cleanText(story.summary||"").slice(0,1400);
       return {title,summary,section:"news",kind:"web" as const,evidence:"mixed" as const,sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+4,provider:"Google News Search"};
     }).filter(item=>item.title&&/^https:\/\//i.test(item.url));
-    diagnostics?.push("Google News RSS raw="+stories.length+" accepted="+out.length);
+    diagnostics?.push("Google News RSS parsed="+stories.length+" accepted="+out.length);
     return out;
   }catch{diagnostics?.push("Google News RSS request failed");return[]}
 }
