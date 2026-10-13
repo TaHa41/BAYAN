@@ -154,7 +154,7 @@ export async function api(request:Request,env:Env){const u=new URL(request.url),
     });
     if(!initialHasIndependentSources&&initialHasOnlyReferenceResults){
       const context=String(found.results.find((candidate:any)=>String(candidate.summary||"").trim())?.summary||summary||"");
-      const contextTerms=context.normalize("NFKC").replace(/[^\\p{L}\\p{N}\\s]/gu," ").split(/\\s+/).filter((word:string)=>word.length>=4&&!/^(the|this|that|with|from|about|where|which|were|their|there|من|في|على|عن|هذا|هذه|الذي|التي|كان|كانت|حيث|وهو|وهي)$/i.test(word)).slice(0,5).join(" ");
+      const contextTerms=context.normalize("NFKC").replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter((word:string)=>word.length>=4&&!/^(the|this|that|with|from|about|where|which|were|their|there|من|في|على|عن|هذا|هذه|الذي|التي|كان|كانت|حيث|وهو|وهي)$/i.test(word)).slice(0,5).join(" ");
       const recoveryQuery=[title,contextTerms].filter(Boolean).join(" ").slice(0,300);
       if(recoveryQuery&&recoveryQuery!==title){
         const recovered:any=await bounded(search(env,recoveryQuery,lang,{publish:false,draft:false,images:false}),6500).catch(()=>({results:[]}));
