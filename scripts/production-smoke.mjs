@@ -42,6 +42,9 @@ try{
     const articleUrl=new URL(newsLocs[0]);
     const articlePage=await get(articleUrl.pathname+articleUrl.search);
     if(!articlePage.text.includes("<h1>")||!articlePage.text.includes("<h2>"))throw new Error("news_sitemap_article_not_rendered_as_full_content");
+    const alternateTags=[...articlePage.text.matchAll(/<link\s+rel="alternate"\s+hreflang="(ar|en|x-default)"\s+href="([^"]+)"/g)];
+    if(alternateTags.length&&alternateTags.length!==3)throw new Error("article_hreflang_set_incomplete");
+    if(alternateTags.length){const byLang=Object.fromEntries(alternateTags.map(match=>[match[1],match[2]]));if(!byLang.ar||!byLang.en||!byLang["x-default"]||byLang["x-default"]!==byLang.ar)throw new Error("article_hreflang_targets_inconsistent");for(const href of Object.values(byLang)){const target=new URL(href);if(target.origin!==origin||!target.pathname.startsWith("/article/"))throw new Error("article_hreflang_target_invalid");}const canonical=articlePage.text.match(/<link rel="canonical" href="([^"]+)">/);if(!canonical||canonical[1]!==articleUrl.href)throw new Error("article_canonical_mismatch");}
   }
   const homeAr=await get("/?lang=ar"); if(!homeAr.text.includes('<link rel="canonical" href="'+origin+'/">'))throw new Error("arabic_homepage_canonical_mismatch");
   const homeEn=await get("/?lang=en"); if(!homeEn.text.includes('<link rel="canonical" href="'+origin+'/?lang=en">'))throw new Error("english_homepage_canonical_mismatch");

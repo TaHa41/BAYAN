@@ -54,7 +54,8 @@ jobs:
     needs: deploy
     concurrency:
       group: bayan-production-verify-v1
-      cancel-in-progress: true
+      # Do not cancel verification of a deployed revision when another commit arrives.
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
