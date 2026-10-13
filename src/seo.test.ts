@@ -38,7 +38,7 @@ describe("newsSitemap database failure handling", () => {
     expect(body).toContain("<urlset");
     expect(body).toContain("</urlset>");
   });
-  it("includes substantive recent published news without arbitrary heading/source-count gates", async () => {
+  it("includes recent verified topical news without arbitrary heading-count gates", async () => {
     const recent = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const old = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
     const env = {
@@ -46,8 +46,8 @@ describe("newsSitemap database failure handling", () => {
         prepare: () => ({
           all: async () => ({
             results: [
-              { slug: "recent-ar-news", title: "عنوان خبر عربي حديث", language: "ar", created_at: recent, body: "محتوى خبر حديث موثق. ".repeat(20) },
-              { slug: "old-news", title: "Older news article", language: "en", created_at: old, body: "Older article body. ".repeat(20) }
+              { slug: "recent-ar-news", title: "عنوان خبر عربي حديث", language: "ar", created_at: recent, body: "محتوى خبر حديث موثق. ".repeat(100), sources_json: JSON.stringify([{ url: "https://news.example.com/a", publisher: "Publisher A" }, { url: "https://wire.example.org/a", publisher: "Publisher B" }]) },
+              { slug: "old-news", title: "Older news article", language: "en", created_at: old, body: "Older article body. ".repeat(100), sources_json: JSON.stringify([{ url: "https://news.example.com/a", publisher: "Publisher A" }, { url: "https://wire.example.org/a", publisher: "Publisher B" }]) }
             ]
           })
         })
