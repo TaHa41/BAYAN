@@ -641,7 +641,13 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
       const title=normalize(x.title),summary=normalize(x.summary);
       const titleHits=terms.filter(term=>title.includes(term)).length;
       const totalHits=terms.filter(term=>(title+" "+summary).includes(term)).length;
-      return terms.length>0&&(titleHits>=1||totalHits>=2);
+      // A single shared word is not enough for multi-word queries: it caused
+      // "history of pyramids" to return unrelated pyramid attractions. Require
+      // coverage of at least two query terms, unless the query itself is one term
+      // or the exact normalized phrase appears in the title.
+      const exactPhrase=title.includes(normalize(q).trim());
+      const minimumHits=terms.length===1?1:Math.min(2,terms.length);
+      return terms.length>0&&(exactPhrase||totalHits>=minimumHits)&&(terms.length===1||titleHits>=2||totalHits>=2);
     }).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
   }
   // Re-apply identity isolation after recovery: fallback must never reintroduce
