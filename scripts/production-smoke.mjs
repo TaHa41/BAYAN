@@ -6,7 +6,7 @@ let bundleText="";
 let bundlePath="";
 let bundleVersion="";
 async function get(path){
-  const r=await fetch(origin+path,{redirect:"manual",headers:{accept:"application/json,text/plain,*/*"},signal:AbortSignal.timeout(25000)});
+  const r=await fetch(origin+path,{redirect:"manual",headers:{accept:"application/json,text/plain,*/*","user-agent":"BAYAN-Production-Smoke/1.0"},signal:AbortSignal.timeout(25000)});
   const text=await r.text();
   console.log(path,r.status,text.slice(0,220));
   if(!r.ok)throw new Error(path+" status "+r.status);
@@ -45,6 +45,11 @@ try{
   }
   const homeAr=await get("/?lang=ar"); if(!homeAr.text.includes('<link rel="canonical" href="'+origin+'/">'))throw new Error("arabic_homepage_canonical_mismatch");
   const homeEn=await get("/?lang=en"); if(!homeEn.text.includes('<link rel="canonical" href="'+origin+'/?lang=en">'))throw new Error("english_homepage_canonical_mismatch");
+  const missing=await fetch(origin+"/__bayan_missing_route_probe__",{redirect:"manual",headers:{accept:"text/html","user-agent":"BAYAN-Production-Smoke/1.0"},signal:AbortSignal.timeout(10000)});
+  const missingBody=await missing.text();
+  if(missing.status!==404||!missing.headers.get("x-robots-tag")?.includes("noindex")||/fallback-home/.test(missingBody))throw new Error("unknown_route_must_return_real_404_not_spa_shell");
+  const missingArticle=await fetch(origin+"/article/__bayan_missing_article_probe__?lang=ar",{redirect:"manual",headers:{accept:"text/html","user-agent":"BAYAN-Production-Smoke/1.0"},signal:AbortSignal.timeout(10000)});
+  if(missingArticle.status!==404||!missingArticle.headers.get("x-robots-tag")?.includes("noindex"))throw new Error("missing_article_must_return_real_404");
   const robots=await get("/robots.txt");
   if(!robots.text.includes("Sitemap:")||!robots.text.includes("Disallow: /admin"))throw new Error("robots_policy_missing");
   if(robots.text.includes("Agentmap:"))throw new Error("robots_contains_unrecognized_agentmap_directive");

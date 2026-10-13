@@ -1,4 +1,13 @@
 import type {Env} from "./types";
+
+const ANALYTICS_EXCLUDED_UA = /(?:googlebot|bingbot|yandexbot|baiduspider|duckduckbot|slurp|crawler|spider|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|slackbot|lighthouse|pagespeed|headlesschrome|puppeteer|playwright|curl\/|wget\/|python-requests|python-urllib|go-http-client|node(?:\.js)?\b|undici|bayan-production-smoke|uptime(?:robot)?|healthcheck|monitoring)/i;
+
+export function analyticsExcluded(request: Request) {
+  const cookies = (request.headers.get("cookie") || "").split(";").map((part) => part.trim());
+  if (cookies.includes("bayan_exclude_analytics=1")) return true;
+  const userAgent = request.headers.get("user-agent") || "";
+  return userAgent.length > 0 && ANALYTICS_EXCLUDED_UA.test(userAgent);
+}
 export function manager(request:Request,env:Env){
   const token=request.headers.get("authorization")?.replace(/^Bearer\s+/i,"")||request.headers.get("x-bayan-manager-token");
   return !!env.BAYAN_AI_MANAGER_TOKEN&&token===env.BAYAN_AI_MANAGER_TOKEN;
