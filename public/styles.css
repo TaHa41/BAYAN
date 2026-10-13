@@ -420,3 +420,54 @@ body{line-height:1.75;-webkit-font-smoothing:antialiased;text-rendering:optimize
 @media(prefers-reduced-motion:reduce){
   :where(.section-card,.article-card,.news-card,.result-card,.article-card img,.news-card img,.result-card img){transition:none}
 }
+
+
+/* Prices workspace: clear hierarchy, high-contrast market cards, and compact conversion tool. */
+.prices-page .prices-heading{max-width:920px;margin-bottom:28px}
+.prices-page .prices-heading h1{letter-spacing:-.045em}
+.prices-intro-strip{display:flex;align-items:center;gap:16px;padding:20px 22px;margin:24px 0 16px;border:1px solid #cfe2dc;border-radius:20px;background:linear-gradient(115deg,#f0f8f5,#fff8f1);box-shadow:0 8px 26px #173b4609}
+.prices-intro-icon{flex:0 0 46px;width:46px;height:46px;display:grid;place-items:center;border-radius:15px;background:#dcefe8;color:#176b67;font-size:24px;font-weight:900}
+.prices-intro-strip strong{display:block;font-size:17px;line-height:1.4}
+.prices-intro-strip p{margin:4px 0 0;color:#66736f;font-size:14px}
+.prices-page .prices-refresh{display:inline-flex;align-items:center;justify-content:center;margin:0 0 24px;padding:11px 17px;border:1px solid #cbded7;background:#fff;color:#176b67;font-weight:800}
+.prices-page .prices-refresh:hover{background:#eaf4f0;border-color:#9fc8bb}
+.prices-page .market-overview{grid-template-columns:minmax(0,1.25fr) minmax(260px,.75fr);align-items:stretch;gap:20px}
+.prices-page .live-card{min-width:0;padding:clamp(20px,3vw,30px);border-radius:22px;background:linear-gradient(150deg,#fff 0%,#fbfdfb 100%);border:1px solid #dce7e2;box-shadow:0 12px 32px #173b460d}
+.prices-page .live-card h2{font-size:clamp(32px,4vw,48px);font-variant-numeric:tabular-nums;letter-spacing:-.04em;line-height:1.15}
+.prices-page .live-card>p{color:#66736f}
+.prices-page .fx-panel .market-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:18px 0}
+.prices-page .market-row{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;padding:12px 13px;border:1px solid #e7eeea;border-radius:13px;background:#fff}
+.prices-page .market-row .currency-label{display:grid;gap:1px;min-width:0}
+.prices-page .market-row .currency-label b{font-size:13px;color:#176b67}
+.prices-page .market-row .currency-label small{color:#74817c;font-size:11px;overflow-wrap:anywhere}
+.prices-page .market-row>strong{font-size:15px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.prices-page .gold-panel{background:radial-gradient(circle at 92% 8%,#f7e7bf 0,transparent 34%),linear-gradient(145deg,#fffdf7,#fff 72%)}
+.prices-page .gold-panel .kicker{color:#9a6b16}
+.prices-page .prices-extra-heading{display:flex;align-items:end;justify-content:space-between;gap:16px;margin:38px 0 16px}
+.prices-page .prices-extra-heading h2{margin:6px 0 0;font-size:clamp(24px,3vw,34px)}
+.prices-page .prices-heading-note{color:#66736f;font-size:13px}
+.prices-page .prices-extra-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.prices-page .market-card{padding:22px;border-radius:18px;background:#fff;border:1px solid #e0e8e3}
+.prices-page .market-card h2{font-size:clamp(25px,3vw,36px);font-variant-numeric:tabular-nums}
+.prices-page .market-card .kicker{display:block;min-height:2.8em;line-height:1.4}
+.prices-page .source-line{display:block;margin-top:16px;padding-top:12px;border-top:1px solid #e8eeeb;font-size:11px;line-height:1.8;overflow-wrap:anywhere}
+.prices-page .market-converter{display:grid;grid-template-columns:1.1fr 1fr 1fr 1.2fr;align-items:end;gap:12px;margin:22px 0 30px;padding:22px;border:1px solid #dce7e2;border-radius:20px;background:#fff;box-shadow:0 8px 26px #173b4608}
+.prices-page .converter-heading{grid-column:1/-1;margin-bottom:2px}
+.prices-page .converter-heading h2{margin:0 0 4px;font-size:22px}
+.prices-page .converter-heading p{margin:0;color:#66736f;font-size:13px}
+.prices-page .converter-field{display:grid;gap:7px;min-width:0;color:#66736f;font-size:12px;font-weight:800}
+.prices-page .converter-field input,.prices-page .converter-field select{width:100%;min-width:0;min-height:46px;padding:10px 12px;border:1px solid #d8e0dc;border-radius:11px;background:#fff;color:#14233b;font:inherit;font-size:15px}
+.prices-page .converter-result{display:grid;gap:3px;min-width:0;padding:10px 14px;border-radius:12px;background:#eaf4f0;color:#176b67}
+.prices-page .converter-result small{font-size:11px}
+.prices-page .converter-result output{font-size:clamp(19px,2vw,26px);font-weight:900;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.prices-page>.muted{margin-top:20px;padding:14px 16px;border-inline-start:3px solid #d6b879;border-radius:8px;background:#fffaf0;font-size:13px}
+@media(max-width:800px){.prices-page .market-overview{grid-template-columns:1fr}.prices-page .prices-extra-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.prices-page .market-converter{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.prices-intro-strip{align-items:flex-start;padding:16px}.prices-page .fx-panel .market-list{grid-template-columns:1fr}.prices-page .prices-extra-heading{align-items:flex-start;flex-direction:column}.prices-page .prices-extra-grid{grid-template-columns:1fr}.prices-page .market-converter{padding:16px;gap:10px}.prices-page .converter-heading{grid-column:1/-1}.prices-page .market-card{padding:18px}}
+.dark .prices-intro-strip{background:linear-gradient(115deg,#182b2b,#29231f);border-color:#38534d}
+.dark .prices-intro-icon{background:#24453f;color:#8ce0d1}
+.dark .prices-intro-strip p,.dark .prices-heading-note{color:var(--muted)}
+.dark .prices-page .live-card,.dark .prices-page .market-card,.dark .prices-page .market-converter{background:var(--surface);border-color:var(--line)}
+.dark .prices-page .gold-panel{background:radial-gradient(circle at 92% 8%,#4c3b1d 0,transparent 34%),var(--surface)}
+.dark .prices-page .market-row,.dark .prices-page .converter-field input,.dark .prices-page .converter-field select{background:#10171b;border-color:#2d3a40;color:var(--ink)}
+.dark .prices-page .converter-result{background:#1d3934;color:#9de3d7}
+.dark .prices-page>.muted{background:#2b261b;border-color:#b18d4d}
