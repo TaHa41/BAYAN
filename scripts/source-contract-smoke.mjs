@@ -16,6 +16,7 @@ const checks = [
   ["wisdom has dedicated news and arts entries", /news:\{ar:/.test(wisdom) && /art:\{ar:/.test(wisdom)],
   ["browser refreshes wisdom every 30 seconds", app.includes("const wisdomTimer = setInterval") && app.includes("}, 30000)")],
   ["asset build version matches production smoke contract", /const BUILD="[^"]+"/.test(index) && index.includes("app-20261009-01.js?v=${BUILD}") && read("scripts/production-smoke.mjs").includes("bundleMatch")],
+  ["server-rendered mobile theme color matches the light interface", (index.match(/<meta name="theme-color" content="#f7f4ee">/g)||[]).length>=2 && !index.includes('theme-color" content="#0d1117"')],
   ["SEO preserves noindex on unpublished news stories and manager routes", index.includes('noindexRoute=path.startsWith("/review")||path.startsWith("/admin")') && index.includes('ensureMeta("name","robots",noindexRoute?"noindex,follow"') && read("src/seo.ts").includes("Disallow: /review")],
   ["article drafting uses one source summary instead of concatenating unrelated result snippets", api.includes('const evidenceBody=String(found.results[0]?.summary||"").trim()') && !api.includes('found.results.slice(0,8).map((x:any)=>x.title+"\\n"+x.summary)')],
   ["article retrieval allows expanded evidence search to finish before falling back", api.includes('images:false}),17000)') && app.includes("timeoutMs:36000")],
