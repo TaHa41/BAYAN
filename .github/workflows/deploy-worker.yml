@@ -27,6 +27,8 @@ jobs:
         run: npm install
       - name: Verify code and build
         run: npm run check
+      - name: Inject commit-specific build ID
+        run: node scripts/inject-build-id.mjs
       - name: Verify Cloudflare deployment credentials
         shell: bash
         env:
