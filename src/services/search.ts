@@ -4,7 +4,7 @@ import {ask} from "./ai";
 import {findRelatedImage,searchNewsFeed} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 
-type Candidate = SearchResult & {score:number; provider:string};
+type Candidate = SearchResult & {score:number; provider:string; identityAliases?:string[]};
 const timeout = async (url:string, ms=2600) => {
   const c=new AbortController(); const t=setTimeout(()=>c.abort(),ms);
   try {
@@ -52,7 +52,7 @@ const matchingSearchTerms=(text:string,terms:string[])=>{const normalized=String
 const relevanceScore=(x:Candidate,q:string)=>{const terms=searchTerms(q);if(!terms.length)return 0;const normalize=(v:string)=>String(v||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"");const title=normalize(x.title),summary=normalize(x.summary),combined=title+" "+summary,normalizedQuery=normalize(q).trim(),titleHits=matchingSearchTerms(title,terms),summaryHits=matchingSearchTerms(summary,terms),allHits=matchingSearchTerms(combined,terms),phrase=title.includes(normalizedQuery);const person=personLookup(q);const identityBoost=person?(titleHits===terms.length?90:titleHits>0?titleHits*28:0):0;const authorOnlyPenalty=person&&titleHits===0&&summaryHits>0?35:0;return(phrase?75:0)+identityBoost+titleHits*18+summaryHits*7+allHits*4+Math.min(8,Number(x.score||0)/12)-authorOnlyPenalty};
 // Do not reject a relevant result solely because a multi-word query is absent verbatim from its title.
 // Use the summary and all query terms too, then fall back to the best locale-safe candidates if providers are weak.
-const relevantCandidate=(x:Candidate,q:string)=>{const terms=searchTerms(q);const score=relevanceScore(x,q);if(!terms.length)return false;const normalize=(v:string)=>String(v||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"");const title=normalize(x.title),summary=normalize(x.summary),combined=title+" "+summary;const titleHits=matchingSearchTerms(title,terms);const hits=matchingSearchTerms(combined,terms);const person=personLookup(q)||nameOnlyArabicQuery(q);if(personIdentityMatches(combined,personQueryName(q)))return true;if(person){if(titleHits===0){const provider=String(x.provider||"")+" "+(x.sources||[]).map(source=>source.publisher||"").join(" ");const encyclopedia=/wikipedia|wikidata/i.test(provider);return encyclopedia?hits>0&&score>=20:hits>=Math.min(2,terms.length)&&score>=16;}return titleHits>=Math.min(1,terms.length)&& (hits>=Math.min(1,terms.length)||score>=25);}if(terms.length<=1)return hits>=1&&score>=4;return hits>=Math.min(2,terms.length);};
+const relevantCandidate=(x:Candidate,q:string)=>{const terms=searchTerms(q);const score=relevanceScore(x,q);if(!terms.length)return false;const normalize=(v:string)=>String(v||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"");const title=normalize(x.title),summary=normalize(x.summary),combined=title+" "+summary;const titleHits=matchingSearchTerms(title,terms);const hits=matchingSearchTerms(combined,terms);const person=personLookup(q)||nameOnlyArabicQuery(q);if(personIdentityMatches(combined,personQueryName(q),x.identityAliases))return true;if(person){if(titleHits===0){const provider=String(x.provider||"")+" "+(x.sources||[]).map(source=>source.publisher||"").join(" ");const encyclopedia=/wikipedia|wikidata/i.test(provider);return encyclopedia?hits>0&&score>=20:hits>=Math.min(2,terms.length)&&score>=16;}return titleHits>=Math.min(1,terms.length)&& (hits>=Math.min(1,terms.length)||score>=25);}if(terms.length<=1)return hits>=1&&score>=4;return hits>=Math.min(2,terms.length);};
 async function wikipedia(env:Env,q:string,language:Locale):Promise<Candidate[]>{
   const api=language==="ar"?"https://ar.wikipedia.org/w/api.php":"https://en.wikipedia.org/w/api.php";
   const stop=new Set(["في","من","على","عن","إلى","الى","ما","ماذا","كيف","لماذا","هل","هو","هي","هذا","هذه","التي","الذي","مع","the","and","for","with","from","about","what","when","where","who","how","why","is","are"]);
@@ -417,8 +417,8 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
      // Exclude encyclopedia pages whose titles append a second person's identity.
      if(title.startsWith(name+" ")&&/(?:دندراوي|زكريا|مصطفى|العزب|جندي|ممثل|مدرب|توضيح|تشالدران|denrawi|zakaria|mustafa|al.?azab|soldier|actor|disambiguation)/i.test(title.slice(name.length)))return false;
      const text=String(item.title||"")+" "+String(item.summary||"");
-     if(context)return context.test(text)&&personIdentityMatches(text,name);
-     return personIdentityMatches(text,name);
+     if(context)return context.test(text)&&personIdentityMatches(text,name,item.identityAliases);
+     return personIdentityMatches(text,name,item.identityAliases);
    });
    return safe.length?safe:cleanExact;
  }
@@ -429,12 +429,10 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
 };
 const identityTextForSearch=(value:string)=>String(value||"").normalize("NFKC").toLowerCase()
  .replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").replace(/\s+/g," ").trim();
-export const personIdentityMatches=(text:string,name:string)=>{
-  const normalizedText=identityTextForSearch(text),normalizedName=identityTextForSearch(name);
-  if(normalizedName&&normalizedText.includes(normalizedName))return true;
-  if(!/(محمد\s+صلاح|mohamed\s+salah|mohammed\s+salah|mo\s+salah)/i.test(name))return false;
-  if(/محمد\s+صلاح|مو\s+صلاح|mohamed\s+salah|mohammed\s+salah|mo\s+salah/i.test(text))return true;
-  return /صلاح/i.test(text)&&/(ليفربول|طرابزون|منتخب مصر|الفرعون المصري|اللاعب المصري|هدف|مباراة|انتقال|يوقع|وقع|عقد|صفقة|نادي|فريق|كرة قدم|الدوري|مهاجم|liverpool|trabzonspor|transfer|signed|contract|deal|joined|club|team|goal|match|league|striker|forward)/i.test(text);
+export const personIdentityMatches=(text:string,name:string,aliases:string[]=[]):boolean=>{
+  const normalizedText=identityTextForSearch(text);
+  const candidates=[name,...(Array.isArray(aliases)?aliases:[])].map(identityTextForSearch).filter(alias=>alias.length>=2);
+  return candidates.some(alias=>normalizedText.includes(alias));
 };
 export const isolateArticleSubject=(title:string,items:Candidate[])=>{
  const query=normalizedEntityTitle(title);
@@ -468,7 +466,7 @@ const personLookup=(q:string)=>{
   // explicitly asks "من هو/من هي", avoiding the restrictive person-only filter.
   return /^[A-Z][a-z]+(?:[ '-]+[A-Z][a-z]+){1,3}$/.test(raw);
 };
-async function expandedSearch(env:Env,q:string,language:Locale,person=false,identitySummary="",diagnostics:string[]=[]):Promise<Candidate[]>{
+async function expandedSearch(env:Env,q:string,language:Locale,person=false,identitySummary="",diagnostics:string[]=[],identityAliases:string[]=[]):Promise<Candidate[]>{
   // Recovery uses distinct query formulations, not just the same phrase with a suffix.
   // Keep the fan-out bounded so broader recall does not create unbounded latency/subrequests.
   const normalized=q.normalize("NFKC").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[“”‘’]/g,'"').replace(/[؟?!،,;；]+/g," ").replace(/\s+/g," ").trim();
@@ -479,15 +477,15 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   // Arabic sports queries can miss current coverage when providers index the
   // player's Latin-script name. Add an English-name query without assuming a club;
   // the result-language and relevance gates still enforce locale and identity.
-  const englishSportsName=person&&language==="ar"&&sportsProfile
-    ? (await wikidata(q,"en").catch(()=>[])).find(item=>!hasArabic(item.title)&&/(footballer|football player|soccer player|athlete)/i.test(String(item.summary||"")) )?.title
+  const englishPersonName=person&&language==="ar"
+    ? identityAliases.find(alias=>!hasArabic(alias)&&normalizedEntityTitle(alias)!==normalizedEntityTitle(q))
     : undefined;
   // Query-type-aware recovery applies to every search; no person or topic is hard-coded.
   const variants=person
     ? (language==="ar"
       ? (sportsProfile
-        ? [q+" آخر الأخبار",englishSportsName ? englishSportsName+" latest news" : q+" آخر الأخبار",q+" انتقال"]
-        : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
+        ? [q+" آخر الأخبار",englishPersonName ? englishPersonName+" latest news" : q+" آخر الأخبار",q+" انتقال"]
+        : writerProfile ? [q+" آخر الأخبار",englishPersonName ? englishPersonName+" latest news" : q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",englishPersonName ? englishPersonName+" latest news" : q+" مقابلة",q+" مصدر رسمي"])
       : (sportsProfile
         ? [q+" latest news",q+" transfer news",q+" official profile"]
         : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
@@ -720,7 +718,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
     }
     if ((!existing.summary || existing.summary.length < 80) && candidate.summary) existing.summary = candidate.summary;
   }
-  const results=[...uniqueByTitle.values()].slice(0,max).map(({score,provider,...x})=>{const rawSources=Array.isArray(x.sources)?x.sources:[];const hasOnlyReferenceSources=rawSources.length>0&&rawSources.every(src=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(src.publisher||"")));return{...x,evidence:hasOnlyReferenceSources?"source_only":(x.evidence||"mixed"),summary:localeSafeText(x.summary,language)?x.summary:(personQuery&&normalizedEntityTitle(x.title)===normalizedEntityTitle(q)?localizedPersonDescription(x.summary,language):""),sources:rawSources.map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}});
+  const results=[...uniqueByTitle.values()].slice(0,max).map(({score,provider,identityAliases,...x})=>{const rawSources=Array.isArray(x.sources)?x.sources:[];const hasOnlyReferenceSources=rawSources.length>0&&rawSources.every(src=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(src.publisher||"")));return{...x,evidence:hasOnlyReferenceSources?"source_only":(x.evidence||"mixed"),summary:localeSafeText(x.summary,language)?x.summary:(personQuery&&normalizedEntityTitle(x.title)===normalizedEntityTitle(q)?localizedPersonDescription(x.summary,language):""),sources:rawSources.map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}});
   // Resolve a subject-specific image for the canonical person result before returning
   // cards, so the exact image can also be carried into the opened article.
   if(personQuery&&options.images!==false){
