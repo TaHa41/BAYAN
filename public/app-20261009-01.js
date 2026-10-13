@@ -412,10 +412,9 @@
     const sectionTasks = sections
       .filter((s) => !["news","prices","trends"].includes(s[0]))
       .map((s) => api("/api/section?section=" + encodeURIComponent(s[0]) + "&lang=" + lang).catch(() => ({items: []})));
-    const [newsData, sectionData] = await Promise.all([
-      newsTask,
-      Promise.all(sectionTasks)
-    ]);
+    // Render the fast news response first. Do not make visitors wait for every
+    // category request before they can read the homepage's first content.
+    const newsData = await newsTask;
 
     const newsOut = document.querySelector("#home-news");
     if (newsData.stale && newsOut) {
@@ -429,19 +428,20 @@
         const title = String(item.title || ""), summary = String(item.summary || "");
         return ar ? /[\u0600-\u06ff]/.test(title) && (!summary || /[\u0600-\u06ff]/.test(summary)) : !/[\u0600-\u06ff]/.test(title) && !/[\u0600-\u06ff]/.test(summary);
       })
-      .slice(0, 6);
+      .slice(0, 9);
     newsOut.innerHTML = newsItems.length
       ? newsItems.map((item) => '<a class="article-card" href="/news?story=' + encodeURIComponent(item.title) + '&lang=' + lang + '">' + imageHtml(item) + '<div class="article-card-body"><span class="kicker">' + escapeHtml(item.publisher || t("الأخبار","News")) + '</span><h3>' + escapeHtml(item.title) + '</h3><p>' + escapeHtml(item.summary || "") + '</p><div class="source-line">' + escapeHtml(formatDate(item.publishedAt)) + '</div><span class="read">' + t("اقرأ داخل بيان","Read inside BAYAN") + " →</span></div></a>").join("")
       : '<div class="notice">' + t("لا توجد أخبار حديثة متاحة الآن؛ لن نعرض خبرًا مختلقًا.","No current news is available right now; BAYAN will not invent a story.") + "</div>";
     if (newsItems.length) hydrateSectionImages(newsItems);
 
+    const sectionData = await Promise.all(sectionTasks);
     const featured = sectionData
       .flatMap((x) => x.items || [])
       .filter((item) => {
         const title = String(item.title || ""), summary = String(item.summary || ""), body = String(item.body || "");
         return ar ? /[\u0600-\u06ff]/.test(title) && (!summary || /[\u0600-\u06ff]/.test(summary)) && (!body || /[\u0600-\u06ff]/.test(body)) : !/[\u0600-\u06ff]/.test(title) && !/[\u0600-\u06ff]/.test(summary) && !/[\u0600-\u06ff]/.test(body);
       })
-      .slice(0, 9);
+      .slice(0, 15);
     const featuredOut = document.querySelector("#home-featured");
     featuredOut.innerHTML = featured.length
       ? featured.map(articleCard).join("")
