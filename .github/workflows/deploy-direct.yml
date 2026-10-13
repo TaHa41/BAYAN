@@ -3,8 +3,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+# Share one release lock with the automatic Worker deployment workflow.
 concurrency:
-  group: bayan-production-manual-deploy
+  group: bayan-production-release-v4
   cancel-in-progress: false
 jobs:
   deploy:
