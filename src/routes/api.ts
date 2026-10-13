@@ -140,8 +140,37 @@ export async function api(request:Request,env:Env){const u=new URL(request.url),
   if(isVideoUrl(storyUrl))return json({error:"video_source_not_article",kind:"video",message:lang==="ar"?"هذا رابط فيديو، وليس مقالًا مكتوبًا. افتح الفيديو كمصدر منفصل، ولا تُنشئ منه مقالًا دون نص موثوق ومصادر مكتوبة مستقلة.":"This is a video, not a written article. Open it as a separate source; do not draft an article without a reliable transcript and independent written sources."},422);
   try{
     let found:any={results:[],status:"insufficient"};
-    try{found=await bounded(search(env,title,lang,{publish:false,draft:false,images:false}),17000)}catch{}
+    try{found=await bounded(search(env,title,lang,{publish:false,draft:false,images:false}),11000)}catch{}
     found.results=isolateArticleSubject(title,(Array.isArray(found.results)?found.results:[]).filter((candidate:any)=>newsArticleEvidenceRelevant(title,candidate)&&!hasMixedPersonIdentities(title,String(candidate.summary||""))&&!isVideoUrl(String(candidate.url||candidate.sources?.[0]?.url||""))) as any);
+    // If the first pass only found encyclopedias, make one bounded, query-derived
+    // recovery pass to find independent reporting or primary sources. This is
+    // generic: it uses the evidence context returned for the requested subject,
+    // never a hard-coded person, club, or topic.
+    const initialSources=found.results.flatMap((candidate:any)=>Array.isArray(candidate.sources)?candidate.sources:[]);
+    const initialHasIndependentSources=articleEvidenceQuality(initialSources);
+    const initialHasOnlyReferenceResults=found.results.length>0&&found.results.every((candidate:any)=>{
+      const sources=Array.isArray(candidate.sources)?candidate.sources:[];
+      return sources.length>0&&sources.every((source:any)=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(source.publisher||"")));
+    });
+    if(!initialHasIndependentSources&&initialHasOnlyReferenceResults){
+      const context=String(found.results.find((candidate:any)=>String(candidate.summary||"").trim())?.summary||summary||"");
+      const contextTerms=context.normalize("NFKC").replace(/[^\\p{L}\\p{N}\\s]/gu," ").split(/\\s+/).filter((word:string)=>word.length>=4&&!/^(the|this|that|with|from|about|where|which|were|their|there|من|في|على|عن|هذا|هذه|الذي|التي|كان|كانت|حيث|وهو|وهي)$/i.test(word)).slice(0,5).join(" ");
+      const recoveryQuery=[title,contextTerms].filter(Boolean).join(" ").slice(0,300);
+      if(recoveryQuery&&recoveryQuery!==title){
+        const recovered:any=await bounded(search(env,recoveryQuery,lang,{publish:false,draft:false,images:false}),6500).catch(()=>({results:[]}));
+        const recoveredResults=isolateArticleSubject(title,(Array.isArray(recovered?.results)?recovered.results:[]).filter((candidate:any)=>newsArticleEvidenceRelevant(title,candidate)&&!hasMixedPersonIdentities(title,String(candidate.summary||""))&&!isVideoUrl(String(candidate.url||candidate.sources?.[0]?.url||""))) as any);
+        const externalResults=recoveredResults.filter((candidate:any)=>{
+          const sources=Array.isArray(candidate.sources)?candidate.sources:[];
+          return sources.some((source:any)=>! /wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(source.publisher||"")));
+        });
+        const seen=new Set<string>();
+        found.results=[...externalResults,...found.results].filter((candidate:any)=>{
+          const key=String(candidate.url||candidate.sources?.[0]?.url||candidate.title||"").trim().toLowerCase();
+          if(!key||seen.has(key))return false;
+          seen.add(key);return true;
+        }).slice(0,12);
+      }
+    }
     if(!found.results.length&&(summary||storyUrl)){
       const safeUrl=storyUrl.startsWith("https://")?storyUrl:"";
       const sourceSummary=(lang==="ar"?/[؀-ۿ]/.test(summary):!/[؀-ۿ]/.test(summary))?summary:"";
