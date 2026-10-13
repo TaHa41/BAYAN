@@ -482,6 +482,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   const englishSportsName=person&&language==="ar"&&sportsProfile
     ? (await wikidata(q,"en").catch(()=>[])).find(item=>!hasArabic(item.title)&&/(footballer|football player|soccer player|athlete)/i.test(String(item.summary||"")) )?.title
     : undefined;
+  // Query-type-aware recovery applies to every search; no person or topic is hard-coded.
   const variants=person
     ? (language==="ar"
       ? (sportsProfile
