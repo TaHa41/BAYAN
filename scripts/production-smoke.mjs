@@ -26,7 +26,7 @@ async function inBatches(items,size,fn){
   }
 }
 await inBatches(checks,4,async path=>{try{await get(path)}catch(e){console.error(e);bad++}});
-try{const health=await get("/api/health");const data=JSON.parse(health.text);if(data.ok!==true||data.database!==true||!data.checkedAt)throw new Error("health_endpoint_did_not_confirm_database_readiness")}catch(e){console.error("HEALTH",e);bad++}
+try{const health=await get("/api/health");const data=JSON.parse(health.text);if(data.ok!==true||data.database!==true||data.articleRevisionHistory!==true||!data.checkedAt)throw new Error("health_endpoint_did_not_confirm_database_and_article_revision_schema_readiness")}catch(e){console.error("HEALTH",e);bad++}
 try{
   const sitemap=await get("/sitemap.xml");
   if(!sitemap.text.includes("?lang=ar")||!sitemap.text.includes("?lang=en")||!sitemap.text.includes("<lastmod>"))throw new Error("localized_sitemap_or_lastmod_missing");
