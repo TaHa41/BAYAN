@@ -101,7 +101,7 @@ try{
   if(manifestData.theme_color!=="#f7f4ee")throw new Error("installed_app_theme_color_mismatch");
   const bundleMatch=h.text.match(/<script src="(\/app-[^"]+\.js\?v=[^"]+)"/);
   if(!bundleMatch)throw new Error("current_bundle_missing");
-  bundlePath=bundleMatch[1].split("?")[0];
+  bundlePath=bundleMatch[1];
   bundleVersion=new URL(bundleMatch[1],"https://bayan.invalid").searchParams.get("v")||"";
   if(!bundleVersion)throw new Error("current_shell_bundle_version_missing");
   const stylesheetMatch=h.text.match(/<link rel="stylesheet" href="\/styles\.css\?v=([^"]+)"/); const stylesheetVersion=stylesheetMatch?.[1]||"";
