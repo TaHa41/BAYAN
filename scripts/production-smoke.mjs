@@ -48,6 +48,8 @@ try{
   const missing=await fetch(origin+"/__bayan_missing_route_probe__",{redirect:"manual",headers:{accept:"text/html","user-agent":"BAYAN-Production-Smoke/1.0"},signal:AbortSignal.timeout(10000)});
   const missingBody=await missing.text();
   if(missing.status!==404||!missing.headers.get("x-robots-tag")?.includes("noindex")||/fallback-home/.test(missingBody))throw new Error("unknown_route_must_return_real_404_not_spa_shell");
+  const missingArticle=await fetch(origin+"/article/__bayan_missing_article_probe__?lang=ar",{redirect:"manual",headers:{accept:"text/html","user-agent":"BAYAN-Production-Smoke/1.0"},signal:AbortSignal.timeout(10000)});
+  if(missingArticle.status!==404||!missingArticle.headers.get("x-robots-tag")?.includes("noindex"))throw new Error("missing_article_must_return_real_404");
   const robots=await get("/robots.txt");
   if(!robots.text.includes("Sitemap:")||!robots.text.includes("Disallow: /admin"))throw new Error("robots_policy_missing");
   if(robots.text.includes("Agentmap:"))throw new Error("robots_contains_unrecognized_agentmap_directive");
