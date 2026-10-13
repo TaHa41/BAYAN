@@ -668,7 +668,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
       safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||""),providerAttempted,identityAliases),[]),
       safe(openAiWebSearch(env,q,language),[])
     ]);
-    candidates.push(...expanded,...web);
+    candidates.push(...expanded,...web.map(item=>identityAliases.length?({...item,identityAliases:[...identityAliases]}):item));
   }
   
   // Expanded providers are appended after the first-pass identity cleanup; sanitize them too before ranking.
