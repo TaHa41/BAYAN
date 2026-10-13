@@ -150,7 +150,7 @@ export async function api(request:Request,env:Env){const u=new URL(request.url),
     const initialHasIndependentSources=articleEvidenceQuality(initialSources);
     const initialHasOnlyReferenceResults=found.results.length>0&&found.results.every((candidate:any)=>{
       const sources=Array.isArray(candidate.sources)?candidate.sources:[];
-      return sources.length>0&&sources.every((source:any)=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(source.publisher||"")));
+      return sources.every((source:any)=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(source.publisher||"")));
     });
     if(!initialHasIndependentSources&&initialHasOnlyReferenceResults){
       const context=String(found.results.find((candidate:any)=>String(candidate.summary||"").trim())?.summary||summary||"");
