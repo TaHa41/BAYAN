@@ -73,9 +73,9 @@ try{
     if(!page.text.includes("<h1>")||!page.text.includes(heading))throw new Error(path+" server_rendered_seo_content_missing");
   });
   const contentDepthPages=[
-    ["/about?lang=ar",195],["/about?lang=en",195],
-    ["/methodology?lang=ar",195],["/methodology?lang=en",195],
-    ["/prices?lang=ar",230],["/prices?lang=en",230],
+    ["/about?lang=ar",300],["/about?lang=en",300],
+    ["/methodology?lang=ar",300],["/methodology?lang=en",300],
+    ["/prices?lang=ar",300],["/prices?lang=en",300],
     ["/science?lang=ar",300]
   ];
   await inBatches(contentDepthPages,3,async([path,minWords])=>{
