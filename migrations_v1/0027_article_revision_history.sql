@@ -1,5 +1,5 @@
 -- Immutable manager and automated-publishing revision snapshots.
-CREATE TABLE IF NOT EXISTS article_revisions (
+CREATE TABLE IF NOT EXISTS article_revision_history (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   article_slug TEXT NOT NULL,
   language TEXT NOT NULL DEFAULT 'ar',
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS article_revisions (
   after_json TEXT,
   created_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_article_revisions_slug_language_created
-  ON article_revisions(article_slug, language, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_article_revisions_created
-  ON article_revisions(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_article_revision_history_slug_language_created
+  ON article_revision_history(article_slug, language, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_article_revision_history_created
+  ON article_revision_history(created_at DESC);
