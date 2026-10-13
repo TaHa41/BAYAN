@@ -53,7 +53,7 @@ jobs:
     # Keep only the newest verification active; concurrent full smoke runs can rate-limit public search providers.
     needs: deploy
     concurrency:
-      group: bayan-production-verify-v1
+      group: bayan-production-verify-${{ github.sha }}
       # Do not cancel verification of a deployed revision when another commit arrives.
       cancel-in-progress: false
     runs-on: ubuntu-latest
