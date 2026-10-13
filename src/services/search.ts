@@ -649,7 +649,13 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
       // or the exact normalized phrase appears in the title.
       const exactPhrase=title.includes(normalize(q).trim());
       const minimumHits=terms.length===1?1:Math.min(2,terms.length);
-      return terms.length>0&&(exactPhrase||totalHits>=minimumHits)&&(terms.length===1||titleHits>=2||totalHits>=2);
+      const historyModifiers=new Set(["history","historical","ancient","origin","origins","timeline","archaeology","archaeological"]);
+      const historicalIntent=terms.some(term=>historyModifiers.has(term));
+      const topicTerms=terms.filter(term=>!historyModifiers.has(term));
+      const topicHits=matchingSearchTerms(title+" "+summary,topicTerms);
+      const historicalContext=/\\b(history|historical|ancient|archaeolog(?:y|ical)|dynasty|century|civilization|civilisation|built|origin|origins|timeline|pharaoh|pharaonic)\\b/i.test(title+" "+summary);
+      const historicalMatch=historicalIntent&&topicTerms.length>0&&topicHits>=1&&historicalContext;
+      return terms.length>0&&(exactPhrase||totalHits>=minimumHits||historicalMatch)&&(terms.length===1||titleHits>=2||totalHits>=2||historicalMatch);
     }).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
   }
   // Re-apply identity isolation after recovery: fallback must never reintroduce
