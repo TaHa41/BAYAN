@@ -46,13 +46,26 @@ export async function publishVerifiedResearch(env:Env,input:{title:string;summar
   const nextSummary=materiallyNew||repairWeakArticle?input.summary.slice(0,500):String(existing.summary||input.summary).slice(0,500);
   const nextTitle=materiallyNew||repairWeakArticle?input.title:String(existing.title||input.title);
   const nextSection=materiallyNew||repairWeakArticle?input.section:String(existing.section||input.section);
-  await env.DB.prepare("UPDATE articles SET title=?,summary=?,body=?,section=?,sources_json=?,image_url=?,image_alt=?,updated_at=? WHERE slug=? AND language=? AND status='PUBLISHED'").bind(nextTitle,nextSummary,nextBody,nextSection,JSON.stringify(mergedSources),/^https:\/\//i.test(String(existing.image_url||"").trim())?String(existing.image_url):input.imageUrl,input.imageAlt||String(existing.image_alt||nextTitle),t,String(existing.slug),input.language).run();
+  const nextImageUrl=/^https:\/\//i.test(String(existing.image_url||"").trim())?String(existing.image_url):input.imageUrl;
+  const nextImageAlt=input.imageAlt||String(existing.image_alt||nextTitle);
+  const nextSourcesJson=JSON.stringify(mergedSources);
+  const beforeSnapshot={slug:String(existing.slug),language:input.language,title:String(existing.title||""),summary:String(existing.summary||""),body:priorBody,section:String(existing.section||input.section),status:"PUBLISHED",sources_json:String(existing.sources_json||"[]"),image_url:existing.image_url||null,image_alt:existing.image_alt||null};
+  const afterSnapshot={...beforeSnapshot,title:nextTitle,summary:nextSummary,body:nextBody,section:nextSection,sources_json:nextSourcesJson,image_url:nextImageUrl||null,image_alt:nextImageAlt,updated_at:t};
+  await env.DB.batch([
+    env.DB.prepare("UPDATE articles SET title=?,summary=?,body=?,section=?,sources_json=?,image_url=?,image_alt=?,updated_at=? WHERE slug=? AND language=? AND status='PUBLISHED'").bind(nextTitle,nextSummary,nextBody,nextSection,nextSourcesJson,nextImageUrl,nextImageAlt,t,String(existing.slug),input.language),
+    env.DB.prepare("INSERT INTO article_revision_history(article_slug,language,title,summary,body,section,status,image_url,image_alt,sources_json,action,editor,before_json,after_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(String(existing.slug),input.language,beforeSnapshot.title,beforeSnapshot.summary,beforeSnapshot.body,beforeSnapshot.section,beforeSnapshot.status,beforeSnapshot.image_url,beforeSnapshot.image_alt,beforeSnapshot.sources_json,"AUTO_UPDATE","BAYAN_AI",JSON.stringify(beforeSnapshot),JSON.stringify(afterSnapshot),t)
+  ]);
   return String(existing.slug);
  }
  const base=input.title.toLowerCase().normalize("NFKC").replace(/[^a-z0-9\u0600-\u06ff]+/gi,"-").replace(/^-|-$/g,"").slice(0,90)||"bayan-research";
  const slug=base+"-"+Date.now().toString(36);
- await env.DB.prepare("INSERT INTO articles(slug,section,language,title,summary,body,sources_json,status,image_url,image_alt,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)").bind(slug,input.section,input.language,input.title,input.summary.slice(0,500),input.body,JSON.stringify(mergedSources.length?mergedSources:input.sources.slice(0,12)),"PUBLISHED",input.imageUrl,input.imageAlt||input.title,t,t).run();
- return slug;
+ const sourcesJson=JSON.stringify(mergedSources.length?mergedSources:input.sources.slice(0,12));
+  const afterSnapshot={slug,section:input.section,language:input.language,title:input.title,summary:input.summary.slice(0,500),body:input.body,sources_json:sourcesJson,status:"PUBLISHED",image_url:input.imageUrl||null,image_alt:input.imageAlt||input.title,created_at:t,updated_at:t};
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO articles(slug,section,language,title,summary,body,sources_json,status,image_url,image_alt,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)").bind(slug,input.section,input.language,input.title,input.summary.slice(0,500),input.body,sourcesJson,"PUBLISHED",input.imageUrl,input.imageAlt||input.title,t,t),
+    env.DB.prepare("INSERT INTO article_revision_history(article_slug,language,title,summary,body,section,status,image_url,image_alt,sources_json,action,editor,before_json,after_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(slug,input.language,input.title,input.summary.slice(0,500),input.body,input.section,"PUBLISHED",input.imageUrl||null,input.imageAlt||input.title,sourcesJson,"CREATE","BAYAN_AI",null,JSON.stringify(afterSnapshot),t)
+  ]);
+return slug;
 }
 export async function addContribution(env:Env,title:string,body:string,source:string|undefined,section:string,language:Locale="ar"){await env.DB.prepare("INSERT INTO contributions(title,body,source,section,language,status,created_at) VALUES(?,?,?,?,?,?,?)").bind(title,body,source||null,section,language,"PENDING",now()).run()}export async function reviewContribution(env:Env,id:number,action:"APPROVE"|"REJECT",note:string){
  const c=await env.DB.prepare("SELECT * FROM contributions WHERE id=?").bind(id).first<any>();
