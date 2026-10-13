@@ -76,7 +76,10 @@ try{
     ["/about?lang=ar",300],["/about?lang=en",300],
     ["/methodology?lang=ar",300],["/methodology?lang=en",300],
     ["/prices?lang=ar",300],["/prices?lang=en",300],
-    ["/science?lang=ar",300]
+    ["/science?lang=ar",300],
+    ["/art?lang=ar",300],["/economy?lang=ar",300],["/politics?lang=ar",300],
+    ["/health?lang=ar",300],["/history?lang=ar",300],["/people?lang=ar",300],
+    ["/sports?lang=ar",300],["/travel?lang=ar",300],["/egypt?lang=ar",300],["/arab?lang=ar",300]
   ];
   await inBatches(contentDepthPages,3,async([path,minWords])=>{
     const page=await get(path);
