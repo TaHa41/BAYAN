@@ -278,7 +278,7 @@ const normalizedEntityTitle=(value:string)=>String(value||"").normalize("NFKC").
   .replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").trim();
 const personQueryName=(query:string)=>String(query||"").trim()
   .replace(/^(?:who is|who was|biography(?: of)?|profile(?: of)?|من هو|من هي|سيرة ذاتية عن|سيرة ذاتية لشخص)\s+/i,"")
-  .replace(/\s+(?:biography|profile|official profile|سيرة ذاتية|مصدر رسمي)$/i,"").trim();
+  .replace(/\s+(?:biography|profile|official profile|wikipedia|wiki|wikidata|سيرة ذاتية|ويكيبيديا|ويكي\s+بيانات|مصدر رسمي|official source)$/i,"").trim();
 const personEvidence=(candidate:SearchResult)=>/(footballer|football player|soccer player|athlete|politician|writer|author|actor|actress|scientist|researcher|coach|president|minister|born in|is a .*player|لاعب كرة قدم|لاعب|رياضي|سياسي|كاتب|مؤلف|ممثل|عالِم|عالم|باحث|مدرب|رئيس|وزير|وُلد|ولد)/i.test(String(candidate.title||"")+" "+String(candidate.summary||""));
 export const isSportsPersonProfile=(value:string)=>/(footballer|football player|soccer player|athlete|لاعب(?:\s+كرة قدم)?|اللاعب(?:ين|ون|ة)?|رياضي)/i.test(String(value||""));
 const wikipediaExactPersonPage=async(query:string,language:Locale):Promise<Candidate[]>=>{
