@@ -466,7 +466,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
     ? (language==="ar"
       ? (sportsProfile ? [q+" آخر الأخبار",englishSportsName ? englishSportsName+" latest news" : q+" منتخب مصر",q+" انتقال"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
       : (sportsProfile ? [q+" latest news",q+" transfer news",q+" Egypt national team"] : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
-    : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
+    : (language==="ar" ? [normalized,compact+" معلومات موثوقة",q+" شرح"] : [normalized,compact+" reliable sources",q+" overview"]);
   // The first pass already calls many providers. Sequential, bounded recovery prevents
   // a 3-variant x 9-provider fan-out from exhausting Cloudflare Worker subrequests.
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,2);
