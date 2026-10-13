@@ -29,7 +29,25 @@ const source=(title:string,publisher:string,url:string):Source=>({title,publishe
 const classifySection=(q:string,items:SearchResult[],language:Locale)=>{const qTerms=searchTerms(q);if((personLookup(q)||(nameOnlyArabicQuery(personQueryName(q))&&items.some(x=>normalizedEntityTitle(x.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(x))))&&items.some(x=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test((x.sources||[]).map(source=>source.publisher).join(" "))&&qTerms.some(term=>String(x.title||"").normalize("NFKC").toLowerCase().includes(term))))return"people";const s=(q+" "+items.slice(0,4).map(x=>x.title+" "+x.summary).join(" ")).toLowerCase();if(/\bscientist\b|\bchemist\b|\bwriter\b|\bauthor\b|\bpolitician\b|\bactor\b|\bathlete\b|\bbiography\b|\bnobel prize winner\b|\bphilosopher\b|\bphysicist\b|\bmathematician\b|عالم مصري|عالمة|كيميائي|سيرة ذاتية|شخصية عامة|كاتب|مؤلف|سياسي|ممثل|لاعب|باحث|رئيس سابق|من هو|من هي/.test(s))return"people";if(/gold|dollar|currency|price|inflation|سعر|ذهب|دولار|عملة|تضخم/.test(s))return"economy";if(/weather|طقس|حرارة|rain|temperature/.test(s))return"travel";if(/ai|artificial intelligence|technology|software|programming|ذكاء اصطناعي|تقنية|برمجة/.test(s))return"technology";if(/health|medicine|medical|nutrition|صحة|طب|دواء|تغذية/.test(s))return"health";if(/science|space|nasa|physics|biology|علم|فضاء|اكتشاف/.test(s))return"science";if(/history|historical|ancient|تاريخ|حضارة|قديم|culture|ثقافة/.test(s))return"history";if(/art|film|book|music|فن|سينما|كتاب|موسيقى|ترفيه/.test(s))return"art";if(/sports|football|soccer|basketball|رياضة|مباراة|لاعب/.test(s))return"sports";if(/travel|tourism|destination|سفر|سياحة|وجهة/.test(s))return"travel";if(/economy|business|market|اقتصاد|أعمال|سوق/.test(s))return"economy";if(/politic|government|election|president|سياسة|حكومة|انتخابات|رئيس/.test(s))return"politics";if(/biography|who is|من هو|من هي|سيرة|شخصية/.test(s))return"people";if(/trend|viral|popular|ترند|متداول|رائج/.test(s))return"trends";if(/egypt|مصر|القاهرة|الإسكندرية/.test(s))return"egypt";if(/arab|العالم العربي|جامعة الدول العربية|العرب|عربي/.test(s))return"arab";return"world"};
 
 const searchTerms=(q:string)=>{const stop=new Set(["the","and","for","with","from","about","what","when","where","who","how","why","are","was","is","of","to","in","on","at","by","as","an","a","or","into","over","under","after","before","than","can","does","do","did","be","been","being","من","في","عن","على","الى","إلى","ما","ماذا","كيف","لماذا","هل","هو","هي","هذا","هذه","التي","الذي","مع"]);return String(q||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter(x=>x.length>=2&&!stop.has(x)).slice(0,10)};
-const searchTermVariants=(value:string)=>{const term=String(value||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"");if(!/^[a-z]+$/.test(term)||["news","series","species"].includes(term))return [term];const variants=[term];if(term.length>5&&term.endsWith("ies"))variants.push(term.slice(0,-3)+"y",term.slice(0,-1));else if(term.length>5&&/(ches|shes|sses|xes|zes)$/.test(term))variants.push(term.slice(0,-2));else if(term.length>4&&term.endsWith("s")&&!/(ss|us|is)$/.test(term))variants.push(term.slice(0,-1));return [...new Set(variants)];};
+const searchTermVariants=(value:string)=>{
+  const term=String(value||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[أإآ]/g,"ا");
+  if(/[\u0600-\u06FF]/.test(term)){
+    const variants=[term];
+    const withoutArticle=term.replace(/^(?:وال|بال|كال|لل|ال)/,"");
+    variants.push(withoutArticle);
+    for(const base of [term,withoutArticle]){
+      if(base.length>4&&base.endsWith("ات"))variants.push(base.slice(0,-2));
+      if(base.length>4&&/(?:ون|ين)$/.test(base))variants.push(base.slice(0,-2));
+    }
+    return [...new Set(variants.filter(Boolean))];
+  }
+  if(!/^[a-z]+$/.test(term)||["news","series","species"].includes(term))return [term];
+  const variants=[term];
+  if(term.length>5&&term.endsWith("ies"))variants.push(term.slice(0,-3)+"y",term.slice(0,-1));
+  else if(term.length>5&&/(ches|shes|sses|xes|zes)$/.test(term))variants.push(term.slice(0,-2));
+  else if(term.length>4&&term.endsWith("s")&&!/(ss|us|is)$/.test(term))variants.push(term.slice(0,-1));
+  return [...new Set(variants)];
+};
 const matchingSearchTerms=(text:string,terms:string[])=>{const normalized=String(text||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}\s]/gu," ");const tokens=normalized.split(/\s+/).filter(Boolean);return terms.filter(term=>{const forms=searchTermVariants(term);return tokens.some(token=>{const tokenForms=searchTermVariants(token);return forms.some(form=>tokenForms.includes(form));});}).length;};
 const relevanceScore=(x:Candidate,q:string)=>{const terms=searchTerms(q);if(!terms.length)return 0;const normalize=(v:string)=>String(v||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"");const title=normalize(x.title),summary=normalize(x.summary),combined=title+" "+summary,normalizedQuery=normalize(q).trim(),titleHits=matchingSearchTerms(title,terms),summaryHits=matchingSearchTerms(summary,terms),allHits=matchingSearchTerms(combined,terms),phrase=title.includes(normalizedQuery);const person=personLookup(q);const identityBoost=person?(titleHits===terms.length?90:titleHits>0?titleHits*28:0):0;const authorOnlyPenalty=person&&titleHits===0&&summaryHits>0?35:0;return(phrase?75:0)+identityBoost+titleHits*18+summaryHits*7+allHits*4+Math.min(8,Number(x.score||0)/12)-authorOnlyPenalty};
 // Do not reject a relevant result solely because a multi-word query is absent verbatim from its title.
@@ -649,11 +667,12 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
       // or the exact normalized phrase appears in the title.
       const exactPhrase=title.includes(normalize(q).trim());
       const minimumHits=terms.length===1?1:Math.min(2,terms.length);
-      const historyModifiers=new Set(["history","historical","ancient","origin","origins","timeline","archaeology","archaeological"]);
-      const historicalIntent=terms.some(term=>historyModifiers.has(term));
-      const topicTerms=terms.filter(term=>!historyModifiers.has(term));
+      const historyModifiers=new Set(["history","historical","ancient","origin","origins","timeline","archaeology","archaeological","تاريخ","تاريخي","تاريخية","قديم","قديمة","أصل","أصول","المنشأ","آثار","أثري","أثرية","حضارة","حضارية","فرعون","فرعوني"]);
+      const historicalIntent=terms.some(term=>historyModifiers.has(term)||historyModifiers.has(term.replace(/[أإآ]/g,"ا")));
+      const topicTerms=terms.filter(term=>!historyModifiers.has(term)&&!historyModifiers.has(term.replace(/[أإآ]/g,"ا")));
       const topicHits=matchingSearchTerms(title+" "+summary,topicTerms);
-      const historicalContext=/\b(history|historical|ancient|archaeolog(?:y|ical)|dynasty|century|civilization|civilisation|built|origin|origins|timeline|pharaoh|pharaonic)\b/i.test(title+" "+summary);
+      const contextText=title+" "+summary;
+      const historicalContext=/\b(history|historical|ancient|archaeolog(?:y|ical)|dynasty|century|civilization|civilisation|built|origin|origins|timeline|pharaoh|pharaonic)\b/i.test(contextText)||/(تاريخ|تاريخي|قديم|قديمة|آثار|أثري|أثرية|حضارة|فرعون)/.test(contextText);
       const historicalMatch=historicalIntent&&topicTerms.length>0&&topicHits>=1&&historicalContext;
       return terms.length>0&&(exactPhrase||totalHits>=minimumHits||historicalMatch)&&(terms.length===1||titleHits>=2||totalHits>=2||historicalMatch);
     }).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
