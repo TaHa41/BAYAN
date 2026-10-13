@@ -69,6 +69,19 @@ try{
     const page=await get(path);
     if(!page.text.includes("<h1>")||!page.text.includes(heading))throw new Error(path+" server_rendered_seo_content_missing");
   });
+  const contentDepthPages=[
+    ["/about?lang=ar",195],["/about?lang=en",195],
+    ["/methodology?lang=ar",195],["/methodology?lang=en",195],
+    ["/prices?lang=ar",230],["/prices?lang=en",230],
+    ["/science?lang=ar",300]
+  ];
+  await inBatches(contentDepthPages,3,async([path,minWords])=>{
+    const page=await get(path);
+    const main=(page.text.match(/<main id="app">([\s\S]*?)<\/main>/i)||[])[1]||"";
+    const visible=main.replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/&(?:nbsp|amp|lt|gt|quot|#39);/g," ").replace(/\s+/g," ").trim();
+    const words=visible?visible.split(" ").filter(Boolean).length:0;
+    if(words<minWords)throw new Error(path+" server_rendered_content_too_thin:"+words+"<"+minWords);
+  });
   for(const path of ["/.well-known/ai-catalog.json","/ai-catalog.json"]){
     const response=await get(path);
     if(!/json/i.test(response.headers.get("content-type")||""))throw new Error(path+" content_type_not_json");
