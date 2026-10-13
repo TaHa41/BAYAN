@@ -632,7 +632,12 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   const personQuery=personLookup(q)||nameOnlyArabicQuery(q);
   const identityAliases:string[]=personQuery?[personQueryName(q)]:[];
   if(personQuery){
-    const exactWikidata=candidates.find(item=>item.provider==="Wikidata"&&normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
+    let exactWikidata=candidates.find(item=>item.provider==="Wikidata"&&normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
+    if(!exactWikidata){
+      const queryLanguage:Locale=hasArabic(personQueryName(q))?"ar":"en";
+      const queryEntities=await wikidata(personQueryName(q),queryLanguage).catch(()=>[]);
+      exactWikidata=queryEntities.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
+    }
     const wikidataUrl=String(exactWikidata?.sources?.find(item=>/wikidata\.org\/wiki\/Q\d+/i.test(String(item.url||"")) )?.url||"");
     const qid=wikidataUrl.match(/\/(Q\d+)/i)?.[1];
     if(qid)identityAliases.push(...await wikidataEntityAliases(qid));
