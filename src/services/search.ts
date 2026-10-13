@@ -693,15 +693,35 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
     }
   }
   const providers=[...new Set(candidates.map(x=>x.provider))];
-  const publishers=[...new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean))];
+  // Verification must reflect independent evidence, not the number of labels.
+  // Wikipedia + Wikidata, or several aggregators pointing to one publisher, are not independent corroboration.
+  const independentEvidence=(items:SearchResult[])=>{
+    const publishers=new Set<string>(),hosts=new Set<string>();
+    for(const item of items){
+      const substantive=String(item.summary||"").trim().length>=100;
+      if(!substantive)continue;
+      for(const src of item.sources||[]){
+        const publisher=String(src.publisher||"").trim().toLowerCase();
+        const url=String(src.url||item.url||"");
+        let host="";
+        try{const parsed=new URL(url);if(parsed.protocol==="https:")host=parsed.hostname.toLowerCase().replace(/^www\\./,"");}catch{}
+        if(!host||/wikipedia\\.org|wikidata\\.org|news\\.google\\.com|bing\\.com|duckduckgo\\.com|news\.yahoo\.com/.test(host))continue;
+        if(/wikipedia|wikidata|google news|bing news|duckduckgo|news aggregator|ويكيبيديا|ويكي بيانات/i.test(publisher))continue;
+        publishers.add(publisher||host);
+        hosts.add(host);
+      }
+    }
+    return {publishers,hosts};
+  };
   const configuredMin=Math.max(2,Math.min(5,Number(s.min_sources||3)));
-  const status=results.length===0?"insufficient":publishers.length>=configuredMin?"verified":"mixed";
+  const corroboration=independentEvidence(results);
+  const status=results.length===0?"insufficient":(corroboration.publishers.size>=configuredMin&&corroboration.hosts.size>=2)?"verified":"mixed";
   let publishedSlug:string|undefined;
   let answer:string|undefined;
   let answerStatus:SearchResponse["status"]|undefined;
   const exactPersonConfirmed=!personQuery||results.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
   if(results.length&&exactPersonConfirmed&&options.draft!==false){
-    try{const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),10000))]);if(drafted.answer){answer=drafted.answer;answerStatus=drafted.status;}const independentSources=new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean));const articleTitle=results.find(x=>x.title&&x.summary)?.title||"";const articleSummary=results.find(x=>x.title&&x.summary)?.summary||q;if(options.publish!==false&&drafted.status==="verified"&&usefulDraft(drafted.answer,language)&&independentSources.size>=2&&articleTitle&&!disallowedContent(articleTitle+" "+articleSummary)){const imageUrl=results.find(item=>/^https:\/\//i.test(String(item.imageUrl||""))&&String(item.imageAlt||item.title||"").trim().length>0)?.imageUrl||await findRelatedImage(articleTitle,undefined,articleSummary).catch(()=>undefined);const savedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:drafted.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle});if(savedSlug)publishedSlug=savedSlug;}}catch{}
+    try{const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),10000))]);if(drafted.answer){answer=drafted.answer;answerStatus=drafted.status;}const independentSources=new Set(results.flatMap(x=>x.sources||[]).map(x=>String(x.publisher||"").trim().toLowerCase()).filter(Boolean));const articleTitle=results.find(x=>x.title&&x.summary)?.title||"";const articleSummary=results.find(x=>x.title&&x.summary)?.summary||q;if(options.publish!==false&&drafted.status==="verified"&&usefulDraft(drafted.answer,language)&&corroboration.publishers.size>=configuredMin&&corroboration.hosts.size>=2&&articleTitle&&!disallowedContent(articleTitle+" "+articleSummary)){const imageUrl=results.find(item=>/^https:\/\//i.test(String(item.imageUrl||""))&&String(item.imageAlt||item.title||"").trim().length>0)?.imageUrl||await findRelatedImage(articleTitle,undefined,articleSummary).catch(()=>undefined);const savedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:drafted.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle});if(savedSlug)publishedSlug=savedSlug;}}catch{}
   }
   const message=results.length?undefined:(language==="ar"?"لم تُرجع محاولات البحث المتاحة نتائج ذات صلة كافية. جرّب إضافة سياق أو كتابة الاسم الكامل أو استخدام صياغة أخرى؛ لن يعرض بيان نتائج غير مرتبطة لمجرد ملء الصفحة.":"The available search attempts did not return sufficiently relevant results. Add context, use the full name, or try another phrasing; BAYAN will not show unrelated results just to fill the page.");
   try{await saveSearch(env,q,language,intent(q),status,results.length,classifySection(q,results,language),results)}catch{}
