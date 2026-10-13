@@ -511,10 +511,11 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   // Retry broadly but sequentially: provider calls are bounded, and the loop exits
   // early when relevance and independent-host diversity are adequate.
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,3);
-  const batches:Candidate[][]=[];
   const labels=["Wikipedia REST Search","GDELT","Google News Search","DuckDuckGo Web Search","Bing Web Search","Bing Web RSS"];
-  for(let variantIndex=0;variantIndex<uniqueVariants.length;variantIndex++){
-    const variant=uniqueVariants[variantIndex];
+  // Run the bounded query variants concurrently. Sequential recovery made the
+  // client hit its 10-second deadline before providers had finished, which
+  // surfaced a misleading "external providers unavailable" message.
+  const variantBatches=await Promise.all(uniqueVariants.map(async(variant,variantIndex)=>{
     const results=await Promise.all([
       wikipediaRestSearch(variant,language).catch(()=>[]),
       gdelt(variant,diagnostics).catch(()=>[]),
@@ -524,15 +525,9 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
       bingWebRssSearch(variant,language).catch(()=>[])
     ]);
     diagnostics.push("Expanded variant "+(variantIndex+1)+" result counts: "+labels.map((label,index)=>label+"="+(results[index]?.length||0)).join(", "));
-    batches.push(results.flat());
-    const recovered=batches.flat().filter(item=>relevantCandidate(item,q)&&languageSafe(item,language));
-    const hosts=new Set(recovered.flatMap(item=>(item.sources||[]).map(src=>{
-      try{return new URL(String(src.url||"")).hostname.toLowerCase().replace(/^www\./,"")}
-      catch{return ""}
-    })).filter(host=>host&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/.test(host)));
-    if(recovered.length>=6&&hosts.size>=3)break;
-  }
-  return batches.flat().map(item=>identityAliases.length?({...item,identityAliases:[...identityAliases]}):item);
+    return results.flat();
+  }));
+  return variantBatches.flat().map(item=>identityAliases.length?({...item,identityAliases:[...identityAliases]}):item);
 }
 async function settings(env:Env){try{const r=await env.DB.prepare("SELECT key,value FROM admin_settings").all<any>();return Object.fromEntries((r.results||[]).map((x:any)=>[x.key,x.value]))}catch{return{}}}
 const hasArabic=(value:string)=>/[\u0600-\u06ff]/.test(String(value||""));
