@@ -704,8 +704,8 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
         const publisher=String(src.publisher||"").trim().toLowerCase();
         const url=String(src.url||item.url||"");
         let host="";
-        try{const parsed=new URL(url);if(parsed.protocol==="https:")host=parsed.hostname.toLowerCase().replace(/^www\\./,"");}catch{}
-        if(!host||/wikipedia\\.org|wikidata\\.org|news\\.google\\.com|bing\\.com|duckduckgo\\.com|news\.yahoo\.com/.test(host))continue;
+        try{const parsed=new URL(url);if(parsed.protocol==="https:")host=parsed.hostname.toLowerCase().replace(/^www\./,"");}catch{}
+        if(!host||/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com|news\.yahoo\.com/.test(host))continue;
         if(/wikipedia|wikidata|google news|bing news|duckduckgo|news aggregator|ويكيبيديا|ويكي بيانات/i.test(publisher))continue;
         publishers.add(publisher||host);
         hosts.add(host);
