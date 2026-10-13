@@ -744,7 +744,7 @@
       '<section class="page prices-page"><div class="page-head prices-heading"><span class="eyebrow">' +
       t("بيانات مباشرة","Live data") + '</span><h1>' + t("الأسعار والبيانات الحية","Prices & Live Data") +
       '</h1><p>' + t("أسعار العملات والمعادن والطاقة والعملات الرقمية ومؤشرات الأسواق، مع المصدر والوحدة ووقت التحديث.","Currencies, metals, energy, crypto and market indices with provider, units and update time.") +
-      '</p></div><div class="prices-intro-strip"><span class="prices-intro-icon">↗</span><div><strong>'+t("صورة أوضح لحركة الأسعار","A clearer view of market prices")+'</strong><p>'+t("تابع أسعار الصرف والذهب في مكان واحد، مع توضيح الوحدة ومصدر البيانات.","Track exchange rates and gold in one place, with units and data sources clearly shown.") +'</p></div></div><button id="pricesRefresh" class="navbtn prices-refresh" type="button">'+t("تحديث الأسعار الآن","Refresh prices now")+'</button><div class="live-grid market-overview"><article class="live live-card fx-panel" id="fx">…</article><article class="live live-card gold-panel" id="gold">…</article></div><div class="prices-extra-heading"><div><span class="eyebrow">'+t("نظرة أوسع","More to explore")+'</span><h2 class="section-title">'+t("أسواق ومواد إضافية","More markets & commodities")+'</h2></div><span class="prices-heading-note">'+t("تُعرض عند توافر بيانات موثوقة","Shown when reliable data is available")+'</span></div><div class="live-grid prices-extra-grid" id="marketExtras"><div class="notice loading">'+t("جاري تحميل الأسعار من المزودات…","Loading provider quotes…")+'</div></div><p class="muted">'+t("الأسعار إرشادية وقد تتأخر أو تتوقف عند تعطل المزود؛ تحقق من المصدر قبل اتخاذ قرارات مالية.","Quotes are indicative and may be delayed or unavailable; verify with the provider before making financial decisions.")+'</p></section>';
+      '</p></div><div class="prices-intro-strip"><span class="prices-intro-icon">↗</span><div><strong>'+t("صورة أوضح لحركة الأسعار","A clearer view of market prices")+'</strong><p>'+t("تابع أسعار الصرف والذهب في مكان واحد، مع توضيح الوحدة ومصدر البيانات.","Track exchange rates and gold in one place, with units and data sources clearly shown.") +'</p></div></div><section class="market-converter" aria-label="'+t("محول العملات","Currency converter")+'"><div class="converter-heading"><h2>'+t("حوّل العملات","Convert currencies")+'</h2><p>'+t("حساب تقريبي باستخدام أسعار الصرف المتاحة من مزود البيانات.","An estimate calculated from the available exchange-rate feed.")+'</p></div><label class="converter-field">'+t("المبلغ","Amount")+'<input id="convertAmount" type="number" min="0" step="any" value="1" inputmode="decimal"></label><label class="converter-field">'+t("من","From")+'<select id="convertFrom"><option value="USD">USD · '+t("الدولار الأمريكي","US dollar")+'</option><option value="EGP">EGP · '+t("الجنيه المصري","Egyptian pound")+'</option><option value="EUR">EUR · '+t("اليورو","Euro")+'</option><option value="GBP">GBP · '+t("الجنيه الإسترليني","British pound")+'</option><option value="SAR">SAR · '+t("الريال السعودي","Saudi riyal")+'</option><option value="AED">AED · '+t("الدرهم الإماراتي","UAE dirham")+'</option></select></label><label class="converter-field">'+t("إلى","To")+'<select id="convertTo"><option value="EGP">EGP · '+t("الجنيه المصري","Egyptian pound")+'</option><option value="USD">USD · '+t("الدولار الأمريكي","US dollar")+'</option><option value="EUR">EUR · '+t("اليورو","Euro")+'</option><option value="GBP">GBP · '+t("الجنيه الإسترليني","British pound")+'</option><option value="SAR">SAR · '+t("الريال السعودي","Saudi riyal")+'</option><option value="AED">AED · '+t("الدرهم الإماراتي","UAE dirham")+'</option></select></label><div class="converter-result"><small>'+t("الناتج التقريبي","Estimated result")+'</small><output id="convertOutput" aria-live="polite">—</output></div></section><button id="pricesRefresh" class="navbtn prices-refresh" type="button">'+t("تحديث الأسعار الآن","Refresh prices now")+'</button><div class="live-grid market-overview"><article class="live live-card fx-panel" id="fx">…</article><article class="live live-card gold-panel" id="gold">…</article></div><div class="prices-extra-heading"><div><span class="eyebrow">'+t("نظرة أوسع","More to explore")+'</span><h2 class="section-title">'+t("أسواق ومواد إضافية","More markets & commodities")+'</h2></div><span class="prices-heading-note">'+t("تُعرض عند توافر بيانات موثوقة","Shown when reliable data is available")+'</span></div><div class="live-grid prices-extra-grid" id="marketExtras"><div class="notice loading">'+t("جاري تحميل الأسعار من المزودات…","Loading provider quotes…")+'</div></div><p class="muted">'+t("الأسعار إرشادية وقد تتأخر أو تتوقف عند تعطل المزود؛ تحقق من المصدر قبل اتخاذ قرارات مالية.","Quotes are indicative and may be delayed or unavailable; verify with the provider before making financial decisions.")+'</p></section>';
     document.querySelector("#pricesRefresh")?.addEventListener("click", () => renderPrices());
     try {
       const [fxResult, goldResult] = await Promise.allSettled([api("/api/live/fx"), api("/api/live/gold")]);
@@ -769,6 +769,26 @@
         MAD:"Moroccan dirham",ZAR:"South African rand"
       };
       const rates = fx.rates || {};
+      // Convert through the feed's USD base: value in USD = amount / rate[from].
+      const convertAmount = document.querySelector("#convertAmount");
+      const convertFrom = document.querySelector("#convertFrom");
+      const convertTo = document.querySelector("#convertTo");
+      const convertOutput = document.querySelector("#convertOutput");
+      const updateConversion = () => {
+        if (!convertAmount || !convertFrom || !convertTo || !convertOutput) return;
+        const amount = Number(convertAmount.value);
+        const fromRate = convertFrom.value === "USD" ? 1 : Number(rates[convertFrom.value]);
+        const toRate = convertTo.value === "USD" ? 1 : Number(rates[convertTo.value]);
+        if (!Number.isFinite(amount) || amount < 0 || !Number.isFinite(fromRate) || fromRate <= 0 || !Number.isFinite(toRate) || toRate <= 0) {
+          convertOutput.textContent = t("السعر غير متاح","Rate unavailable");
+          return;
+        }
+        const result = amount / fromRate * toRate;
+        convertOutput.textContent = result.toLocaleString(ar ? "ar-EG-u-nu-latn" : "en-US", {maximumFractionDigits: 4}) + " " + convertTo.value;
+      };
+      [convertAmount, convertFrom, convertTo].forEach((control) => control?.addEventListener("input", updateConversion));
+      [convertFrom, convertTo].forEach((control) => control?.addEventListener("change", updateConversion));
+      updateConversion();
       const currencyRows = Object.entries(rates).filter(([code,value]) => Number.isFinite(Number(value))).map(([code,value]) =>
         '<div class="market-row"><span class="currency-label"><b>'+escapeHtml(code)+'</b><small>'+escapeHtml(currencyNames[code]||code)+'</small></span><strong>'+escapeHtml(Number(value).toLocaleString(ar ? "ar-EG-u-nu-latn" : "en-US",{maximumFractionDigits:4}))+'</strong></div>'
       ).join("");
