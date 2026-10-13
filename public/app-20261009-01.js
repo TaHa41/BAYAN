@@ -168,9 +168,9 @@
       if (!text) { paragraph = []; return; }
       // Split abnormally long single paragraphs into smaller, readable paragraphs.
       const sentences = text.match(/[^.!؟?]+[.!؟?]+(?:["'»”)]*)|[^.!؟?]+$/gu) || [text];
-      if (text.length > 520 && sentences.length >= 4) {
-        for (let i = 0; i < sentences.length; i += 3) {
-          const chunk = sentences.slice(i, i + 3).join(" ").trim();
+      if (text.length > 260 && sentences.length >= 3) {
+        for (let i = 0; i < sentences.length; i += 2) {
+          const chunk = sentences.slice(i, i + 2).join(" ").trim();
           if (chunk) out.push("<p>" + escapeHtml(chunk) + "</p>");
         }
       } else {
