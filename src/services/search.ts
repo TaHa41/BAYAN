@@ -176,7 +176,7 @@ async function openAiWebSearch(env:Env,q:string,language:Locale):Promise<Candida
     const response=await fetch("https://api.openai.com/v1/responses",{
       method:"POST",
       headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},
-      signal:AbortSignal.timeout(3500),
+      signal:AbortSignal.timeout(9000),
       body:JSON.stringify({
         model:env.OPENAI_MODEL||"gpt-5-mini",
         tools:[{type:"web_search"}],
@@ -434,7 +434,7 @@ export const personIdentityMatches=(text:string,name:string)=>{
   if(normalizedName&&normalizedText.includes(normalizedName))return true;
   if(!/(محمد\s+صلاح|mohamed\s+salah|mohammed\s+salah|mo\s+salah)/i.test(name))return false;
   if(/محمد\s+صلاح|مو\s+صلاح|mohamed\s+salah|mohammed\s+salah|mo\s+salah/i.test(text))return true;
-  return /صلاح/i.test(text)&&/(ليفربول|منتخب مصر|الفرعون المصري|اللاعب المصري|هدف|مباراة)/i.test(text);
+  return /صلاح/i.test(text)&&/(ليفربول|طرابزون|منتخب مصر|الفرعون المصري|اللاعب المصري|هدف|مباراة|انتقال|يوقع|وقع|عقد|صفقة|نادي|فريق|كرة قدم|الدوري|مهاجم|liverpool|trabzonspor|transfer|signed|contract|deal|joined|club|team|goal|match|league|striker|forward)/i.test(text);
 };
 export const isolateArticleSubject=(title:string,items:Candidate[])=>{
  const query=normalizedEntityTitle(title);
@@ -484,12 +484,16 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
     : undefined;
   const variants=person
     ? (language==="ar"
-      ? (sportsProfile ? [q+" آخر الأخبار",englishSportsName ? englishSportsName+" latest news" : q+" منتخب مصر",q+" انتقال"] : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
-      : (sportsProfile ? [q+" latest news",q+" transfer news",q+" Egypt national team"] : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
-    : (language==="ar" ? [normalized,compact+" معلومات موثوقة",q+" شرح"] : [normalized,compact+" reliable sources",q+" overview"]);
-  // The first pass already calls many providers. Sequential, bounded recovery prevents
-  // a 3-variant x 9-provider fan-out from exhausting Cloudflare Worker subrequests.
-  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,2);
+      ? (sportsProfile
+        ? [q+" آخر الأخبار",englishSportsName ? englishSportsName+" latest news" : q+" آخر الأخبار",q+" مصدر رسمي"]
+        : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
+      : (sportsProfile
+        ? [q+" latest news",q+" official profile",q+" recent coverage"]
+        : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
+    : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات ومصادر موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
+  // Retry broadly but sequentially: provider calls are bounded, and the loop exits
+  // early when relevance and independent-host diversity are adequate.
+  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,3);
   const batches:Candidate[][]=[];
   const labels=["Wikipedia REST Search","GDELT","Google News Search","DuckDuckGo Web Search","Bing Web Search","Bing Web RSS"];
   for(let variantIndex=0;variantIndex<uniqueVariants.length;variantIndex++){
