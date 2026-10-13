@@ -462,7 +462,7 @@
     const output = document.querySelector("#out");
     output.innerHTML = '<div class="notice loading">' + t("جاري البحث في مصادر متعددة…","Searching multiple sources…") + "</div>";
     let data = null, fallbackUsed = false;
-    try { data = await api("/api/search?q=" + encodeURIComponent(query) + "&lang=" + lang, {timeoutMs:18000}); } catch {}
+    try { data = await api("/api/search?q=" + encodeURIComponent(query) + "&lang=" + lang, {timeoutMs:10000}); } catch {}
     if (!data?.results?.length && !((data?.providers||[]).includes("BAYAN content safety"))) {
       fallbackUsed = true;
       const serverData = data || {};
@@ -591,7 +591,7 @@
             "&summary=" + encodeURIComponent(story.summary || "") +
             "&url=" + encodeURIComponent(story.url || "") +
             "&publisher=" + encodeURIComponent(story.publisher || "") +
-            "&publishedAt=" + encodeURIComponent(story.publishedAt || "") + "&lang=" + lang, { timeoutMs:36000 });
+            "&publishedAt=" + encodeURIComponent(story.publishedAt || "") + "&lang=" + lang, { timeoutMs:14000 });
           const article = articleData.article;
           if(!article?.title)throw new Error("article_unavailable");
           if(article.status!=="verified")throw new Error("article_not_verified");
