@@ -79,6 +79,10 @@ try{
 try{
   const h=await get("/?lang=en");
   if(!/<html[^>]+lang="en"/.test(h.text))throw new Error("english_lang_missing");
+  if(!h.text.includes('<meta name="theme-color" content="#f7f4ee">'))throw new Error("light_mobile_theme_color_mismatch");
+  const manifest=await get("/manifest.json");
+  const manifestData=JSON.parse(manifest.text);
+  if(manifestData.theme_color!=="#f7f4ee")throw new Error("installed_app_theme_color_mismatch");
   const bundleMatch=h.text.match(/<script src="(\/app-[^"]+\.js\?v=[^"]+)"/);
   if(!bundleMatch)throw new Error("current_bundle_missing");
   bundlePath=bundleMatch[1].split("?")[0];
