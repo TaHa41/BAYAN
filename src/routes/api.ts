@@ -422,7 +422,8 @@ if(u.pathname==="/api/admin/article/restore"&&request.method==="POST"){
  const current=await env.DB.prepare("SELECT * FROM articles WHERE slug=? AND language=?").bind(slug,language).first<any>();
  const now=new Date().toISOString(),title=String(revision.title||""),summary=String(revision.summary||""),articleBody=String(revision.body||""),section=String(revision.section||"world"),imageUrl=String(revision.image_url||""),imageAlt=String(revision.image_alt||""),sourcesJson=String(revision.sources_json||"[]");
  const after={slug,language,title,summary,body:articleBody,section,status:"DRAFT",image_url:imageUrl||null,image_alt:imageAlt||null,sources_json:sourcesJson,updated_at:now};
- const revisionRecord=env.DB.prepare("INSERT INTO article_revisions(article_slug,language,title,summary,body,section,status,image_url,image_alt,sources_json,action,editor,before_json,after_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(slug,language,title,summary,articleBody,section,"DRAFT",imageUrl||null,imageAlt||null,sourcesJson,"RESTORE","BAYAN_MANAGER",current?JSON.stringify(current):null,JSON.stringify(after),now);
+ const snapshot=current||after;
+ const revisionRecord=env.DB.prepare("INSERT INTO article_revisions(article_slug,language,title,summary,body,section,status,image_url,image_alt,sources_json,action,editor,before_json,after_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(slug,language,String(snapshot.title||""),String(snapshot.summary||""),String(snapshot.body||""),String(snapshot.section||"world"),String(snapshot.status||"DRAFT"),snapshot.image_url||null,snapshot.image_alt||null,String(snapshot.sources_json||"[]"),"RESTORE","BAYAN_MANAGER",current?JSON.stringify(current):null,JSON.stringify(after),now);
  if(current){
   await env.DB.batch([
    env.DB.prepare("UPDATE articles SET title=?,summary=?,body=?,section=?,status='DRAFT',image_url=?,image_alt=?,sources_json=?,updated_at=? WHERE slug=? AND language=?").bind(title,summary,articleBody,section,imageUrl||null,imageAlt||null,sourcesJson,now,slug,language),
@@ -444,7 +445,7 @@ if(u.pathname==="/api/admin/article"&&request.method==="POST"){
  const now=new Date().toISOString(),after={...before,title,summary,body:articleBody,section,status,image_url:imageUrl||null,image_alt:imageAlt||null,updated_at:now};
  await env.DB.batch([
   env.DB.prepare("UPDATE articles SET title=?,summary=?,body=?,section=?,status=?,image_url=?,image_alt=?,updated_at=? WHERE slug=? AND language=?").bind(title,summary,articleBody,section,status,imageUrl||null,imageAlt||null,now,slug,language),
-  env.DB.prepare("INSERT INTO article_revisions(article_slug,language,title,summary,body,section,status,image_url,image_alt,sources_json,action,editor,before_json,after_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(slug,language,title,summary,articleBody,section,status,imageUrl||null,imageAlt||null,String(before.sources_json||"[]"),"EDIT","BAYAN_MANAGER",JSON.stringify(before),JSON.stringify(after),now)
+  env.DB.prepare("INSERT INTO article_revisions(article_slug,language,title,summary,body,section,status,image_url,image_alt,sources_json,action,editor,before_json,after_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(slug,language,String(before.title||""),String(before.summary||""),String(before.body||""),String(before.section||"world"),String(before.status||"DRAFT"),before.image_url||null,before.image_alt||null,String(before.sources_json||"[]"),"EDIT","BAYAN_MANAGER",JSON.stringify(before),JSON.stringify(after),now)
  ]);
  return json({ok:true,revisionSaved:true});
 }
@@ -468,7 +469,7 @@ if(u.pathname==="/api/admin/article/status"&&request.method==="POST"){
  const now=new Date().toISOString(),after={...before,status,updated_at:now};
  await env.DB.batch([
   env.DB.prepare("UPDATE articles SET status=?,updated_at=? WHERE slug=? AND language=?").bind(status,now,slug,language),
-  env.DB.prepare("INSERT INTO article_revisions(article_slug,language,title,summary,body,section,status,image_url,image_alt,sources_json,action,editor,before_json,after_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(slug,language,String(before.title||""),String(before.summary||""),String(before.body||""),String(before.section||"world"),status,before.image_url||null,before.image_alt||null,String(before.sources_json||"[]"),"STATUS","BAYAN_MANAGER",JSON.stringify(before),JSON.stringify(after),now)
+  env.DB.prepare("INSERT INTO article_revisions(article_slug,language,title,summary,body,section,status,image_url,image_alt,sources_json,action,editor,before_json,after_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(slug,language,String(before.title||""),String(before.summary||""),String(before.body||""),String(before.section||"world"),String(before.status||"DRAFT"),before.image_url||null,before.image_alt||null,String(before.sources_json||"[]"),"STATUS","BAYAN_MANAGER",JSON.stringify(before),JSON.stringify(after),now)
  ]);
  return json({ok:true,revisionSaved:true});
 }
@@ -480,7 +481,7 @@ if(u.pathname==="/api/admin/article-image"&&request.method==="POST"){
  const now=new Date().toISOString(),after={...before,image_url:imageUrl,image_alt:imageAlt||null,updated_at:now};
  await env.DB.batch([
   env.DB.prepare("UPDATE articles SET image_url=?,image_alt=?,updated_at=? WHERE slug=? AND language=? AND status='PUBLISHED'").bind(imageUrl,imageAlt||null,now,slug,language),
-  env.DB.prepare("INSERT INTO article_revisions(article_slug,language,title,summary,body,section,status,image_url,image_alt,sources_json,action,editor,before_json,after_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(slug,language,String(before.title||""),String(before.summary||""),String(before.body||""),String(before.section||"world"),String(before.status||"PUBLISHED"),imageUrl,imageAlt||null,String(before.sources_json||"[]"),"IMAGE","BAYAN_MANAGER",JSON.stringify(before),JSON.stringify(after),now)
+  env.DB.prepare("INSERT INTO article_revisions(article_slug,language,title,summary,body,section,status,image_url,image_alt,sources_json,action,editor,before_json,after_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(slug,language,String(before.title||""),String(before.summary||""),String(before.body||""),String(before.section||"world"),String(before.status||"PUBLISHED"),before.image_url||null,before.image_alt||null,String(before.sources_json||"[]"),"IMAGE","BAYAN_MANAGER",JSON.stringify(before),JSON.stringify(after),now)
  ]);
  return json({ok:true,revisionSaved:true});
 }
