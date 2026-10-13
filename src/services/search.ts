@@ -111,6 +111,20 @@ async function wikidata(q:string,language:Locale):Promise<Candidate[]>{
     return (d.search||[]).map((x:any)=>({title:cleanText(x.label||x.id),summary:cleanText(x.description||"").slice(0,900),section:"people",kind:"web",evidence:"mixed",sources:[source(x.label||x.id,"Wikidata","https://www.wikidata.org/wiki/"+x.id)],score:scoreSource("Wikidata",x.label||"",q),provider:"Wikidata"}));
   }catch{return[]}
 }
+async function wikidataEntityAliases(qid:string):Promise<string[]>{
+  if(!/^Q\\d+$/i.test(qid))return[];
+  try{
+    const url="https://www.wikidata.org/w/api.php?action=wbgetentities&ids="+encodeURIComponent(qid)+"&props=labels%7Caliases&languages=en%7Car&format=json&origin=*";
+    const response=await timeout(url,3500);
+    if(!response.ok)return[];
+    const data=await response.json<any>();
+    const entity=data.entities?.[qid];
+    if(!entity)return[];
+    const labels=Object.values(entity.labels||{}).map((item:any)=>item?.value||"");
+    const aliases=Object.values(entity.aliases||{}).flatMap((items:any)=>Array.isArray(items)?items.map((item:any)=>item?.value||""):[]);
+    return [...new Set([...labels,...aliases].map(cleanText).filter((value:string)=>value.length>=2&&value.length<=120))].slice(0,40);
+  }catch{return[]}
+}
 async function gdelt(q:string):Promise<Candidate[]>{
  try{const u="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(q)+"&mode=artlist&maxrecords=8&format=json&sort=HybridRel";const r=await timeout(u,4000);if(!r.ok)return[];const d=await r.json<any>();return(d.articles||[]).map((x:any)=>({title:cleanText(x.title),summary:cleanText(x.seendate||"")+" "+cleanText(x.domain||""),section:"news",kind:"web",evidence:"mixed",sources:[source(x.title,x.domain||"GDELT",x.url)],url:x.url,score:scoreSource(x.domain||"GDELT",x.title,q),provider:"GDELT"})).filter((x:any)=>x.title&&x.url)}catch{return[]}
 }
@@ -514,7 +528,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
     })).filter(host=>host&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/.test(host)));
     if(recovered.length>=6&&hosts.size>=3)break;
   }
-  return batches.flat();
+  return batches.flat().map(item=>identityAliases.length?({...item,identityAliases:[...identityAliases]}):item);
 }
 async function settings(env:Env){try{const r=await env.DB.prepare("SELECT key,value FROM admin_settings").all<any>();return Object.fromEntries((r.results||[]).map((x:any)=>[x.key,x.value]))}catch{return{}}}
 const hasArabic=(value:string)=>/[\u0600-\u06ff]/.test(String(value||""));
@@ -616,8 +630,18 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   }
   // Person/name lookups should return a useful collection, not stop after the first matching page.
   const personQuery=personLookup(q)||nameOnlyArabicQuery(q);
-  if(personQuery){const exactName=normalizedEntityTitle(personQueryName(q));for(const item of candidates){if(normalizedEntityTitle(item.title)===exactName){item.summary=sanitizeConflictingCurrentClubClaims(item.summary||"");item.section="people";}}}
-  if(personQuery){const exactProfile=await wikipediaExactPersonPage(q,language);if(exactProfile.length)candidates.unshift(...exactProfile);}
+  const identityAliases:string[]=personQuery?[personQueryName(q)]:[];
+  if(personQuery){
+    const exactWikidata=candidates.find(item=>item.provider==="Wikidata"&&normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
+    const wikidataUrl=String(exactWikidata?.sources?.find(item=>/wikidata\\.org\\/wiki\\/Q\\d+/i.test(String(item.url||"")) )?.url||"");
+    const qid=wikidataUrl.match(/\\/(Q\\d+)/i)?.[1];
+    if(qid)identityAliases.push(...await wikidataEntityAliases(qid));
+    const uniqueAliases=[...new Set(identityAliases.map(cleanText).filter(value=>value.length>=2&&value.length<=120))];
+    identityAliases.splice(0,identityAliases.length,...uniqueAliases);
+    const exactName=normalizedEntityTitle(personQueryName(q));
+    for(const item of candidates){item.identityAliases=identityAliases;if(normalizedEntityTitle(item.title)===exactName){item.summary=sanitizeConflictingCurrentClubClaims(item.summary||"");item.section="people";}}
+  }
+  if(personQuery){const exactProfile=await wikipediaExactPersonPage(q,language);if(exactProfile.length)candidates.unshift(...exactProfile);for(const item of candidates)item.identityAliases=identityAliases;}
   const firstPassMatches=()=>candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q));
   const firstPassCount=()=>{const matching=firstPassMatches();return personQuery?isolateExactPerson(q,matching).length:matching.length;};
   // Count evidence diversity, not just result cards. Duplicate hits from Wikipedia
@@ -641,7 +665,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
     providerAttempted.push("Expanded topic variants: Wikipedia, Wikipedia REST Search, Wikidata, GDELT, DuckDuckGo Web Search, Bing Web Search, Bing Web RSS Search, Google News Search, Bing News RSS","OpenAI Web Search (fallback)");
     const [expanded,web]=await Promise.all([
-      safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||""),providerAttempted),[]),
+      safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||""),providerAttempted,identityAliases),[]),
       safe(openAiWebSearch(env,q,language),[])
     ]);
     candidates.push(...expanded,...web);
