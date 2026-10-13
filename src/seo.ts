@@ -37,13 +37,17 @@ export async function newsSitemap(env:Env){
   const now=Date.now();
   let items:Array<{slug:string;title:string;language:Locale;publishedAt:string}>=[];
   try{
-    const r=await env.DB.prepare("SELECT slug,title,language,created_at,body FROM articles WHERE status='PUBLISHED' AND section='news' ORDER BY created_at DESC LIMIT 1000").all<any>();
+    const r=await env.DB.prepare("SELECT slug,title,language,created_at,body,sources_json FROM articles WHERE status='PUBLISHED' ORDER BY created_at DESC LIMIT 1000").all<any>();
     items=(r.results||[]).filter((x:any)=>{
       const published=Date.parse(String(x.created_at||""));
       const body=String(x.body||"").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim();
-      // Google News sitemaps are a freshness/discovery feed, not an editorial
-      // quality score. Avoid excluding legitimate recent articles merely
-      // because they have fewer headings or source records than an arbitrary threshold.
+      let sources:any[]=[];
+      try{const parsed=JSON.parse(String(x.sources_json||"[]"));sources=Array.isArray(parsed)?parsed:[]}catch{}
+      const hosts=new Set(sources.map((source:any)=>{try{return new URL(String(source.url||"")).hostname.toLowerCase().replace(/^www\./,"")}catch{return""}}).filter(Boolean));
+      const publishers=new Set(sources.map((source:any)=>String(source.publisher||"").trim().toLowerCase()).filter(Boolean));
+      // News stories are stored under their topical section (science, economy,
+      // sports, etc.), not section='news'. Filter by freshness and verified
+      // multi-source evidence instead of a section value that excludes them all.
       return Boolean(
         x.slug &&
         String(x.title||"").trim().length>=8 &&
@@ -51,7 +55,9 @@ export async function newsSitemap(env:Env){
         Number.isFinite(published) &&
         published<=now+5*60*1000 &&
         now-published<=48*60*60*1000 &&
-        body.length>=250
+        body.length>=1800 &&
+        hosts.size>=2 &&
+        publishers.size>=2
       );
     }).map((x:any)=>({
       slug:String(x.slug),
