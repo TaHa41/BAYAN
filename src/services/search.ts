@@ -653,7 +653,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
       const historicalIntent=terms.some(term=>historyModifiers.has(term));
       const topicTerms=terms.filter(term=>!historyModifiers.has(term));
       const topicHits=matchingSearchTerms(title+" "+summary,topicTerms);
-      const historicalContext=/\\b(history|historical|ancient|archaeolog(?:y|ical)|dynasty|century|civilization|civilisation|built|origin|origins|timeline|pharaoh|pharaonic)\\b/i.test(title+" "+summary);
+      const historicalContext=/\b(history|historical|ancient|archaeolog(?:y|ical)|dynasty|century|civilization|civilisation|built|origin|origins|timeline|pharaoh|pharaonic)\b/i.test(title+" "+summary);
       const historicalMatch=historicalIntent&&topicTerms.length>0&&topicHits>=1&&historicalContext;
       return terms.length>0&&(exactPhrase||totalHits>=minimumHits||historicalMatch)&&(terms.length===1||titleHits>=2||totalHits>=2||historicalMatch);
     }).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
