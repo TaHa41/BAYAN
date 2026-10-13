@@ -77,8 +77,8 @@ try{
   ];
   await inBatches(contentDepthPages,3,async([path,minWords])=>{
     const page=await get(path);
-    const main=(page.text.match(/<main id="app">([\\s\\S]*?)<\\/main>/i)||[])[1]||"";
-    const visible=main.replace(/<script[\\s\\S]*?<\\/script>/gi," ").replace(/<style[\\s\\S]*?<\\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/&(?:nbsp|amp|lt|gt|quot|#39);/g," ").replace(/\\s+/g," ").trim();
+    const main=(page.text.match(/<main id="app">([\s\S]*?)<\/main>/i)||[])[1]||"";
+    const visible=main.replace(/<script[\s\S]*?<\/script>/gi," ").replace(/<style[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," ").replace(/&(?:nbsp|amp|lt|gt|quot|#39);/g," ").replace(/\s+/g," ").trim();
     const words=visible?visible.split(" ").filter(Boolean).length:0;
     if(words<minWords)throw new Error(path+" server_rendered_content_too_thin:"+words+"<"+minWords);
   });
