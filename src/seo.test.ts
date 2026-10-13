@@ -38,6 +38,29 @@ describe("newsSitemap database failure handling", () => {
     expect(body).toContain("<urlset");
     expect(body).toContain("</urlset>");
   });
+  it("includes recent verified topical news without arbitrary heading-count gates", async () => {
+    const recent = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const old = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
+    const env = {
+      DB: {
+        prepare: () => ({
+          all: async () => ({
+            results: [
+              { slug: "recent-ar-news", title: "عنوان خبر عربي حديث", language: "ar", created_at: recent, body: "محتوى خبر حديث موثق. ".repeat(100), sources_json: JSON.stringify([{ url: "https://news.example.com/a", publisher: "Publisher A" }, { url: "https://wire.example.org/a", publisher: "Publisher B" }]) },
+              { slug: "old-news", title: "Older news article", language: "en", created_at: old, body: "Older article body. ".repeat(100), sources_json: JSON.stringify([{ url: "https://news.example.com/a", publisher: "Publisher A" }, { url: "https://wire.example.org/a", publisher: "Publisher B" }]) }
+            ]
+          })
+        })
+      }
+    } as any;
+    const response = await newsSitemap(env);
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain("/article/recent-ar-news?lang=ar");
+    expect(body).toContain("<news:language>ar</news:language>");
+    expect(body).not.toContain("old-news");
+  });
+
 });
 
 describe("sitemap database failure handling", () => {
