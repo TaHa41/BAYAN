@@ -486,12 +486,12 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   const variants=person
     ? (language==="ar"
       ? (sportsProfile
-        ? [q+" آخر الأخبار",englishSportsName ? englishSportsName+" latest news" : q+" آخر الأخبار",q+" مصدر رسمي"]
+        ? [q+" آخر الأخبار",englishSportsName ? englishSportsName+" latest news" : q+" آخر الأخبار",q+" انتقال"]
         : writerProfile ? [q+" آخر الأخبار",q+" مقابلة",q+" أعماله ومؤلفاته"] : [q+" آخر الأخبار",q+" مقابلة",q+" مصدر رسمي"])
       : (sportsProfile
-        ? [q+" latest news",q+" official profile",q+" recent coverage"]
+        ? [q+" latest news",q+" transfer news",q+" official profile"]
         : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
-    : (language==="ar" ? [q+" شرح",normalized,compact+" معلومات ومصادر موثوقة"] : [q+" overview",normalized,compact+" reliable sources"]);
+    : (language==="ar" ? [normalized,compact+" معلومات ومصادر موثوقة",q+" شرح"] : [normalized,compact+" reliable sources",q+" overview"]);
   // Retry broadly but sequentially: provider calls are bounded, and the loop exits
   // early when relevance and independent-host diversity are adequate.
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,3);
