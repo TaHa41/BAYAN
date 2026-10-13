@@ -37,21 +37,29 @@ export async function newsSitemap(env:Env){
   const now=Date.now();
   let items:Array<{slug:string;title:string;language:Locale;publishedAt:string}>=[];
   try{
-    const r=await env.DB.prepare("SELECT slug,title,language,created_at,body,sources_json FROM articles WHERE status='PUBLISHED' AND section='news' ORDER BY created_at DESC LIMIT 1000").all<any>();
+    const r=await env.DB.prepare("SELECT slug,title,language,created_at,body FROM articles WHERE status='PUBLISHED' AND section='news' ORDER BY created_at DESC LIMIT 1000").all<any>();
     items=(r.results||[]).filter((x:any)=>{
       const published=Date.parse(String(x.created_at||""));
-      const body=String(x.body||"").trim();
-      const headings=(body.match(/^#{1,3}\s+.+$/gm)||[]).length;
-      const paragraphs=body.split(/\n\s*\n/).map((part:string)=>part.trim()).filter((part:string)=>part.length>=65&&!/^#{1,4}\s/.test(part)&&!/^([-*+] |\d+[.)] )/.test(part));
-      const uniqueParagraphs=new Set(paragraphs.map((part:string)=>part.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu," ").trim()));
-      let sources:any[]=[];
-      try{const parsed=JSON.parse(String(x.sources_json||"[]"));sources=Array.isArray(parsed)?parsed:[]}catch{}
-      const hosts=new Set(sources.map((source:any)=>{try{return new URL(String(source.url||"")).hostname.toLowerCase().replace(/^www\./,"")}catch{return""}}).filter(Boolean));
-      const publishers=new Set(sources.map((source:any)=>String(source.publisher||"").trim().toLowerCase()).filter(Boolean));
-      return Boolean(x.slug&&x.title&&(x.language==="ar"||x.language==="en")&&Number.isFinite(published)&&published<=now+5*60*1000&&now-published<=48*60*60*1000&&body.length>=1800&&headings>=4&&paragraphs.length>=5&&uniqueParagraphs.size>=5&&hosts.size>=2&&publishers.size>=2);
-    }).map((x:any)=>({slug:String(x.slug),title:String(x.title),language:x.language as Locale,publishedAt:new Date(String(x.created_at)).toISOString()}));
+      const body=String(x.body||"").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim();
+      // Google News sitemaps are a freshness/discovery feed, not an editorial
+      // quality score. Avoid excluding legitimate recent articles merely
+      // because they have fewer headings or source records than an arbitrary threshold.
+      return Boolean(
+        x.slug &&
+        String(x.title||"").trim().length>=8 &&
+        (x.language==="ar"||x.language==="en") &&
+        Number.isFinite(published) &&
+        published<=now+5*60*1000 &&
+        now-published<=48*60*60*1000 &&
+        body.length>=250
+      );
+    }).map((x:any)=>({
+      slug:String(x.slug),
+      title:String(x.title).trim(),
+      language:x.language as Locale,
+      publishedAt:new Date(String(x.created_at)).toISOString()
+    }));
   }catch(error){
-    // Do not disguise a database outage as a valid but empty news sitemap.
     console.error("news_sitemap_database_query_failed", error instanceof Error ? error.message : String(error));
     return retryableUnavailable("News sitemap temporarily unavailable; retry later.");
   }
