@@ -508,13 +508,12 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
         ? [q+" latest news",q+" transfer news",q+" official profile"]
         : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
     : (language==="ar" ? [normalized,compact+" معلومات ومصادر موثوقة",q+" شرح"] : [normalized,compact+" reliable sources",q+" overview"]);
-  // Retry broadly but sequentially: provider calls are bounded, and the loop exits
-  // early when relevance and independent-host diversity are adequate.
+  // Run the first variant alone, then fan out remaining bounded variants only
+  // when evidence is still sparse. This avoids unnecessary provider load while
+  // keeping the worst-case recovery window short enough for the browser request.
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,3);
-  const batches:Candidate[][]=[];
   const labels=["Wikipedia REST Search","GDELT","Google News Search","DuckDuckGo Web Search","Bing Web Search","Bing Web RSS"];
-  for(let variantIndex=0;variantIndex<uniqueVariants.length;variantIndex++){
-    const variant=uniqueVariants[variantIndex];
+  const runVariant=async(variant:string,variantIndex:number):Promise<Candidate[]>=>{
     const results=await Promise.all([
       wikipediaRestSearch(variant,language).catch(()=>[]),
       gdelt(variant,diagnostics).catch(()=>[]),
@@ -524,13 +523,20 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
       bingWebRssSearch(variant,language).catch(()=>[])
     ]);
     diagnostics.push("Expanded variant "+(variantIndex+1)+" result counts: "+labels.map((label,index)=>label+"="+(results[index]?.length||0)).join(", "));
-    batches.push(results.flat());
+    return results.flat();
+  };
+  const batches:Candidate[][]=[];
+  if(uniqueVariants.length){
+    batches.push(await runVariant(uniqueVariants[0],0));
     const recovered=batches.flat().filter(item=>relevantCandidate(item,q)&&languageSafe(item,language));
     const hosts=new Set(recovered.flatMap(item=>(item.sources||[]).map(src=>{
       try{return new URL(String(src.url||"")).hostname.toLowerCase().replace(/^www\./,"")}
       catch{return ""}
     })).filter(host=>host&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/.test(host)));
-    if(recovered.length>=6&&hosts.size>=3)break;
+    if(!(recovered.length>=6&&hosts.size>=3)&&uniqueVariants.length>1){
+      const remaining=await Promise.all(uniqueVariants.slice(1).map((variant,offset)=>runVariant(variant,offset+1)));
+      batches.push(...remaining);
+    }
   }
   return batches.flat().map(item=>identityAliases.length?({...item,identityAliases:[...identityAliases]}):item);
 }
