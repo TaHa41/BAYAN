@@ -112,7 +112,7 @@ async function wikidata(q:string,language:Locale):Promise<Candidate[]>{
   }catch{return[]}
 }
 async function wikidataEntityAliases(qid:string):Promise<string[]>{
-  if(!/^Q\\d+$/i.test(qid))return[];
+  if(!/^Q\d+$/i.test(qid))return[];
   try{
     const url="https://www.wikidata.org/w/api.php?action=wbgetentities&ids="+encodeURIComponent(qid)+"&props=labels%7Caliases&languages=en%7Car&format=json&origin=*";
     const response=await timeout(url,3500);
@@ -633,8 +633,8 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   const identityAliases:string[]=personQuery?[personQueryName(q)]:[];
   if(personQuery){
     const exactWikidata=candidates.find(item=>item.provider==="Wikidata"&&normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
-    const wikidataUrl=String(exactWikidata?.sources?.find(item=>/wikidata\\.org\\/wiki\\/Q\\d+/i.test(String(item.url||"")) )?.url||"");
-    const qid=wikidataUrl.match(/\\/(Q\\d+)/i)?.[1];
+    const wikidataUrl=String(exactWikidata?.sources?.find(item=>/wikidata\.org\/wiki\/Q\d+/i.test(String(item.url||"")) )?.url||"");
+    const qid=wikidataUrl.match(/\/(Q\d+)/i)?.[1];
     if(qid)identityAliases.push(...await wikidataEntityAliases(qid));
     const uniqueAliases=[...new Set(identityAliases.map(cleanText).filter(value=>value.length>=2&&value.length<=120))];
     identityAliases.splice(0,identityAliases.length,...uniqueAliases);
