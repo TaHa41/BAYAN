@@ -154,14 +154,28 @@
   // Render article Markdown as semantic, readable HTML instead of wrapping every
   // source line in a paragraph (which made headings and lists appear as raw text).
   const renderArticleBody = (value) => {
-    const lines = String(value || "").replace(/\r/g, "").split("\n");
+    // Normalize source dumps into readable semantic blocks. Many source providers
+    // return one long paragraph even when the content contains multiple sentences.
+    const raw = String(value || "").replace(/\r/g, "").trim();
+    if (!raw) return "";
+    const lines = raw.split("\n");
     const out = [];
     let paragraph = [];
     let listType = "";
     let listItems = [];
     const flushParagraph = () => {
       const text = paragraph.join(" ").trim();
-      if (text) out.push("<p>" + escapeHtml(text) + "</p>");
+      if (!text) { paragraph = []; return; }
+      // Split abnormally long single paragraphs into smaller, readable paragraphs.
+      const sentences = text.match(/[^.!؟?]+[.!؟?]+(?:["'»”)]*)|[^.!؟?]+$/gu) || [text];
+      if (text.length > 260 && sentences.length >= 3) {
+        for (let i = 0; i < sentences.length; i += 2) {
+          const chunk = sentences.slice(i, i + 2).join(" ").trim();
+          if (chunk) out.push("<p>" + escapeHtml(chunk) + "</p>");
+        }
+      } else {
+        out.push("<p>" + escapeHtml(text) + "</p>");
+      }
       paragraph = [];
     };
     const flushList = () => {
@@ -398,10 +412,9 @@
     const sectionTasks = sections
       .filter((s) => !["news","prices","trends"].includes(s[0]))
       .map((s) => api("/api/section?section=" + encodeURIComponent(s[0]) + "&lang=" + lang).catch(() => ({items: []})));
-    const [newsData, sectionData] = await Promise.all([
-      newsTask,
-      Promise.all(sectionTasks)
-    ]);
+    // Render the fast news response first. Do not make visitors wait for every
+    // category request before they can read the homepage's first content.
+    const newsData = await newsTask;
 
     const newsOut = document.querySelector("#home-news");
     if (newsData.stale && newsOut) {
@@ -415,19 +428,20 @@
         const title = String(item.title || ""), summary = String(item.summary || "");
         return ar ? /[\u0600-\u06ff]/.test(title) && (!summary || /[\u0600-\u06ff]/.test(summary)) : !/[\u0600-\u06ff]/.test(title) && !/[\u0600-\u06ff]/.test(summary);
       })
-      .slice(0, 6);
+      .slice(0, 9);
     newsOut.innerHTML = newsItems.length
       ? newsItems.map((item) => '<a class="article-card" href="/news?story=' + encodeURIComponent(item.title) + '&lang=' + lang + '">' + imageHtml(item) + '<div class="article-card-body"><span class="kicker">' + escapeHtml(item.publisher || t("الأخبار","News")) + '</span><h3>' + escapeHtml(item.title) + '</h3><p>' + escapeHtml(item.summary || "") + '</p><div class="source-line">' + escapeHtml(formatDate(item.publishedAt)) + '</div><span class="read">' + t("اقرأ داخل بيان","Read inside BAYAN") + " →</span></div></a>").join("")
       : '<div class="notice">' + t("لا توجد أخبار حديثة متاحة الآن؛ لن نعرض خبرًا مختلقًا.","No current news is available right now; BAYAN will not invent a story.") + "</div>";
     if (newsItems.length) hydrateSectionImages(newsItems);
 
+    const sectionData = await Promise.all(sectionTasks);
     const featured = sectionData
       .flatMap((x) => x.items || [])
       .filter((item) => {
         const title = String(item.title || ""), summary = String(item.summary || ""), body = String(item.body || "");
         return ar ? /[\u0600-\u06ff]/.test(title) && (!summary || /[\u0600-\u06ff]/.test(summary)) && (!body || /[\u0600-\u06ff]/.test(body)) : !/[\u0600-\u06ff]/.test(title) && !/[\u0600-\u06ff]/.test(summary) && !/[\u0600-\u06ff]/.test(body);
       })
-      .slice(0, 9);
+      .slice(0, 15);
     const featuredOut = document.querySelector("#home-featured");
     featuredOut.innerHTML = featured.length
       ? featured.map(articleCard).join("")
@@ -448,7 +462,7 @@
     const output = document.querySelector("#out");
     output.innerHTML = '<div class="notice loading">' + t("جاري البحث في مصادر متعددة…","Searching multiple sources…") + "</div>";
     let data = null, fallbackUsed = false;
-    try { data = await api("/api/search?q=" + encodeURIComponent(query) + "&lang=" + lang, {timeoutMs:18000}); } catch {}
+    try { data = await api("/api/search?q=" + encodeURIComponent(query) + "&lang=" + lang, {timeoutMs:10000}); } catch {}
     if (!data?.results?.length && !((data?.providers||[]).includes("BAYAN content safety"))) {
       fallbackUsed = true;
       const serverData = data || {};
@@ -577,7 +591,7 @@
             "&summary=" + encodeURIComponent(story.summary || "") +
             "&url=" + encodeURIComponent(story.url || "") +
             "&publisher=" + encodeURIComponent(story.publisher || "") +
-            "&publishedAt=" + encodeURIComponent(story.publishedAt || "") + "&lang=" + lang, { timeoutMs:36000 });
+            "&publishedAt=" + encodeURIComponent(story.publishedAt || "") + "&lang=" + lang, { timeoutMs:14000 });
           const article = articleData.article;
           if(!article?.title)throw new Error("article_unavailable");
           if(article.status!=="verified")throw new Error("article_not_verified");
@@ -586,8 +600,7 @@
             '<span class="eyebrow">' + escapeHtml(story.publisher || t("الأخبار","News")) + "</span><h1>" +
             escapeHtml(article.title) + '</h1><p class="lead">' + escapeHtml(article.summary || story.summary || "") +
             '</p>' + (article.savedSlug ? '<div class="notice">' + t("تمت إضافة المقال تلقائيًا إلى قسم", "Automatically added to section") + ' <a href="/' + encodeURIComponent(article.section || "news") + '?lang=' + lang + '">' + escapeHtml((sections.find(section => section[0] === (article.section || "news")) || [])[ar ? 1 : 2] || article.section || "news") + '</a></div>' : "") + (article.status === "source_only" ? '<div class="notice">' + t("هذا ملخص المصدر المتاح؛ لم تتوفر أدلة كافية لإعداد عرض تحليلي كامل بعد.","This is the available source summary; there is not enough evidence to prepare a full analysis yet.") + '</div>' : "") +
-            '<div class="article-body">' + String(article.body || "").split(String.fromCharCode(10)).map((line) =>
-            "<p>" + escapeHtml(line) + "</p>").join("") +
+            '<div class="article-body">' + renderArticleBody(article.body || "") +
             '</div><div class="sources-box"><h2>' + t("الأدلة والمصادر","Evidence & sources") + "</h2>" +
             (article.sources || []).map((source) =>
               '<div class="source-line">' + escapeHtml(source.publisher || "") + " · " + escapeHtml(source.title || "") +
@@ -745,7 +758,22 @@
       t("بيانات مباشرة","Live data") + '</span><h1>' + t("الأسعار والبيانات الحية","Prices & Live Data") +
       '</h1><p>' + t("أسعار العملات والمعادن والطاقة والعملات الرقمية ومؤشرات الأسواق، مع المصدر والوحدة ووقت التحديث.","Currencies, metals, energy, crypto and market indices with provider, units and update time.") +
       '</p></div><div class="prices-intro-strip"><span class="prices-intro-icon">↗</span><div><strong>'+t("صورة أوضح لحركة الأسعار","A clearer view of market prices")+'</strong><p>'+t("تابع أسعار الصرف والذهب في مكان واحد، مع توضيح الوحدة ومصدر البيانات.","Track exchange rates and gold in one place, with units and data sources clearly shown.") +'</p></div></div><section class="market-converter" aria-label="'+t("محول العملات","Currency converter")+'"><div class="converter-heading"><h2>'+t("حوّل العملات","Convert currencies")+'</h2><p>'+t("حساب تقريبي باستخدام أسعار الصرف المتاحة من مزود البيانات.","An estimate calculated from the available exchange-rate feed.")+'</p></div><label class="converter-field">'+t("المبلغ","Amount")+'<input id="convertAmount" type="number" min="0" step="any" value="1" inputmode="decimal"></label><label class="converter-field">'+t("من","From")+'<select id="convertFrom"><option value="USD">USD · '+t("الدولار الأمريكي","US dollar")+'</option><option value="EGP">EGP · '+t("الجنيه المصري","Egyptian pound")+'</option><option value="EUR">EUR · '+t("اليورو","Euro")+'</option><option value="GBP">GBP · '+t("الجنيه الإسترليني","British pound")+'</option><option value="SAR">SAR · '+t("الريال السعودي","Saudi riyal")+'</option><option value="AED">AED · '+t("الدرهم الإماراتي","UAE dirham")+'</option></select></label><label class="converter-field">'+t("إلى","To")+'<select id="convertTo"><option value="EGP">EGP · '+t("الجنيه المصري","Egyptian pound")+'</option><option value="USD">USD · '+t("الدولار الأمريكي","US dollar")+'</option><option value="EUR">EUR · '+t("اليورو","Euro")+'</option><option value="GBP">GBP · '+t("الجنيه الإسترليني","British pound")+'</option><option value="SAR">SAR · '+t("الريال السعودي","Saudi riyal")+'</option><option value="AED">AED · '+t("الدرهم الإماراتي","UAE dirham")+'</option></select></label><div class="converter-result"><small>'+t("الناتج التقريبي","Estimated result")+'</small><output id="convertOutput" aria-live="polite">—</output></div></section><button id="pricesRefresh" class="navbtn prices-refresh" type="button">'+t("تحديث الأسعار الآن","Refresh prices now")+'</button><div class="live-grid market-overview"><article class="live live-card fx-panel" id="fx">…</article><article class="live live-card gold-panel" id="gold">…</article></div><div class="prices-extra-heading"><div><span class="eyebrow">'+t("نظرة أوسع","More to explore")+'</span><h2 class="section-title">'+t("أسواق ومواد إضافية","More markets & commodities")+'</h2></div><span class="prices-heading-note">'+t("تُعرض عند توافر بيانات موثوقة","Shown when reliable data is available")+'</span></div><div class="live-grid prices-extra-grid" id="marketExtras"><div class="notice loading">'+t("جاري تحميل الأسعار من المزودات…","Loading provider quotes…")+'</div></div><p class="muted">'+t("الأسعار إرشادية وقد تتأخر أو تتوقف عند تعطل المزود؛ تحقق من المصدر قبل اتخاذ قرارات مالية.","Quotes are indicative and may be delayed or unavailable; verify with the provider before making financial decisions.")+'</p></section>';
-    document.querySelector("#pricesRefresh")?.addEventListener("click", () => renderPrices());
+    document.querySelector("#pricesRefresh")?.addEventListener("click", async () => {
+      const button = document.querySelector("#pricesRefresh");
+      if (!button || button.dataset.loading === "1") return;
+      button.dataset.loading = "1";
+      button.disabled = true;
+      button.textContent = t("جاري تحديث الأسعار…", "Refreshing prices…");
+      try { await renderPrices(); }
+      finally {
+        const current = document.querySelector("#pricesRefresh");
+        if (current) {
+          current.dataset.loading = "0";
+          current.disabled = false;
+          current.textContent = t("تحديث الأسعار الآن", "Refresh prices now");
+        }
+      }
+    });
     try {
       const [fxResult, goldResult] = await Promise.allSettled([api("/api/live/fx"), api("/api/live/gold")]);
       const fx = fxResult.status === "fulfilled" ? fxResult.value : {ok:false,stale:true,provider:"Frankfurter v2",rates:{}};
