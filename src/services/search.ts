@@ -530,9 +530,9 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
     batches.push(await runVariant(uniqueVariants[0],0));
     const recovered=batches.flat().filter(item=>relevantCandidate(item,q)&&languageSafe(item,language));
     const hosts=new Set(recovered.flatMap(item=>(item.sources||[]).map(src=>{
-      try{return new URL(String(src.url||"")).hostname.toLowerCase().replace(/^www\\./,"")}
+      try{return new URL(String(src.url||"")).hostname.toLowerCase().replace(/^www\./,"")}
       catch{return ""}
-    })).filter(host=>host&&!/wikipedia\\.org|wikidata\\.org|news\\.google\\.com|bing\\.com|duckduckgo\\.com/.test(host)));
+    })).filter(host=>host&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/.test(host)));
     if(!(recovered.length>=6&&hosts.size>=3)&&uniqueVariants.length>1){
       const remaining=await Promise.all(uniqueVariants.slice(1).map((variant,offset)=>runVariant(variant,offset+1)));
       batches.push(...remaining);
