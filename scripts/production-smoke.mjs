@@ -96,6 +96,28 @@ try{
   }
 }catch(e){console.error("SEO",e);bad++}
 try{
+  // These two published seed articles are an explicit bilingual pair. Keep this
+  // check strict so a missing hreflang set cannot silently pass production smoke.
+  const pair=[
+    {lang:"ar",slug:"politics-public-consultation-ar"},
+    {lang:"en",slug:"politics-public-consultation-en"}
+  ];
+  const expected={
+    ar:origin+"/article/politics-public-consultation-ar?lang=ar",
+    en:origin+"/article/politics-public-consultation-en?lang=en"
+  };
+  for(const item of pair){
+    const path="/article/"+item.slug+"?lang="+item.lang;
+    const page=await get(path);
+    const canonical=page.text.match(/<link rel="canonical" href="([^"]+)">/);
+    if(!canonical||canonical[1]!==expected[item.lang])throw new Error(path+"_canonical_mismatch");
+    const alternates=[...page.text.matchAll(/<link rel="alternate" hreflang="(ar|en|x-default)" href="([^"]+)">/g)];
+    if(alternates.length!==3)throw new Error(path+"_expected_exactly_three_hreflang_links_found_"+alternates.length);
+    const byLang=Object.fromEntries(alternates.map(match=>[match[1],match[2]]));
+    if(byLang.ar!==expected.ar||byLang.en!==expected.en||byLang["x-default"]!==expected.ar)throw new Error(path+"_hreflang_targets_incorrect");
+  }
+}catch(e){console.error("BILINGUAL_ARTICLE_SEO",e);bad++}
+try{
   const h=await get("/?lang=en");
   if(!/<html[^>]+lang="en"/.test(h.text))throw new Error("english_lang_missing");
   if(!h.text.includes('<meta name="theme-color" content="#f7f4ee">'))throw new Error("light_mobile_theme_color_mismatch");
