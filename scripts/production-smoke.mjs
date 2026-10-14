@@ -20,6 +20,22 @@ async function get(path){
   for(const [name,value] of [["x-content-type-options","nosniff"],["x-frame-options","DENY"],["referrer-policy","strict-origin-when-cross-origin"]])if(r.headers.get(name)!==value)throw new Error(path+" missing security header "+name);
   return{text,status:r.status,headers:r.headers};
 }
+
+function assertNoBlockedImageHosts(payload,label){
+  const textValue=typeof payload==="string"?payload:JSON.stringify(payload);
+  const urls=textValue.match(/https?:\\/\\/[^\\s"'<>\\\\)]+/gi)||[];
+  const blocked=[];
+  for(const candidate of urls){
+    try{
+      const host=new URL(candidate).hostname.toLowerCase().replace(/\\.$/,"");
+      if(host==="googleusercontent.com"||host.endsWith(".googleusercontent.com")||
+         host==="news.google.com"||host.endsWith(".news.google.com")||
+         host==="gstatic.com"||host.endsWith(".gstatic.com")) blocked.push(host);
+    }catch{}
+  }
+  if(blocked.length)throw new Error(label+"_contains_blocked_image_host:"+[...new Set(blocked)].join(","));
+}
+
 async function inBatches(items,size,fn){
   for(let i=0;i<items.length;i+=size){
     await Promise.all(items.slice(i,i+size).map(fn));
@@ -309,5 +325,23 @@ try{
   if(!css.text.includes(".prices-refresh")||!css.text.includes("@media(max-width:360px)"))throw new Error("responsive_prices_styles_missing");
 }catch(e){console.error("LIVE_DATA",e);bad++}
 try{const a=await fetch(origin+"/api/admin/analytics",{headers:{accept:"application/json"},signal:AbortSignal.timeout(10000)});if(a.status!==401)throw new Error("admin_auth_not_enforced")}catch(e){console.error("ADMIN_AUTH",e);bad++}
+
+try{
+  // BLOCKED_IMAGE_HOST_REGRESSION: reject the three known bad image-host families
+  // in server-rendered pages, sitemaps, and public article/news/image API payloads.
+  const imageSafetyPaths=[
+    "/?lang=ar","/?lang=en","/news?lang=ar","/news?lang=en",
+    "/sitemap.xml","/news-sitemap.xml",
+    "/api/news?lang=ar","/api/news?lang=en",
+    "/api/article?slug=who-is-naguib-mahfouz-ar&lang=ar",
+    "/api/article?slug=who-is-naguib-mahfouz-en&lang=en",
+    "/api/image?q="+encodeURIComponent("نجيب محفوظ")
+  ];
+  await inBatches(imageSafetyPaths,3,async path=>{
+    const response=await get(path);
+    assertNoBlockedImageHosts(response.text,"IMAGE_HOST_GUARD"+path.replace(/[^a-z0-9]+/gi,"_"));
+  });
+}catch(e){console.error("BLOCKED_IMAGE_HOST_REGRESSION",e);bad++}
+
 if(bad)process.exit(1);
 console.log("BAYAN production smoke passed");
