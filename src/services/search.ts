@@ -1,3 +1,4 @@
+import{safePublicImageUrl}from"../image-url";
 import type {Env,Locale,SearchResponse,SearchResult,Source} from "../types";
 import {searchArticles,saveSearch,publishVerifiedResearch} from "../db";
 import {ask} from "./ai";
@@ -767,6 +768,7 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
       if(image&&/^https:\/\//i.test(image)){canonical.imageUrl=image;canonical.imageAlt=String(canonical.title||q);}
     }
   }
+  for(const item of results){item.imageUrl=safePublicImageUrl(item.imageUrl);for(const source of item.sources||[])source.imageUrl=safePublicImageUrl(source.imageUrl);}
   const providers=[...new Set(candidates.map(x=>x.provider))];
   // Verification must reflect independent evidence, not the number of labels.
   // Wikipedia + Wikidata, or several aggregators pointing to one publisher, are not independent corroboration.
