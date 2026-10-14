@@ -23,11 +23,11 @@ async function get(path){
 
 function assertNoBlockedImageHosts(payload,label){
   const textValue=typeof payload==="string"?payload:JSON.stringify(payload);
-  const urls=textValue.match(/https?:\\/\\/[^\\s"'<>\\\\)]+/gi)||[];
+  const urls=textValue.match(/https?:\/\/[^\s"'<>\\)]+/gi)||[];
   const blocked=[];
   for(const candidate of urls){
     try{
-      const host=new URL(candidate).hostname.toLowerCase().replace(/\\.$/,"");
+      const host=new URL(candidate).hostname.toLowerCase().replace(/\.$/,"");
       if(host==="googleusercontent.com"||host.endsWith(".googleusercontent.com")||
          host==="news.google.com"||host.endsWith(".news.google.com")||
          host==="gstatic.com"||host.endsWith(".gstatic.com")) blocked.push(host);
