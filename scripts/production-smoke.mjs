@@ -22,10 +22,34 @@ async function get(path){
 }
 
 function assertNoBlockedImageHosts(payload,label){
-  const textValue=typeof payload==="string"?payload:JSON.stringify(payload);
-  const urls=textValue.match(/https?:\/\/[^\s"'<>\\)]+/gi)||[];
+  const raw=typeof payload==="string"?payload:JSON.stringify(payload);
+  const candidates=[];
+  const add=(value)=>{if(typeof value==="string"&&/^https?:\/\//i.test(value.trim()))candidates.push(value.trim());};
+  let parsed;
+  try{parsed=JSON.parse(raw)}catch{}
+  if(parsed&&typeof parsed==="object"){
+    const visit=(value)=>{
+      if(!value||typeof value!=="object")return;
+      for(const [key,item] of Object.entries(value)){
+        if(/(?:image|thumbnail|avatar|picture|photo)(?:url|_url)?/i.test(key)){
+          if(typeof item==="string")add(item);
+          else if(Array.isArray(item))item.forEach(add);
+        }
+        if(item&&typeof item==="object")visit(item);
+      }
+    };
+    visit(parsed);
+  }else{
+    for(const match of raw.matchAll(/<img\b[^>]*\bsrc=["']([^"']+)["']/gi))add(match[1]);
+    for(const tag of raw.matchAll(/<meta\b[^>]*>/gi)){
+      if(!/(?:property|name)=["'](?:og:image|twitter:image)["']/i.test(tag[0]))continue;
+      const content=tag[0].match(/\bcontent=["']([^"']+)["']/i);
+      if(content)add(content[1]);
+    }
+    for(const match of raw.matchAll(/<image:loc>(.*?)<\/image:loc>/gi))add(match[1]);
+  }
   const blocked=[];
-  for(const candidate of urls){
+  for(const candidate of candidates){
     try{
       const host=new URL(candidate).hostname.toLowerCase().replace(/\.$/,"");
       if(host==="googleusercontent.com"||host.endsWith(".googleusercontent.com")||
