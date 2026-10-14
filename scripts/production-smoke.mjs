@@ -355,6 +355,8 @@ try{
   // in server-rendered pages, sitemaps, and public article/news/image API payloads.
   const imageSafetyPaths=[
     "/?lang=ar","/?lang=en","/news?lang=ar","/news?lang=en",
+    "/article/who-is-naguib-mahfouz-ar?lang=ar",
+    "/article/who-is-naguib-mahfouz-en?lang=en",
     "/sitemap.xml","/news-sitemap.xml",
     "/api/news?lang=ar","/api/news?lang=en",
     "/api/article?slug=who-is-naguib-mahfouz-ar&lang=ar",
