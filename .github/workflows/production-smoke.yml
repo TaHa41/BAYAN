@@ -2,6 +2,12 @@ name: Production smoke monitor
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/production-smoke.mjs"
+      - "scripts/production-self-heal.mjs"
+      - ".github/workflows/production-smoke.yml"
   schedule:
     - cron: "17 */6 * * *"
 
