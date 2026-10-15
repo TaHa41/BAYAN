@@ -137,6 +137,18 @@ const staticPageContent:Record<string,{title:string;metaTitle?:string;descriptio
     paragraphs:["يُقدَّم محتوى بيان لأغراض المعرفة والتثقيف العام.","ينبغي للقارئ مراجعة الادعاءات المهمة بالرجوع إلى المصادر الأصلية وطلب المشورة المتخصصة عند الحاجة. وقد تكون الملخصات الإخبارية والشروحات المولدة بالذكاء الاصطناعي غير مكتملة أو تتغير عند ظهور أدلة جديدة.","لا تعتمد على بيان وحده لاتخاذ قرارات عاجلة أو قانونية أو طبية أو مالية. استخدم الخدمة وفق القانون، ولا تحاول تعطيلها أو إساءة استخدام معلومات الآخرين.","قد يربط بيان بمحتوى نشرته جهات خارجية أو يلخصه، وقد تتغير معلومات هذه الجهات أو تحتوي على أخطاء أو تستخدم تعريفات تختلف عن مصادر أخرى. ولا يضمن الموقع أن كل مادة مكتملة أو محدثة أو مناسبة لقرار بعينه. وينبغي للمستخدم احترام القانون وحقوق الغير، وتجنب إرسال البيانات الشخصية الحساسة، والإبلاغ عن الأخطاء الجوهرية عبر وسيلة التواصل المتاحة."]
   }
 };
+if(path==="/"&&!section){
+  const homeTitle=lang==="en"?"Latest knowledge articles | BAYAN":"أحدث المقالات المعرفية | بيان";
+  const homeDescription=lang==="en"?"Explore recent source-aware explainers from BAYAN. Each article links directly to its full page and supporting context.":"استكشف أحدث الشروحات المعرفية في بيان، مع روابط مباشرة إلى المقالات الكاملة وسياقها ومصادرها.";
+  try{
+    const rows=await env.DB.prepare("SELECT slug,title,summary,image_url,image_alt FROM articles WHERE language=? AND status='PUBLISHED' AND slug IS NOT NULL AND title IS NOT NULL ORDER BY updated_at DESC LIMIT 8").bind(lang).all<any>();
+    const cards=(rows.results||[]).filter((row:any)=>row.slug&&row.title).map((row:any)=>'<article class="seo-content-item">'+(safePublicImageUrl(row.image_url)?'<figure class="seo-content-image"><img src="'+seoEscape(safePublicImageUrl(row.image_url))+'" alt="'+seoEscape(row.image_alt||row.title)+'" loading="lazy" decoding="async"></figure>':"")+'<h2><a href="/article/'+encodeURIComponent(String(row.slug))+'?lang='+lang+'">'+seoEscape(row.title)+'</a></h2>'+(row.summary?'<p>'+seoEscape(String(row.summary).slice(0,700))+'</p>':"")+'</article>').join("");
+    seoFallback='<section class="seo-content-fallback seo-home-featured"><h1>'+seoEscape(homeTitle)+'</h1><p>'+seoEscape(homeDescription)+'</p><div class="seo-content-grid">'+(cards||'<p>'+seoEscape(lang==="en"?"New reviewed articles are being prepared.":"يجري تجهيز مقالات جديدة للمراجعة.")+'</p>')+'</div><p><a href="/science?lang='+lang+'">'+seoEscape(lang==="en"?"Explore all knowledge sections":"استكشف جميع أقسام المعرفة")+'</a></p></section>';
+    title=homeTitle;
+    description=homeDescription;
+    headExtras+='<script type="application/ld+json">'+JSON.stringify({"@context":"https://schema.org","@type":"CollectionPage","name":homeTitle,"description":homeDescription,"inLanguage":lang,"url":ORIGIN+(lang==="en"?"/?lang=en":"/")})+'</script>';
+  }catch{}
+}
 const staticPage=staticPageContent[path];
 if(staticPage){
   title=(staticPage.metaTitle||staticPage.title)+" | BAYAN";
