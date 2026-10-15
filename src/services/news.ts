@@ -131,7 +131,7 @@ const readFeed = async (name: string, url: string): Promise<Story[]> => {
     }
     // RSS uses <item>; Atom uses <entry>. Parse both so feeds do not silently
     // become empty just because a publisher changed its feed format.
-    const entries = [...xml.matchAll(/<(item|entry)\b[\s\S]*?<\/\1>/gi)].slice(0, 16);
+    const entries = [...xml.matchAll(/<(item|entry)\b[\s\S]*?<\/\1>/gi)].slice(0, 12);
     return entries.map((match) => {
       const item = match[0];
       const tag = (...names: string[]) => {
@@ -661,7 +661,7 @@ export async function news(env: Env, lang: Locale, options: {forceRefresh?:boole
       })),
     };
   }
-  const providers = feeds(lang);
+  const providers = feeds(lang).slice(0, 4);
   const batches = await Promise.all(
     providers.map(([name, url]) => readFeed(name, url)),
   );
@@ -684,14 +684,12 @@ export async function news(env: Env, lang: Locale, options: {forceRefresh?:boole
   // together. Serial retries repeatedly queried Google News and could exhaust the
   // Worker time budget before any stories reached the page.
   if (all.length < 3) {
-    const [google, gdelt, aiSearch, bing, direct] = await Promise.all([
+    const [google, aiSearch, bing] = await Promise.all([
       lang === "ar" ? googleArabicFallback() : googleEnglishFallback(),
-      gdeltFallback(lang),
       aiSearchNews(env, lang),
       bingNewsFallback(lang),
-      directNewsPageFallback(lang),
     ]);
-    const fallback = [...google, ...gdelt, ...aiSearch, ...bing, ...direct]
+    const fallback = [...google, ...aiSearch, ...bing]
       .filter((story) => lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title))
       .map((story) => ({ ...story, summary: languageSafeText(story.summary, lang) ? story.summary : "" }))
       .filter(isFreshNews);
@@ -741,10 +739,10 @@ export async function news(env: Env, lang: Locale, options: {forceRefresh?:boole
     // then search the publisher page and topic-specific image providers.
     if (isUsableNewsImage(story.imageUrl)) return story;
     // Keep publisher-image fetches bounded so feed refresh stays within Worker limits.
-    if (index >= 6) return story;
+    if (index >= 3) return story;
     const direct = await sourceImage(story.url);
     if (isUsableNewsImage(direct)) return { ...story, imageUrl: direct, imageAlt: story.imageAlt || story.title };
-    if (index < 4) {
+    if (index < 2) {
       const image = await findRelatedImage(story.title, story.url);
       if (isUsableNewsImage(image)) return { ...story, imageUrl: image, imageAlt: story.title };
     }
