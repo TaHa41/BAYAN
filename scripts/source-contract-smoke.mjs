@@ -234,4 +234,5 @@ for (const [name, ok] of checks) {
   if (!ok) failed++;
 }
 if (failed) process.exit(1);
+  ["gold quote stops at first successful provider and keeps chart payloads daily", read("src/services/live.ts").includes("for(const [name,url] of providers)") && !read("src/services/live.ts").includes("Promise.any(providers.map") && read("src/services/live.ts").includes("?range=1d&interval=1d") && read("src/services/live.ts").includes("markets:[]")],
 console.log("BAYAN source contract checks passed");
