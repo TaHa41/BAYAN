@@ -681,8 +681,14 @@ export async function news(env: Env, lang: Locale) {
   const finalStories = enriched
     .filter((story) => isUsableNewsImage(story.imageUrl))
     .map((story) => ({ ...story, publisher: localizedPublisher(story.publisher, lang), summary: languageSafeText(story.summary, lang) ? story.summary : "" }));
-  // Keep a durable archive separate from the short-lived latest-news cache.
-  await archiveNewsStories(env, lang, finalStories);
+  // Archive eligible dated stories even if no usable image was found. Missing images
+  // should not erase a real story from the historical archive.
+  const archiveCandidates = enriched
+    .filter((story) => story.title && story.url && /^https:\/\//i.test(story.url) &&
+      (lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title)) &&
+      Boolean(story.publishedAt) && Number.isFinite(Date.parse(String(story.publishedAt))) &&
+      Date.parse(String(story.publishedAt)) <= Date.now() + 5 * 60 * 1000);
+  await archiveNewsStories(env, lang, archiveCandidates);
 
   const cached = await readNewsCache(env, lang);
   // Keep a healthy cache behind the live providers. If providers return nothing
