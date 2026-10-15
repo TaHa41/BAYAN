@@ -307,7 +307,12 @@ try{return await page(request,env)}catch(error){const message=String((error as a
   }else if(task===1){
     try{
       const result=await publishNextArchivedNewsArticle(env);
-      if(result.status!=="idle")console.info("news_archive_article_generation",JSON.stringify(result));
+      if(result.status!=="idle"){
+        const level=result.status==="published"?"INFO":"WARN";
+        const details=JSON.stringify(result).slice(0,900);
+        try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind(level,"news_archive_article_generation",details,new Date().toISOString()).run()}catch{}
+        console.info("news_archive_article_generation",details);
+      }
     }catch(error){
       try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","news_archive_article_generation",String(error).slice(0,350),new Date().toISOString()).run()}catch{}
     }
