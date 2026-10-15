@@ -240,11 +240,12 @@ export async function api(request:Request,env:Env){const u=new URL(request.url),
 }if(u.pathname==="/api/news/archive"){
   const q=clean(u.searchParams.get("q")||"",300);
   const section=clean(u.searchParams.get("section")||"news",80);
+  const archiveId=Math.max(0,Number(u.searchParams.get("id")||0));
   const limit=Math.max(1,Math.min(50,Number(u.searchParams.get("limit")||24)));
   const like="%"+q.replace(/[%_]/g,"")+"%";
   try{
-    const rows=await env.DB.prepare("SELECT id,url,language,title,summary,publisher,published_at,image_url,image_alt,section,fetched_at FROM news_archive WHERE language=? AND section=? AND (?='' OR title LIKE ? OR summary LIKE ?) ORDER BY COALESCE(published_at,fetched_at) DESC LIMIT ?")
-      .bind(lang,section,q,like,like,limit).all<any>();
+    const rows=await env.DB.prepare("SELECT id,url,language,title,summary,publisher,published_at,image_url,image_alt,section,fetched_at FROM news_archive WHERE language=? AND section=? AND (?='' OR title LIKE ? OR summary LIKE ?) AND (?=0 OR id=?) ORDER BY COALESCE(published_at,fetched_at) DESC LIMIT ?")
+      .bind(lang,section,q,like,like,archiveId,archiveId,limit).all<any>();
     const items=(rows.results||[]).map((row:any)=>({id:Number(row.id),title:String(row.title||""),summary:String(row.summary||""),url:String(row.url||""),publisher:String(row.publisher||""),publishedAt:row.published_at||null,imageUrl:safePublicImageUrl(row.image_url),imageAlt:String(row.image_alt||row.title||""),section:String(row.section||"news"),language:lang,archivedAt:String(row.fetched_at||""),sources:[{title:String(row.title||""),publisher:String(row.publisher||""),url:String(row.url||""),publishedAt:row.published_at||undefined,imageUrl:safePublicImageUrl(row.image_url)}]}));
     return json({ok:true,language:lang,section,items,count:items.length});
   }catch(error){
