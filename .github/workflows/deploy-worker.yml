@@ -11,7 +11,7 @@ permissions:
 # Serialize the entire release, including post-deploy smoke and repair verification.
 # A newer deployment must not replace the revision while the previous revision is being verified.
 concurrency:
-  group: bayan-production-release-v4
+  group: bayan-production-search-checks
   cancel-in-progress: false
 
 jobs:
@@ -54,12 +54,8 @@ jobs:
 
 
   verify-production:
-    # Keep only the newest verification active; concurrent full smoke runs can rate-limit public search providers.
+    # The workflow-level shared lock serializes deployment and all production smoke checks.
     needs: deploy
-    concurrency:
-      group: bayan-production-search-checks
-      # Do not cancel verification of a deployed revision when another commit arrives.
-      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
