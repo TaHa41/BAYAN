@@ -1,6 +1,7 @@
 import type {Env,Locale} from "../types";
 import {search} from "./search";
 
+// One bounded, evidence-gated article attempt per cron tick keeps the Worker responsive.
 export async function publishNextArchivedNewsArticle(env:Env){
   const now=Date.now();
   const cutoff=new Date(now-48*60*60*1000).toISOString();
