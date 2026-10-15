@@ -2,29 +2,25 @@ name: Production smoke monitor
 
 on:
   workflow_dispatch:
-  push:
+  workflow_run:
+    workflows: ["BAYAN Worker Deploy"]
+    types: [completed]
     branches: [main]
-    paths:
-      - "scripts/production-smoke.mjs"
-      - "scripts/production-self-heal.mjs"
-      - "src/**"
-      - "public/**"
-      - "migrations_v1/**"
-      - "wrangler.jsonc"
-      - "package.json"
-      - "package-lock.json"
   schedule:
     - cron: "17 */6 * * *"
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
-  group: bayan-production-release-v4
+  # Keep monitoring runs out of the deploy lock; the workflow_run trigger executes after deployment.
+  group: bayan-production-smoke-v4
   cancel-in-progress: false
 
 jobs:
   production-smoke:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     name: Verify deployed BAYAN
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -35,6 +31,21 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 24
+      - name: Wait until no production deployment is active
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in $(seq 1 60); do
+            active=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/deploy-worker.yml/runs?per_page=20" --jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress")] | length')
+            if [[ "$active" -eq 0 ]]; then
+              echo "No active deployment; safe to run smoke tests."
+              exit 0
+            fi
+            echo "A production deployment is active; waiting before smoke tests."
+            sleep 10
+          done
+          echo "::error::Timed out waiting for the production deployment to finish."
+          exit 1
       - name: Run deployed-site smoke tests
         env:
           BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
