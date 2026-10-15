@@ -42,17 +42,17 @@ const NEWS_PUBLISHER_HOSTS=new Set([
   "abcnews.go.com","thetimes.com","ft.com","bloomberg.com","ap.org"
 ]);
 const hostname=(value:unknown)=>{
-  try{return new URL(String(value||"")).hostname.toLowerCase().replace(/^www\\./,"")}
+  try{return new URL(String(value||"")).hostname.toLowerCase().replace(/^www\./,"")}
   catch{return ""}
 };
 const bodyText=(value:unknown)=>String(value||"")
-  .replace(/<script\\b[\\s\\S]*?<\\/script>/gi," ")
-  .replace(/<style\\b[\\s\\S]*?<\\/style>/gi," ")
+  .replace(/<script\b[\s\S]*?<\/script>/gi," ")
+  .replace(/<style\b[\s\S]*?<\/style>/gi," ")
   .replace(/<[^>]*>/g," ")
   .replace(/&nbsp;/gi," ")
   .replace(/&amp;/gi,"&")
   .replace(/&(?:quot|apos|lt|gt);/gi," ")
-  .replace(/\\s+/g," ").trim();
+  .replace(/\s+/g," ").trim();
 
 export async function newsSitemap(env:Env){
   const now=Date.now();
