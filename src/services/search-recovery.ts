@@ -203,8 +203,8 @@ export async function externalSearchRecovery(query: string, language: Locale): P
 
   await runBatch(q);
   if (!results.some(item => relevant(item.title, item.summary, q))) {
-    const compact = normalize(q).split(" ").filter(Boolean).slice(0, 6).join(" ");
-    if (compact && compact !== normalize(q)) await runBatch(compact, true);
+    const compact = termsOf(q).slice(0, 6).join(" ");
+    if (compact && compact !== normalize(q)) await runBatch(compact);
   }
 
   const filtered = results
