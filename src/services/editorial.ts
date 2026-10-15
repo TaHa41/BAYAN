@@ -83,7 +83,9 @@ const templates:Record<string,{ar:string;en:string}>={
 
 export function articlePromptForTopic(title:string,language:Locale,evidence:SearchResult[]=[]){
  const evidenceText=evidence.slice(0,8).map(item=>String(item.title||"")+" "+String(item.summary||"")).join(" ");
- const section=sectionForOpenedStory(title,evidenceText);
+ const inferred=sectionForOpenedStory(title,evidenceText);
+ const healthEvidence=/(?:health|medical|medicine|hospital|disease|vaccine|doctor|symptom|treatment|clinical trial|hypertension|blood pressure|cardiology|ضغط الدم|ارتفاع ضغط الدم|صحة|طب|مستشفى|مرض|لقاح|طبيب|أعراض|علاج|تجربة سريرية|دواء|وقاية)/i.test(normalized(title+" "+evidenceText));
+ const section=healthEvidence?"health":inferred;
  const lang=language==="ar"?"ar":"en";
  const structure=(templates[section]||templates.world)[lang];
  const lead=lang==="ar"
