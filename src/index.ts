@@ -144,8 +144,9 @@ if(path==="/"&&!section){
     const rows=await env.DB.prepare("SELECT slug,title,summary,image_url,image_alt FROM articles WHERE language=? AND status='PUBLISHED' AND slug IS NOT NULL AND title IS NOT NULL ORDER BY updated_at DESC LIMIT 8").bind(lang).all<any>();
     const cards=(rows.results||[]).filter((row:any)=>row.slug&&row.title).map((row:any)=>'<article class="seo-content-item">'+(safePublicImageUrl(row.image_url)?'<figure class="seo-content-image"><img src="'+seoEscape(safePublicImageUrl(row.image_url))+'" alt="'+seoEscape(row.image_alt||row.title)+'" loading="lazy" decoding="async"></figure>':"")+'<h2><a href="/article/'+encodeURIComponent(String(row.slug))+'?lang='+lang+'">'+seoEscape(row.title)+'</a></h2>'+(row.summary?'<p>'+seoEscape(String(row.summary).slice(0,700))+'</p>':"")+'</article>').join("");
     seoFallback='<section class="seo-content-fallback seo-home-featured"><h1>'+seoEscape(homeTitle)+'</h1><p>'+seoEscape(homeDescription)+'</p><div class="seo-content-grid">'+(cards||'<p>'+seoEscape(lang==="en"?"New reviewed articles are being prepared.":"يجري تجهيز مقالات جديدة للمراجعة.")+'</p>')+'</div><p><a href="/science?lang='+lang+'">'+seoEscape(lang==="en"?"Explore all knowledge sections":"استكشف جميع أقسام المعرفة")+'</a></p></section>';
+    title=homeTitle;
     description=homeDescription;
-    headExtras+='<script type="application/ld+json">'+JSON.stringify({"@context":"https://schema.org","@type":"CollectionPage","name":homeTitle,"description":homeDescription,"inLanguage":lang,"url":ORIGIN+"/?lang="+lang})+'</script>';
+    headExtras+='<script type="application/ld+json">'+JSON.stringify({"@context":"https://schema.org","@type":"CollectionPage","name":homeTitle,"description":homeDescription,"inLanguage":lang,"url":ORIGIN+(lang==="en"?"/?lang=en":"/")})+'</script>';
   }catch{}
 }
 const staticPage=staticPageContent[path];
