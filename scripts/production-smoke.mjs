@@ -78,7 +78,7 @@ try{
   const newsLocs=[...newsMap.text.matchAll(/<loc>(.*?)<\/loc>/g)].map(match=>match[1]);
   if(newsLocs.some(url=>!url.includes("/article/")))throw new Error("news_sitemap_url_is_not_full_article");
   if(newsLocs.length!==new Set(newsLocs).size)throw new Error("news_sitemap_duplicate_article_urls");
-  if(!/<urlset\\b[^>]*xmlns:news="http:\/\/www\\.google\\.com\/schemas\/sitemap-news\/0\\.9"/.test(newsMap.text))throw new Error("news_sitemap_namespace_missing");
+  if(!/<urlset\b[^>]*xmlns:news="http:\/\/www\.google\.com\/schemas\/sitemap-news\/0\.9"/.test(newsMap.text))throw new Error("news_sitemap_namespace_missing");
   const eligibleHeader=Number(newsMap.headers.get("x-bayan-news-sitemap-eligible-count"));
   const candidateHeader=Number(newsMap.headers.get("x-bayan-news-sitemap-candidate-count"));
   if(!Number.isInteger(eligibleHeader)||eligibleHeader!==newsLocs.length)throw new Error("news_sitemap_eligible_count_header_mismatch");
