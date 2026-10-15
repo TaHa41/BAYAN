@@ -15,7 +15,7 @@ describe("newsSitemap database failure handling", () => {
     } finally { errorSpy.mockRestore(); }
   });
 
-  it("includes recent substantial archived news using BAYAN archive time, without requiring two publisher labels", async () => {
+  it("reports fresh archive candidates without treating summary-only archive pages as full news articles", async () => {
     const fetchedAt = new Date(Date.now() - 20 * 60 * 1000).toISOString();
     const sourcePublished = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     const env = { DB: { prepare: (sql:string) => ({ all: async () => sql.includes("FROM news_archive") ? ({results:[
@@ -25,10 +25,11 @@ describe("newsSitemap database failure handling", () => {
     const response = await newsSitemap(env);
     const body = await response.text();
     expect(response.status).toBe(200);
-    expect(body).toContain("/news?archive=42&amp;lang=en");
-    expect(body).toContain("<news:title>A substantial current news report</news:title>");
+    expect(body).not.toContain("archive=42");
+    expect(body).not.toContain("<news:title>A substantial current news report</news:title>");
     expect(body).not.toContain("archive=43");
-    expect(response.headers.get("x-bayan-news-sitemap-archive-eligible-count")).toBe("1");
+    expect(response.headers.get("x-bayan-news-sitemap-archive-ready-for-drafting-count")).toBe("1");
+    expect(response.headers.get("x-bayan-news-sitemap-eligible-count")).toBe("0");
   });
 
   it("returns valid empty XML only when the database query succeeds with no eligible articles", async () => {
