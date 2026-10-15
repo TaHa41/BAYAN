@@ -28,7 +28,7 @@ describe("newsSitemap database failure handling", () => {
     expect(body).not.toContain("archive=42");
     expect(body).not.toContain("<news:title>A substantial current news report</news:title>");
     expect(body).not.toContain("archive=43");
-    expect(response.headers.get("x-bayan-news-sitemap-archive-eligible-count")).toBe("1");
+    expect(response.headers.get("x-bayan-news-sitemap-archive-ready-for-drafting-count")).toBe("1");
     expect(response.headers.get("x-bayan-news-sitemap-eligible-count")).toBe("0");
   });
 
