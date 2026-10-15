@@ -585,7 +585,7 @@
       const archiveId = Number(params.get("archive") || 0);
       if (archiveId && output) {
         try {
-          const archived = await api("/api/news/archive?lang=" + lang + "&id=" + archiveId + "&limit=1");
+          const archived = await api("/api/news/archive?lang=" + lang + "&section=all&id=" + archiveId + "&limit=1");
           const item = (archived.items || [])[0];
           if (item) {
             output.className = "results";
@@ -650,7 +650,7 @@
           "No news provider returned a story right now. BAYAN will not invent news.") + "</div>";
       if (items.length) hydrateSectionImages(items);
       try {
-        const archived = await api("/api/news/archive?lang=" + lang + "&limit=24");
+        const archived = await api("/api/news/archive?lang=" + lang + "&section=all&limit=24");
         const archiveItems = (archived.items || []).filter((item) => !items.some((latest) => String(latest.title || "").trim().toLowerCase() === String(item.title || "").trim().toLowerCase()));
         if (archiveItems.length && output) {
           output.insertAdjacentHTML("afterend", '<div class="section-intro"><h2>' + t("أرشيف الأخبار", "News archive") + '</h2><p>' + t("أخبار محفوظة للرجوع إليها، مع الاحتفاظ بتاريخ نشرها الأصلي.", "Previously published stories preserved with their original publication dates.") + '</p></div><div class="article-grid">' +
