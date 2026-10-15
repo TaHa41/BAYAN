@@ -1,4 +1,5 @@
 import type { Env, Locale, SearchResult } from "../types";
+import { safePublicImageUrl } from "../image-url";
 
 let cachedAccessToken = "";
 let accessTokenExpiresAt = 0;
@@ -62,7 +63,8 @@ export async function searchWikimediaEnterprise(
       if (!article || !article.name) return null;
       const abstract = clean(article.abstract || "");
       const body = clean(article.article_body || "");
-      const summary = (abstract || body).slice(0, 1800);
+      const summary = (abstract || body).slice(0, 5000);
+      const imageUrl = safePublicImageUrl(article.image?.content_url || article.image?.url || article.image?.thumbnail?.url || article.thumbnail?.url);
       if (!summary) return null;
       const url = /^https:\/\//i.test(String(article.url || "")) ? String(article.url) : "https://" + (language === "ar" ? "ar" : "en") + ".wikipedia.org/wiki/" + encodeURIComponent(String(article.name).replace(/ /g, "_"));
       const result: SearchResult & { score?: number; provider?: string } = {
@@ -71,7 +73,9 @@ export async function searchWikimediaEnterprise(
         section: "world",
         kind: "web",
         evidence: "mixed",
-        sources: [{ title: clean(article.name), publisher: language === "ar" ? "ويكيميديا إنتربرايز" : "Wikimedia Enterprise", url }],
+        sources: [{ title: clean(article.name), publisher: language === "ar" ? "ويكيميديا إنتربرايز" : "Wikimedia Enterprise", url, imageUrl }],
+        imageUrl,
+        imageAlt: clean(article.name),
         url
       };
       return result;
