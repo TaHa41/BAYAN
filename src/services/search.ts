@@ -545,15 +545,15 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   // when evidence is still sparse. This avoids unnecessary provider load while
   // keeping the worst-case recovery window short enough for the browser request.
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,3);
-  const labels=["Wikipedia REST Search","GDELT","Google News Search","DuckDuckGo Web Search","Bing Web Search","Bing Web RSS"];
+  const labels=["Wikipedia REST Search","GDELT","Google News Search","Bing Web Search"];
   const runVariant=async(variant:string,variantIndex:number):Promise<Candidate[]>=>{
+    // Keep per-request provider fan-out bounded. Running six HTML/RSS parsers
+    // for each variant caused Cloudflare Worker resource-limit errors under load.
     const results=await Promise.all([
       wikipediaRestSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Wikipedia REST Search",error);return[]}),
       gdelt(variant,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"GDELT",error);return[]}),
       googleNewsSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Google News Search",error);return[]}),
-      duckWebSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"DuckDuckGo Web Search",error);return[]}),
-      bingWebSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing Web Search",error);return[]}),
-      bingWebRssSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing Web RSS",error);return[]})
+      bingWebSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing Web Search",error);return[]})
     ]);
     diagnostics.push("Expanded variant "+(variantIndex+1)+" result counts: "+labels.map((label,index)=>label+"="+(results[index]?.length||0)).join(", "));
     return results.flat();
@@ -567,8 +567,17 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
       catch{return ""}
     })).filter(host=>host&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/.test(host)));
     if(!(recovered.length>=6&&hosts.size>=3)&&uniqueVariants.length>1){
-      const remaining=await Promise.all(uniqueVariants.slice(1).map((variant,offset)=>runVariant(variant,offset+1)));
-      batches.push(...remaining);
+      // Retry alternate phrasings sequentially to avoid multiplying simultaneous
+      // outbound requests when the first pass is already resource-constrained.
+      for(let index=1;index<uniqueVariants.length;index++){
+        batches.push(await runVariant(uniqueVariants[index],index));
+        const accumulated=batches.flat().filter(item=>relevantCandidate(item,q)&&languageSafe(item,language));
+        const accumulatedHosts=new Set(accumulated.flatMap(item=>(item.sources||[]).map(src=>{
+          try{return new URL(String(src.url||"")).hostname.toLowerCase().replace(/^www\./,"")}
+          catch{return ""}
+        })).filter(host=>host&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/.test(host)));
+        if(accumulated.length>=6&&accumulatedHosts.size>=3)break;
+      }
     }
   }
   return batches.flat().map(item=>identityAliases.length?({...item,identityAliases:[...identityAliases]}):item);
@@ -659,8 +668,8 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const providerDiagnostics:string[]=[];const safe=async<T>(task:Promise<T>,fallback:T,provider="external provider"):Promise<T>=>{try{return await task}catch(error){reportProviderFailure(providerDiagnostics,provider,error);return fallback}};const academicQuery=/(research|paper|papers|study|studies|journal|doi|scholar|academic|citation|crossref|openalex|pubmed|clinical trial|systematic review|بحث علمي|أبحاث|دراسة|دراسات|مجلة علمية|ورقة بحثية|مصدر أكاديمي|دراسات سريرية|مراجعة منهجية)/i.test(q);
 const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|medicine|health study|بحث طبي|دراسة طبية|دراسات سريرية|تجربة سريرية|مراجعة منهجية)/i.test(q);
-let [local, wiki, wikiRest, wd, gd, oa, remote, dd, duckWeb, bingWeb, google, bing, crossref, pubmed] = await Promise.all([safe(searchArticles(env,q,language,max),[],"BAYAN Knowledge Base"),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language,providerDiagnostics),[],"Wikipedia"),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipediaRestSearch(q,language,providerDiagnostics),[],"Wikipedia REST Search"),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language,providerDiagnostics),[],"Wikidata"),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q,providerDiagnostics),[],"GDELT"),safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q,providerDiagnostics),[],"OpenAlex"),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q,providerDiagnostics),[],"Cloudflare AI Search"),safe(duck(q,language,providerDiagnostics),[],"DuckDuckGo Instant Answers"),safe(duckWebSearch(q,language,providerDiagnostics),[],"DuckDuckGo Web Search"),safe(bingWebSearch(q,language,providerDiagnostics),[],"Bing Web Search"),safe(googleNewsSearch(q,language,providerDiagnostics),[],"Google News Search"),safe(bingNewsSearch(q,language,providerDiagnostics),[],"Bing News RSS"),safe((academicQuery&&!personLookup(q))?crossrefSearch(q,providerDiagnostics):Promise.resolve([]),[],"Crossref"),safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language,providerDiagnostics),[],"PubMed / NCBI")]);
-const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...(s.source_gdelt==="0"?[]:["GDELT"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers","DuckDuckGo Web Search","Bing Web Search","Bing Web RSS Search","Google News Search","Bing News RSS"];providerAttempted.push(...providerDiagnostics);const candidates:Candidate[]=[
+let [local, wiki, wikiRest, wd, gd, oa, remote, dd, duckWeb, bingWeb, google, bing, crossref, pubmed] = await Promise.all([safe(searchArticles(env,q,language,max),[],"BAYAN Knowledge Base"),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language,providerDiagnostics),[],"Wikipedia"),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipediaRestSearch(q,language,providerDiagnostics),[],"Wikipedia REST Search"),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language,providerDiagnostics),[],"Wikidata"),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q,providerDiagnostics),[],"GDELT"),safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q,providerDiagnostics),[],"OpenAlex"),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q,providerDiagnostics),[],"Cloudflare AI Search"),safe(duck(q,language,providerDiagnostics),[],"DuckDuckGo Instant Answers"),Promise.resolve([]),safe(bingWebSearch(q,language,providerDiagnostics),[],"Bing Web Search"),safe(googleNewsSearch(q,language,providerDiagnostics),[],"Google News Search"),Promise.resolve([]),safe((academicQuery&&!personLookup(q))?crossrefSearch(q,providerDiagnostics):Promise.resolve([]),[],"Crossref"),safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language,providerDiagnostics),[],"PubMed / NCBI")]);
+const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...(s.source_gdelt==="0"?[]:["GDELT"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers","Bing Web Search","Google News Search"];providerAttempted.push(...providerDiagnostics);const candidates:Candidate[]=[
     ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wikiRest,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...duckWeb,...bingWeb,...google,...bing
   ];
   // Optional authenticated Enterprise enrichment: exact-title article lookups only.
