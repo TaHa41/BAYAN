@@ -153,6 +153,36 @@ async function newsRss(query: string, language: Locale, provider: "Google News" 
   return results;
 }
 
+async function duckDuckGoHtml(query: string, language: Locale): Promise<SearchResult[]> {
+  // Instant Answers can be empty for ordinary queries; use the independent HTML
+  // results endpoint as a bounded general-purpose recovery provider.
+  const url = "https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query);
+  const response = await timedFetch(url, 4600);
+  const html = (await response.text()).slice(0, 900_000);
+  const anchors = [...html.matchAll(/<a\b[^>]*class=["'][^"']*result__a[^"']*["'][^>]*>[\s\S]*?<\/a>/gi)];
+  const output: SearchResult[] = [];
+  for (const match of anchors) {
+    const anchor = match[0];
+    const rawHref = anchor.match(/\bhref=["']([^"']+)["']/i)?.[1] || "";
+    const rawTitle = anchor.replace(/^.*?>/s, "").replace(/<\/a>\s*$/i, "");
+    let target = clean(rawHref);
+    try {
+      const parsed = new URL(target, "https://duckduckgo.com");
+      const redirected = parsed.searchParams.get("uddg");
+      if (redirected) target = decodeURIComponent(redirected);
+    } catch {}
+    try { if (new URL(target).protocol !== "https:" || /(^|\.)duckduckgo\.com$/i.test(new URL(target).hostname)) continue; }
+    catch { continue; }
+    const after = html.slice((match.index || 0) + anchor.length, (match.index || 0) + anchor.length + 2400);
+    const rawSnippet = after.match(/class=["'][^"']*result__snippet[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i)?.[1] || "";
+    const host = new URL(target).hostname.replace(/^www\./, "");
+    const item = makeResult(rawTitle, rawSnippet, target, host, "DuckDuckGo Web Search", language, "world");
+    if (item) output.push(item);
+    if (output.length >= 8) break;
+  }
+  return output;
+}
+
 async function gdelt(query: string, language: Locale): Promise<SearchResult[]> {
   const url = "https://api.gdeltproject.org/api/v2/doc/doc?query=" + encodeURIComponent(query) + "&mode=artlist&maxrecords=8&format=json&sort=HybridRel";
   const response = await timedFetch(url, 4200);
@@ -177,6 +207,7 @@ export async function externalSearchRecovery(query: string, language: Locale): P
     ["Wikimedia REST", () => wikipediaRest(q, language)],
     ["Google News RSS", () => newsRss(q, language, "Google News")],
     ["Bing News RSS", () => newsRss(q, language, "Bing News")],
+    ["DuckDuckGo Web Search", () => duckDuckGoHtml(q, language)],
     ["GDELT", () => gdelt(q, language)]
   ];
   const settled = await Promise.allSettled(tasks.map(([, run]) => run()));
