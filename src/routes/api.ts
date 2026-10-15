@@ -340,7 +340,7 @@ if(items.length<2&&section!=="prices"){
   items=[...items,...cachedEvidence];
   const refreshed=await listArticles(env,section,lang,24);
   const existingSlugs=new Set(items.map((x:any)=>String(x.slug||"")).filter(Boolean));
-  const refreshedComplete=refreshed.filter((x:any)=>x.slug&&!existingSlugs.has(String(x.slug))&&articleBodyQuality(String(x.body||"")).ok&&localeSafeItem(x)&&String(x.section||"")===section&&/^https:\\/\\//i.test(String(x.imageUrl||"")));
+  const refreshedComplete=refreshed.filter((x:any)=>x.slug&&!existingSlugs.has(String(x.slug))&&articleBodyQuality(String(x.body||"")).ok&&localeSafeItem(x)&&String(x.section||"")===section&&/^https:\/\//i.test(String(x.imageUrl||"")));
   items=[...items,...refreshedComplete];
  }catch{}
 }
