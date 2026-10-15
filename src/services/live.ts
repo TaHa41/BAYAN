@@ -58,7 +58,7 @@ async function cryptoQuote(symbol:string,id:string,pair:string){
   return coingecko||binance;
 }
 async function marketQuote(symbol:string){
-  const yahooHosts=["query1.finance.yahoo.com","query2.finance.yahoo.com"];
+  const yahooHosts=["query1.finance.yahoo.com"]; // Avoid duplicate quote requests per symbol; fallback providers run only if needed.
   const yahoo=await Promise.all(yahooHosts.map(async host=>{
     try{
       const r=await timeout("https://"+host+"/v8/finance/chart/"+encodeURIComponent(symbol)+"?range=1d&interval=5m",3500);
