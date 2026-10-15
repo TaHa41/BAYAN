@@ -345,11 +345,6 @@ async function bingWebRssSearch(q:string,language:Locale,diagnostics?:string[]):
     return out;
   }catch(error){reportProviderFailure(diagnostics,"Bing Web RSS",error);return[]}
 }
-async function broadGdelt(q:string):Promise<Candidate[]>{
-  const variants=[...new Set([q,q.split(/\s+/).slice(0,6).join(" "),q.split(/\s+/).slice(0,3).join(" ")].filter(Boolean))];
-  const batches=await Promise.all(variants.map(v=>gdelt(v).catch(()=>[])));
-  return batches.flat().slice(0,12);
-}
 const normalizedEntityTitle=(value:string)=>String(value||"").normalize("NFKC").toLowerCase()
   .replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").trim();
 const personQueryName=(query:string)=>String(query||"").trim()
