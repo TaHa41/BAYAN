@@ -545,15 +545,15 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   // when evidence is still sparse. This avoids unnecessary provider load while
   // keeping the worst-case recovery window short enough for the browser request.
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,3);
-  const labels=["Wikipedia REST Search","GDELT","Google News Search","DuckDuckGo Web Search","Bing Web Search","Bing Web RSS"];
+  const labels=["Wikipedia REST Search","GDELT","Google News Search","Bing Web Search"];
   const runVariant=async(variant:string,variantIndex:number):Promise<Candidate[]>=>{
+    // Keep per-request provider fan-out bounded. Running six HTML/RSS parsers
+    // for each variant caused Cloudflare Worker resource-limit errors under load.
     const results=await Promise.all([
       wikipediaRestSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Wikipedia REST Search",error);return[]}),
       gdelt(variant,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"GDELT",error);return[]}),
       googleNewsSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Google News Search",error);return[]}),
-      duckWebSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"DuckDuckGo Web Search",error);return[]}),
-      bingWebSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing Web Search",error);return[]}),
-      bingWebRssSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing Web RSS",error);return[]})
+      bingWebSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing Web Search",error);return[]})
     ]);
     diagnostics.push("Expanded variant "+(variantIndex+1)+" result counts: "+labels.map((label,index)=>label+"="+(results[index]?.length||0)).join(", "));
     return results.flat();
@@ -567,8 +567,17 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
       catch{return ""}
     })).filter(host=>host&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/.test(host)));
     if(!(recovered.length>=6&&hosts.size>=3)&&uniqueVariants.length>1){
-      const remaining=await Promise.all(uniqueVariants.slice(1).map((variant,offset)=>runVariant(variant,offset+1)));
-      batches.push(...remaining);
+      // Retry alternate phrasings sequentially to avoid multiplying simultaneous
+      // outbound requests when the first pass is already resource-constrained.
+      for(let index=1;index<uniqueVariants.length;index++){
+        batches.push(await runVariant(uniqueVariants[index],index));
+        const accumulated=batches.flat().filter(item=>relevantCandidate(item,q)&&languageSafe(item,language));
+        const accumulatedHosts=new Set(accumulated.flatMap(item=>(item.sources||[]).map(src=>{
+          try{return new URL(String(src.url||"")).hostname.toLowerCase().replace(/^www\./,"")}
+          catch{return ""}
+        })).filter(host=>host&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/.test(host)));
+        if(accumulated.length>=6&&accumulatedHosts.size>=3)break;
+      }
     }
   }
   return batches.flat().map(item=>identityAliases.length?({...item,identityAliases:[...identityAliases]}):item);
