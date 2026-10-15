@@ -224,7 +224,7 @@ const checks = [
   ["RSS and Atom provider bodies are size-capped while their timeout remains active during streaming", read("src/services/news.ts").includes("const maxFeedBytes = 384 * 1024") && read("src/services/news.ts").includes("const reader = response.body.getReader()") && read("src/services/news.ts").includes("total > maxFeedBytes") && read("src/services/news.ts").includes("clearTimeout(timer)")],
   ["production smoke runs general searches sequentially and limits section-query concurrency", read("scripts/production-smoke.mjs").includes("inBatches(generalQueries,1,async item=>{") && read("scripts/production-smoke.mjs").includes("inBatches(sectionChecks,2,async({section,language})=>{")],
   ["owner and admin sessions are excluded from GA4 and private routes are excluded server-side", index.includes("document.cookie.split(\";\").some(function(v){return v.trim()===\"bayan_exclude_analytics=1\"})") && index.includes("headers.append(\"Set-Cookie\",\"bayan_exclude_analytics=1; Max-Age=31536000") && read("src/security.ts").includes("/^\\/(?:admin|review)(?:\\/|$)/.test(pathname)") && read("src/security.ts").includes("/^\\/api\\/admin(?:\\/|$)/.test(pathname)")],
-  ["Cloudflare Worker logs and traces redact query strings", read("wrangler.jsonc").includes("\"redact_query_string\":true")],
+  ["Cloudflare Worker logs and traces redact query strings", (()=>{const cfg=JSON.parse(read("wrangler.jsonc"));return cfg.observability?.redact_query_string===true&&cfg.observability?.logs?.enabled===true&&cfg.observability?.traces?.enabled===true})()],
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
