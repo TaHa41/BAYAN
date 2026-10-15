@@ -76,6 +76,7 @@ try{
   if(!newsLanding.text.includes('class="seo-content-image"'))throw new Error("news_landing_server_rendered_images_missing");
   if(newsMap.text.includes("/news?story="))throw new Error("news_sitemap_contains_summary_only_pages");
   const newsLocs=[...newsMap.text.matchAll(/<loc>(.*?)<\/loc>/g)].map(match=>match[1]);
+  if(newsLocs.length===0)throw new Error("news_sitemap_empty_no_recent_verified_news_articles");
   if(newsLocs.some(url=>!url.includes("/article/")))throw new Error("news_sitemap_url_is_not_full_article");
   if(newsLocs.length!==new Set(newsLocs).size)throw new Error("news_sitemap_duplicate_article_urls");
   if(!/<urlset\b[^>]*xmlns:news="http:\/\/www\.google\.com\/schemas\/sitemap-news\/0\.9"/.test(newsMap.text))throw new Error("news_sitemap_namespace_missing");
