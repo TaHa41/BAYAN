@@ -38,7 +38,7 @@ const timeout = async (url:string, ms=2600, diagnostics?:string[], provider="ext
       const bytes=new Uint8Array(total);
       let offset=0;
       for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
-      body=bytes.buffer;
+      body=bytes.buffer as ArrayBuffer;
     }else if(!bodyless){
       body=new ArrayBuffer(0);
     }
