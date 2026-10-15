@@ -88,16 +88,47 @@ const readFeed = async (name: string, url: string): Promise<Story[]> => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
     let response: Response;
+    let xml = "";
     try {
       response = await fetch(url, {
         signal: controller.signal,
         headers: { accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, */*", "user-agent": "BAYAN/1.3 (+https://bayan.tahaomar411.workers.dev)" },
       });
+      if (!response.ok) return [];
+      // RSS feeds are untrusted upstream payloads. Keep the abort timer active
+      // while consuming the body, and cap decompressed bytes before regex parsing.
+      const maxFeedBytes = 384 * 1024;
+      const declaredSize = Number(response.headers.get("content-length") || 0);
+      if (declaredSize > maxFeedBytes) {
+        await response.body?.cancel().catch(() => {});
+        return [];
+      }
+      if (response.body) {
+        const reader = response.body.getReader();
+        const chunks: Uint8Array[] = [];
+        let total = 0;
+        try {
+          while (true) {
+            const part = await reader.read();
+            if (part.done) break;
+            total += part.value.byteLength;
+            if (total > maxFeedBytes) {
+              await reader.cancel().catch(() => {});
+              return [];
+            }
+            chunks.push(part.value);
+          }
+        } finally {
+          reader.releaseLock();
+        }
+        const bytes = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+        xml = new TextDecoder().decode(bytes);
+      }
     } finally {
       clearTimeout(timer);
     }
-    if (!response.ok) return [];
-    const xml = await response.text();
     // RSS uses <item>; Atom uses <entry>. Parse both so feeds do not silently
     // become empty just because a publisher changed its feed format.
     const entries = [...xml.matchAll(/<(item|entry)\b[\s\S]*?<\/\1>/gi)].slice(0, 16);
