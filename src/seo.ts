@@ -60,9 +60,9 @@ const newsSitemapEligibility=(row:any,now:number)=>{
   return {eligible:true,reason:""};
 };
 const archiveArticleCandidate=(row:any,now:number)=>{
-  const title=String(row?.title||"").trim(),language=String(row?.language||""),summary=String(row?.summary||"").replace(/<script\\b[\\s\\S]*?<\\/script>/gi," ").replace(/<style\\b[\\s\\S]*?<\\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/\\s+/g," ").trim();
+  const title=String(row?.title||"").trim(),language=String(row?.language||""),summary=String(row?.summary||"").replace(/<script\b[\s\S]*?<\/script>/gi," ").replace(/<style\b[\s\S]*?<\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim();
   const publisher=String(row?.publisher||"").trim(),fetched=Date.parse(String(row?.fetched_at||""));
-  if(Number(row?.id)<1||title.length<8||(language!=="ar"&&language!=="en")||summary.length<120||!publisher)return false;
+  if(!Number.isInteger(Number(row?.id))||Number(row?.id)<1||title.length<8||(language!=="ar"&&language!=="en")||summary.length<120||!publisher)return false;
   if(!Number.isFinite(fetched)||fetched>now+5*60*1000||now-fetched>48*60*60*1000)return false;
   try{const source=new URL(String(row?.url||""));return source.protocol==="https:"&&!source.username&&!source.password}catch{return false}
 };
