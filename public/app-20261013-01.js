@@ -98,7 +98,12 @@
 
   const safeImageUrl = (value) => {
     const url = String(value || "");
-    return /^https:\/\/[^\s"'<>]+$/i.test(url) ? url : "";
+    if (!/^https:\/\/[^\s"'<>]+$/i.test(url)) return "";
+    try {
+      const host = new URL(url).hostname.toLowerCase().replace(/\.$/, "");
+      if (host === "googleusercontent.com" || host.endsWith(".googleusercontent.com") || host === "gstatic.com" || host.endsWith(".gstatic.com") || host === "news.google.com" || host.endsWith(".news.google.com")) return "";
+      return url;
+    } catch { return ""; }
   };
   const safeInternalHref = (value, fallback) => {
     const href = String(value || "");
