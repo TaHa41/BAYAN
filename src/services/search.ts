@@ -782,10 +782,8 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   // when primary retrieval lacks independent publishers, reducing work on healthy searches.
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
     const archiveNews=await safe(searchRecentNewsArchive(env,q,language),[],"BAYAN Recent News Archive");
-    if(archiveNews.length){
-      candidates.push(...archiveNews);
-      providerAttempted.push("BAYAN Recent News Archive");
-    }
+    providerAttempted.push("BAYAN Recent News Archive");
+    if(archiveNews.length)candidates.push(...archiveNews);
   }
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
     const diagnosticStart=providerDiagnostics.length;
