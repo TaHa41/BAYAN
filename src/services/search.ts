@@ -645,7 +645,40 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   // the mismatched summary below rather than discarding the entire source.
   const title=String(x.title||"");
   return language==="ar" ? hasArabic(title) : !hasArabic(title);
-};export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean;draft?:boolean;images?:boolean;background?:(task:Promise<unknown>)=>void}={}):Promise<SearchResponse>{
+};async function searchRecentNewsArchive(env:Env,q:string,language:Locale):Promise<Candidate[]>{
+  const cutoff=new Date(Date.now()-7*24*60*60*1000).toISOString();
+  const future=new Date(Date.now()+5*60*1000).toISOString();
+  try{
+    const terms=searchTerms(q).slice(0,3);
+    if(!terms.length)return[];
+    const predicates=terms.map(()=>"(title LIKE ? OR summary LIKE ?)").join(" OR ");
+    const patterns=terms.flatMap(term=>["%"+term+"%","%"+term+"%"]);
+    const response=await env.DB.prepare("SELECT title,summary,url,publisher,published_at,image_url,image_alt,section FROM news_archive WHERE language=? AND fetched_at>=? AND published_at>=? AND published_at<=? AND length(summary)>=80 AND ("+predicates+") ORDER BY fetched_at DESC LIMIT 60").bind(language,cutoff,cutoff,future,...patterns).all<any>();
+    const output:Candidate[]=[];
+    const seenPublishers=new Set<string>();
+    for(const row of response.results||[]){
+      const title=cleanText(String(row.title||""));
+      const summary=cleanText(String(row.summary||"")).slice(0,1200);
+      const url=String(row.url||"").trim();
+      if(!title||!summary||!/^https:\/\//i.test(url)||/\/videos?\/|youtube\.com|youtu\.be|vimeo\.com|^Watch:/i.test(url+" "+title))continue;
+      if(!languageSafe({title,summary} as Candidate,language)||!localeSafeText(summary,language))continue;
+      let host="";
+      try{const parsed=new URL(url);if(parsed.protocol!=="https:"||parsed.username||parsed.password)continue;host=parsed.hostname.toLowerCase().replace(/^www\./,"");}catch{continue;}
+      if(!host||/(?:^|\.)(?:bayan\.tahaomar411\.workers\.dev|wikipedia\.org|wikidata\.org|google\.com|googleusercontent\.com|bing\.com|duckduckgo\.com)$/i.test(host))continue;
+      const publisher=cleanText(String(row.publisher||host));
+      if(/google news|bing news|duckduckgo|wikipedia|wikidata|aggregator|ويكيبيديا|ويكي بيانات/i.test(publisher))continue;
+      const candidate:Candidate={title,summary,section:"news",kind:"web",evidence:"mixed",sources:[{title,publisher,url,publishedAt:String(row.published_at||""),imageUrl:safePublicImageUrl(row.image_url)}],url,imageUrl:safePublicImageUrl(row.image_url),imageAlt:String(row.image_alt||title),score:scoreSource(publisher,title,q)+22,provider:"BAYAN Recent News Archive"};
+      if(!relevantCandidate(candidate,q))continue;
+      const publisherKey=publisher.toLowerCase();
+      if(seenPublishers.has(publisherKey))continue;
+      seenPublishers.add(publisherKey);
+      output.push(candidate);
+      if(output.length>=8)break;
+    }
+    return output;
+  }catch{return[]}
+}
+export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean;draft?:boolean;images?:boolean;background?:(task:Promise<unknown>)=>void}={}):Promise<SearchResponse>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   // Reuse a recent, previously verified answer when its evidence is still source-diverse.
   // This avoids re-running the full external-provider fan-out for repeat queries.
@@ -745,6 +778,13 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   // Expand when sparse OR when the first pass is dominated by duplicates, a
   // single publisher, encyclopedia-only results, or very thin snippets.
   const expansionThreshold=personQuery?Math.min(6,Math.max(3,Number(s.min_sources||3))):Math.max(3,Number(s.min_sources||3));
+  // The local news archive is a cheap, bounded recovery source; query it only
+  // when primary retrieval lacks independent publishers, reducing work on healthy searches.
+  if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
+    const archiveNews=await safe(searchRecentNewsArchive(env,q,language),[],"BAYAN Recent News Archive");
+    providerAttempted.push("BAYAN Recent News Archive");
+    if(archiveNews.length)candidates.push(...archiveNews);
+  }
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
     const diagnosticStart=providerDiagnostics.length;
     const [bingRssRows,googleRows]=await Promise.all([

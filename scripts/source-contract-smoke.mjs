@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 const read = (path) => readFileSync(new URL("../" + path, import.meta.url), "utf8");
 const news = read("src/services/news.ts");
+const seo = read("src/seo.ts");
+const live = read("src/services/live.ts");
 const search = read("src/services/search.ts");
 const db = read("src/db.ts");
 const ai = read("src/services/ai.ts");
@@ -228,6 +230,9 @@ const checks = [
   ["owner and admin sessions are excluded from GA4 and private routes are excluded server-side", index.includes("document.cookie.split(\";\").some(function(v){return v.trim()===\"bayan_exclude_analytics=1\"})") && index.includes("headers.append(\"Set-Cookie\",\"bayan_exclude_analytics=1; Max-Age=31536000") && read("src/security.ts").includes("/^\\/(?:admin|review)(?:\\/|$)/.test(pathname)") && read("src/security.ts").includes("/^\\/api\\/admin(?:\\/|$)/.test(pathname)")],
   ["Cloudflare Worker logs and traces redact query strings", (()=>{const cfg=JSON.parse(read("wrangler.jsonc"));return cfg.observability?.redact_query_string===true&&cfg.observability?.logs?.enabled===true&&cfg.observability?.traces?.enabled===true})()],
   ["Cloudflare Preview has isolated D1 bindings and explicit AI bindings", (()=>{const cfg=JSON.parse(read("wrangler.jsonc"));return cfg.previews?.d1_databases?.some(x=>x.binding==="DB"&&x.database_id==="0d14b908-dbb2-4296-9e04-ed7d559f9c28") && cfg.previews?.ai_search_namespaces?.some(x=>x.binding==="AI_SEARCH"&&x.namespace==="default") && cfg.previews?.ai?.binding==="AI" && !cfg.previews.d1_databases.some(x=>x.database_id===cfg.d1_databases?.find(y=>y.binding==="DB")?.database_id)})()],
+  ["news sitemap bounds database work to recent full articles and recent archive candidates", seo.includes("julianday(created_at)>=julianday('now','-48 hours')") && seo.includes("julianday(fetched_at)>=julianday('now','-48 hours')") && seo.includes("length(body)>=500") && seo.includes("length(summary)>=120") && seo.includes("LIMIT 200")],
+  ["gold quote fallbacks are sequential and avoid unnecessary quote chains after failure", live.includes("for(const [name,url] of providers)") && live.includes("await timeout(url,3200)") && live.includes("Do not start seven additional quote chains") && !live.includes("Promise.any(providers.map")],
+  ["search uses recent language-matched news archive records as evidence diversity fallback", search.includes("async function searchRecentNewsArchive") && search.includes("FROM news_archive WHERE language=?") && search.includes("BAYAN Recent News Archive") && search.includes("seenPublishers")],
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
