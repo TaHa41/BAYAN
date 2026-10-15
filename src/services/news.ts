@@ -474,6 +474,24 @@ const writeNewsCache = async (env: Env, lang: Locale, items: Story[]) => {
     } catch {}
   }
 };
+const classifyNewsSection = (story: Story): string => {
+  const text = (String(story.title || "") + " " + String(story.summary || "")).toLowerCase();
+  if (/(football|soccer|basketball|tennis|league|championship|match|athlete|رياضة|كرة|دوري|بطولة|مباراة|لاعب|منتخب)/i.test(text)) return "sports";
+  if (/(artificial intelligence|technology|software|cybersecurity|computing|تقنية|تكنولوجيا|ذكاء اصطناعي|برمجيات|سيبراني)/i.test(text)) return "technology";
+  if (/(health|medical|medicine|disease|hospital|clinical|صحة|طب|مرض|طبي|مستشفى|دواء|علاج)/i.test(text)) return "health";
+  if (/(economy|economic|inflation|market|finance|currency|bank|trade|gdp|اقتصاد|تضخم|أسواق|مال|عملة|بنك|تجارة|بطالة)/i.test(text)) return "economy";
+  if (/(politics|political|government|election|parliament|diplomacy|president|minister|policy|سياسة|حكومة|انتخابات|برلمان|دبلوماسية|رئيس|وزير)/i.test(text)) return "politics";
+  if (/(science|scientific|space|nasa|physics|chemistry|biology|research|علم|علوم|فضاء|ناسا|فيزياء|كيمياء|أحياء|بحث علمي)/i.test(text)) return "science";
+  if (/(history|historical|civilization|ancient|archaeology|تاريخ|حضارة|تاريخي|قديم|آثار)/i.test(text)) return "history";
+  if (/(travel|tourism|destination|airport|hotel|visa|سفر|سياحة|وجهة|مطار|فندق|تأشيرة)/i.test(text)) return "travel";
+  if (/(film|cinema|music|theatre|theater|song|museum|culture|arts|فن|سينما|موسيقى|مسرح|فيلم|أغنية|أدب|ثقافة|فنان)/i.test(text)) return "art";
+  if (/(egypt|egyptian|cairo|alexandria|nile|aswan|luxor|sinai|red sea|مصر|المصري|القاهرة|الإسكندرية|النيل|أسوان|الأقصر|سيناء|البحر الأحمر)/i.test(text)) return "egypt";
+  if (/(arab|arabic|arab league|العرب|عربي|العالم العربي|جامعة الدول العربية)/i.test(text)) return "arab";
+  if (/(biography|writer|author|novelist|scientist|poet|artist|inventor|actor|شخصية|سيرة|كاتب|روائي|عالم|شاعر|فنان|مؤلف|أديب|ممثل|مخترع)/i.test(text)) return "people";
+  if (/(trend|viral|popular|social media|survey|poll|ترند|متداول|رائج|استطلاع|شبكات اجتماعية)/i.test(text)) return "trends";
+  return "world";
+};
+
 const archiveNewsStories = async (env: Env, lang: Locale, items: Story[]) => {
   if (!items.length) return;
   const fetchedAt = new Date().toISOString();
@@ -481,8 +499,8 @@ const archiveNewsStories = async (env: Env, lang: Locale, items: Story[]) => {
     .filter((story) => story.title && story.url && /^https:\/\//i.test(story.url))
     .slice(0, 40)
     .map((story) => env.DB.prepare(
-      "INSERT INTO news_archive(url,language,title,summary,publisher,published_at,image_url,image_alt,section,fetched_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(url,language) DO UPDATE SET title=excluded.title,summary=CASE WHEN length(excluded.summary)>length(news_archive.summary) THEN excluded.summary ELSE news_archive.summary END,publisher=excluded.publisher,published_at=COALESCE(excluded.published_at,news_archive.published_at),image_url=COALESCE(excluded.image_url,news_archive.image_url),image_alt=COALESCE(excluded.image_alt,news_archive.image_alt),fetched_at=excluded.fetched_at"
-    ).bind(story.url, lang, story.title.slice(0, 500), story.summary.slice(0, 5000), story.publisher.slice(0, 200), story.publishedAt || null, isUsableNewsImage(story.imageUrl) ? story.imageUrl : null, (story.imageAlt || story.title).slice(0, 500), "news", fetchedAt));
+      "INSERT INTO news_archive(url,language,title,summary,publisher,published_at,image_url,image_alt,section,fetched_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(url,language) DO UPDATE SET title=excluded.title,summary=CASE WHEN length(excluded.summary)>length(news_archive.summary) THEN excluded.summary ELSE news_archive.summary END,publisher=excluded.publisher,published_at=COALESCE(excluded.published_at,news_archive.published_at),image_url=COALESCE(excluded.image_url,news_archive.image_url),image_alt=COALESCE(excluded.image_alt,news_archive.image_alt),section=excluded.section,fetched_at=excluded.fetched_at"
+    ).bind(story.url, lang, story.title.slice(0, 500), story.summary.slice(0, 5000), story.publisher.slice(0, 200), story.publishedAt || null, isUsableNewsImage(story.imageUrl) ? story.imageUrl : null, (story.imageAlt || story.title).slice(0, 500), classifyNewsSection(story), fetchedAt));
   if (statements.length) {
     try { await env.DB.batch(statements); }
     catch (error) {
