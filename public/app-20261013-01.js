@@ -582,6 +582,22 @@
         return ar ? /[\u0600-\u06ff]/.test(title) && (!summary || /[\u0600-\u06ff]/.test(summary)) : !/[\u0600-\u06ff]/.test(title) && !/[\u0600-\u06ff]/.test(summary);
       });
       const output = document.querySelector("#news");
+      const archiveId = Number(params.get("archive") || 0);
+      if (archiveId && output) {
+        try {
+          const archived = await api("/api/news/archive?lang=" + lang + "&id=" + archiveId + "&limit=1");
+          const item = (archived.items || [])[0];
+          if (item) {
+            output.className = "results";
+            output.innerHTML = '<article class="article-full">' + (item.imageUrl ? heroImageHtml(item.imageUrl, item.title, item.summary || "") : imageHtml(item)) +
+              '<span class="eyebrow">' + escapeHtml(item.publisher || t("أرشيف الأخبار", "News archive")) + '</span><h1>' + escapeHtml(item.title) + '</h1>' +
+              '<p class="lead">' + escapeHtml(item.summary || "") + '</p><div class="source-line">' + escapeHtml(formatDate(item.publishedAt)) + '</div>' +
+              '<div class="notice">' + t("هذه نسخة محفوظة داخل أرشيف بيان. تاريخ النشر الأصلي محفوظ، ولا تُعرض باعتبارها خبرًا جديدًا.", "This story is preserved in BAYAN\'s archive. Its original publication date is retained; it is not presented as new news.") + '</div>' +
+              '<a class="primary" href="/news?lang=' + lang + '">' + t("العودة إلى الأخبار الحديثة", "Back to latest news") + '</a></article>';
+            return;
+          }
+        } catch {}
+      }
       if (data.stale && output) {
         output.insertAdjacentHTML("beforebegin", '<div class="notice">' +
           t("المعروض هنا آخر أخبار متحققة محفوظة مؤقتًا؛ تعذر الوصول إلى مزودات الأخبار المباشرة الآن.",
@@ -633,6 +649,16 @@
         : '<div class="notice">' + t("لم يرجع أي مزود أخبار مادة الآن. لن نعرض أخبارًا مختلقة.",
           "No news provider returned a story right now. BAYAN will not invent news.") + "</div>";
       if (items.length) hydrateSectionImages(items);
+      try {
+        const archived = await api("/api/news/archive?lang=" + lang + "&limit=24");
+        const archiveItems = (archived.items || []).filter((item) => !items.some((latest) => String(latest.title || "").trim().toLowerCase() === String(item.title || "").trim().toLowerCase()));
+        if (archiveItems.length && output) {
+          output.insertAdjacentHTML("afterend", '<div class="section-intro"><h2>' + t("أرشيف الأخبار", "News archive") + '</h2><p>' + t("أخبار محفوظة للرجوع إليها، مع الاحتفاظ بتاريخ نشرها الأصلي.", "Previously published stories preserved with their original publication dates.") + '</p></div><div class="article-grid">' +
+            archiveItems.map((item) => '<article class="article-card"><a class="article-card-link" href="/news?archive=' + encodeURIComponent(item.id) + '&lang=' + lang + '">' +
+              imageHtml(item) + '<div class="article-card-body"><span class="kicker">' + escapeHtml(item.publisher || t("أرشيف الأخبار", "News archive")) + '</span><h2>' + escapeHtml(item.title) + '</h2><p>' + escapeHtml(item.summary || "") + '</p><div class="source-line">' + escapeHtml(formatDate(item.publishedAt)) + '</div><span class="read">' + t("اقرأ من الأرشيف", "Read from archive") + ' →</span></div></a></article>').join("") + '</div>');
+          hydrateSectionImages(archiveItems);
+        }
+      } catch {}
     } catch {
       document.querySelector("#news").innerHTML =
         '<div class="notice">' + t("تعذر تحديث الأخبار الآن.","News could not be refreshed right now.") + "</div>";
