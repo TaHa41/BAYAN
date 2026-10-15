@@ -83,7 +83,7 @@ try{
   const candidateCount=Number(newsMap.headers.get("x-bayan-news-sitemap-candidate-count"));
   if(!Number.isInteger(eligibleCount)||eligibleCount!==newsLocs.length)throw new Error("news_sitemap_eligible_count_header_mismatch");
   if(!Number.isInteger(candidateCount)||candidateCount<eligibleCount)throw new Error("news_sitemap_candidate_count_header_invalid");
-  for(const match of newsMap.text.matchAll(/<news:publication_date>(.*?)<\\/news:publication_date>/g)){
+  for(const match of newsMap.text.matchAll(/<news:publication_date>(.*?)<\/news:publication_date>/g)){
     const published=Date.parse(match[1]);
     if(!Number.isFinite(published)||published>Date.now()+5*60*1000||Date.now()-published>48*60*60*1000)throw new Error("news_sitemap_publication_date_outside_48h_window");
   }
