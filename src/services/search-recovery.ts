@@ -183,48 +183,28 @@ export async function externalSearchRecovery(query: string, language: Locale): P
   const providers: string[] = [];
   const providerAttempted: string[] = [];
 
-  const runBatch = async (searchQuery: string, suffix = "") => {
-    const batchTasks = searchQuery === q ? tasks : [\n      ["Wikipedia compact retry", () => wikipediaAction(searchQuery, language)],\n      ["Wikimedia REST compact retry", () => wikipediaRest(searchQuery, language)],\n      ["Google News RSS compact retry", () => newsRss(searchQuery, language, "Google News")],\n      ["Bing News RSS compact retry", () => newsRss(searchQuery, language, "Bing News")],\n      ["GDELT compact retry", () => gdelt(searchQuery, language)]\n    ] as Array<[string, () => Promise<SearchResult[]>]>;\n    const settled = await Promise.allSettled(batchTasks.map(([, run]) => run()));
+  const runBatch = async (searchQuery: string, compactRetry = false) => {
+    const batchTasks: Array<[string, () => Promise<SearchResult[]>]> = searchQuery === q ? tasks : [
+      ["Wikipedia compact retry", () => wikipediaAction(searchQuery, language)],
+      ["Wikimedia REST compact retry", () => wikipediaRest(searchQuery, language)],
+      ["Google News RSS compact retry", () => newsRss(searchQuery, language, "Google News")],
+      ["Bing News RSS compact retry", () => newsRss(searchQuery, language, "Bing News")],
+      ["GDELT compact retry", () => gdelt(searchQuery, language)]
+    ];
+    const settled = await Promise.allSettled(batchTasks.map(([, run]) => run()));
     settled.forEach((entry, index) => {
       const name = batchTasks[index][0];
-      providerAttempted.push(name + suffix + (entry.status === "fulfilled" ? ":ok:" + entry.value.length : ":" + recoveryFailureKind(entry.reason)));
+      providerAttempted.push(name + (entry.status === "fulfilled" ? ":ok:" + entry.value.length : ":" + recoveryFailureKind(entry.reason)));
       if (entry.status !== "fulfilled" || !entry.value.length) return;
       providers.push(name);
       results.push(...entry.value);
     });
   };
-  const runQuery = (run: () => Promise<SearchResult[]>, searchQuery: string) => {
-    // Each provider receives the query chosen for this pass without mutating
-    // the original query used for relevance checks and audit logging.
-    return runWithQuery(run, searchQuery);
-  };
-  const runWithQuery = async (run: () => Promise<SearchResult[]>, searchQuery: string): Promise<SearchResult[]> => {
-    // Providers in the task list close over q, so a second pass is implemented
-    // by rebuilding the provider functions with the compact query below.
-    return run();
-  };
-  await runBatch(q);
 
-  const preliminary = results.filter(item => relevant(item.title, item.summary, q));
-  if (!preliminary.length) {
+  await runBatch(q);
+  if (!results.some(item => relevant(item.title, item.summary, q))) {
     const compact = normalize(q).split(" ").filter(Boolean).slice(0, 6).join(" ");
-    if (compact && compact !== normalize(q)) {
-      const retryTasks: Array<[string, () => Promise<SearchResult[]>]> = [
-        ["Wikipedia compact retry", () => wikipediaAction(compact, language)],
-        ["Wikimedia REST compact retry", () => wikipediaRest(compact, language)],
-        ["Google News RSS compact retry", () => newsRss(compact, language, "Google News")],
-        ["Bing News RSS compact retry", () => newsRss(compact, language, "Bing News")],
-        ["GDELT compact retry", () => gdelt(compact, language)]
-      ];
-      const retry = await Promise.allSettled(retryTasks.map(([, run]) => run()));
-      retry.forEach((entry, index) => {
-        const name = retryTasks[index][0];
-        providerAttempted.push(name + (entry.status === "fulfilled" ? ":ok:" + entry.value.length : ":" + recoveryFailureKind(entry.reason)));
-        if (entry.status !== "fulfilled" || !entry.value.length) return;
-        providers.push(name);
-        results.push(...entry.value);
-      });
-    }
+    if (compact && compact !== normalize(q)) await runBatch(compact, true);
   }
 
   const filtered = results
