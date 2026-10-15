@@ -158,7 +158,7 @@ async function bingNewsSearch(q:string,language:Locale,diagnostics?:string[]):Pr
     }
     diagnostics?.push("Bing News RSS raw="+rawItems+" accepted="+out.length);
     return out;
-  }catch{diagnostics?.push("Bing News RSS request failed");return[]}
+  }catch(error){reportProviderFailure(diagnostics,"Bing News RSS",error);return[]}
 }
 async function crossrefSearch(q:string,diagnostics?:string[]):Promise<Candidate[]>{
   try{
