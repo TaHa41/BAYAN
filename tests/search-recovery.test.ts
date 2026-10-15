@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { externalSearchRecovery } from "../src/services/search-recovery";
+import { normalizeBingNewsUrl } from "../src/services/search";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -85,5 +86,15 @@ describe("external search recovery", () => {
 
     const result = await externalSearchRecovery("تغير المناخ", "en");
     expect(result.results).toEqual([]);
+  });
+});
+
+
+describe("Bing News RSS URL safety", () => {
+  it("upgrades only Bing redirect hosts to HTTPS and rejects insecure publisher URLs", () => {
+    expect(normalizeBingNewsUrl("http://www.bing.com/news/apiclick.aspx?ref=1")).toBe("https://www.bing.com/news/apiclick.aspx?ref=1");
+    expect(normalizeBingNewsUrl("http://news.example.com/article")).toBeUndefined();
+    expect(normalizeBingNewsUrl("https://news.example.com/article")).toBe("https://news.example.com/article");
+    expect(normalizeBingNewsUrl("https://user:secret@news.example.com/article")).toBeUndefined();
   });
 });
