@@ -88,8 +88,8 @@ try{
   }
   const homeAr=await get("/?lang=ar"); if(!homeAr.text.includes('<link rel="canonical" href="'+origin+'/">'))throw new Error("arabic_homepage_canonical_mismatch");
   const homeEn=await get("/?lang=en"); if(!homeEn.text.includes('<link rel="canonical" href="'+origin+'/?lang=en">'))throw new Error("english_homepage_canonical_mismatch");
-  if(!homeAr.text.includes('href="/article/')||!homeAr.text.includes("?lang=ar"))throw new Error("arabic_homepage_missing_server_rendered_article_links");
-  if(!homeEn.text.includes('href="/article/')||!homeEn.text.includes("?lang=en"))throw new Error("english_homepage_missing_server_rendered_article_links");
+  if(!/href="\\/article\\/[^"]+\\?lang=ar"/.test(homeAr.text))throw new Error("arabic_homepage_missing_server_rendered_article_links");
+  if(!/href="\\/article\\/[^"]+\\?lang=en"/.test(homeEn.text))throw new Error("english_homepage_missing_server_rendered_article_links");
   const missing=await fetch(origin+"/__bayan_missing_route_probe__",{redirect:"manual",headers:{accept:"text/html","user-agent":"BAYAN-Production-Smoke/1.0"},signal:AbortSignal.timeout(10000)});
   const missingBody=await missing.text();
   if(missing.status!==404||!missing.headers.get("x-robots-tag")?.includes("noindex")||/fallback-home/.test(missingBody))throw new Error("unknown_route_must_return_real_404_not_spa_shell");
