@@ -649,7 +649,11 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   const cutoff=new Date(Date.now()-7*24*60*60*1000).toISOString();
   const future=new Date(Date.now()+5*60*1000).toISOString();
   try{
-    const response=await env.DB.prepare("SELECT title,summary,url,publisher,published_at,image_url,image_alt,section FROM news_archive WHERE language=? AND fetched_at>=? AND published_at>=? AND published_at<=? AND length(summary)>=80 ORDER BY fetched_at DESC LIMIT 100").bind(language,cutoff,cutoff,future).all<any>();
+    const terms=searchTerms(q).slice(0,3);
+    if(!terms.length)return[];
+    const predicates=terms.map(()=>"(title LIKE ? OR summary LIKE ?)").join(" OR ");
+    const patterns=terms.flatMap(term=>["%"+term+"%","%"+term+"%"]);
+    const response=await env.DB.prepare("SELECT title,summary,url,publisher,published_at,image_url,image_alt,section FROM news_archive WHERE language=? AND fetched_at>=? AND published_at>=? AND published_at<=? AND length(summary)>=80 AND ("+predicates+") ORDER BY fetched_at DESC LIMIT 60").bind(language,cutoff,cutoff,future,...patterns).all<any>();
     const output:Candidate[]=[];
     const seenPublishers=new Set<string>();
     for(const row of response.results||[]){
@@ -709,7 +713,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
 // Stage discovery: query the local index and compact reference providers first.
   // Broad HTML/RSS providers run only if the first batch lacks relevant evidence,
   // preventing each visitor search from launching a dozen expensive requests at once.
-  let [local, wiki, wikiRest, wd, remote, dd, oa, crossref, pubmed, archiveNews] = await Promise.all([
+  let [local, wiki, wikiRest, wd, remote, dd, oa, crossref, pubmed] = await Promise.all([
     safe(searchArticles(env,q,language,max),[],"BAYAN Knowledge Base"),
     safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language,providerDiagnostics),[],"Wikipedia"),
     safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipediaRestSearch(q,language,providerDiagnostics),[],"Wikipedia REST Search"),
@@ -718,15 +722,14 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     safe(duck(q,language,providerDiagnostics),[],"DuckDuckGo Instant Answers"),
     safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q,providerDiagnostics),[],"OpenAlex"),
     safe((academicQuery&&!personLookup(q))?crossrefSearch(q,providerDiagnostics):Promise.resolve([]),[],"Crossref"),
-    safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language,providerDiagnostics),[],"PubMed / NCBI"),
-    safe(searchRecentNewsArchive(env,q,language),[],"BAYAN Recent News Archive")
+    safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language,providerDiagnostics),[],"PubMed / NCBI")
   ]);
 
   let google:Candidate[]=[];
-  const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers","BAYAN Recent News Archive"];
+  const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers"];
   providerAttempted.push(...providerDiagnostics);
   const candidates:Candidate[]=[
-    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wikiRest,...wd,...oa,...crossref,...pubmed,...remote,...dd,...archiveNews,...google
+    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wikiRest,...wd,...oa,...crossref,...pubmed,...remote,...dd,...google
   ];
   // Use the authenticated Enterprise index as a recovery provider only when
   // primary discovery is empty or thin; avoid token/article requests on every search.
@@ -775,6 +778,15 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   // Expand when sparse OR when the first pass is dominated by duplicates, a
   // single publisher, encyclopedia-only results, or very thin snippets.
   const expansionThreshold=personQuery?Math.min(6,Math.max(3,Number(s.min_sources||3))):Math.max(3,Number(s.min_sources||3));
+  // The local news archive is a cheap, bounded recovery source; query it only
+  // when primary retrieval lacks independent publishers, reducing work on healthy searches.
+  if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
+    const archiveNews=await safe(searchRecentNewsArchive(env,q,language),[],"BAYAN Recent News Archive");
+    if(archiveNews.length){
+      candidates.push(...archiveNews);
+      providerAttempted.push("BAYAN Recent News Archive");
+    }
+  }
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
     const diagnosticStart=providerDiagnostics.length;
     const [bingRssRows,googleRows]=await Promise.all([
