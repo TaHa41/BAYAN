@@ -759,12 +759,12 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
     providerAttempted.push("Expanded topic variants: Wikipedia REST Search, Google News Search, Bing Web RSS Search","OpenAI Web Search (fallback)");
     const expanded=await safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||""),providerAttempted,identityAliases),[]);
-    candidates.push(...expanded.slice(0,24));
+    candidates.push(...expanded.slice(0,12));
     // OpenAI web search is the final recovery path, not a parallel request on
     // every weak first pass. Skip it as soon as independent evidence is adequate.
-    if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
+    if(firstPassCount()===0||((personQuery||academicQuery)&&(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()))){
       const web=await safe(openAiWebSearch(env,q,language,providerDiagnostics),[],"OpenAI Web Search");
-      candidates.push(...web.slice(0,8).map(item=>identityAliases.length?({...item,identityAliases:[...identityAliases]}):item));
+      candidates.push(...web.slice(0,6).map(item=>identityAliases.length?({...item,identityAliases:[...identityAliases]}):item));
     }
   }
   
