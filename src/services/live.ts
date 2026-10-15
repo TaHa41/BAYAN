@@ -61,7 +61,7 @@ async function marketQuote(symbol:string){
   const yahooHosts=["query1.finance.yahoo.com"]; // Avoid duplicate quote requests per symbol; fallback providers run only if needed.
   const yahoo=await Promise.all(yahooHosts.map(async host=>{
     try{
-      const r=await timeout("https://"+host+"/v8/finance/chart/"+encodeURIComponent(symbol)+"?range=1d&interval=5m",3500);
+      const r=await timeout("https://"+host+"/v8/finance/chart/"+encodeURIComponent(symbol)+"?range=1d&interval=1d",3500);
       if(!r.ok)return null;
       const d=await r.json<any>(),meta=d?.chart?.result?.[0]?.meta,price=Number(meta?.regularMarketPrice);
       if(!Number.isFinite(price)||price<=0)return null;
@@ -81,7 +81,55 @@ async function extraMarkets(){
   const names:Record<string,{ar:string;en:string;unit:string;unitAr:string;unitEn:string}>={"SI=F":{ar:"الفضة",en:"Silver",unit:"USD / troy ounce",unitAr:"دولار أمريكي / أونصة تروي",unitEn:"USD / troy ounce"},"CL=F":{ar:"النفط الخام",en:"Crude oil",unit:"USD / barrel",unitAr:"دولار أمريكي / برميل",unitEn:"USD / barrel"},"GC=F":{ar:"العقود الآجلة للذهب",en:"Gold futures",unit:"USD / troy ounce",unitAr:"دولار أمريكي / أونصة تروي",unitEn:"USD / troy ounce"},"BTC-USD":{ar:"بيتكوين",en:"Bitcoin",unit:"USD",unitAr:"دولار أمريكي",unitEn:"USD"},"ETH-USD":{ar:"إيثيريوم",en:"Ethereum",unit:"USD",unitAr:"دولار أمريكي",unitEn:"USD"},"^GSPC":{ar:"مؤشر S&P 500",en:"S&P 500",unit:"index points",unitAr:"نقطة مؤشر",unitEn:"index points"},"^IXIC":{ar:"مؤشر ناسداك المركب",en:"Nasdaq Composite",unit:"index points",unitAr:"نقطة مؤشر",unitEn:"index points"}};
   return quotes.filter(Boolean).map((q:any)=>({...q,...names[q.symbol]}));
 }
-export async function gold(env:Env){const providers=[["CoinGecko PAXG","https://api.coingecko.com/api/v3/simple/price?ids=pax-gold&vs_currencies=usd"],["Yahoo Finance","https://query1.finance.yahoo.com/v8/finance/chart/XAUUSD=X?range=1d&interval=1m"],["GoldPrice.dev","https://api.goldprice.dev/v1/prices?symbol=XAU-USD-SPOT"],["Gold API","https://api.gold-api.com/price/XAU"]];try{const [g,f,markets]=await Promise.all([Promise.any(providers.map(async([name,url])=>{const r=await timeout(url,5000);if(!r.ok)throw new Error(name);const d=await r.json<any>();let p=Number(d?.["pax-gold"]?.usd);if(!p)p=Number(d?.chart?.result?.[0]?.meta?.regularMarketPrice);if(!p)p=Number(d?.symbols?.[0]?.price??d?.price);if(!Number.isFinite(p)||p<=0)throw new Error(name+"_data");return{name,price:p}})),timeout("https://api.frankfurter.dev/v2/rates?base=USD&quotes=EGP",5000),extraMarkets()]);const fd=await f.json<any>();const egp=Number(fd.rates?.EGP);if(!egp)throw new Error("fx");return{ok:true,provider:g.name+" + Frankfurter",price:(g.price/31.1034768)*egp,unit:"EGP/g (24K reference)",usdPerOunce:g.price,fx:egp,markets,updatedAt:new Date().toISOString(),stale:false}}catch{try{const [r,markets]=await Promise.all([timeout("https://goldpriceo.com/egypt.html",5000),extraMarkets()]);if(!r.ok)throw new Error("goldpriceo");const h=await r.text();const m=h.match(/(?:عيار 24|24K)[^0-9]{0,120}([0-9][0-9,]*(?:\.[0-9]+)?)/i);const p=Number((m?.[1]||"").replace(/,/g,""));if(!p||p<1000||p>20000)throw new Error("goldpriceo_data");return{ok:true,provider:"GoldPriceO Egypt",price:p,unit:"EGP/g (24K reference)",markets,updatedAt:new Date().toISOString(),stale:false}}catch{return{ok:false,provider:"gold providers unavailable",stale:true,message:"Gold providers temporarily unavailable",markets:await extraMarkets()}}}}
+export async function gold(env:Env){
+  const providers:Array<[string,string]>=[
+    ["Gold API","https://api.gold-api.com/price/XAU"],
+    ["Yahoo Finance","https://query1.finance.yahoo.com/v8/finance/chart/XAUUSD=X?range=1d&interval=1d"],
+    ["CoinGecko PAXG","https://api.coingecko.com/api/v3/simple/price?ids=pax-gold&vs_currencies=usd"],
+    ["GoldPrice.dev","https://api.goldprice.dev/v1/prices?symbol=XAU-USD-SPOT"]
+  ];
+  let quote:{name:string;price:number}|null=null;
+  // Sequential fallbacks prevent losing Promise.any requests from continuing
+  // to consume subrequests and CPU after a quote has already succeeded.
+  for(const [name,url] of providers){
+    try{
+      const response=await timeout(url,3200);
+      if(!response.ok)continue;
+      const data=await response.json<any>();
+      const price=name==="Yahoo Finance"
+        ?Number(data?.chart?.result?.[0]?.meta?.regularMarketPrice)
+        :name==="CoinGecko PAXG"
+          ?Number(data?.["pax-gold"]?.usd)
+          :Number(data?.symbols?.[0]?.price??data?.price);
+      if(Number.isFinite(price)&&price>0){quote={name,price};break;}
+    }catch{}
+  }
+  if(quote){
+    try{
+      const [fxResponse,markets]=await Promise.all([
+        timeout("https://api.frankfurter.dev/v2/rates?base=USD&quotes=EGP",3500),
+        extraMarkets()
+      ]);
+      if(!fxResponse.ok)throw new Error("fx");
+      const fxData=await fxResponse.json<any>(),egp=Number(fxData.rates?.EGP);
+      if(!egp)throw new Error("fx_data");
+      return{ok:true,provider:quote.name+" + Frankfurter",price:(quote.price/31.1034768)*egp,unit:"EGP/g (24K reference)",usdPerOunce:quote.price,fx:egp,markets,updatedAt:new Date().toISOString(),stale:false};
+    }catch{}
+  }
+  try{
+    const response=await timeout("https://goldpriceo.com/egypt.html",3200);
+    if(response.ok){
+      const html=await response.text();
+      const match=html.match(/(?:عيار 24|24K)[^0-9]{0,120}([0-9][0-9,]*(?:\.[0-9]+)?)/i);
+      const price=Number((match?.[1]||"").replace(/,/g,""));
+      if(Number.isFinite(price)&&price>=1000&&price<=20000){
+        return{ok:true,provider:"GoldPriceO Egypt",price,unit:"EGP/g (24K reference)",markets:await extraMarkets(),updatedAt:new Date().toISOString(),stale:false};
+      }
+    }
+  }catch{}
+  // Do not start seven additional quote chains when the gold quote itself failed.
+  return{ok:false,provider:"gold providers unavailable",stale:true,message:"Gold providers temporarily unavailable",markets:[]};
+}
 
 export async function prayerTimes(cityInput?:string,countryInput?:string){
  const city=String(cityInput||"Hurghada").trim().slice(0,100)||"Hurghada",country=String(countryInput||"Egypt").trim().slice(0,100)||"Egypt";
