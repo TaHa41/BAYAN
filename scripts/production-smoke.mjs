@@ -76,6 +76,17 @@ try{
   if(!newsLanding.text.includes('class="seo-content-image"'))throw new Error("news_landing_server_rendered_images_missing");
   if(newsMap.text.includes("/news?story="))throw new Error("news_sitemap_contains_summary_only_pages");
   const newsLocs=[...newsMap.text.matchAll(/<loc>(.*?)<\/loc>/g)].map(match=>match[1]);
+  if(newsLocs.length<2)throw new Error("news_sitemap_has_fewer_than_two_recent_verified_articles");
+  if(newsLocs.length!==new Set(newsLocs).size)throw new Error("news_sitemap_duplicate_article_urls");
+  if(!newsMap.text.includes('xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"'))throw new Error("news_sitemap_namespace_missing");
+  const eligibleCount=Number(newsMap.headers.get("x-bayan-news-sitemap-eligible-count"));
+  const candidateCount=Number(newsMap.headers.get("x-bayan-news-sitemap-candidate-count"));
+  if(!Number.isInteger(eligibleCount)||eligibleCount!==newsLocs.length)throw new Error("news_sitemap_eligible_count_header_mismatch");
+  if(!Number.isInteger(candidateCount)||candidateCount<eligibleCount)throw new Error("news_sitemap_candidate_count_header_invalid");
+  for(const match of newsMap.text.matchAll(/<news:publication_date>(.*?)<\/news:publication_date>/g)){
+    const published=Date.parse(match[1]);
+    if(!Number.isFinite(published)||published>Date.now()+5*60*1000||Date.now()-published>48*60*60*1000)throw new Error("news_sitemap_publication_date_outside_48h_window");
+  }
   if(newsLocs.some(url=>!url.includes("/article/")))throw new Error("news_sitemap_url_is_not_full_article");
   if(newsLocs.length>0&&!newsMap.text.includes("<news:news>"))throw new Error("news_sitemap_news_metadata_missing");
   if(newsLocs.length>0){
