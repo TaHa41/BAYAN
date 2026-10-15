@@ -1,3 +1,4 @@
+import { safePublicImageUrl } from "../image-url";
 import type { Locale, SearchResult } from "../types";
 
 type RecoveryResult = {
@@ -77,7 +78,7 @@ const makeResult = (
   if (language === "en" && hasArabic(cleanSummary)) cleanSummary = "";
   const cleanUrl = String(url || "").trim();
   if (!cleanTitle || !/^https:\/\//i.test(cleanUrl) || !languageMatches(cleanTitle, language)) return null;
-  if (/googleusercontent\.com|gstatic\.com/i.test(imageUrl || "")) imageUrl = undefined;
+  imageUrl = safePublicImageUrl(imageUrl);
   return {
     title: cleanTitle,
     summary: cleanSummary,
