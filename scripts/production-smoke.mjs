@@ -68,6 +68,14 @@ async function inBatches(items,size,fn){
 await inBatches(checks,4,async path=>{try{await get(path)}catch(e){console.error(e);bad++}});
 try{const health=await get("/api/health");const data=JSON.parse(health.text);if(data.ok!==true||data.database!==true||data.articleRevisionHistory!==true||!data.checkedAt)throw new Error("health_endpoint_did_not_confirm_database_and_article_revision_schema_readiness")}catch(e){console.error("HEALTH",e);bad++}
 try{
+  const home=await get("/?lang=ar");
+  if(!home.text.includes('id="bayan-support-toggle"')||!home.text.includes('id="bayan-support-panel"'))throw new Error("visitor_support_widget_missing_from_public_html");
+  const invalid=await fetch(origin+"/api/support",{method:"POST",headers:{"content-type":"application/json","accept":"application/json","user-agent":"BAYAN-Production-Smoke/1.0"},body:JSON.stringify({action:"invalid",message:"x"}),signal:AbortSignal.timeout(10000)});
+  if(invalid.status!==400)throw new Error("support_endpoint_invalid_payload_contract_failed:"+invalid.status);
+  const features=await get("/api/features"),featureData=JSON.parse(features.text);
+  if(!featureData.capabilities?.includes("visitor-support")||!featureData.capabilities?.includes("issue-reporting"))throw new Error("support_capabilities_missing");
+}catch(e){console.error("VISITOR SUPPORT",e);bad++}
+try{
   const sitemap=await get("/sitemap.xml");
   if(!sitemap.text.includes("?lang=ar")||!sitemap.text.includes("?lang=en")||!sitemap.text.includes("<lastmod>"))throw new Error("localized_sitemap_or_lastmod_missing");
   if(!sitemap.text.includes("<loc>"+origin+"/</loc>")||sitemap.text.includes("<loc>"+origin+"/?lang=ar</loc>"))throw new Error("homepage_canonical_sitemap_mismatch");
