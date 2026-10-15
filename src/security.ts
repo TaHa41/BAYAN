@@ -5,6 +5,10 @@ const ANALYTICS_EXCLUDED_UA = /(?:googlebot|bingbot|yandexbot|baiduspider|duckdu
 export function analyticsExcluded(request: Request) {
   const cookies = (request.headers.get("cookie") || "").split(";").map((part) => part.trim());
   if (cookies.includes("bayan_exclude_analytics=1")) return true;
+  // Private control-center routes and their authenticated repair APIs must never
+  // be counted as public audience traffic, even before the browser cookie lands.
+  const pathname = new URL(request.url).pathname;
+  if (/^\/(?:admin|review)(?:\/|$)/.test(pathname) || /^\/api\/admin(?:\/|$)/.test(pathname)) return true;
   const userAgent = request.headers.get("user-agent") || "";
   return userAgent.length > 0 && ANALYTICS_EXCLUDED_UA.test(userAgent);
 }
