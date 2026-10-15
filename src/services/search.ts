@@ -114,7 +114,7 @@ async function wikidataEntityAliases(qid:string):Promise<string[]>{
   try{
     const url="https://www.wikidata.org/w/api.php?action=wbgetentities&ids="+encodeURIComponent(qid)+"&props=labels%7Caliases&languages=en%7Car&format=json&origin=*";
     const response=await timeout(url,3500);
-    if(!response.ok){diagnostics?.push("OpenAI Web Search: http_"+response.status);return[];}
+    if(!response.ok)return[];
     const data=await response.json<any>();
     const entity=data.entities?.[qid];
     if(!entity)return[];
@@ -202,7 +202,7 @@ async function openAiWebSearch(env:Env,q:string,language:Locale,diagnostics?:str
         input:"Search query: "+q+". Return up to six distinct useful sources with concise source-specific summaries."
       })
     });
-    if(!response.ok)return[];
+    if(!response.ok){diagnostics?.push("OpenAI Web Search: http_"+response.status);return[];}
     const data=await response.json<any>();
     const output=String(data.output_text||"").trim();
     const cited=new Map<string,string>();
