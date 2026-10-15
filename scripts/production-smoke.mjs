@@ -1,5 +1,5 @@
 const origin=process.env.BAYAN_ORIGIN||"https://bayan.tahaomar411.workers.dev";
-const checks=["/","/saved?lang=ar","/tools?lang=ar","/about?lang=ar","/methodology?lang=ar","/privacy?lang=ar","/terms?lang=ar","/api/health","/api/features","/api/live/weather","/api/live/fx","/api/live/gold","/news?lang=ar","/news?lang=en","/prices?lang=ar","/art?lang=ar","/trends?lang=ar","/robots.txt","/sitemap.xml","/news-sitemap.xml","/llms.txt","/.well-known/ai-catalog.json","/ai-catalog.json"];
+const checks=["/","/saved?lang=ar","/tools?lang=ar","/about?lang=ar","/methodology?lang=ar","/privacy?lang=ar","/terms?lang=ar","/api/health","/api/features","/api/news/archive?lang=ar","/api/news/archive?lang=en","/api/live/weather","/api/live/fx","/api/live/gold","/news?lang=ar","/news?lang=en","/prices?lang=ar","/art?lang=ar","/trends?lang=ar","/robots.txt","/sitemap.xml","/news-sitemap.xml","/llms.txt","/.well-known/ai-catalog.json","/ai-catalog.json"];
 const sections=["science","technology","economy","politics","health","history","people","sports","travel","art","news","trends","prices","egypt","arab","world"];
 let bad=0;
 let bundleText="";
@@ -66,6 +66,18 @@ async function inBatches(items,size,fn){
   }
 }
 await inBatches(checks,4,async path=>{try{await get(path)}catch(e){console.error(e);bad++}});
+for(const lang of ["ar","en"]){
+  try{
+    const response=await get("/api/news/archive?lang="+lang);
+    const payload=JSON.parse(response.text);
+    if(payload.ok!==true||payload.language!==lang||!Array.isArray(payload.items))throw new Error("news_archive_contract_invalid_"+lang);
+    assertNoBlockedImageHosts(payload,"news_archive_"+lang);
+    for(const item of payload.items){
+      if(item.language!==lang)throw new Error("news_archive_language_mixing_"+lang);
+      if(!item.url||!/^https:\/\//i.test(item.url))throw new Error("news_archive_source_url_invalid_"+lang);
+    }
+  }catch(error){console.error("NEWS ARCHIVE",lang,error);bad++}
+}
 try{const health=await get("/api/health");const data=JSON.parse(health.text);if(data.ok!==true||data.database!==true||data.articleRevisionHistory!==true||!data.checkedAt)throw new Error("health_endpoint_did_not_confirm_database_and_article_revision_schema_readiness")}catch(e){console.error("HEALTH",e);bad++}
 try{
   const sitemap=await get("/sitemap.xml");
