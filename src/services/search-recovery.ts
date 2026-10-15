@@ -153,36 +153,6 @@ async function newsRss(query: string, language: Locale, provider: "Google News" 
   return results;
 }
 
-async function duckDuckGoHtml(query: string, language: Locale): Promise<SearchResult[]> {
-  // Instant Answers can be empty for ordinary queries; use the independent HTML
-  // results endpoint as a bounded general-purpose recovery provider.
-  const url = "https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query);
-  const response = await timedFetch(url, 4600);
-  const html = (await response.text()).slice(0, 900_000);
-  const anchors = [...html.matchAll(/<a\b[^>]*class=["'][^"']*result__a[^"']*["'][^>]*>[\s\S]*?<\/a>/gi)];
-  const output: SearchResult[] = [];
-  for (const match of anchors) {
-    const anchor = match[0];
-    const rawHref = anchor.match(/\bhref=["']([^"']+)["']/i)?.[1] || "";
-    const rawTitle = anchor.replace(/^.*?>/s, "").replace(/<\/a>\s*$/i, "");
-    let target = clean(rawHref);
-    try {
-      const parsed = new URL(target, "https://duckduckgo.com");
-      const redirected = parsed.searchParams.get("uddg");
-      if (redirected) target = decodeURIComponent(redirected);
-    } catch {}
-    try { if (new URL(target).protocol !== "https:" || /(^|\.)duckduckgo\.com$/i.test(new URL(target).hostname)) continue; }
-    catch { continue; }
-    const after = html.slice((match.index || 0) + anchor.length, (match.index || 0) + anchor.length + 2400);
-    const rawSnippet = after.match(/class=["'][^"']*result__snippet[^"']*["'][^>]*>([\s\S]*?)<\/[^>]+>/i)?.[1] || "";
-    const host = new URL(target).hostname.replace(/^www\./, "");
-    const item = makeResult(rawTitle, rawSnippet, target, host, "DuckDuckGo Web Search", language, "world");
-    if (item) output.push(item);
-    if (output.length >= 8) break;
-  }
-  return output;
-}
-
 async function gdelt(query: string, language: Locale): Promise<SearchResult[]> {
   const url = "https://api.gdeltproject.org/api/v2/doc/doc?query=" + encodeURIComponent(query) + "&mode=artlist&maxrecords=8&format=json&sort=HybridRel";
   const response = await timedFetch(url, 4200);
@@ -207,21 +177,55 @@ export async function externalSearchRecovery(query: string, language: Locale): P
     ["Wikimedia REST", () => wikipediaRest(q, language)],
     ["Google News RSS", () => newsRss(q, language, "Google News")],
     ["Bing News RSS", () => newsRss(q, language, "Bing News")],
-    ["DuckDuckGo Web Search", () => duckDuckGoHtml(q, language)],
     ["GDELT", () => gdelt(q, language)]
   ];
-  const settled = await Promise.allSettled(tasks.map(([, run]) => run()));
   const results: SearchResult[] = [];
   const providers: string[] = [];
   const providerAttempted: string[] = [];
 
-  settled.forEach((entry, index) => {
-    const name = tasks[index][0];
-    providerAttempted.push(name + (entry.status === "fulfilled" ? ":ok:" + entry.value.length : ":" + recoveryFailureKind(entry.reason)));
-    if (entry.status !== "fulfilled" || !entry.value.length) return;
-    providers.push(name);
-    results.push(...entry.value);
-  });
+  const runBatch = async (searchQuery: string, suffix = "") => {
+    const batchTasks = searchQuery === q ? tasks : [\n      ["Wikipedia compact retry", () => wikipediaAction(searchQuery, language)],\n      ["Wikimedia REST compact retry", () => wikipediaRest(searchQuery, language)],\n      ["Google News RSS compact retry", () => newsRss(searchQuery, language, "Google News")],\n      ["Bing News RSS compact retry", () => newsRss(searchQuery, language, "Bing News")],\n      ["GDELT compact retry", () => gdelt(searchQuery, language)]\n    ] as Array<[string, () => Promise<SearchResult[]>]>;\n    const settled = await Promise.allSettled(batchTasks.map(([, run]) => run()));
+    settled.forEach((entry, index) => {
+      const name = batchTasks[index][0];
+      providerAttempted.push(name + suffix + (entry.status === "fulfilled" ? ":ok:" + entry.value.length : ":" + recoveryFailureKind(entry.reason)));
+      if (entry.status !== "fulfilled" || !entry.value.length) return;
+      providers.push(name);
+      results.push(...entry.value);
+    });
+  };
+  const runQuery = (run: () => Promise<SearchResult[]>, searchQuery: string) => {
+    // Each provider receives the query chosen for this pass without mutating
+    // the original query used for relevance checks and audit logging.
+    return runWithQuery(run, searchQuery);
+  };
+  const runWithQuery = async (run: () => Promise<SearchResult[]>, searchQuery: string): Promise<SearchResult[]> => {
+    // Providers in the task list close over q, so a second pass is implemented
+    // by rebuilding the provider functions with the compact query below.
+    return run();
+  };
+  await runBatch(q);
+
+  const preliminary = results.filter(item => relevant(item.title, item.summary, q));
+  if (!preliminary.length) {
+    const compact = normalize(q).split(" ").filter(Boolean).slice(0, 6).join(" ");
+    if (compact && compact !== normalize(q)) {
+      const retryTasks: Array<[string, () => Promise<SearchResult[]>]> = [
+        ["Wikipedia compact retry", () => wikipediaAction(compact, language)],
+        ["Wikimedia REST compact retry", () => wikipediaRest(compact, language)],
+        ["Google News RSS compact retry", () => newsRss(compact, language, "Google News")],
+        ["Bing News RSS compact retry", () => newsRss(compact, language, "Bing News")],
+        ["GDELT compact retry", () => gdelt(compact, language)]
+      ];
+      const retry = await Promise.allSettled(retryTasks.map(([, run]) => run()));
+      retry.forEach((entry, index) => {
+        const name = retryTasks[index][0];
+        providerAttempted.push(name + (entry.status === "fulfilled" ? ":ok:" + entry.value.length : ":" + recoveryFailureKind(entry.reason)));
+        if (entry.status !== "fulfilled" || !entry.value.length) return;
+        providers.push(name);
+        results.push(...entry.value);
+      });
+    }
+  }
 
   const filtered = results
     .filter(item => relevant(item.title, item.summary, q))
