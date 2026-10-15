@@ -8,6 +8,7 @@ const wisdom = read("src/wisdom.ts");
 const app = read("public/app-20261013-01.js");
 const index = read("src/index.ts");
 const api = read("src/routes/api.ts");
+const recovery = read("src/services/search-recovery.ts");
 const http = read("src/http.ts");
 const checks = [
   ["news never invents dates or serves expired cached stories as current", !news.includes("publishedAt:new Date().toISOString()") && news.includes("const publishedAt = dateMatch") && news.includes("&& isFreshNews(story)")],
@@ -202,6 +203,7 @@ const checks = [
   ["sitemap route preserves retryable failures instead of rewriting them as empty XML with HTTP 200", read("src/index.ts").includes('return new Response(response.body,{status:response.status,headers})') && read("src/index.ts").includes('status:503,headers:{"Content-Type":"text/plain; charset=utf-8","Cache-Control":"no-store","Retry-After":"300"') && !read("src/index.ts").includes("sitemap-fallback")],
   ["source-only article requests retry once with evidence-derived context for independent sources", read("src/routes/api.ts").includes("initialHasOnlyReferenceResults") && read("src/routes/api.ts").includes("const recoveryQuery=[title,contextTerms]") && read("src/routes/api.ts").includes("}),6500).catch(()=>({results:[]}))") && read("src/routes/api.ts").includes("const externalResults=recoveredResults.filter")],
   ["article revision history is created and upgraded compatibly before its language-aware index is added", read("src/schema.ts").includes("CREATE TABLE IF NOT EXISTS article_revision_history") && read("src/schema.ts").includes('PRAGMA table_info(article_revision_history)') && read("src/schema.ts").includes('"ALTER TABLE article_revision_history ADD COLUMN "+name+" "+definition') && read("src/schema.ts").includes("idx_article_revision_history_lookup") && read("src/db.ts").includes("INSERT INTO article_revision_history(article_slug,language,title,summary,body,section,status,image_url,image_alt,sources_json,action,editor,before_json,after_json,created_at)")],
+  ["external search recovery classifies timeout, connection, HTTP and malformed-response failures and logs them without query text", recovery.includes("recoveryFailureKind") && recovery.includes("recoveryFailureKind(entry.reason)") && search.includes("providerFailureKind") && api.includes("external_search_provider_failures") && api.includes("queryLength:q.length")],
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
