@@ -281,25 +281,6 @@ async function duck(q:string,language:Locale,diagnostics?:string[]):Promise<Cand
     return out;
   }catch(error){reportProviderFailure(diagnostics,"DuckDuckGo Instant Answers",error);return[]}
 }
-async function duckWebSearch(q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
-  try{
-    const url="https://html.duckduckgo.com/html/?q="+encodeURIComponent(q)+"&kl="+(language==="ar"?"ar-eg":"us-en");
-    const response=await timeout(url,2600,diagnostics,"DuckDuckGo Web Search");if(!response.ok)return[];
-    const html=await response.text();const out:Candidate[]=[];
-    const anchors=[...html.matchAll(/<a\b([^>]*class=["'][^"']*result__a[^"']*["'][^>]*)>([\s\S]*?)<\/a>/gi)];
-    for(const match of anchors.slice(0,10)){
-      const attrs=match[1],title=cleanText(decodeXml(match[2]).replace(/<[^>]*>/g," "));
-      let url=decodeXml(attrs.match(/href=["']([^"']+)["']/i)?.[1]||"");
-      try{const parsed=new URL(url,"https://duckduckgo.com");const redirect=parsed.searchParams.get("uddg");url=redirect?decodeURIComponent(redirect):parsed.href;}catch{}
-      if(!title||!/^https:\/\//i.test(url)||/duckduckgo\.com\/l\//i.test(url))continue;
-      const around=html.slice(match.index||0,(match.index||0)+1800);
-      const snippet=cleanText(decodeXml(around.match(/class=["'][^"']*result__snippet[^"']*["'][^>]*>([\s\S]*?)<\//i)?.[1]||"")).slice(0,1200);
-      let publisher="Web result";try{publisher=new URL(url).hostname.replace(/^www\./i,"");}catch{}
-      out.push({title,summary:snippet,section:"world",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+10,provider:"DuckDuckGo Web"});
-    }
-    return out;
-  }catch(error){reportProviderFailure(diagnostics,"DuckDuckGo Web Search",error);return[]}
-}
 async function bingWebSearch(q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
   // General web search, independent of Bing News RSS and Wikimedia.
   // This is a public HTML fallback, so parse defensively and tolerate layout changes.
@@ -331,7 +312,7 @@ async function bingWebRssSearch(q:string,language:Locale,diagnostics?:string[]):
   try{
     const setlang=language==="ar"?"ar":"en-US";
     const url="https://www.bing.com/search?q="+encodeURIComponent(q)+"&format=rss&setlang="+setlang;
-    const response=await timeout(url,4500,diagnostics,"Bing Web RSS");if(!response.ok)return[];
+    const response=await timeout(url,3200,diagnostics,"Bing Web RSS");if(!response.ok)return[];
     const xml=await response.text();const out:Candidate[]=[];
     for(const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
       const block=match[1];
@@ -545,7 +526,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   // when evidence is still sparse. This avoids unnecessary provider load while
   // keeping the worst-case recovery window short enough for the browser request.
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,person?2:1);
-  const labels=["Wikipedia REST Search","Google News Search","DuckDuckGo Web Search"];
+  const labels=["Wikipedia REST Search","Google News Search","Bing Web RSS Search"];
   const runVariant=async(variant:string,variantIndex:number):Promise<Candidate[]>=>{
     // GDELT repeatedly timed out in production and amplified request fan-out.
     // Keep each recovery variant to three independent providers; try a second
@@ -553,7 +534,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
     const results=await Promise.all([
       wikipediaRestSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Wikipedia REST Search",error);return[]}),
       googleNewsSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Google News Search",error);return[]}),
-      duckWebSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"DuckDuckGo Web Search",error);return[]})
+      bingWebRssSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing Web RSS Search",error);return[]})
     ]);
     diagnostics.push("Expanded variant "+(variantIndex+1)+" result counts: "+labels.map((label,index)=>label+"="+(results[index]?.length||0)).join(", "));
     return results.flat();
@@ -666,6 +647,34 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   return language==="ar" ? hasArabic(title) : !hasArabic(title);
 };export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean;draft?:boolean;images?:boolean;background?:(task:Promise<unknown>)=>void}={}):Promise<SearchResponse>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
+  // Reuse a recent, previously verified answer when its evidence is still source-diverse.
+  // This avoids re-running the full external-provider fan-out for repeat queries.
+  if(!options.publish&&!options.images&&!options.background){
+    try{
+      const since=new Date(Date.now()-5*60*1000).toISOString();
+      const cached=await env.DB.prepare("SELECT results_json,status,created_at FROM searches WHERE query=? AND language=? AND created_at>=? AND status IN ('verified','mixed') ORDER BY created_at DESC LIMIT 1").bind(q,language,since).first<any>();
+      let parsed:any[]=[];
+      try{const value=JSON.parse(String(cached?.results_json||"[]"));if(Array.isArray(value))parsed=value}catch{}
+      const cachedResults:Candidate[]=parsed.filter((item:any)=>String(item?.title||"").trim()&&String(item?.summary||"").trim()).slice(0,12).map((item:any)=>({...item,score:70,kind:item.kind||"evidence",evidence:item.evidence||"mixed",provider:"BAYAN verified search cache",sources:Array.isArray(item.sources)?item.sources:[]}));
+      const hosts=new Set<string>();
+      for(const item of cachedResults){
+        for(const source of item.sources||[]){
+          try{const url=new URL(String(source?.url||""));if(url.protocol==="https:"&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/i.test(url.hostname))hosts.add(url.hostname.toLowerCase().replace(/^www\./,""))}catch{}
+        }
+        if(item.url){try{const url=new URL(String(item.url));if(url.protocol==="https:"&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/i.test(url.hostname))hosts.add(url.hostname.toLowerCase().replace(/^www\./,""))}catch{}}
+      }
+      const substantive=cachedResults.filter(item=>String(item.summary||"").trim().length>=100).length;
+      const localeSafe=cachedResults.every(item=>language==="ar"?hasArabic(item.title)&&hasArabic(item.summary):!hasArabic(item.title)&&!hasArabic(item.summary));
+      if(cached&&cachedResults.length>=3&&hosts.size>=2&&substantive>=2&&localeSafe){
+        let drafted:any=null;
+        if(options.draft!==false){
+          try{drafted=await Promise.race([ask(env,q,language,cachedResults),new Promise(resolve=>setTimeout(()=>resolve(null),2500))])}catch{}
+        }
+        const status:SearchResponse["status"]=cached.status==="verified"?"verified":"mixed";
+        return{query:q,locale:language,results:cachedResults,providers:["BAYAN verified search cache"],providerAttempted:["BAYAN verified search cache"],status,answer:drafted?.answer||undefined,answerStatus:drafted?.answer?(status==="verified"&&drafted.status==="verified"?"verified":"mixed"):undefined};
+      }
+    }catch{}
+  }
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const providerDiagnostics:string[]=[];const safe=async<T>(task:Promise<T>,fallback:T,provider="external provider"):Promise<T>=>{try{return await task}catch(error){reportProviderFailure(providerDiagnostics,provider,error);return fallback}};const academicQuery=/(research|paper|papers|study|studies|journal|doi|scholar|academic|citation|crossref|openalex|pubmed|clinical trial|systematic review|بحث علمي|أبحاث|دراسة|دراسات|مجلة علمية|ورقة بحثية|مصدر أكاديمي|دراسات سريرية|مراجعة منهجية)/i.test(q);
 const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|medicine|health study|بحث طبي|دراسة طبية|دراسات سريرية|تجربة سريرية|مراجعة منهجية)/i.test(q);
 // Stage discovery: query the local index and compact reference providers first.
@@ -682,14 +691,12 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     safe((academicQuery&&!personLookup(q))?crossrefSearch(q,providerDiagnostics):Promise.resolve([]),[],"Crossref"),
     safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language,providerDiagnostics),[],"PubMed / NCBI")
   ]);
-  let duckWeb:Candidate[]=[];
-  let bingWeb:Candidate[]=[];
+
   let google:Candidate[]=[];
-  const bing:Candidate[]=[];
   const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers"];
   providerAttempted.push(...providerDiagnostics);
   const candidates:Candidate[]=[
-    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wikiRest,...wd,...oa,...crossref,...pubmed,...remote,...dd,...duckWeb,...bingWeb,...google,...bing
+    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wikiRest,...wd,...oa,...crossref,...pubmed,...remote,...dd,...google
   ];
   // Use the authenticated Enterprise index as a recovery provider only when
   // primary discovery is empty or thin; avoid token/article requests on every search.
@@ -740,26 +747,24 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   const expansionThreshold=personQuery?Math.min(6,Math.max(3,Number(s.min_sources||3))):Math.max(3,Number(s.min_sources||3));
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
     const diagnosticStart=providerDiagnostics.length;
-    const [duckRows,bingRows,googleRows]=await Promise.all([
-      safe(duckWebSearch(q,language,providerDiagnostics),[],"DuckDuckGo Web Search"),
-      safe(bingWebSearch(q,language,providerDiagnostics),[],"Bing Web Search"),
+    const [bingRssRows,googleRows]=await Promise.all([
+      safe(bingWebRssSearch(q,language,providerDiagnostics),[],"Bing Web RSS Search"),
       safe(googleNewsSearch(q,language,providerDiagnostics),[],"Google News Search")
     ]);
-    duckWeb=duckRows.slice(0,8);
-    bingWeb=bingRows.slice(0,8);
+    const bingRss=bingRssRows.slice(0,8);
     google=googleRows.slice(0,8);
-    candidates.push(...duckWeb,...bingWeb,...google);
-    providerAttempted.push("DuckDuckGo Web Search","Bing Web Search","Google News Search",...providerDiagnostics.slice(diagnosticStart));
+    candidates.push(...bingRss,...google);
+    providerAttempted.push("Bing Web RSS Search","Google News Search",...providerDiagnostics.slice(diagnosticStart));
   }
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
-    providerAttempted.push("Expanded topic variants: Wikipedia REST Search, Google News Search, DuckDuckGo Web Search","OpenAI Web Search (fallback)");
+    providerAttempted.push("Expanded topic variants: Wikipedia REST Search, Google News Search, Bing Web RSS Search","OpenAI Web Search (fallback)");
     const expanded=await safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||""),providerAttempted,identityAliases),[]);
-    candidates.push(...expanded.slice(0,24));
+    candidates.push(...expanded.slice(0,12));
     // OpenAI web search is the final recovery path, not a parallel request on
     // every weak first pass. Skip it as soon as independent evidence is adequate.
-    if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
+    if(firstPassCount()===0||((personQuery||academicQuery)&&(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()))){
       const web=await safe(openAiWebSearch(env,q,language,providerDiagnostics),[],"OpenAI Web Search");
-      candidates.push(...web.slice(0,8).map(item=>identityAliases.length?({...item,identityAliases:[...identityAliases]}):item));
+      candidates.push(...web.slice(0,6).map(item=>identityAliases.length?({...item,identityAliases:[...identityAliases]}):item));
     }
   }
   
