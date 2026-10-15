@@ -131,7 +131,7 @@ const readFeed = async (name: string, url: string): Promise<Story[]> => {
     }
     // RSS uses <item>; Atom uses <entry>. Parse both so feeds do not silently
     // become empty just because a publisher changed its feed format.
-    const entries = [...xml.matchAll(/<(item|entry)\b[\s\S]*?<\/\1>/gi)].slice(0, 16);
+    const entries = [...xml.matchAll(/<(item|entry)\b[\s\S]*?<\/\1>/gi)].slice(0, 12);
     return entries.map((match) => {
       const item = match[0];
       const tag = (...names: string[]) => {
@@ -626,8 +626,42 @@ const aiSearchNews = async (env: Env, lang: Locale): Promise<Story[]> => {
   } catch { return []; }
 };
 
-export async function news(env: Env, lang: Locale) {
-  const providers = feeds(lang);
+export async function news(env: Env, lang: Locale, options: {forceRefresh?:boolean} = {}) {
+  const cachedAtStart = await readNewsCache(env, lang);
+  const cacheAge = cachedAtStart?.updatedAt ? Date.now() - Date.parse(cachedAtStart.updatedAt) : Number.POSITIVE_INFINITY;
+  const cachedItems = (cachedAtStart?.items || []).filter((story) => {
+    const published = Date.parse(String(story.publishedAt || ""));
+    return Boolean(story.title && /^https:\/\//i.test(String(story.url || "")) &&
+      Number.isFinite(published) && published <= Date.now() + 5 * 60 * 1000 &&
+      Date.now() - published <= 72 * 60 * 60 * 1000 &&
+      (lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title)) &&
+      isUsableNewsImage(story.imageUrl));
+  });
+  // Public reads must not re-run every RSS parser and image lookup. The scheduled
+  // refresh and self-heal paths explicitly opt into live refresh; visitors receive
+  // recent verified cache entries and avoid exhausting the Free-plan CPU budget.
+  if (!options.forceRefresh && cachedItems.length >= 3) {
+    return {
+      ok: true,
+      stale: !Number.isFinite(cacheAge) || cacheAge > 15 * 60 * 1000,
+      cachedAt: cachedAtStart?.updatedAt,
+      providers: ["BAYAN verified cache"],
+      items: cachedItems.map((story) => ({
+        ...story,
+        publisher: localizedPublisher(story.publisher, lang),
+        summary: languageSafeText(story.summary, lang) ? story.summary : "",
+        sources: [{
+          title: story.title,
+          publisher: localizedPublisher(story.publisher, lang),
+          url: story.url,
+          publishedAt: story.publishedAt,
+          imageUrl: story.imageUrl,
+        } as Source],
+        evidence: "mixed" as const,
+      })),
+    };
+  }
+  const providers = feeds(lang).slice(0, 4);
   const batches = await Promise.all(
     providers.map(([name, url]) => readFeed(name, url)),
   );
@@ -650,14 +684,12 @@ export async function news(env: Env, lang: Locale) {
   // together. Serial retries repeatedly queried Google News and could exhaust the
   // Worker time budget before any stories reached the page.
   if (all.length < 3) {
-    const [google, gdelt, aiSearch, bing, direct] = await Promise.all([
+    const [google, aiSearch, bing] = await Promise.all([
       lang === "ar" ? googleArabicFallback() : googleEnglishFallback(),
-      gdeltFallback(lang),
       aiSearchNews(env, lang),
       bingNewsFallback(lang),
-      directNewsPageFallback(lang),
     ]);
-    const fallback = [...google, ...gdelt, ...aiSearch, ...bing, ...direct]
+    const fallback = [...google, ...aiSearch, ...bing]
       .filter((story) => lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title))
       .map((story) => ({ ...story, summary: languageSafeText(story.summary, lang) ? story.summary : "" }))
       .filter(isFreshNews);
@@ -707,10 +739,10 @@ export async function news(env: Env, lang: Locale) {
     // then search the publisher page and topic-specific image providers.
     if (isUsableNewsImage(story.imageUrl)) return story;
     // Keep publisher-image fetches bounded so feed refresh stays within Worker limits.
-    if (index >= 6) return story;
+    if (index >= 3) return story;
     const direct = await sourceImage(story.url);
     if (isUsableNewsImage(direct)) return { ...story, imageUrl: direct, imageAlt: story.imageAlt || story.title };
-    if (index < 4) {
+    if (index < 2) {
       const image = await findRelatedImage(story.title, story.url);
       if (isUsableNewsImage(image)) return { ...story, imageUrl: image, imageAlt: story.title };
     }
@@ -729,7 +761,7 @@ export async function news(env: Env, lang: Locale) {
       Date.parse(String(story.publishedAt)) <= Date.now() + 5 * 60 * 1000);
   await archiveNewsStories(env, lang, archiveCandidates);
 
-  const cached = await readNewsCache(env, lang);
+  const cached = cachedAtStart;
   // Keep a healthy cache behind the live providers. If providers return nothing
   // (or only a partial batch), reuse recent verified stories instead of rendering
   // an empty news page.

@@ -931,7 +931,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
       const articleSummary=results.find(x=>x.title&&x.summary)?.summary||q;
       // Search answers stay concise; long-form publication gets a separate
       // evidence-gated draft so a short answer is never mistaken for a complete article.
-      if(options.publish!==false&&drafted.status==="verified"&&independentlyVerified&&articleTitle&&!disallowedContent(articleTitle+" "+articleSummary)){
+      if(options.publish!==false&&independentlyVerified&&articleTitle&&!disallowedContent(articleTitle+" "+articleSummary)){
         const publishLongArticle=async()=>{
           const longDraft=await Promise.race([draftArticle(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),18000))]);
           if(longDraft.status!=="verified"||!usefulDraft(longDraft.answer,language))return;

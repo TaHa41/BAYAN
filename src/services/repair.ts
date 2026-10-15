@@ -181,7 +181,7 @@ async function repairRuntime(env:Env,failures:string[]){
   if(failures.includes("news_cache")&&!imageOnlyPass&&!sectionOnlyPass){
     const refreshed:string[]=[];
     for(const language of ["ar","en"] as const){
-      try{const result=await news(env,language);refreshed.push(language+":"+result.items.length)}catch(error){refreshed.push(language+":failed");await record(env,"warn","self_heal_news_refresh",language+" "+String(error).slice(0,300))}
+      try{const result=await news(env,language,{forceRefresh:true});refreshed.push(language+":"+result.items.length)}catch(error){refreshed.push(language+":failed");await record(env,"warn","self_heal_news_refresh",language+" "+String(error).slice(0,300))}
     }
     actions.push("live news refresh attempted for both locales ("+refreshed.join(", ")+"); no news content fabricated");
 

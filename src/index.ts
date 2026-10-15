@@ -282,4 +282,43 @@ if(seoPath==="/sitemap.xml"||seoPath==="/news-sitemap.xml"){
   }
 }
 try{return await page(request,env)}catch(error){const message=String((error as any)?.stack||error).slice(0,1200).replace(/https?:\/\/[^\s]+/g,"[url-redacted]");const rayId=request.headers.get("cf-ray")||"unknown";try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("ERROR","page_render_exception",JSON.stringify({path:u.pathname,rayId,error:message}).slice(0,1800),new Date().toISOString()).run()}catch{}try{await notify(env,"BAYAN PAGE ERROR\\nPath: "+u.pathname+"\\nError: "+message)}catch{}const lang=u.searchParams.get("lang")==="en"?"en":"ar";const title=lang==="en"?"BAYAN is temporarily unavailable":"بيان غير متاح مؤقتًا";const body=lang==="en"?"We could not complete this request. Please retry in a moment.":"تعذر إكمال الطلب هذه المرة. يرجى المحاولة بعد قليل.";const html='<!doctype html><html lang="'+lang+'" dir="'+(lang==="ar"?"rtl":"ltr")+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>'+title+'</title></head><body><main><h1>'+title+'</h1><p>'+body+'</p><a href="/?lang='+lang+'">'+(lang==="en"?"Return home":"العودة للرئيسية")+'</a></main></body></html>';return new Response(html,{status:500,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","Retry-After":"60","X-Content-Type-Options":"nosniff","Referrer-Policy":"strict-origin-when-cross-origin","X-Frame-Options":"DENY","Permissions-Policy":"camera=(), microphone=(), geolocation=()","X-BAYAN-Route-Error":"page-render-failed"}})}
-},async scheduled(_event:ScheduledEvent,env:Env){try{await ensureSchema(env)}catch{}try{const now=Date.now();const previous=await env.DB.prepare("SELECT value FROM admin_settings WHERE key=? LIMIT 1").bind("news_archive_refresh_last").first<any>();const last=Date.parse(String(previous?.value||""));if(!Number.isFinite(last)||now-last>=15*60*1000){const stamp=new Date(now).toISOString();await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind("news_archive_refresh_last",stamp,stamp).run();await Promise.all([news(env,"ar"),news(env,"en")])}}catch(error){try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","scheduled_news_archive_refresh",String(error).slice(0,300),new Date().toISOString()).run()}catch{}}await selfHeal(env);try{const result=await publishNextArchivedNewsArticle(env);if(result.status!=="idle")console.info("news_archive_article_generation",JSON.stringify(result))}catch(error){try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","news_archive_article_generation",String(error).slice(0,350),new Date().toISOString()).run()}catch{}}}};
+},async scheduled(event:ScheduledEvent,env:Env){
+  try{await ensureSchema(env)}catch{}
+  // Free-plan Worker CPU is limited. Run only one expensive maintenance task per
+  // cron invocation instead of combining news refresh, article drafting, and AI repair.
+  const task=Math.floor(Number(event.scheduledTime||Date.now())/(5*60*1000))%3;
+  if(task===0){
+    try{
+      const now=Date.now();
+      const previous=await env.DB.prepare("SELECT value FROM admin_settings WHERE key=? LIMIT 1").bind("news_archive_refresh_last").first<any>();
+      const last=Date.parse(String(previous?.value||""));
+      if(!Number.isFinite(last)||now-last>=15*60*1000){
+        const stamp=new Date(now).toISOString();
+        await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind("news_archive_refresh_last",stamp,stamp).run();
+        const languageSetting=await env.DB.prepare("SELECT value FROM admin_settings WHERE key=? LIMIT 1").bind("news_archive_refresh_language").first<any>();
+        const language=String(languageSetting?.value||"ar")==="en"?"en":"ar";
+        const nextLanguage=language==="ar"?"en":"ar";
+        await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind("news_archive_refresh_language",nextLanguage,stamp).run();
+        await news(env,language,{forceRefresh:true});
+      }
+    }catch(error){
+      try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","scheduled_news_archive_refresh",String(error).slice(0,300),new Date().toISOString()).run()}catch{}
+    }
+  }else if(task===1){
+    try{
+      const result=await publishNextArchivedNewsArticle(env);
+      if(result.status!=="idle"){
+        const level=result.status==="published"?"INFO":"WARN";
+        const details=JSON.stringify(result).slice(0,900);
+        try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind(level,"news_archive_article_generation",details,new Date().toISOString()).run()}catch{}
+        console.info("news_archive_article_generation",details);
+      }
+    }catch(error){
+      try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","news_archive_article_generation",String(error).slice(0,350),new Date().toISOString()).run()}catch{}
+    }
+  }else{
+    try{await selfHeal(env)}catch(error){
+      try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","scheduled_self_heal",String(error).slice(0,300),new Date().toISOString()).run()}catch{}
+    }
+  }
+}};

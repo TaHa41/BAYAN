@@ -314,46 +314,9 @@ const sectionRelevant=(x:any)=>{
  return terms.filter(term=>summaryWords.has(term)).length>=2;
 };
 items=items.filter((x:any)=>(x.slug?String(x.section||"")===section:sectionRelevant(x))&&(x.kind==="evidence"||(articleBodyQuality(String(x.body||"")).ok&&articleEvidenceQuality(x.sources)))).filter(localeSafeItem);
-const imageCandidates=items.filter((x:any)=>x.slug&&!/^https:\/\//i.test(String(x.imageUrl||""))).slice(0,3);
-await Promise.all(imageCandidates.map(async(item:any)=>{try{const imageUrl=await bounded(findRelatedImage(String(item.title||"")),2000);if(imageUrl&&/^https:\/\//i.test(imageUrl)){item.imageUrl=imageUrl;item.imageAlt=String(item.title||"");await env.DB.prepare("UPDATE articles SET image_url=?,image_alt=?,updated_at=? WHERE slug=? AND language=? AND (image_url IS NULL OR trim(image_url)='')").bind(imageUrl,item.imageAlt,new Date().toISOString(),item.slug,lang).run();}}catch{}}));
 items=items.filter((x:any)=>x.kind==="evidence"||/^https:\/\//i.test(String(x.imageUrl||"")));
 if(items.length<2&&section!=="prices"){
  try{
-  const queries:Record<string,{ar:string;en:string}>={
-   science:{ar:"اكتشافات علمية وشرح مبادئ العلوم من مصادر موثوقة",en:"science discoveries and evidence-based explanations of science"},
-   technology:{ar:"تقنيات الذكاء الاصطناعي والحوسبة وأمن المعلومات",en:"artificial intelligence computing and information security explained"},
-   economy:{ar:"شرح التضخم والأسواق والاقتصاد من مصادر موثوقة",en:"economics inflation markets and financial systems explained"},
-   politics:{ar:"الانتخابات والبرلمان والحكومة والسياسة العامة في مصر والعالم العربي",en:"politics elections parliaments and government policy in Egypt and the Arab world"},
-   health:{ar:"الصحة العامة والطب المبني على الأدلة من مصادر طبية",en:"public health and evidence-based medicine from medical sources"},
-   history:{ar:"أحداث تاريخية وحضارات وسياق تاريخي من مصادر موثوقة",en:"historical events civilizations and historical context from reliable sources"},
-   people:{ar:"سيرة ذاتية لشخصيات عامة موثقة وحياتهم وأعمالهم",en:"biography and life stories of public figures from reliable sources"},
-   sports:{ar:"كرة القدم والبطولات الرياضية والنتائج والإحصاءات",en:"football leagues sports results and competition statistics"},
-   travel:{ar:"السياحة ووجهات السفر وإرشادات التأشيرات الرسمية",en:"travel destinations tourism and official visa guidance"},
-   art:{ar:"السينما المصرية والموسيقى العربية والفنون التشكيلية والمسرح",en:"Egyptian cinema Arabic music visual arts and theatre"},
-   trends:{ar:"ترندات مواقع التواصل الاجتماعي واستطلاعات الرأي والبيانات الاجتماعية",en:"social media trends public opinion surveys and current data"},
-   egypt:{ar:"مصر: الجغرافيا والمدن ونهر النيل والمعلومات العامة",en:"Egypt geography cities the Nile and public information"},
-   arab:{ar:"العالم العربي والجامعة العربية والبلدان العربية والثقافة العربية",en:"the Arab world Arab League Arab countries and Arabic culture"},
-   world:{ar:"قضايا عالمية وتحولات دولية وتأثيراتها بمصادر موثوقة",en:"global issues international changes and their impacts from reliable sources"}
-  };
-  const meta=sectionBySlug(section)!;
-  const q=queries[section]?.[lang]||(lang==="ar"?meta.descriptionAr:meta.descriptionEn);
-  const alternateQueries:Record<string,{ar:string;en:string}>={
-   science:{ar:"أبحاث علمية ونتائج دراسات وتجارب منشورة من الجامعات والمؤسسات العلمية",en:"published scientific studies research findings experiments and university research"},
-   technology:{ar:"أخبار التكنولوجيا وأدوات الذكاء الاصطناعي والبرمجيات والأمن السيبراني",en:"technology news artificial intelligence software cybersecurity and computing"},
-   economy:{ar:"مؤشرات الاقتصاد وأسعار الأسواق والبنوك والتجارة والتضخم",en:"economic indicators financial markets banking trade and inflation"},
-   politics:{ar:"البرلمان والحكومة والانتخابات والتشريعات والقرارات السياسية",en:"government decisions legislation elections parliament and public policy"},
-   health:{ar:"إرشادات الصحة العامة والأبحاث الطبية والوقاية والتشخيص من جهات طبية",en:"public health guidance medical research prevention and diagnosis from health authorities"},
-   history:{ar:"وثائق تاريخية وآثار وحضارات وشخصيات وأحداث تاريخية موثقة",en:"historical documents archaeology civilizations and documented historical events"},
-   people:{ar:"الشخصيات العامة والسير الذاتية والإنجازات الموثقة",en:"public figures biographies and documented achievements"},
-   sports:{ar:"نتائج البطولات والمباريات والاتحادات الرياضية والإحصاءات الرسمية",en:"sports tournament match results official leagues and verified statistics"},
-   travel:{ar:"المعالم السياحية والوجهات والحدائق والمتاحف وإرشادات السفر الرسمية",en:"tourism landmarks destinations parks museums and official travel advice"},
-   art:{ar:"الأعمال الفنية والعروض والأفلام والموسيقى والمعارض ومصادرها الرسمية",en:"arts performances films music exhibitions and official cultural sources"},
-   trends:{ar:"بيانات الاتجاهات العامة واستطلاعات الرأي ومؤشرات البحث ومصادر البيانات",en:"public trend data opinion polls search interest and data sources"},
-   egypt:{ar:"محافظات مصر ومعالمها وتاريخها وخدماتها ومعلومات الجهات الرسمية",en:"Egyptian governorates landmarks history services and official information"},
-   arab:{ar:"البلدان العربية وثقافتها واقتصادها ومؤسساتها الإقليمية",en:"Arab countries culture economies and regional institutions"},
-   world:{ar:"التطورات الدولية والمنظمات العالمية والبيئة والتجارة الدولية",en:"international developments global organizations environment and international trade"}
-  };
-  let found:any={results:[]};
   let cachedEvidence:any[]=[];
   try{
    const since=new Date(Date.now()-7*86400000).toISOString();
@@ -365,8 +328,7 @@ if(items.length<2&&section!=="prices"){
      const title=String(item?.title||""),summary=String(item?.summary||"");
      const key=title.normalize("NFKC").toLowerCase().trim();
      if(!title||!summary||!key||seenCached.has(key))continue;
-     const safe=lang==="ar"?hasArabic(title)&&hasArabic(summary):!hasArabic(title)&&!hasArabic(summary);
-     if(!safe||!sectionRelevant(item))continue;
+     if(!localeSafeItem(item)||!sectionRelevant(item)||!safePublicImageUrl(item.imageUrl))continue;
      seenCached.add(key);cachedEvidence.push({...item,section,kind:"evidence"});
      if(cachedEvidence.length>=8)break;
     }
@@ -374,41 +336,21 @@ if(items.length<2&&section!=="prices"){
    }
   }catch{}
   items=[...items,...cachedEvidence];
-  if(cachedEvidence.length<2){
-   try{
-    found=await bounded(search(env,q,lang),5500);
-    const usable=(results:any[])=>results.filter((x:any)=>{
-     const title=String(x?.title||""),summary=String(x?.summary||""),body=String(x?.body||"");
-     return title&&summary&&sectionRelevant(x)&&(lang==="ar"?hasArabic(title)&&hasArabic(summary)&&(!body||hasArabic(body)):!hasArabic(title)&&!hasArabic(summary)&&!hasArabic(body));
-    });
-    const alt=alternateQueries[section]?.[lang];
-    if(usable(found.results||[]).length<2&&alt){
-     try{
-      const more=await bounded(search(env,alt,lang),5500);
-      const seen=new Set((found.results||[]).map((x:any)=>String(x.url||x.title||"").trim().toLowerCase()));
-      found={...found,results:[...(found.results||[]),...(more.results||[]).filter((x:any)=>{const key=String(x.url||x.title||"").trim().toLowerCase();if(!key||seen.has(key))return false;seen.add(key);return true;})]};
-     }catch{}
-    }
-   }catch{found={results:[]};}
-  }
   const refreshed=await listArticles(env,section,lang,24);
   const existingSlugs=new Set(items.map((x:any)=>String(x.slug||"")).filter(Boolean));
-  const refreshedComplete=refreshed.filter((x:any)=>x.slug&&!existingSlugs.has(String(x.slug))&&articleBodyQuality(String(x.body||"")).ok&&localeSafeItem(x)&&(x.slug?String(x.section||"")===section:sectionRelevant(x))&&/^https:\/\//i.test(String(x.imageUrl||"")));
+  const refreshedComplete=refreshed.filter((x:any)=>x.slug&&!existingSlugs.has(String(x.slug))&&articleBodyQuality(String(x.body||"")).ok&&localeSafeItem(x)&&String(x.section||"")===section&&/^https:\/\//i.test(String(x.imageUrl||"")));
   items=[...items,...refreshedComplete];
-  const completeCount=items.filter((x:any)=>x.slug&&articleBodyQuality(String(x.body||"")).ok&&/^https:\/\//i.test(String(x.imageUrl||""))).length;
-  if(completeCount<2){
-   const existingTitles=new Set(items.map((x:any)=>String(x.title||"").normalize("NFKC").toLowerCase().trim()));
-   const fallback=(found.results||[]).filter((x:any)=>{const title=String(x?.title||""),summary=String(x?.summary||""),body=String(x?.body||"");return title&&summary&&!existingTitles.has(title.normalize("NFKC").toLowerCase().trim())&&sectionRelevant(x)&&articleLocaleSafe(title,lang)&&articleLocaleSafe(summary,lang)&&(!body||articleLocaleSafe(body,lang));}).slice(0,12).map((x:any)=>({...x,section:section,kind:"evidence"}));
-   items=[...items,...fallback];
-  }
+
  }catch{}
 }
 try{
-  const archived=await env.DB.prepare("SELECT id,title,summary,publisher,published_at,image_url,image_alt,section,fetched_at FROM news_archive WHERE language=? AND section=? ORDER BY COALESCE(published_at,fetched_at) DESC LIMIT 12").bind(lang,section).all<any>();
+  const newsCutoff=new Date(Date.now()-72*60*60*1000).toISOString();
+  const newsFuture=new Date(Date.now()+5*60*1000).toISOString();
+  const archived=await env.DB.prepare("SELECT id,title,summary,publisher,published_at,image_url,image_alt,section,fetched_at FROM news_archive WHERE language=? AND section=? AND fetched_at>=? AND published_at>=? AND published_at<=? AND length(summary)>=120 AND image_url IS NOT NULL AND trim(image_url)<>'' ORDER BY published_at DESC LIMIT 12").bind(lang,section,newsCutoff,newsCutoff,newsFuture).all<any>();
   for(const row of archived.results||[]){
-    const title=String(row.title||""),summary=String(row.summary||"");
-    if(!title||!localeSafeItem({title,summary})||items.some((item:any)=>String(item.title||"").trim().toLowerCase()===title.trim().toLowerCase()))continue;
-    items.push({id:Number(row.id),title,summary,publisher:String(row.publisher||""),publishedAt:row.published_at||null,imageUrl:safePublicImageUrl(row.image_url),imageAlt:String(row.image_alt||title),section,kind:"news_archive",body:summary,slug:"",href:"/news?archive="+encodeURIComponent(String(row.id))+"&lang="+lang,sources:[],archivedAt:String(row.fetched_at||"")});
+    const title=String(row.title||""),summary=String(row.summary||""),imageUrl=safePublicImageUrl(row.image_url);
+    if(!title||summary.length<120||!imageUrl||!localeSafeItem({title,summary})||items.some((item:any)=>String(item.title||"").trim().toLowerCase()===title.trim().toLowerCase()))continue;
+    items.push({id:Number(row.id),title,summary,publisher:String(row.publisher||""),publishedAt:row.published_at||null,imageUrl,imageAlt:String(row.image_alt||title),section,kind:"news_archive",body:summary,slug:"",href:"/news?archive="+encodeURIComponent(String(row.id))+"&lang="+lang,sources:[],archivedAt:String(row.fetched_at||"")});
   }
 }catch{}
 items=items.filter((item:any)=>localeSafeItem(item)&&(()=>{const text=String(item?.body||item?.summary||"");return lang==="ar"?/[؀-ۿ]/.test(text):!/[؀-ۿ]/.test(text)})());

@@ -25,7 +25,7 @@ export async function publishNextArchivedNewsArticle(env:Env){
   try{
     const result=await search(env,title,language,{publish:true,draft:true,images:true});
     const slug=String(result.articleSlug||"").trim();
-    if(!slug)return{status:"attempted_no_publish" as const,id,language};
+    if(!slug)return{status:"attempted_no_publish" as const,id,language,searchStatus:result.status,resultCount:Array.isArray(result.results)?result.results.length:0,sourceCount:new Set((result.results||[]).flatMap((item:any)=>item.sources||[]).map((source:any)=>String(source.url||"").trim()).filter(Boolean)).size,providers:Array.isArray(result.providers)?result.providers.slice(0,8):[]};
     await env.DB.prepare("UPDATE news_archive SET article_slug=? WHERE id=?").bind(slug,id).run();
     return{status:"published" as const,id,language,slug};
   }catch(error){
