@@ -16,7 +16,7 @@ const timeout = async (url:string, ms=2600, diagnostics?:string[], provider="ext
     // return full HTML pages; buffering several multi-megabyte pages concurrently
     // can exhaust a Worker even when every provider has a timeout.
     const contentType=String(response.headers.get("content-type")||"").toLowerCase();
-    const maxBytes=/text\/html/.test(contentType)?768*1024:/xml|rss|text\/plain/.test(contentType)?1024*1024:1536*1024;
+    const maxBytes=/text\/html/.test(contentType)?256*1024:/xml|rss|text\/plain/.test(contentType)?384*1024:768*1024;
     const declaredSize=Number(response.headers.get("content-length")||0);
     if(declaredSize>maxBytes){
       await response.body?.cancel().catch(()=>{});
@@ -164,7 +164,7 @@ async function wikidataEntityAliases(qid:string,diagnostics?:string[]):Promise<s
   }catch(error){reportProviderFailure(diagnostics,"Wikidata entity aliases",error);return[]}
 }
 async function gdelt(q:string,diagnostics?:string[]):Promise<Candidate[]>{
- try{const u="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(q)+"&mode=artlist&maxrecords=8&format=json&sort=HybridRel";const r=await timeout(u,4000,diagnostics,"GDELT");if(!r.ok){diagnostics?.push("GDELT HTTP "+r.status);return[];}const d=await r.json<any>();const articles=d.articles||[];const out=articles.map((x:any)=>({title:cleanText(x.title),summary:cleanText(x.seendate||"")+" "+cleanText(x.domain||""),section:"news",kind:"web",evidence:"mixed",sources:[source(x.title,x.domain||"GDELT",x.url)],url:x.url,score:scoreSource(x.domain||"GDELT",x.title,q),provider:"GDELT"})).filter((x:any)=>x.title&&x.url);diagnostics?.push("GDELT raw="+articles.length+" accepted="+out.length);return out}catch(error){reportProviderFailure(diagnostics,"GDELT",error);return[]}
+ try{const u="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(q)+"&mode=artlist&maxrecords=8&format=json&sort=HybridRel";const r=await timeout(u,1800,diagnostics,"GDELT");if(!r.ok){diagnostics?.push("GDELT HTTP "+r.status);return[];}const d=await r.json<any>();const articles=d.articles||[];const out=articles.map((x:any)=>({title:cleanText(x.title),summary:cleanText(x.seendate||"")+" "+cleanText(x.domain||""),section:"news",kind:"web",evidence:"mixed",sources:[source(x.title,x.domain||"GDELT",x.url)],url:x.url,score:scoreSource(x.domain||"GDELT",x.title,q),provider:"GDELT"})).filter((x:any)=>x.title&&x.url);diagnostics?.push("GDELT raw="+articles.length+" accepted="+out.length);return out}catch(error){reportProviderFailure(diagnostics,"GDELT",error);return[]}
 }
 const decodeXml=(value:string)=>String(value||"").replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,"$1").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n)));
 async function googleNewsSearch(q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
@@ -234,7 +234,7 @@ async function openAiWebSearch(env:Env,q:string,language:Locale,diagnostics?:str
     const response=await fetch("https://api.openai.com/v1/responses",{
       method:"POST",
       headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},
-      signal:AbortSignal.timeout(9000),
+      signal:AbortSignal.timeout(6500),
       body:JSON.stringify({
         model:env.OPENAI_MODEL||"gpt-5-mini",
         tools:[{type:"web_search"}],
@@ -547,12 +547,12 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
       : (sportsProfile
         ? [q+" latest news",q+" transfer news",q+" official profile"]
         : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
-    : (language==="ar" ? [normalized,compact+" معلومات ومصادر موثوقة",q+" شرح"] : [normalized,compact+" reliable sources",q+" overview"]);
+    : (language==="ar" ? [compact+" معلومات ومصادر موثوقة",q+" شرح"] : [compact+" reliable sources",q+" overview"]);
   // Run the first variant alone, then fan out remaining bounded variants only
   // when evidence is still sparse. This avoids unnecessary provider load while
   // keeping the worst-case recovery window short enough for the browser request.
-  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,2);
-  const labels=["Wikipedia REST Search","Google News Search","Bing Web Search"];
+  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,person?2:1);
+  const labels=["Wikipedia REST Search","Google News Search","DuckDuckGo Web Search"];
   const runVariant=async(variant:string,variantIndex:number):Promise<Candidate[]>=>{
     // GDELT repeatedly timed out in production and amplified request fan-out.
     // Keep each recovery variant to three independent providers; try a second
@@ -560,7 +560,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
     const results=await Promise.all([
       wikipediaRestSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Wikipedia REST Search",error);return[]}),
       googleNewsSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Google News Search",error);return[]}),
-      bingWebSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing Web Search",error);return[]})
+      duckWebSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"DuckDuckGo Web Search",error);return[]})
     ]);
     diagnostics.push("Expanded variant "+(variantIndex+1)+" result counts: "+labels.map((label,index)=>label+"="+(results[index]?.length||0)).join(", "));
     return results.flat();
@@ -762,7 +762,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     providerAttempted.push(...(s.source_gdelt==="0"?[]:["GDELT"]),"DuckDuckGo Web Search","Bing Web Search","Google News Search",...providerDiagnostics.slice(diagnosticStart));
   }
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
-    providerAttempted.push("Expanded topic variants: Wikipedia REST Search, Google News Search, Bing Web Search","OpenAI Web Search (fallback)");
+    providerAttempted.push("Expanded topic variants: Wikipedia REST Search, Google News Search, DuckDuckGo Web Search","OpenAI Web Search (fallback)");
     const expanded=await safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||""),providerAttempted,identityAliases),[]);
     candidates.push(...expanded.slice(0,24));
     // OpenAI web search is the final recovery path, not a parallel request on
@@ -890,7 +890,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   const exactPersonConfirmed=!personQuery||results.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
   if(results.length&&exactPersonConfirmed&&options.draft!==false){
     try{
-      const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),10000))]);
+      const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),7500))]);
       if(drafted.answer){answer=drafted.answer;answerStatus=independentlyVerified?drafted.status:"mixed";}
       const articleTitle=results.find(x=>x.title&&x.summary)?.title||"";
       const articleSummary=results.find(x=>x.title&&x.summary)?.summary||q;
