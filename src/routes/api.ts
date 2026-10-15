@@ -263,7 +263,7 @@ export async function api(request:Request,env:Env){const u=new URL(request.url),
     }
   }catch{}
   return json({section,items:items.map((item:any)=>({...item,imageUrl:safePublicImageUrl(item.imageUrl)}))})
-}let items=await listArticles(env,section,lang,24);
+}let items:any[]=await listArticles(env,section,lang,24);
 const hasArabic=(value:unknown)=>/[\u0600-\u06ff]/.test(String(value||""));
 const localeSafeItem=(x:any)=>{const title=String(x?.title||""),summary=String(x?.summary||""),bodyText=String(x?.body||"");return lang==="ar"?hasArabic(title)&&(!summary||hasArabic(summary))&&(!bodyText||hasArabic(bodyText)):!hasArabic(title)&&!hasArabic(summary)&&!hasArabic(bodyText);};
 const sectionPatterns:Record<string,RegExp>={
