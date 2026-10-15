@@ -12,9 +12,16 @@ const timeout = async (url:string, ms=2600, diagnostics?:string[], provider="ext
   const c=new AbortController(); const t=setTimeout(()=>c.abort(),ms);
   try {
     const response=await fetch(url,{signal:c.signal,headers:{accept:"application/json,text/plain,*/*","user-agent":"BAYAN/1.2 (+https://bayan.tahaomar411.workers.dev; contact: bayan.contact@yahoo.com)","api-user-agent":"BAYAN/1.2 (https://bayan.tahaomar411.workers.dev)"}});
-    // fetch() resolves when headers arrive, not when the response body has been
-    // consumed. Keep the abort timer active while reading the body so a slow
-    // provider cannot bypass the advertised timeout after sending headers.
+    // Bound memory and parsing cost per upstream response. Search providers often
+    // return full HTML pages; buffering several multi-megabyte pages concurrently
+    // can exhaust a Worker even when every provider has a timeout.
+    const contentType=String(response.headers.get("content-type")||"").toLowerCase();
+    const maxBytes=/text\/html/.test(contentType)?768*1024:/xml|rss|text\/plain/.test(contentType)?1024*1024:1536*1024;
+    const declaredSize=Number(response.headers.get("content-length")||0);
+    if(declaredSize>maxBytes){
+      await response.body?.cancel().catch(()=>{});
+      throw new Error("response_body_too_large");
+    }
     const bodyless=response.status===204||response.status===205||response.status===304;
     let body:ArrayBuffer|null=null;
     if(!bodyless&&response.body){
@@ -26,7 +33,7 @@ const timeout = async (url:string, ms=2600, diagnostics?:string[], provider="ext
           const part=await reader.read();
           if(part.done)break;
           total+=part.value.byteLength;
-          if(total>4*1024*1024){
+          if(total>maxBytes){
             await reader.cancel().catch(()=>{});
             throw new Error("response_body_too_large");
           }
@@ -544,14 +551,14 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   // Run the first variant alone, then fan out remaining bounded variants only
   // when evidence is still sparse. This avoids unnecessary provider load while
   // keeping the worst-case recovery window short enough for the browser request.
-  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,3);
-  const labels=["Wikipedia REST Search","GDELT","Google News Search","Bing Web Search"];
+  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,2);
+  const labels=["Wikipedia REST Search","Google News Search","Bing Web Search"];
   const runVariant=async(variant:string,variantIndex:number):Promise<Candidate[]>=>{
-    // Keep per-request provider fan-out bounded. Running six HTML/RSS parsers
-    // for each variant caused Cloudflare Worker resource-limit errors under load.
+    // GDELT repeatedly timed out in production and amplified request fan-out.
+    // Keep each recovery variant to three independent providers; try a second
+    // wording only when the first one still lacks useful independent evidence.
     const results=await Promise.all([
       wikipediaRestSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Wikipedia REST Search",error);return[]}),
-      gdelt(variant,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"GDELT",error);return[]}),
       googleNewsSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Google News Search",error);return[]}),
       bingWebSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing Web Search",error);return[]})
     ]);
@@ -668,20 +675,37 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const providerDiagnostics:string[]=[];const safe=async<T>(task:Promise<T>,fallback:T,provider="external provider"):Promise<T>=>{try{return await task}catch(error){reportProviderFailure(providerDiagnostics,provider,error);return fallback}};const academicQuery=/(research|paper|papers|study|studies|journal|doi|scholar|academic|citation|crossref|openalex|pubmed|clinical trial|systematic review|بحث علمي|أبحاث|دراسة|دراسات|مجلة علمية|ورقة بحثية|مصدر أكاديمي|دراسات سريرية|مراجعة منهجية)/i.test(q);
 const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|medicine|health study|بحث طبي|دراسة طبية|دراسات سريرية|تجربة سريرية|مراجعة منهجية)/i.test(q);
-let [local, wiki, wikiRest, wd, gd, oa, remote, dd, duckWeb, bingWeb, google, bing, crossref, pubmed] = await Promise.all([safe(searchArticles(env,q,language,max),[],"BAYAN Knowledge Base"),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language,providerDiagnostics),[],"Wikipedia"),safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipediaRestSearch(q,language,providerDiagnostics),[],"Wikipedia REST Search"),safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language,providerDiagnostics),[],"Wikidata"),safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q,providerDiagnostics),[],"GDELT"),safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q,providerDiagnostics),[],"OpenAlex"),safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q,providerDiagnostics),[],"Cloudflare AI Search"),safe(duck(q,language,providerDiagnostics),[],"DuckDuckGo Instant Answers"),safe(duckWebSearch(q,language,providerDiagnostics),[],"DuckDuckGo Web Search"),safe(bingWebSearch(q,language,providerDiagnostics),[],"Bing Web Search"),safe(googleNewsSearch(q,language,providerDiagnostics),[],"Google News Search"),Promise.resolve([]),safe((academicQuery&&!personLookup(q))?crossrefSearch(q,providerDiagnostics):Promise.resolve([]),[],"Crossref"),safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language,providerDiagnostics),[],"PubMed / NCBI")]);
-const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...(s.source_gdelt==="0"?[]:["GDELT"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers","DuckDuckGo Web Search","Bing Web Search","Google News Search"];providerAttempted.push(...providerDiagnostics);const candidates:Candidate[]=[
+// Stage discovery: query the local index and compact reference providers first.
+  // Broad HTML/RSS providers run only if the first batch lacks relevant evidence,
+  // preventing each visitor search from launching a dozen expensive requests at once.
+  let [local, wiki, wikiRest, wd, remote, dd, oa, crossref, pubmed] = await Promise.all([
+    safe(searchArticles(env,q,language,max),[],"BAYAN Knowledge Base"),
+    safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language,providerDiagnostics),[],"Wikipedia"),
+    safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipediaRestSearch(q,language,providerDiagnostics),[],"Wikipedia REST Search"),
+    safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language,providerDiagnostics),[],"Wikidata"),
+    safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q,providerDiagnostics),[],"Cloudflare AI Search"),
+    safe(duck(q,language,providerDiagnostics),[],"DuckDuckGo Instant Answers"),
+    safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q,providerDiagnostics),[],"OpenAlex"),
+    safe((academicQuery&&!personLookup(q))?crossrefSearch(q,providerDiagnostics):Promise.resolve([]),[],"Crossref"),
+    safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language,providerDiagnostics),[],"PubMed / NCBI")
+  ]);
+  let gd:Candidate[]=[];
+  let duckWeb:Candidate[]=[];
+  let bingWeb:Candidate[]=[];
+  let google:Candidate[]=[];
+  const bing:Candidate[]=[];
+  const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers"];
+  providerAttempted.push(...providerDiagnostics);
+  const candidates:Candidate[]=[
     ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wikiRest,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...duckWeb,...bingWeb,...google,...bing
   ];
-  // Run authenticated Enterprise search even when public Wikipedia is down or empty.
-  // Previously the `wiki.length` gate disabled this independent provider precisely
-  // when the primary encyclopedia provider failed, leaving fewer recovery paths.
-  if (env.WIKIMEDIA_ENTERPRISE_USERNAME && env.WIKIMEDIA_ENTERPRISE_REFRESH_TOKEN) {
-    const enterpriseQueries = [...new Set([q, ...wiki.slice(0, 2).map(x => x.title)].map(x => String(x || "").trim()).filter(Boolean))].slice(0, 3);
-    const enterpriseRows = await safe(searchWikimediaEnterprise(env, enterpriseQueries, language), [], "Wikimedia Enterprise");
+  // Use the authenticated Enterprise index as a recovery provider only when
+  // primary discovery is empty or thin; avoid token/article requests on every search.
+  if(env.WIKIMEDIA_ENTERPRISE_USERNAME&&env.WIKIMEDIA_ENTERPRISE_REFRESH_TOKEN&&(!wiki.length||!wikiRest.length||candidates.length<5)){
+    const enterpriseQueries=[q];
+    const enterpriseRows=await safe(searchWikimediaEnterprise(env,enterpriseQueries,language),[],"Wikimedia Enterprise");
     providerAttempted.push("Wikimedia Enterprise");
-    for (const row of enterpriseRows) {
-      candidates.push({ ...row, score: scoreSource("Wikimedia Enterprise", row.title, q) + 12, provider: "Wikimedia Enterprise" });
-    }
+    for(const row of enterpriseRows)candidates.push({...row,score:scoreSource("Wikimedia Enterprise",row.title,q)+12,provider:"Wikimedia Enterprise"});
   }
   // Person/name lookups should return a useful collection, not stop after the first matching page.
   const personQuery=personLookup(q)||nameOnlyArabicQuery(q);
@@ -723,12 +747,30 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
   // single publisher, encyclopedia-only results, or very thin snippets.
   const expansionThreshold=personQuery?Math.min(6,Math.max(3,Number(s.min_sources||3))):Math.max(3,Number(s.min_sources||3));
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
-    providerAttempted.push("Expanded topic variants: Wikipedia, Wikipedia REST Search, Wikidata, GDELT, DuckDuckGo Web Search, Bing Web Search, Bing Web RSS Search, Google News Search, Bing News RSS","OpenAI Web Search (fallback)");
-    const [expanded,web]=await Promise.all([
-      safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||""),providerAttempted,identityAliases),[]),
-      safe(openAiWebSearch(env,q,language,providerDiagnostics),[],"OpenAI Web Search")
+    const diagnosticStart=providerDiagnostics.length;
+    const [gdRows,duckRows,bingRows,googleRows]=await Promise.all([
+      safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q,providerDiagnostics),[],"GDELT"),
+      safe(duckWebSearch(q,language,providerDiagnostics),[],"DuckDuckGo Web Search"),
+      safe(bingWebSearch(q,language,providerDiagnostics),[],"Bing Web Search"),
+      safe(googleNewsSearch(q,language,providerDiagnostics),[],"Google News Search")
     ]);
-    candidates.push(...expanded,...web.map(item=>identityAliases.length?({...item,identityAliases:[...identityAliases]}):item));
+    gd=gdRows.slice(0,6);
+    duckWeb=duckRows.slice(0,8);
+    bingWeb=bingRows.slice(0,8);
+    google=googleRows.slice(0,8);
+    candidates.push(...gd,...duckWeb,...bingWeb,...google);
+    providerAttempted.push(...(s.source_gdelt==="0"?[]:["GDELT"]),"DuckDuckGo Web Search","Bing Web Search","Google News Search",...providerDiagnostics.slice(diagnosticStart));
+  }
+  if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
+    providerAttempted.push("Expanded topic variants: Wikipedia REST Search, Google News Search, Bing Web Search","OpenAI Web Search (fallback)");
+    const expanded=await safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||""),providerAttempted,identityAliases),[]);
+    candidates.push(...expanded.slice(0,24));
+    // OpenAI web search is the final recovery path, not a parallel request on
+    // every weak first pass. Skip it as soon as independent evidence is adequate.
+    if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
+      const web=await safe(openAiWebSearch(env,q,language,providerDiagnostics),[],"OpenAI Web Search");
+      candidates.push(...web.slice(0,8).map(item=>identityAliases.length?({...item,identityAliases:[...identityAliases]}):item));
+    }
   }
   
   // Expanded providers are appended after the first-pass identity cleanup; sanitize them too before ranking.
