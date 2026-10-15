@@ -756,15 +756,19 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
       if (sourceUrl && !sourceKeys.has(sourceUrl)) { existing.sources.push(source); sourceKeys.add(sourceUrl); }
     }
     if ((!existing.summary || existing.summary.length < 80) && candidate.summary) existing.summary = candidate.summary;
+    if (!safePublicImageUrl(existing.imageUrl) && safePublicImageUrl(candidate.imageUrl)) {
+      existing.imageUrl = safePublicImageUrl(candidate.imageUrl);
+      existing.imageAlt = candidate.imageAlt || candidate.title || existing.title;
+    }
   }
   const results=[...uniqueByTitle.values()].slice(0,max).map(({score,provider,identityAliases,...x})=>{const rawSources=Array.isArray(x.sources)?x.sources:[];const hasOnlyReferenceSources=rawSources.length>0&&rawSources.every(src=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(src.publisher||"")));return{...x,evidence:hasOnlyReferenceSources?"source_only":(x.evidence||"mixed"),summary:localeSafeText(x.summary,language)?x.summary:(personQuery&&normalizedEntityTitle(x.title)===normalizedEntityTitle(q)?localizedPersonDescription(x.summary,language):""),sources:rawSources.map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}});
   // Resolve a subject-specific image for the canonical person result before returning
   // cards, so the exact image can also be carried into the opened article.
   if(personQuery&&options.images!==false){
     const canonical=results.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
-    if(canonical&&!/^https:\/\//i.test(String(canonical.imageUrl||""))){
+    if(canonical&&!safePublicImageUrl(canonical.imageUrl)){
       const image=await Promise.race([findRelatedImage(String(canonical.title||q),String(canonical.url||canonical.sources?.[0]?.url||""),String(canonical.summary||"")),new Promise<undefined>(resolve=>setTimeout(()=>resolve(undefined),4500))]).catch(()=>undefined);
-      if(image&&/^https:\/\//i.test(image)){canonical.imageUrl=image;canonical.imageAlt=String(canonical.title||q);}
+      if(safePublicImageUrl(image)){canonical.imageUrl=safePublicImageUrl(image);canonical.imageAlt=String(canonical.title||q);}
     }
   }
   for(const item of results){item.imageUrl=safePublicImageUrl(item.imageUrl);for(const source of item.sources||[])source.imageUrl=safePublicImageUrl(source.imageUrl);}
