@@ -25,10 +25,11 @@ describe("newsSitemap database failure handling", () => {
     const response = await newsSitemap(env);
     const body = await response.text();
     expect(response.status).toBe(200);
-    expect(body).toContain("/news?archive=42&amp;lang=en");
-    expect(body).toContain("<news:title>A substantial current news report</news:title>");
+    expect(body).not.toContain("archive=42");
+    expect(body).not.toContain("<news:title>A substantial current news report</news:title>");
     expect(body).not.toContain("archive=43");
     expect(response.headers.get("x-bayan-news-sitemap-archive-eligible-count")).toBe("1");
+    expect(response.headers.get("x-bayan-news-sitemap-eligible-count")).toBe("0");
   });
 
   it("returns valid empty XML only when the database query succeeds with no eligible articles", async () => {
