@@ -7,12 +7,6 @@ on:
     paths:
       - "scripts/production-smoke.mjs"
       - "scripts/production-self-heal.mjs"
-      - "src/**"
-      - "public/**"
-      - "migrations_v1/**"
-      - "wrangler.jsonc"
-      - "package.json"
-      - ".github/workflows/production-smoke.yml"
   schedule:
     - cron: "17 */6 * * *"
 
