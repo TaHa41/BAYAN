@@ -321,7 +321,7 @@ try{
   const hostCoverage=new Set();
   const outcomes=[];
   // Use two concurrent queries at a time to reduce wall-clock time without flooding providers.
-  await inBatches(generalQueries,2,async item=>{
+  await inBatches(generalQueries,1,async item=>{
     try{
       const response=await get("/api/search?q="+encodeURIComponent(item.q)+"&lang="+item.lang);
       const data=JSON.parse(response.text);
@@ -342,7 +342,7 @@ try{
   if(hostCoverage.size<4)throw new Error("general_search_source_diversity_too_low");
 }catch(e){console.error("GENERAL_SEARCH_MATRIX",e);bad++}
 const sectionChecks=sections.filter(section=>section!=="prices").flatMap(section=>["ar","en"].map(language=>({section,language})));
-await inBatches(sectionChecks,4,async({section,language})=>{
+await inBatches(sectionChecks,2,async({section,language})=>{
   try{
     const x=await get("/api/section?section="+section+"&lang="+language); const d=JSON.parse(x.text);
     if(!Array.isArray(d.items)||d.items.length<2)throw new Error(section+"_"+language+"_needs_at_least_two_articles");
