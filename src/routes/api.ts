@@ -14,7 +14,7 @@ const articleHasNamesakeContamination=(title:string,bodyText:string,sources:any[
  return bodyHasDisambiguation||wikipediaNamesakes.length>=2;
 };
 const articleEditorialProfile=(title:string,lang:Locale)=>{const q=String(title||"").normalize("NFKC").toLowerCase();const profiles:[RegExp,string,string][]=[
-[/(biography|who is|profile|born|career|writer|scientist|athlete|actor|president|نجيب|ماري|سيرة|من هو|من هي|ولد|ولدت|عالم|عالمة|كاتب|لاعب|رئيس|شخصية)/i,"biography","سيرة وشخصية"],
+[/(biography|who is|profile|born|career|writer|scientist|athlete|actor|president|سيرة|من هو|من هي|ولد|ولدت|حياته|حياتها|مسيرته|مسيرتها|أعماله|أعمالها|إرثه|إرثها|إنجازاته|إنجازاتها|عالم|عالمة|كاتب|لاعب|رئيس|شخصية)/i,"biography","سيرة وشخصية"],
 [/(news|latest|today|breaking|announced|report|election|war|attack|resigns|launches|أخبار|عاجل|اليوم|أعلن|تعلن|انتخابات|حرب|هجوم|استقال|إطلاق)/i,"news","خبر وحدث"],
 [/(health|medical|medicine|disease|treatment|vaccine|doctor|صحة|طب|مرض|علاج|لقاح|طبيب|دواء)/i,"health","صحة وطب"],
 [/(science|physics|chemistry|biology|space|research|discovery|scientific|علم|فيزياء|كيمياء|أحياء|فضاء|بحث|اكتشاف)/i,"science","شرح علمي"],
