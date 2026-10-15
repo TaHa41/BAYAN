@@ -474,6 +474,24 @@ const writeNewsCache = async (env: Env, lang: Locale, items: Story[]) => {
     } catch {}
   }
 };
+const archiveNewsStories = async (env: Env, lang: Locale, items: Story[]) => {
+  if (!items.length) return;
+  const fetchedAt = new Date().toISOString();
+  const statements = items
+    .filter((story) => story.title && story.url && /^https:\/\//i.test(story.url))
+    .slice(0, 40)
+    .map((story) => env.DB.prepare(
+      "INSERT INTO news_archive(url,language,title,summary,publisher,published_at,image_url,image_alt,section,fetched_at) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(url,language) DO UPDATE SET title=excluded.title,summary=CASE WHEN length(excluded.summary)>length(news_archive.summary) THEN excluded.summary ELSE news_archive.summary END,publisher=excluded.publisher,published_at=COALESCE(excluded.published_at,news_archive.published_at),image_url=COALESCE(excluded.image_url,news_archive.image_url),image_alt=COALESCE(excluded.image_alt,news_archive.image_alt),fetched_at=excluded.fetched_at"
+    ).bind(story.url, lang, story.title.slice(0, 500), story.summary.slice(0, 5000), story.publisher.slice(0, 200), story.publishedAt || null, isUsableNewsImage(story.imageUrl) ? story.imageUrl : null, (story.imageAlt || story.title).slice(0, 500), "news", fetchedAt));
+  if (statements.length) {
+    try { await env.DB.batch(statements); }
+    catch (error) {
+      try { await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)")
+        .bind("WARN", "news_archive_write", String(error).slice(0, 400), fetchedAt).run(); } catch {}
+    }
+  }
+};
+
 const googleArabicFallback = async (): Promise<Story[]> => {
   const feeds = [
     ["أخبار Google عربية", "https://news.google.com/rss?hl=ar&gl=EG&ceid=EG:ar"],
@@ -663,6 +681,14 @@ export async function news(env: Env, lang: Locale) {
   const finalStories = enriched
     .filter((story) => isUsableNewsImage(story.imageUrl))
     .map((story) => ({ ...story, publisher: localizedPublisher(story.publisher, lang), summary: languageSafeText(story.summary, lang) ? story.summary : "" }));
+  // Archive eligible dated stories even if no usable image was found. Missing images
+  // should not erase a real story from the historical archive.
+  const archiveCandidates = enriched
+    .filter((story) => story.title && story.url && /^https:\/\//i.test(story.url) &&
+      (lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title)) &&
+      Boolean(story.publishedAt) && Number.isFinite(Date.parse(String(story.publishedAt))) &&
+      Date.parse(String(story.publishedAt)) <= Date.now() + 5 * 60 * 1000);
+  await archiveNewsStories(env, lang, archiveCandidates);
 
   const cached = await readNewsCache(env, lang);
   // Keep a healthy cache behind the live providers. If providers return nothing
