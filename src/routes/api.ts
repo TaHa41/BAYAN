@@ -302,10 +302,14 @@ const sectionRelevant=(x:any)=>{
  const title=String(x?.title||""),summary=String(x?.summary||"");
  const text=title+" "+summary;
  if(section==="sports"&&/(video game|لعبة فيديو|ألعاب فيديو)/i.test(text))return false;
+ // Animal behaviour and wildlife-photo stories are not human biographies.
+ if(section==="people"&&/(\\belephants?\\b|\\bwildlife\\b|\\banimals?\\b|\\bconservation\\b|فيل|أفيال|حيوان|حيوانات|الحياة البرية|صغير نافق|أنثى فيل)/i.test(text))return false;
  const terms=sectionTerms[section],pattern=sectionPatterns[section];
  if(!terms)return !pattern||pattern.test(text);
  const words=(value:string)=>new Set(value.normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").split(/[^\p{L}\p{N}]+/u).filter(Boolean));
  const titleWords=words(title),summaryWords=words(summary);
+ // Do not classify a general story as a biography using vague summary-only word matches.
+ if(section==="people"&&!terms.some(term=>titleWords.has(term)))return false;
  if(terms.some(term=>titleWords.has(term)))return true;
  return terms.filter(term=>summaryWords.has(term)).length>=2;
 };
