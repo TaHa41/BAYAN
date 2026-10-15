@@ -236,6 +236,7 @@ const checks = [
   ["news public reads use verified cache and maintenance explicitly opts into refresh", news.includes("cachedAtStart = await readNewsCache(env, lang)") && news.includes("!options.forceRefresh && cachedItems.length >= 3") && repair.includes("news(env,language,{forceRefresh:true})")],
   ["scheduled maintenance rotates one expensive task per five-minute invocation", index.includes("Math.floor(Number(event.scheduledTime||Date.now())/(5*60*1000))%3") && index.includes("const result=await publishNextArchivedNewsArticle(env)") && index.includes("await selfHeal(env)") && JSON.parse(read("wrangler.jsonc")).triggers.crons.includes("*/5 * * * *")],
   ["search cache TTL and independent source diversity are enforced before reuse", search.includes("new Date(Date.now()-5*60*1000)") && search.includes("hosts.size>=2") && search.includes("substantive>=2") && search.includes("!options.publish&&!options.images&&!options.background")],
+  ["section archive cards are recent, substantial, localized, and image-backed", api.includes("fetched_at>=? AND published_at>=? AND published_at<=?") && api.includes("length(summary)>=120") && api.includes("image_url IS NOT NULL") && api.includes("const imageUrl=safePublicImageUrl(row.image_url)")],
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
