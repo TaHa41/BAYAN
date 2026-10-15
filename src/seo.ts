@@ -106,7 +106,7 @@ export async function newsSitemap(env:Env){
   response.headers.set("x-bayan-news-sitemap-eligible-count",String(items.length));
   response.headers.set("x-bayan-news-sitemap-rejected-count",String(Math.max(0,rows.length-items.length)));
   response.headers.set("x-bayan-news-sitemap-archive-candidate-count",String(archiveRows.length));
-  response.headers.set("x-bayan-news-sitemap-archive-eligible-count",String(archiveEligibleCount));
+  response.headers.set("x-bayan-news-sitemap-archive-ready-for-drafting-count",String(archiveEligibleCount));
   response.headers.set("x-bayan-news-sitemap-rejection-reasons",JSON.stringify(rejectionReasons));
   console.info("news_sitemap_generation",JSON.stringify({articleCandidates:rows.length,archiveCandidates:archiveRows.length,eligible:items.length,archiveReadyForArticleDrafting:archiveEligibleCount,rejected:Math.max(0,rows.length-items.length),rejectionReasons,freshnessWindowHours:48}));
   return response;
