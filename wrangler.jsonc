@@ -54,5 +54,22 @@
       "/*"
     ],
     "not_found_handling": "single-page-application"
+  },
+  "previews": {
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_id": "0d14b908-dbb2-4296-9e04-ed7d559f9c28"
+      }
+    ],
+    "ai_search_namespaces": [
+      {
+        "binding": "AI_SEARCH",
+        "namespace": "default"
+      }
+    ],
+    "ai": {
+      "binding": "AI"
+    }
   }
 }
