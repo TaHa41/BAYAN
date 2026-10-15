@@ -672,10 +672,13 @@ let [local, wiki, wikiRest, wd, gd, oa, remote, dd, duckWeb, bingWeb, google, bi
 const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...(s.source_gdelt==="0"?[]:["GDELT"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers","DuckDuckGo Web Search","Bing Web Search","Google News Search"];providerAttempted.push(...providerDiagnostics);const candidates:Candidate[]=[
     ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wikiRest,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...duckWeb,...bingWeb,...google,...bing
   ];
-  // Optional authenticated Enterprise enrichment: exact-title article lookups only.
-  // Public Wikipedia remains the discovery mechanism; Enterprise is supplemental.
-  if (env.WIKIMEDIA_ENTERPRISE_USERNAME && env.WIKIMEDIA_ENTERPRISE_REFRESH_TOKEN && wiki.length) {
-    const enterpriseRows = await safe(searchWikimediaEnterprise(env, wiki.slice(0, 2).map(x => x.title), language), []);
+  // Run authenticated Enterprise search even when public Wikipedia is down or empty.
+  // Previously the `wiki.length` gate disabled this independent provider precisely
+  // when the primary encyclopedia provider failed, leaving fewer recovery paths.
+  if (env.WIKIMEDIA_ENTERPRISE_USERNAME && env.WIKIMEDIA_ENTERPRISE_REFRESH_TOKEN) {
+    const enterpriseQueries = [...new Set([q, ...wiki.slice(0, 2).map(x => x.title)].map(x => String(x || "").trim()).filter(Boolean))].slice(0, 3);
+    const enterpriseRows = await safe(searchWikimediaEnterprise(env, enterpriseQueries, language), [], "Wikimedia Enterprise");
+    providerAttempted.push("Wikimedia Enterprise");
     for (const row of enterpriseRows) {
       candidates.push({ ...row, score: scoreSource("Wikimedia Enterprise", row.title, q) + 12, provider: "Wikimedia Enterprise" });
     }
