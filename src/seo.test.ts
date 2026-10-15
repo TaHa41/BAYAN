@@ -15,6 +15,22 @@ describe("newsSitemap database failure handling", () => {
     } finally { errorSpy.mockRestore(); }
   });
 
+  it("includes recent substantial archived news using BAYAN archive time, without requiring two publisher labels", async () => {
+    const fetchedAt = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+    const sourcePublished = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const env = { DB: { prepare: (sql:string) => ({ all: async () => sql.includes("FROM news_archive") ? ({results:[
+      {id:42,url:"https://news.example.org/story",language:"en",title:"A substantial current news report",summary:"A meaningful archived news summary with context and relevant details. ".repeat(4),publisher:"Example News",published_at:sourcePublished,image_url:"https://images.example.org/story.jpg",section:"news",fetched_at:fetchedAt},
+      {id:43,url:"https://news.example.org/old",language:"en",title:"Old archived report",summary:"An old archived news summary with enough text. ".repeat(4),publisher:"Example News",published_at:sourcePublished,image_url:null,section:"news",fetched_at:new Date(Date.now()-60*60*60*1000).toISOString()}
+    ]}):({results:[]})}) } } as any;
+    const response = await newsSitemap(env);
+    const body = await response.text();
+    expect(response.status).toBe(200);
+    expect(body).toContain("/news?archive=42&lang=en");
+    expect(body).toContain("<news:title>A substantial current news report</news:title>");
+    expect(body).not.toContain("archive=43");
+    expect(response.headers.get("x-bayan-news-sitemap-archive-eligible-count")).toBe("1");
+  });
+
   it("returns valid empty XML only when the database query succeeds with no eligible articles", async () => {
     const env = { DB: { prepare: () => ({ all: async () => ({ results: [] }) }) } } as any;
     const response = await newsSitemap(env);
