@@ -235,4 +235,5 @@ for (const [name, ok] of checks) {
   if (!ok) failed++;
 }
 if (failed) process.exit(1);
+  ["section page views stay cache-only and scheduled maintenance tasks remain isolated", !read("src/routes/api.ts").includes("bounded(search(env,q,lang),5500)") && !read("src/routes/api.ts").includes("const imageCandidates=items.filter") && read("src/index.ts").includes("const task=Math.floor(Number(event.scheduledTime||Date.now())/(5*60*1000))%3") && read("src/services/news.ts").includes("if (!options.forceRefresh && cachedItems.length >= 3)")],
 console.log("BAYAN source contract checks passed");
