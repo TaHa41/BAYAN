@@ -9,6 +9,8 @@ try{
     contentType:response.headers.get("content-type"),
     urlCount:urls.length,
     candidateCount:response.headers.get("x-bayan-news-sitemap-candidate-count"),
+    archiveCandidateCount:response.headers.get("x-bayan-news-sitemap-archive-candidate-count"),
+    archiveEligibleCount:response.headers.get("x-bayan-news-sitemap-archive-eligible-count"),
     eligibleCount:response.headers.get("x-bayan-news-sitemap-eligible-count"),
     rejectedCount:response.headers.get("x-bayan-news-sitemap-rejected-count"),
     rejectionReasons:response.headers.get("x-bayan-news-sitemap-rejection-reasons"),

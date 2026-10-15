@@ -591,7 +591,7 @@
             output.className = "results";
             output.innerHTML = '<article class="article-full">' + (item.imageUrl ? heroImageHtml(item.imageUrl, item.title, item.summary || "") : imageHtml(item)) +
               '<span class="eyebrow">' + escapeHtml(item.publisher || t("أرشيف الأخبار", "News archive")) + '</span><h1>' + escapeHtml(item.title) + '</h1>' +
-              '<p class="lead">' + escapeHtml(item.summary || "") + '</p><div class="source-line">' + escapeHtml(formatDate(item.publishedAt)) + '</div>' +
+              '<p class="lead">' + escapeHtml(item.summary || "") + '</p><div class="source-line">' + t("تاريخ النشر الأصلي: ", "Original source date: ") + escapeHtml(formatDate(item.publishedAt)) + '</div><div class="source-line">' + t("حُفظ في بيان: ", "Archived in BAYAN: ") + escapeHtml(formatDate(item.archivedAt)) + '</div>' +
               '<div class="notice">' + t("هذه نسخة محفوظة داخل أرشيف بيان. تاريخ النشر الأصلي محفوظ، ولا تُعرض باعتبارها خبرًا جديدًا.", "This story is preserved in BAYAN\'s archive. Its original publication date is retained; it is not presented as new news.") + '</div>' +
               '<a class="primary" href="/news?lang=' + lang + '">' + t("العودة إلى الأخبار الحديثة", "Back to latest news") + '</a></article>';
             return;
