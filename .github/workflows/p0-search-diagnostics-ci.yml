@@ -27,6 +27,6 @@ jobs:
           node-version: 24
           cache: npm
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
       - name: Typecheck, unit tests, source contracts, and Worker build
         run: npm run check
