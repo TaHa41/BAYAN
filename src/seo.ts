@@ -42,7 +42,7 @@ const newsSitemapEligibility=(row:any,now:number)=>{
   if(!Number.isFinite(published))return reject("invalid_publication_date");
   if(published>now+5*60*1000)return reject("future_publication_date");
   if(now-published>48*60*60*1000)return reject("outside_48_hour_window");
-  const body=String(row?.body||"").replace(/<script\\b[\\s\\S]*?<\\/script>/gi," ").replace(/<style\\b[\\s\\S]*?<\\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/\\s+/g," ").trim();
+  const body=String(row?.body||"").replace(/<script\b[\s\S]*?<\/script>/gi," ").replace(/<style\b[\s\S]*?<\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim();
   if(body.length<500)return reject("body_too_short");
   let sources:any[]=[];
   try{const parsed=JSON.parse(String(row?.sources_json||"[]"));sources=Array.isArray(parsed)?parsed:[]}catch{}
@@ -51,7 +51,7 @@ const newsSitemapEligibility=(row:any,now:number)=>{
     try{
       const url=new URL(String(source?.url||""));
       if(url.protocol!=="https:"||url.username||url.password)continue;
-      const host=url.hostname.toLowerCase().replace(/^www\\./,"").replace(/\\.$/,"");
+      const host=url.hostname.toLowerCase().replace(/^www\./,"").replace(/\.$/,"");
       if(!host||host==="localhost"||host.endsWith(".localhost"))continue;
       hosts.add(host);
     }catch{}
