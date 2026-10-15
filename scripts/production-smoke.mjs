@@ -77,7 +77,17 @@ try{
   if(newsMap.text.includes("/news?story="))throw new Error("news_sitemap_contains_summary_only_pages");
   const newsLocs=[...newsMap.text.matchAll(/<loc>(.*?)<\/loc>/g)].map(match=>match[1]);
   if(newsLocs.some(url=>!url.includes("/article/")))throw new Error("news_sitemap_url_is_not_full_article");
+  if(newsLocs.length!==new Set(newsLocs).size)throw new Error("news_sitemap_duplicate_article_urls");
+  if(!/<urlset\\b[^>]*xmlns:news="http:\/\/www\\.google\\.com\/schemas\/sitemap-news\/0\\.9"/.test(newsMap.text))throw new Error("news_sitemap_namespace_missing");
+  const eligibleHeader=Number(newsMap.headers.get("x-bayan-news-sitemap-eligible-count"));
+  const candidateHeader=Number(newsMap.headers.get("x-bayan-news-sitemap-candidate-count"));
+  if(!Number.isInteger(eligibleHeader)||eligibleHeader!==newsLocs.length)throw new Error("news_sitemap_eligible_count_header_mismatch");
+  if(!Number.isInteger(candidateHeader)||candidateHeader<eligibleHeader)throw new Error("news_sitemap_candidate_count_header_invalid");
   if(newsLocs.length>0&&!newsMap.text.includes("<news:news>"))throw new Error("news_sitemap_news_metadata_missing");
+  for(const match of newsMap.text.matchAll(/<news:publication_date>(.*?)<\\/news:publication_date>/g)){
+    const published=Date.parse(match[1]);
+    if(!Number.isFinite(published)||published>Date.now()+5*60*1000||Date.now()-published>48*60*60*1000)throw new Error("news_sitemap_publication_date_outside_48h_window");
+  }
   if(newsLocs.length>0){
     const articleUrl=new URL(newsLocs[0]);
     const articlePage=await get(articleUrl.pathname+articleUrl.search);
