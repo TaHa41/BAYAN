@@ -51,7 +51,7 @@ const timeout = async (url:string, ms=2600, diagnostics?:string[], provider="ext
     }
     if(!response.ok)diagnostics?.push(provider+": http_"+response.status);
     return new Response(body,{status:response.status,statusText:response.statusText,headers:response.headers});
-  }catch(error){reportProviderFailure(diagnostics,provider,error);throw error;}finally{clearTimeout(t);}
+  }catch(error){throw error;}finally{clearTimeout(t);}
 };
 const cleanText=(s:string)=>String(s||"").replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim();
 const scoreSource=(publisher:string, title:string, q:string) => {
@@ -163,9 +163,7 @@ async function wikidataEntityAliases(qid:string,diagnostics?:string[]):Promise<s
     return [...new Set([...labels,...aliases].map(cleanText).filter((value:string)=>value.length>=2&&value.length<=120))].slice(0,40);
   }catch(error){reportProviderFailure(diagnostics,"Wikidata entity aliases",error);return[]}
 }
-async function gdelt(q:string,diagnostics?:string[]):Promise<Candidate[]>{
- try{const u="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(q)+"&mode=artlist&maxrecords=8&format=json&sort=HybridRel";const r=await timeout(u,1800,diagnostics,"GDELT");if(!r.ok){diagnostics?.push("GDELT HTTP "+r.status);return[];}const d=await r.json<any>();const articles=d.articles||[];const out=articles.map((x:any)=>({title:cleanText(x.title),summary:cleanText(x.seendate||"")+" "+cleanText(x.domain||""),section:"news",kind:"web",evidence:"mixed",sources:[source(x.title,x.domain||"GDELT",x.url)],url:x.url,score:scoreSource(x.domain||"GDELT",x.title,q),provider:"GDELT"})).filter((x:any)=>x.title&&x.url);diagnostics?.push("GDELT raw="+articles.length+" accepted="+out.length);return out}catch(error){reportProviderFailure(diagnostics,"GDELT",error);return[]}
-}
+
 const decodeXml=(value:string)=>String(value||"").replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,"$1").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n)));
 async function googleNewsSearch(q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
   try{
@@ -689,7 +687,6 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     safe((academicQuery&&!personLookup(q))?crossrefSearch(q,providerDiagnostics):Promise.resolve([]),[],"Crossref"),
     safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language,providerDiagnostics),[],"PubMed / NCBI")
   ]);
-  let gd:Candidate[]=[];
   let duckWeb:Candidate[]=[];
   let bingWeb:Candidate[]=[];
   let google:Candidate[]=[];
@@ -697,7 +694,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers"];
   providerAttempted.push(...providerDiagnostics);
   const candidates:Candidate[]=[
-    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wikiRest,...wd,...gd,...oa,...crossref,...pubmed,...remote,...dd,...duckWeb,...bingWeb,...google,...bing
+    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wikiRest,...wd,...oa,...crossref,...pubmed,...remote,...dd,...duckWeb,...bingWeb,...google,...bing
   ];
   // Use the authenticated Enterprise index as a recovery provider only when
   // primary discovery is empty or thin; avoid token/article requests on every search.
@@ -748,18 +745,16 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   const expansionThreshold=personQuery?Math.min(6,Math.max(3,Number(s.min_sources||3))):Math.max(3,Number(s.min_sources||3));
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
     const diagnosticStart=providerDiagnostics.length;
-    const [gdRows,duckRows,bingRows,googleRows]=await Promise.all([
-      safe(s.source_gdelt==="0"?Promise.resolve([]):gdelt(q,providerDiagnostics),[],"GDELT"),
+    const [duckRows,bingRows,googleRows]=await Promise.all([
       safe(duckWebSearch(q,language,providerDiagnostics),[],"DuckDuckGo Web Search"),
       safe(bingWebSearch(q,language,providerDiagnostics),[],"Bing Web Search"),
       safe(googleNewsSearch(q,language,providerDiagnostics),[],"Google News Search")
     ]);
-    gd=gdRows.slice(0,6);
     duckWeb=duckRows.slice(0,8);
     bingWeb=bingRows.slice(0,8);
     google=googleRows.slice(0,8);
-    candidates.push(...gd,...duckWeb,...bingWeb,...google);
-    providerAttempted.push(...(s.source_gdelt==="0"?[]:["GDELT"]),"DuckDuckGo Web Search","Bing Web Search","Google News Search",...providerDiagnostics.slice(diagnosticStart));
+    candidates.push(...duckWeb,...bingWeb,...google);
+    providerAttempted.push("DuckDuckGo Web Search","Bing Web Search","Google News Search",...providerDiagnostics.slice(diagnosticStart));
   }
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
     providerAttempted.push("Expanded topic variants: Wikipedia REST Search, Google News Search, DuckDuckGo Web Search","OpenAI Web Search (fallback)");
