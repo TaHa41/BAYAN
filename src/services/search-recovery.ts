@@ -71,7 +71,7 @@ const makeResult = (
   publishedAt?: string
 ): SearchResult | null => {
   const cleanTitle = clean(title);
-  const cleanSummary = clean(summary).slice(0, 1600);
+  let cleanSummary = clean(summary).slice(0, 1600);\n  if (language === "ar" && cleanSummary && !hasArabic(cleanSummary)) cleanSummary = "";\n  if (language === "en" && hasArabic(cleanSummary)) cleanSummary = "";
   const cleanUrl = String(url || "").trim();
   if (!cleanTitle || !/^https:\\/\\//i.test(cleanUrl) || !languageMatches(cleanTitle, language)) return null;
   if (/googleusercontent\\.com|gstatic\\.com/i.test(imageUrl || "")) imageUrl = undefined;
