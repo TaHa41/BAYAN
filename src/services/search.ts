@@ -109,19 +109,19 @@ async function wikidata(q:string,language:Locale,diagnostics?:string[]):Promise<
     return (d.search||[]).map((x:any)=>({title:cleanText(x.label||x.id),summary:cleanText(x.description||"").slice(0,900),section:"people",kind:"web",evidence:"mixed",sources:[source(x.label||x.id,"Wikidata","https://www.wikidata.org/wiki/"+x.id)],score:scoreSource("Wikidata",x.label||"",q),provider:"Wikidata"}));
   }catch(error){reportProviderFailure(diagnostics,"Wikidata",error);return[]}
 }
-async function wikidataEntityAliases(qid:string):Promise<string[]>{
+async function wikidataEntityAliases(qid:string,diagnostics?:string[]):Promise<string[]>{
   if(!/^Q\d+$/i.test(qid))return[];
   try{
     const url="https://www.wikidata.org/w/api.php?action=wbgetentities&ids="+encodeURIComponent(qid)+"&props=labels%7Caliases&languages=en%7Car&format=json&origin=*";
-    const response=await timeout(url,3500);
-    if(!response.ok)return[];
+    const response=await timeout(url,3500,diagnostics,"Wikidata entity aliases");
+    if(!response.ok){diagnostics?.push("Wikidata entity aliases: http_"+response.status);return[];}
     const data=await response.json<any>();
     const entity=data.entities?.[qid];
     if(!entity)return[];
     const labels=Object.values(entity.labels||{}).map((item:any)=>item?.value||"");
     const aliases=Object.values(entity.aliases||{}).flatMap((items:any)=>Array.isArray(items)?items.map((item:any)=>item?.value||""):[]);
     return [...new Set([...labels,...aliases].map(cleanText).filter((value:string)=>value.length>=2&&value.length<=120))].slice(0,40);
-  }catch{return[]}
+  }catch(error){reportProviderFailure(diagnostics,"Wikidata entity aliases",error);return[]}
 }
 async function gdelt(q:string,diagnostics?:string[]):Promise<Candidate[]>{
  try{const u="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(q)+"&mode=artlist&maxrecords=8&format=json&sort=HybridRel";const r=await timeout(u,4000,diagnostics,"GDELT");if(!r.ok){diagnostics?.push("GDELT HTTP "+r.status);return[];}const d=await r.json<any>();const articles=d.articles||[];const out=articles.map((x:any)=>({title:cleanText(x.title),summary:cleanText(x.seendate||"")+" "+cleanText(x.domain||""),section:"news",kind:"web",evidence:"mixed",sources:[source(x.title,x.domain||"GDELT",x.url)],url:x.url,score:scoreSource(x.domain||"GDELT",x.title,q),provider:"GDELT"})).filter((x:any)=>x.title&&x.url);diagnostics?.push("GDELT raw="+articles.length+" accepted="+out.length);return out}catch(error){reportProviderFailure(diagnostics,"GDELT",error);return[]}
@@ -643,12 +643,12 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
     let exactWikidata=candidates.find(item=>item.provider==="Wikidata"&&normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
     if(!exactWikidata){
       const queryLanguage:Locale=hasArabic(personQueryName(q))?"ar":"en";
-      const queryEntities=await wikidata(personQueryName(q),queryLanguage).catch(()=>[]);
+      const queryEntities=await wikidata(personQueryName(q),queryLanguage,providerDiagnostics).catch(error=>{reportProviderFailure(providerDiagnostics,"Wikidata",error);return[]});
       exactWikidata=queryEntities.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
     }
     const wikidataUrl=String(exactWikidata?.sources?.find(item=>/wikidata\.org\/wiki\/Q\d+/i.test(String(item.url||"")) )?.url||"");
     const qid=wikidataUrl.match(/\/(Q\d+)/i)?.[1];
-    if(qid)identityAliases.push(...await wikidataEntityAliases(qid));
+    if(qid)identityAliases.push(...await wikidataEntityAliases(qid,providerDiagnostics));
     const uniqueAliases=[...new Set(identityAliases.map(cleanText).filter(value=>value.length>=2&&value.length<=120))];
     identityAliases.splice(0,identityAliases.length,...uniqueAliases);
     const exactName=normalizedEntityTitle(personQueryName(q));
