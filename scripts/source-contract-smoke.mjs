@@ -208,6 +208,7 @@ const checks = [
   ["published news stories resolve to their canonical article regardless of topical category", index.includes("SELECT slug,title,summary,body,image_url,image_alt,created_at FROM articles WHERE title=? AND language=? AND status='PUBLISHED' ORDER BY updated_at DESC LIMIT 1") && !index.includes("WHERE title=? AND language=? AND section='news' AND status='PUBLISHED'")],
   ["Bing News RSS normalizes only Bing redirects to HTTPS and skips unconfigured AI Search instances", search.includes("normalizeBingNewsUrl") && search.includes("rejected_url=") && search.includes('instanceName.toLowerCase()==="default"')],
   ["news sitemap reports aggregate eligibility reasons without requiring an artificial minimum", read("src/seo.ts").includes("x-bayan-news-sitemap-rejection-reasons") && read("scripts/production-smoke.mjs").includes("NEWS_SITEMAP_DIAGNOSTICS") && !read("scripts/production-smoke.mjs").includes("news_sitemap_has_fewer_than_two_recent_verified_articles")],
+  ["news sitemap rejection diagnostics run after deployment without blocking release", read("src/seo.ts").includes("x-bayan-news-sitemap-rejection-reasons") && read("scripts/news-sitemap-diagnostics.mjs").includes("NEWS_SITEMAP_DIAGNOSTICS") && read(".github/workflows/deploy-worker.yml").includes("node scripts/news-sitemap-diagnostics.mjs")],
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
