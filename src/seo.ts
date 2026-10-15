@@ -108,8 +108,8 @@ export async function newsSitemap(env:Env){
     else if(!Number.isFinite(published))reason="invalid_date";
     else if(published>now+5*60*1000||now-published>windowMs)reason="stale_or_future";
     else if(plainBody.length<600)reason="body_too_short";
-    else if(hosts.size<1)reason="no_https_sources";
-    else if(!recognizedNewsPublisher&&!recentSource&&publishers.size<1)reason="source_not_news_eligible";
+    else if(hosts.size<2)reason="fewer_than_two_independent_https_sources";
+    else if(!recognizedNewsPublisher&&!recentSource&&publishers.size<2)reason="source_not_news_eligible";
     if(reason){rejected[reason]=(rejected[reason]||0)+1;return false}
     return true;
   }).map((x)=>({
