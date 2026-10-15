@@ -15,7 +15,7 @@ describe("newsSitemap database failure handling", () => {
     } finally { errorSpy.mockRestore(); }
   });
 
-  it("includes recent substantial archived news using BAYAN archive time, without requiring two publisher labels", async () => {
+  it("reports fresh archive candidates without treating summary-only archive pages as full news articles", async () => {
     const fetchedAt = new Date(Date.now() - 20 * 60 * 1000).toISOString();
     const sourcePublished = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
     const env = { DB: { prepare: (sql:string) => ({ all: async () => sql.includes("FROM news_archive") ? ({results:[
