@@ -140,23 +140,25 @@ async function googleNewsSearch(q:string,language:Locale,diagnostics?:string[]):
   }catch(error){reportProviderFailure(diagnostics,"Google News Search",error);return[]}
 }
 
+export function normalizeBingNewsUrl(raw:string):string|undefined{try{const url=new URL(String(raw||"").trim());if(url.protocol==="http:"&&/(^|\.)bing\.com$/i.test(url.hostname))url.protocol="https:";if(url.protocol!=="https:"||url.username||url.password||/^(?:localhost|127(?:\.\d+){3}|0\.0\.0\.0|\[::1\])$/i.test(url.hostname))return;return url.toString()}catch{return}}
 async function bingNewsSearch(q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
   try{
     const setlang=language==="ar"?"ar":"en-US";
     const url="https://www.bing.com/news/search?q="+encodeURIComponent(q)+"&format=rss&setlang="+setlang;
     const response=await timeout(url,4500,diagnostics,"Bing News RSS");if(!response.ok){diagnostics?.push("Bing News RSS HTTP "+response.status);return[];}
-    const xml=await response.text();const out:Candidate[]=[];let rawItems=0;
+    const xml=await response.text();const out:Candidate[]=[];let rawItems=0,rejectedTitle=0,rejectedUrl=0;
     for(const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
       rawItems++;
       const block=match[1];
       const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
-      const title=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1200);
-      if(!title||!/^https:\/\//i.test(url))continue;
+      const title=cleanText(field("title")),rawUrl=field("link"),summary=cleanText(field("description")).slice(0,1200);
+      if(!title){rejectedTitle++;continue;}
+      const url=normalizeBingNewsUrl(rawUrl);if(!url){rejectedUrl++;continue;}
       const publisher=cleanText(field("source")||"Bing News");
       out.push({title,summary,section:"news",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+3,provider:"Bing News RSS"});
       if(out.length>=8)break;
     }
-    diagnostics?.push("Bing News RSS raw="+rawItems+" accepted="+out.length);
+    diagnostics?.push("Bing News RSS raw="+rawItems+" accepted="+out.length+" rejected_title="+rejectedTitle+" rejected_url="+rejectedUrl);
     return out;
   }catch(error){reportProviderFailure(diagnostics,"Bing News RSS",error);return[]}
 }
@@ -224,7 +226,7 @@ async function openAlex(q:string,diagnostics?:string[]):Promise<Candidate[]>{
 }
 async function aiSearch(env:Env,q:string,diagnostics?:string[]):Promise<Candidate[]>{
   try{
-    if(!env.AI_SEARCH)return[]; const r=await env.AI_SEARCH.get(env.BAYAN_AI_SEARCH_INSTANCE||"default").search({messages:[{role:"user",content:q}]});
+    const instanceName=String(env.BAYAN_AI_SEARCH_INSTANCE||"").trim();if(!env.AI_SEARCH||!instanceName||instanceName.toLowerCase()==="default")return[]; const r=await env.AI_SEARCH.get(instanceName).search({messages:[{role:"user",content:q}]});
     const chunks=Array.isArray((r as any)?.chunks)?(r as any).chunks:[];
     return chunks.slice(0,12).map((x:any)=>({title:cleanText(x.title||x.filename||"BAYAN evidence"),summary:cleanText(x.content||x.text||"").slice(0,1800),section:String(x.metadata?.section||"world"),kind:"web",evidence:"mixed",sources:[source(cleanText(x.title||"Evidence"),String(x.metadata?.publisher||"BAYAN AI Search"),String(x.url||"https://bayan.tahaomar411.workers.dev/"))],score:58,provider:"Cloudflare AI Search"}));
   }catch(error){reportProviderFailure(diagnostics,"Cloudflare AI Search",error);return[]}
