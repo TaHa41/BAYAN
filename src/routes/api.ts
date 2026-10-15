@@ -14,14 +14,14 @@ const articleHasNamesakeContamination=(title:string,bodyText:string,sources:any[
  return bodyHasDisambiguation||wikipediaNamesakes.length>=2;
 };
 const articleEditorialProfile=(title:string,lang:Locale)=>{const q=String(title||"").normalize("NFKC").toLowerCase();const profiles:[RegExp,string,string][]=[
-[/\b(biography|who is|profile|born|career|writer|scientist|athlete|actor|president|نجيب|ماري|سيرة|من هو|من هي|ولد|ولدت|عالم|عالمة|كاتب|لاعب|رئيس|شخصية)\b/i,"biography","سيرة وشخصية"],
-[/\b(news|latest|today|breaking|announced|report|election|war|attack|resigns|launches|أخبار|عاجل|اليوم|أعلن|تعلن|انتخابات|حرب|هجوم|استقال|إطلاق)\b/i,"news","خبر وحدث"],
-[/\b(health|medical|medicine|disease|treatment|vaccine|doctor|صحة|طب|مرض|علاج|لقاح|طبيب|دواء)\b/i,"health","صحة وطب"],
-[/\b(science|physics|chemistry|biology|space|research|discovery|scientific|علم|فيزياء|كيمياء|أحياء|فضاء|بحث|اكتشاف)\b/i,"science","شرح علمي"],
-[/\b(economy|economic|market|stock|currency|inflation|price|gold|سعر|اقتصاد|سوق|أسهم|عملة|تضخم|ذهب|دولار)\b/i,"economy","اقتصاد وبيانات"],
-[/\b(sports|football|soccer|match|league|player|team|رياضة|كرة|مباراة|الدوري|لاعب|فريق|منتخب)\b/i,"sports","رياضة ونتائج"],
-[/\b(travel|tourism|city|country|destination|airport|سفر|سياحة|مدينة|دولة|وجهة|مطار)\b/i,"travel","مكان ودليل"],
-[/\b(book|novel|film|movie|music|artist|album|رواية|كتاب|فيلم|سينما|موسيقى|فنان|ألبوم)\b/i,"culture","عمل ثقافي"]
+[/(biography|who is|profile|born|career|writer|scientist|athlete|actor|president|نجيب|ماري|سيرة|من هو|من هي|ولد|ولدت|عالم|عالمة|كاتب|لاعب|رئيس|شخصية)/i,"biography","سيرة وشخصية"],
+[/(news|latest|today|breaking|announced|report|election|war|attack|resigns|launches|أخبار|عاجل|اليوم|أعلن|تعلن|انتخابات|حرب|هجوم|استقال|إطلاق)/i,"news","خبر وحدث"],
+[/(health|medical|medicine|disease|treatment|vaccine|doctor|صحة|طب|مرض|علاج|لقاح|طبيب|دواء)/i,"health","صحة وطب"],
+[/(science|physics|chemistry|biology|space|research|discovery|scientific|علم|فيزياء|كيمياء|أحياء|فضاء|بحث|اكتشاف)/i,"science","شرح علمي"],
+[/(economy|economic|market|stock|currency|inflation|price|gold|سعر|اقتصاد|سوق|أسهم|عملة|تضخم|ذهب|دولار)/i,"economy","اقتصاد وبيانات"],
+[/(sports|football|soccer|match|league|player|team|رياضة|كرة|مباراة|الدوري|لاعب|فريق|منتخب)/i,"sports","رياضة ونتائج"],
+[/(travel|tourism|city|country|destination|airport|سفر|سياحة|مدينة|دولة|وجهة|مطار)/i,"travel","مكان ودليل"],
+[/(book|novel|film|movie|music|artist|album|رواية|كتاب|فيلم|سينما|موسيقى|فنان|ألبوم)/i,"culture","عمل ثقافي"]
 ];for(const [pattern,key,label] of profiles)if(pattern.test(q))return{key,label};return{key:"general",label:lang==="ar"?"موضوع معرفي":"knowledge topic"};};
 const articlePrompt=(title:string,lang:Locale)=>{const profile=articleEditorialProfile(title,lang);const commonAr="الموضوع: "+title+"\nنوع المحتوى التحريري: "+profile.label+".\nاكتب بالعربية الفصحى فقط. استخدم الأدلة المقدمة في نتائج البحث ومصادرها فقط، ولا تعتبر وجود مصدرين دليلًا تلقائيًا على صحة كل ادعاء. افصل بوضوح بين الوقائع المؤكدة والتفسير والاستنتاج، واذكر حدود الأدلة والتعارضات وتاريخ المعلومات عندما يكون مهمًا. لا تخترع أسماء أو تواريخ أو أرقامًا أو اقتباسات أو روابط، ولا تنسب معلومة إلى مصدر لم يذكرها. لا تكرر الفكرة، ولا تستخدم عبارات حشو، ولا تكتب أقسامًا شكلية لا تضيف معلومة. إذا كانت الأدلة لا تكفي لفقرة أو قسم فقل ذلك بوضوح، ولا تملأ الفراغ بالتخمين. أخرج المقال بعناوين Markdown تبدأ بـ ##، ومقدمة قصيرة، وفقرات مترابطة، وخاتمة تضيف فهمًا ولا تعيد المقدمة. لا تضع قائمة المصادر الوهمية داخل النص؛ احتفظ بمعلومات المصادر في حقل المصادر المنفصل.";
 const commonEn="Topic: "+title+"\nEditorial content type: "+profile.label+".\nWrite in English only. Use only the evidence and source material supplied in the search results; two sources do not automatically prove every claim. Clearly distinguish confirmed facts, interpretation and inference, and state evidence limits, conflicts and information dates where relevant. Never invent names, dates, numbers, quotations or URLs, and never attribute a claim to a source that does not support it. Avoid repetition, filler and headings that add no information. If evidence is insufficient for a paragraph or section, state the gap rather than guessing. Use Markdown subheadings beginning with ##, a concise introduction, coherent paragraphs and a conclusion that adds insight rather than repeating the introduction. Do not fabricate an inline bibliography; source metadata is supplied separately.";
