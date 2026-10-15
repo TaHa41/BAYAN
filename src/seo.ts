@@ -32,56 +32,64 @@ export async function sitemap(env:Env){
     return '<url><loc>'+xml(item.url)+'</loc>'+lastmod+'</url>';
   }).join("")+"</urlset>","application/xml;charset=utf-8");
 }
+const newsSitemapEligibility=(row:any,now:number)=>{
+  const reject=(reason:string)=>({eligible:false,reason});
+  const slug=String(row?.slug||"").trim(),title=String(row?.title||"").trim(),language=String(row?.language||"");
+  if(!slug)return reject("missing_slug");
+  if(title.length<8)return reject("title_too_short");
+  if(language!=="ar"&&language!=="en")return reject("invalid_language");
+  const published=Date.parse(String(row?.created_at||""));
+  if(!Number.isFinite(published))return reject("invalid_publication_date");
+  if(published>now+5*60*1000)return reject("future_publication_date");
+  if(now-published>48*60*60*1000)return reject("outside_48_hour_window");
+  const body=String(row?.body||"").replace(/<script\b[\s\S]*?<\/script>/gi," ").replace(/<style\b[\s\S]*?<\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim();
+  if(body.length<500)return reject("body_too_short");
+  let sources:any[]=[];
+  try{const parsed=JSON.parse(String(row?.sources_json||"[]"));sources=Array.isArray(parsed)?parsed:[]}catch{}
+  const hosts=new Set<string>();
+  for(const source of sources){
+    try{
+      const url=new URL(String(source?.url||""));
+      if(url.protocol!=="https:"||url.username||url.password)continue;
+      const host=url.hostname.toLowerCase().replace(/^www\./,"").replace(/\.$/,"");
+      if(!host||host==="localhost"||host.endsWith(".localhost"))continue;
+      hosts.add(host);
+    }catch{}
+  }
+  if(hosts.size<2)return reject("fewer_than_two_https_source_hosts");
+  return {eligible:true,reason:""};
+};
 export async function newsSitemap(env:Env){
   const now=Date.now();
-  let items:Array<{slug:string;title:string;language:Locale;publishedAt:string}>=[];
+  let rows:any[]=[];
   try{
     const r=await env.DB.prepare("SELECT slug,title,language,created_at,body,sources_json FROM articles WHERE status='PUBLISHED' ORDER BY created_at DESC LIMIT 1000").all<any>();
-    items=(r.results||[]).filter((x:any)=>{
-      const published=Date.parse(String(x.created_at||""));
-      const body=String(x.body||"").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim();
-      let sources:any[]=[];
-      try{const parsed=JSON.parse(String(x.sources_json||"[]"));sources=Array.isArray(parsed)?parsed:[]}catch{}
-      // Count distinct HTTPS source hosts, not publisher display labels: imported
-      // records often have valid source URLs but omit the optional publisher field.
-      const hosts=new Set(sources.flatMap((source:any)=>{
-        try{
-          const url=new URL(String(source?.url||""));
-          if(url.protocol!=="https:"||url.username||url.password)return [];
-          const host=url.hostname.toLowerCase().replace(/^www\./,"").replace(/\.$/,"");
-          if(!host||host==="localhost"||host.endsWith(".localhost"))return [];
-          return [host];
-        }catch{return []}
-      }));
-      // Stories live in topical sections, not necessarily a section named "news".
-      // Google News entries must be recent, real published articles with independent
-      // evidence; do not impose an arbitrary 1,800-character minimum or require
-      // optional publisher labels that are absent from some valid source records.
-      return Boolean(
-        x.slug &&
-        String(x.title||"").trim().length>=8 &&
-        (x.language==="ar"||x.language==="en") &&
-        Number.isFinite(published) &&
-        published<=now+5*60*1000 &&
-        now-published<=48*60*60*1000 &&
-        body.length>=500 &&
-        hosts.size>=2
-      );
-    }).map((x:any)=>({
-      slug:String(x.slug),
-      title:String(x.title).trim(),
-      language:x.language as Locale,
-      publishedAt:new Date(String(x.created_at)).toISOString()
-    }));
+    rows=r.results||[];
   }catch(error){
-    console.error("news_sitemap_database_query_failed", error instanceof Error ? error.message : String(error));
+    console.error("news_sitemap_database_query_failed",error instanceof Error?error.message:String(error));
     return retryableUnavailable("News sitemap temporarily unavailable; retry later.");
   }
-  // Stable de-duplication prevents duplicated URLs from creating invalid news entries.
-  const unique=new Map<string,typeof items[number]>();
-  for(const item of items)unique.set(item.language+":"+item.slug,item);
-  return text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">'+[...unique.values()].map(x=>{
-    const url=ORIGIN+"/article/"+encodeURIComponent(x.slug)+"?lang="+x.language;
-    return '<url><loc>'+xml(url)+'</loc><news:news><news:publication><news:name>BAYAN</news:name><news:language>'+xml(x.language)+'</news:language></news:publication><news:publication_date>'+xml(x.publishedAt)+'</news:publication_date><news:title>'+xml(x.title)+'</news:title></news:news></url>';
+  const rejectionReasons:Record<string,number>={};
+  const eligibleRows:any[]=[];
+  for(const row of rows){
+    const result=newsSitemapEligibility(row,now);
+    if(result.eligible)eligibleRows.push(row);
+    else rejectionReasons[result.reason]=(rejectionReasons[result.reason]||0)+1;
+  }
+  const unique=new Map<string,{slug:string;title:string;language:Locale;publishedAt:string}>();
+  for(const row of eligibleRows){
+    const slug=String(row.slug),language=row.language as Locale,key=language+":"+slug;
+    if(unique.has(key)){rejectionReasons.duplicate_article_url=(rejectionReasons.duplicate_article_url||0)+1;continue;}
+    unique.set(key,{slug,title:String(row.title).trim(),language,publishedAt:new Date(String(row.created_at)).toISOString()});
+  }
+  const items=[...unique.values()];
+  const response=text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">'+items.map(item=>{
+    const url=ORIGIN+"/article/"+encodeURIComponent(item.slug)+"?lang="+item.language;
+    return '<url><loc>'+xml(url)+'</loc><news:news><news:publication><news:name>BAYAN</news:name><news:language>'+xml(item.language)+'</news:language></news:publication><news:publication_date>'+xml(item.publishedAt)+'</news:publication_date><news:title>'+xml(item.title)+'</news:title></news:news></url>';
   }).join("")+"</urlset>","application/xml;charset=utf-8");
+  response.headers.set("x-bayan-news-sitemap-candidate-count",String(rows.length));
+  response.headers.set("x-bayan-news-sitemap-eligible-count",String(items.length));
+  response.headers.set("x-bayan-news-sitemap-rejected-count",String(Math.max(0,rows.length-items.length)));response.headers.set("x-bayan-news-sitemap-rejection-reasons",JSON.stringify(rejectionReasons));
+  console.info("news_sitemap_generation",JSON.stringify({candidates:rows.length,eligible:items.length,rejected:Math.max(0,rows.length-items.length),rejectionReasons,freshnessWindowHours:48}));
+  return response;
 }
