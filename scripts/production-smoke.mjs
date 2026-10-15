@@ -369,5 +369,49 @@ try{
   });
 }catch(e){console.error("BLOCKED_IMAGE_HOST_REGRESSION",e);bad++}
 
+
+  // Exhaustive sitemap audit: the fixed regression sample above protects key
+  // routes; this pass protects every URL the site itself asks search engines to crawl.
+  const sitemapXml=(await get("/sitemap.xml")).text;
+  const newsSitemapXml=(await get("/news-sitemap.xml")).text;
+  const sitemapUrls=[...new Set(
+    [...(sitemapXml+"\\n"+newsSitemapXml).matchAll(/<loc>([\\s\\S]*?)<\\/loc>/gi)]
+      .map(match=>match[1].trim().replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">"))
+      .filter(value=>/^https?:\\/\\//i.test(value))
+  )];
+  if(sitemapUrls.length===0)throw new Error("sitemap_has_no_crawlable_urls");
+  console.log("SITEMAP_URL_AUDIT_START",JSON.stringify({urls:sitemapUrls.length}));
+  await inBatches(sitemapUrls,4,async absoluteUrl=>{
+    try{
+      const target=new URL(absoluteUrl);
+      if(target.origin!==new URL(origin).origin)throw new Error("sitemap_url_outside_production_origin:"+absoluteUrl);
+      const page=await get(target.pathname+target.search);
+      assertNoBlockedImageHosts(page.text,"SITEMAP_PAGE_IMAGE_HOST_"+target.pathname);
+      if(!/text\\/html/i.test(page.headers.get("content-type")||""))throw new Error("sitemap_url_not_html:"+absoluteUrl);
+      if(/<meta\\b[^>]*name=["']robots["'][^>]*content=["'][^"']*noindex/i.test(page.text)||
+         /<meta\\b[^>]*content=["'][^"']*noindex[^"']*["'][^>]*name=["']robots["']/i.test(page.text)||
+         /(^|,)\\s*noindex\\s*(,|$)/i.test(page.headers.get("x-robots-tag")||"")) {
+        throw new Error("sitemap_url_marked_noindex:"+absoluteUrl);
+      }
+      const canonicalMatch=page.text.match(/<link\\b[^>]*rel=["']canonical["'][^>]*href=["']([^"']+)["'][^>]*>/i)||
+        page.text.match(/<link\\b[^>]*href=["']([^"']+)["'][^>]*rel=["']canonical["'][^>]*>/i);
+      if(!canonicalMatch)throw new Error("sitemap_url_canonical_missing:"+absoluteUrl);
+      const canonicalHref=canonicalMatch[1].includes("canonical")?canonicalMatch[1]:canonicalMatch[1];
+      const canonical=new URL(canonicalHref,target).href;
+      if(canonical!==target.href)throw new Error("sitemap_url_canonical_mismatch:"+absoluteUrl+" -> "+canonical);
+    }catch(error){
+      console.error("SITEMAP_URL_AUDIT",absoluteUrl,String(error));
+      bad++;
+    }
+  });
+  // Validate every image URL in current news API payloads, not just the first few
+  // cards; this catches bad records that were not selected by the fixed samples.
+  for(const language of ["ar","en"]){
+    try{
+      const response=await get("/api/news?lang="+language);
+      assertNoBlockedImageHosts(response.text,"ALL_NEWS_API_IMAGES_"+language);
+    }catch(error){console.error("ALL_NEWS_API_IMAGES",language,String(error));bad++}
+  }
+
 if(bad)process.exit(1);
 console.log("BAYAN production smoke passed");
