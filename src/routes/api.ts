@@ -317,6 +317,40 @@ items=items.filter((x:any)=>(x.slug?String(x.section||"")===section:sectionRelev
 items=items.filter((x:any)=>x.kind==="evidence"||/^https:\/\//i.test(String(x.imageUrl||"")));
 if(items.length<2&&section!=="prices"){
  try{
+  const queries:Record<string,{ar:string;en:string}>={
+   science:{ar:"اكتشافات علمية وشرح مبادئ العلوم من مصادر موثوقة",en:"science discoveries and evidence-based explanations of science"},
+   technology:{ar:"تقنيات الذكاء الاصطناعي والحوسبة وأمن المعلومات",en:"artificial intelligence computing and information security explained"},
+   economy:{ar:"شرح التضخم والأسواق والاقتصاد من مصادر موثوقة",en:"economics inflation markets and financial systems explained"},
+   politics:{ar:"الانتخابات والبرلمان والحكومة والسياسة العامة في مصر والعالم العربي",en:"politics elections parliaments and government policy in Egypt and the Arab world"},
+   health:{ar:"الصحة العامة والطب المبني على الأدلة من مصادر طبية",en:"public health and evidence-based medicine from medical sources"},
+   history:{ar:"أحداث تاريخية وحضارات وسياق تاريخي من مصادر موثوقة",en:"historical events civilizations and historical context from reliable sources"},
+   people:{ar:"سيرة ذاتية لشخصيات عامة موثقة وحياتهم وأعمالهم",en:"biography and life stories of public figures from reliable sources"},
+   sports:{ar:"كرة القدم والبطولات الرياضية والنتائج والإحصاءات",en:"football leagues sports results and competition statistics"},
+   travel:{ar:"السياحة ووجهات السفر وإرشادات التأشيرات الرسمية",en:"travel destinations tourism and official visa guidance"},
+   art:{ar:"السينما المصرية والموسيقى العربية والفنون التشكيلية والمسرح",en:"Egyptian cinema Arabic music visual arts and theatre"},
+   trends:{ar:"ترندات مواقع التواصل الاجتماعي واستطلاعات الرأي والبيانات الاجتماعية",en:"social media trends public opinion surveys and current data"},
+   egypt:{ar:"مصر: الجغرافيا والمدن ونهر النيل والمعلومات العامة",en:"Egypt geography cities the Nile and public information"},
+   arab:{ar:"العالم العربي والجامعة العربية والبلدان العربية والثقافة العربية",en:"the Arab world Arab League Arab countries and Arabic culture"},
+   world:{ar:"قضايا عالمية وتحولات دولية وتأثيراتها بمصادر موثوقة",en:"global issues international changes and their impacts from reliable sources"}
+  };
+  const meta=sectionBySlug(section)!;
+  const q=queries[section]?.[lang]||(lang==="ar"?meta.descriptionAr:meta.descriptionEn);
+  const alternateQueries:Record<string,{ar:string;en:string}>={
+   science:{ar:"أبحاث علمية ونتائج دراسات وتجارب منشورة من الجامعات والمؤسسات العلمية",en:"published scientific studies research findings experiments and university research"},
+   technology:{ar:"أخبار التكنولوجيا وأدوات الذكاء الاصطناعي والبرمجيات والأمن السيبراني",en:"technology news artificial intelligence software cybersecurity and computing"},
+   economy:{ar:"مؤشرات الاقتصاد وأسعار الأسواق والبنوك والتجارة والتضخم",en:"economic indicators financial markets banking trade and inflation"},
+   politics:{ar:"البرلمان والحكومة والانتخابات والتشريعات والقرارات السياسية",en:"government decisions legislation elections parliament and public policy"},
+   health:{ar:"إرشادات الصحة العامة والأبحاث الطبية والوقاية والتشخيص من جهات طبية",en:"public health guidance medical research prevention and diagnosis from health authorities"},
+   history:{ar:"وثائق تاريخية وآثار وحضارات وشخصيات وأحداث تاريخية موثقة",en:"historical documents archaeology civilizations and documented historical events"},
+   people:{ar:"الشخصيات العامة والسير الذاتية والإنجازات الموثقة",en:"public figures biographies and documented achievements"},
+   sports:{ar:"نتائج البطولات والمباريات والاتحادات الرياضية والإحصاءات الرسمية",en:"sports tournament match results official leagues and verified statistics"},
+   travel:{ar:"المعالم السياحية والوجهات والحدائق والمتاحف وإرشادات السفر الرسمية",en:"tourism landmarks destinations parks museums and official travel advice"},
+   art:{ar:"الأعمال الفنية والعروض والأفلام والموسيقى والمعارض ومصادرها الرسمية",en:"arts performances films music exhibitions and official cultural sources"},
+   trends:{ar:"بيانات الاتجاهات العامة واستطلاعات الرأي ومؤشرات البحث ومصادر البيانات",en:"public trend data opinion polls search interest and data sources"},
+   egypt:{ar:"محافظات مصر ومعالمها وتاريخها وخدماتها ومعلومات الجهات الرسمية",en:"Egyptian governorates landmarks history services and official information"},
+   arab:{ar:"البلدان العربية وثقافتها واقتصادها ومؤسساتها الإقليمية",en:"Arab countries culture economies and regional institutions"},
+   world:{ar:"التطورات الدولية والمنظمات العالمية والبيئة والتجارة الدولية",en:"international developments global organizations environment and international trade"}
+  };
   // Section views reuse previously captured evidence and published content only.
   // Live provider discovery belongs to an explicit search request, not every page view.
   let cachedEvidence:any[]=[];
