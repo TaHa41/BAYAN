@@ -54,12 +54,8 @@ jobs:
 
 
   verify-production:
-    # Keep only the newest verification active; concurrent full smoke runs can rate-limit public search providers.
+    # The workflow-level shared lock serializes deployment and all production smoke checks.
     needs: deploy
-    concurrency:
-      group: bayan-production-verify-${{ github.sha }}
-      # Do not cancel verification of a deployed revision when another commit arrives.
-      cancel-in-progress: false
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
