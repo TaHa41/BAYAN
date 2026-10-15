@@ -328,7 +328,7 @@ if(items.length<2&&section!=="prices"){
      const title=String(item?.title||""),summary=String(item?.summary||"");
      const key=title.normalize("NFKC").toLowerCase().trim();
      if(!title||!summary||!key||seenCached.has(key))continue;
-     if(!localeSafeItem(item)||!sectionRelevant(item))continue;
+     if(!localeSafeItem(item)||!sectionRelevant(item)||!safePublicImageUrl(item.imageUrl))continue;
      seenCached.add(key);cachedEvidence.push({...item,section,kind:"evidence"});
      if(cachedEvidence.length>=8)break;
     }
