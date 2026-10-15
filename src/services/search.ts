@@ -660,7 +660,7 @@ const languageSafe=(x:Candidate,language:Locale)=>{
       const title=cleanText(String(row.title||""));
       const summary=cleanText(String(row.summary||"")).slice(0,1200);
       const url=String(row.url||"").trim();
-      if(!title||!summary||!/^https:\/\//i.test(url))continue;
+      if(!title||!summary||!/^https:\/\//i.test(url)||/\/videos?\/|youtube\.com|youtu\.be|vimeo\.com|^Watch:/i.test(url+" "+title))continue;
       if(!languageSafe({title,summary} as Candidate,language)||!localeSafeText(summary,language))continue;
       let host="";
       try{const parsed=new URL(url);if(parsed.protocol!=="https:"||parsed.username||parsed.password)continue;host=parsed.hostname.toLowerCase().replace(/^www\./,"");}catch{continue;}
