@@ -89,7 +89,7 @@ export async function newsSitemap(env:Env){
   }).join("")+"</urlset>","application/xml;charset=utf-8");
   response.headers.set("x-bayan-news-sitemap-candidate-count",String(rows.length));
   response.headers.set("x-bayan-news-sitemap-eligible-count",String(items.length));
-  response.headers.set("x-bayan-news-sitemap-rejected-count",String(Math.max(0,rows.length-items.length)));
+  response.headers.set("x-bayan-news-sitemap-rejected-count",String(Math.max(0,rows.length-items.length)));response.headers.set("x-bayan-news-sitemap-rejection-reasons",JSON.stringify(rejectionReasons));
   console.info("news_sitemap_generation",JSON.stringify({candidates:rows.length,eligible:items.length,rejected:Math.max(0,rows.length-items.length),rejectionReasons,freshnessWindowHours:48}));
   return response;
 }
