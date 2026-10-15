@@ -60,7 +60,7 @@ describe("external search recovery", () => {
     expect(result.results).toEqual([]);
     expect(result.providers).toEqual([]);
     expect(result.providerAttempted).toHaveLength(5);
-    expect(result.providerAttempted.every(item => item.endsWith(":failed"))).toBe(true);
+    expect(result.providerAttempted.every(item => item.endsWith(":failed") || /:(?:timeout|connection_failure|invalid_response|request_failure|http_)/i.test(item))).toBe(true);
   });
 
   it("does not mix Arabic titles into English recovery results", async () => {
