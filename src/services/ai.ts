@@ -46,7 +46,7 @@ export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[
   });
 };
 const independentSourceCount=(evidence:SearchResult[])=>new Set(evidence.flatMap(item=>item.sources||[]).map(source=>{
-  try{const host=new URL(String(source.url||"")).hostname.toLowerCase().replace(/^www\\./,"");if(host)return host}catch{}
+  try{const host=new URL(String(source.url||"")).hostname.toLowerCase().replace(/^www\./,"");if(host)return host}catch{}
   return String(source.publisher||"").trim().toLowerCase();
 }).filter(Boolean)).size;
 
