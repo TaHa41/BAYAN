@@ -49,6 +49,8 @@ const relevant = (title: string, summary: string, query: string) => {
   return hits >= Math.min(2, terms.length);
 };
 
+const recoveryFailureKind=(error:unknown):string=>{const value=error as {name?:string;message?:string};const name=String(value?.name||"");const message=String(value?.message||error||"").toLowerCase();const http=message.match(/http[_\s-]?(\d{3})/);if(http)return"http_"+http[1];if(name==="AbortError"||name==="TimeoutError"||/timeout|timed out|aborted/.test(message))return"timeout";if(name==="SyntaxError"||/invalid json|json parse|unexpected token/.test(message))return"invalid_response";if(name==="TypeError"||/fetch failed|network|connection|dns|socket|econn/.test(message))return"connection_failure";return"request_failure";};
+
 const timedFetch = async (url: string, ms = 4200) => {
   const response = await fetch(url, {
     signal: AbortSignal.timeout(ms),
@@ -184,7 +186,7 @@ export async function externalSearchRecovery(query: string, language: Locale): P
 
   settled.forEach((entry, index) => {
     const name = tasks[index][0];
-    providerAttempted.push(name + (entry.status === "fulfilled" ? ":ok:" + entry.value.length : ":failed"));
+    providerAttempted.push(name + (entry.status === "fulfilled" ? ":ok:" + entry.value.length : ":" + recoveryFailureKind(entry.reason)));
     if (entry.status !== "fulfilled" || !entry.value.length) return;
     providers.push(name);
     results.push(...entry.value);
