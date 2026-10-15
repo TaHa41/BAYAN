@@ -209,6 +209,7 @@ const checks = [
   ["Bing News RSS normalizes only Bing redirects to HTTPS and skips unconfigured AI Search instances", search.includes("normalizeBingNewsUrl") && search.includes("rejected_url=") && search.includes('instanceName.toLowerCase()==="default"')],
   ["news sitemap reports aggregate eligibility reasons without requiring an artificial minimum", read("src/seo.ts").includes("x-bayan-news-sitemap-rejection-reasons") && read("scripts/production-smoke.mjs").includes("NEWS_SITEMAP_DIAGNOSTICS") && !read("scripts/production-smoke.mjs").includes("news_sitemap_has_fewer_than_two_recent_verified_articles")],
   ["news sitemap rejection diagnostics run after deployment without blocking release", read("src/seo.ts").includes("x-bayan-news-sitemap-rejection-reasons") && read("scripts/news-sitemap-diagnostics.mjs").includes("NEWS_SITEMAP_DIAGNOSTICS") && read(".github/workflows/deploy-worker.yml").includes("node scripts/news-sitemap-diagnostics.mjs")],
+  ["homepage SEO metadata keeps one H1 and caps descriptions at 160 characters", read("src/index.ts").includes('const homeTitle=lang==="en"?"Latest knowledge articles | BAYAN":"أحدث المقالات المعرفية والمصادر | بيان"') && read("src/index.ts").includes('seo-home-featured"><h2>') && read("src/index.ts").includes("metaDescriptionChars.slice(0,160)") && read("src/index.ts").includes("seoEscape(metaDescription)")],
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
