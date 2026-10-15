@@ -183,7 +183,7 @@ export async function externalSearchRecovery(query: string, language: Locale): P
   const providers: string[] = [];
   const providerAttempted: string[] = [];
 
-  const runBatch = async (searchQuery: string, compactRetry = false) => {
+  const runBatch = async (searchQuery: string) => {
     const batchTasks: Array<[string, () => Promise<SearchResult[]>]> = searchQuery === q ? tasks : [
       ["Wikipedia compact retry", () => wikipediaAction(searchQuery, language)],
       ["Wikimedia REST compact retry", () => wikipediaRest(searchQuery, language)],
