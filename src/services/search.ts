@@ -622,7 +622,7 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   // the mismatched summary below rather than discarding the entire source.
   const title=String(x.title||"");
   return language==="ar" ? hasArabic(title) : !hasArabic(title);
-};export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean;draft?:boolean;images?:boolean}={}):Promise<SearchResponse>{
+};export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean;draft?:boolean;images?:boolean;background?:(task:Promise<unknown>)=>void}={}):Promise<SearchResponse>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const providerDiagnostics:string[]=[];const safe=async<T>(task:Promise<T>,fallback:T,provider="external provider"):Promise<T>=>{try{return await task}catch(error){reportProviderFailure(providerDiagnostics,provider,error);return fallback}};const academicQuery=/(research|paper|papers|study|studies|journal|doi|scholar|academic|citation|crossref|openalex|pubmed|clinical trial|systematic review|بحث علمي|أبحاث|دراسة|دراسات|مجلة علمية|ورقة بحثية|مصدر أكاديمي|دراسات سريرية|مراجعة منهجية)/i.test(q);
 const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|medicine|health study|بحث طبي|دراسة طبية|دراسات سريرية|تجربة سريرية|مراجعة منهجية)/i.test(q);
@@ -810,12 +810,15 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
       // Search answers stay concise; long-form publication gets a separate
       // evidence-gated draft so a short answer is never mistaken for a complete article.
       if(options.publish!==false&&drafted.status==="verified"&&independentlyVerified&&articleTitle&&!disallowedContent(articleTitle+" "+articleSummary)){
-        const longDraft=await Promise.race([draftArticle(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),9000))]);
-        if(longDraft.status==="verified"&&usefulDraft(longDraft.answer,language)){
+        const publishLongArticle=async()=>{
+          const longDraft=await Promise.race([draftArticle(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),18000))]);
+          if(longDraft.status!=="verified"||!usefulDraft(longDraft.answer,language))return;
           const imageUrl=results.find(item=>/^https:\/\//i.test(String(item.imageUrl||""))&&String(item.imageAlt||item.title||"").trim().length>0)?.imageUrl||await findRelatedImage(articleTitle,undefined,articleSummary).catch(()=>undefined);
           const savedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:longDraft.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle});
           if(savedSlug)publishedSlug=savedSlug;
-        }
+        };
+        if(options.background){try{options.background(publishLongArticle().catch(()=>undefined))}catch{}}
+        else await publishLongArticle();
       }
     }catch{}
   }
