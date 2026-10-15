@@ -124,7 +124,7 @@ async function wikidataEntityAliases(qid:string):Promise<string[]>{
   }catch{return[]}
 }
 async function gdelt(q:string,diagnostics?:string[]):Promise<Candidate[]>{
- try{const u="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(q)+"&mode=artlist&maxrecords=8&format=json&sort=HybridRel";const r=await timeout(u,4000,diagnostics,"GDELT");if(!r.ok){diagnostics?.push("GDELT HTTP "+r.status);return[];}const d=await r.json<any>();const articles=d.articles||[];const out=articles.map((x:any)=>({title:cleanText(x.title),summary:cleanText(x.seendate||"")+" "+cleanText(x.domain||""),section:"news",kind:"web",evidence:"mixed",sources:[source(x.title,x.domain||"GDELT",x.url)],url:x.url,score:scoreSource(x.domain||"GDELT",x.title,q),provider:"GDELT"})).filter((x:any)=>x.title&&x.url);diagnostics?.push("GDELT raw="+articles.length+" accepted="+out.length);return out}catch{diagnostics?.push("GDELT request failed");return[]}
+ try{const u="https://api.gdeltproject.org/api/v2/doc/doc?query="+encodeURIComponent(q)+"&mode=artlist&maxrecords=8&format=json&sort=HybridRel";const r=await timeout(u,4000,diagnostics,"GDELT");if(!r.ok){diagnostics?.push("GDELT HTTP "+r.status);return[];}const d=await r.json<any>();const articles=d.articles||[];const out=articles.map((x:any)=>({title:cleanText(x.title),summary:cleanText(x.seendate||"")+" "+cleanText(x.domain||""),section:"news",kind:"web",evidence:"mixed",sources:[source(x.title,x.domain||"GDELT",x.url)],url:x.url,score:scoreSource(x.domain||"GDELT",x.title,q),provider:"GDELT"})).filter((x:any)=>x.title&&x.url);diagnostics?.push("GDELT raw="+articles.length+" accepted="+out.length);return out}catch(error){reportProviderFailure(diagnostics,"GDELT",error);return[]}
 }
 const decodeXml=(value:string)=>String(value||"").replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,"$1").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n)));
 async function googleNewsSearch(q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
@@ -137,7 +137,7 @@ async function googleNewsSearch(q:string,language:Locale,diagnostics?:string[]):
     }).filter(item=>item.title&&/^https:\/\//i.test(item.url));
     diagnostics?.push("Google News RSS parsed="+stories.length+" accepted="+out.length);
     return out;
-  }catch{diagnostics?.push("Google News RSS request failed");return[]}
+  }catch(error){reportProviderFailure(diagnostics,"Google News Search",error);return[]}
 }
 
 async function bingNewsSearch(q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
