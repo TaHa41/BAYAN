@@ -15,8 +15,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: bayan-production-smoke
-  cancel-in-progress: true
+  group: bayan-production-search-checks
+  cancel-in-progress: false
 
 jobs:
   production-smoke:
