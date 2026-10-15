@@ -19,6 +19,7 @@ describe("topic-aware article editorial",()=>{
     const prompt=articlePromptForTopic("ما الذي نعرفه عن ارتفاع ضغط الدم؟","ar",[
       {title:"Clinical review of hypertension",summary:"Medical evidence describes risk factors and treatment limitations."} as any
     ]);
+    expect(sectionForOpenedStory("ما الذي نعرفه عن ارتفاع ضغط الدم؟","Medical evidence describes treatment limitations.")).toBe("health");
     expect(prompt).toContain("بنية صحية مسؤولة");
     expect(prompt).toContain("لا تشخّص القارئ");
     expect(prompt).toContain("لا تخترع أسماء أو تواريخ أو أرقامًا");
