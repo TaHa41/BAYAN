@@ -77,13 +77,19 @@ export async function newsSitemap(env:Env){
     console.error("news_sitemap_database_query_failed", error instanceof Error ? error.message : String(error));
     return retryableUnavailable("News sitemap temporarily unavailable; retry later.");
   }
+  // Count rejection reasons so an empty sitemap is diagnosable without exposing
+  // article bodies, source URLs, or other content in production logs.
+  const rejected:Record<string,number>={invalid_slug:0,invalid_title:0,invalid_language:0,invalid_date:0,stale_or_future:0,body_too_short:0,no_https_sources:0,source_not_news_eligible:0};
   const items=candidates.filter((x)=>{
     const published=Date.parse(x.publishedAt);
     const plainBody=bodyText(x.body);
     let sources:any[]=[];
     try{const parsed=JSON.parse(x.sources_json);sources=Array.isArray(parsed)?parsed:[]}catch{}
     const validSources=sources.filter((source:any)=>{
-      try{return new URL(String(source?.url||"")).protocol==="https:"}catch{return false}
+      try{
+        const url=new URL(String(source?.url||""));
+        return url.protocol==="https:" && Boolean(url.hostname);
+      }catch{return false}
     });
     const hosts=new Set(validSources.map((source:any)=>hostname(source.url)).filter(Boolean));
     const publishers=new Set(validSources.map((source:any)=>String(source?.publisher||"").trim().toLowerCase()).filter(Boolean));
@@ -95,17 +101,17 @@ export async function newsSitemap(env:Env){
       const date=Date.parse(String(source?.publishedAt||""));
       return Number.isFinite(date)&&date<=now+5*60*1000&&now-date<=windowMs;
     });
-    return Boolean(
-      x.slug &&
-      x.title.length>=8 &&
-      (x.language==="ar"||x.language==="en") &&
-      Number.isFinite(published) &&
-      published<=now+5*60*1000 &&
-      now-published<=windowMs &&
-      plainBody.length>=1200 &&
-      hosts.size>=2 &&
-      (recognizedNewsPublisher||recentSource||publishers.size>=2)
-    );
+    let reason="";
+    if(!x.slug)reason="invalid_slug";
+    else if(x.title.length<8)reason="invalid_title";
+    else if(x.language!=="ar"&&x.language!=="en")reason="invalid_language";
+    else if(!Number.isFinite(published))reason="invalid_date";
+    else if(published>now+5*60*1000||now-published>windowMs)reason="stale_or_future";
+    else if(plainBody.length<600)reason="body_too_short";
+    else if(hosts.size<1)reason="no_https_sources";
+    else if(!recognizedNewsPublisher&&!recentSource&&publishers.size<1)reason="source_not_news_eligible";
+    if(reason){rejected[reason]=(rejected[reason]||0)+1;return false}
+    return true;
   }).map((x)=>({
     slug:x.slug,
     title:x.title,
@@ -124,5 +130,13 @@ export async function newsSitemap(env:Env){
   response.headers.set("cache-control","public, max-age=300, s-maxage=300");
   response.headers.set("x-bayan-news-sitemap-candidate-count",String(candidates.length));
   response.headers.set("x-bayan-news-sitemap-eligible-count",String(finalItems.length));
+  response.headers.set("x-bayan-news-sitemap-rejected-count",String(candidates.length-items.length));
+  console.info("news_sitemap_generation",JSON.stringify({
+    candidates:candidates.length,
+    eligible:finalItems.length,
+    rejected:candidates.length-items.length,
+    rejectionReasons:rejected,
+    freshnessWindowHours:48
+  }));
   return response;
 }
