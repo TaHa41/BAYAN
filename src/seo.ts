@@ -1,7 +1,6 @@
 import {ORIGIN,SECTIONS} from "./config";
 import type {Env,Locale} from "./types";
 import {text}from"./http";
-import {safePublicImageUrl} from "./image-url";
 
 export function robots(){
   // Keep robots.txt limited to directives recognized by crawlers.
@@ -60,20 +59,30 @@ const newsSitemapEligibility=(row:any,now:number)=>{
   if(hosts.size<2)return reject("fewer_than_two_https_source_hosts");
   return {eligible:true,reason:""};
 };
+const archiveArticleCandidate=(row:any,now:number)=>{
+  const title=String(row?.title||"").trim(),language=String(row?.language||""),summary=String(row?.summary||"").replace(/<script\b[\s\S]*?<\/script>/gi," ").replace(/<style\b[\s\S]*?<\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim();
+  const publisher=String(row?.publisher||"").trim(),fetched=Date.parse(String(row?.fetched_at||""));
+  if(!Number.isInteger(Number(row?.id))||Number(row?.id)<1||title.length<8||(language!=="ar"&&language!=="en")||summary.length<120||!publisher)return false;
+  if(!Number.isFinite(fetched)||fetched>now+5*60*1000||now-fetched>48*60*60*1000)return false;
+  try{const source=new URL(String(row?.url||""));return source.protocol==="https:"&&!source.username&&!source.password}catch{return false}
+};
 export async function newsSitemap(env:Env){
   const now=Date.now();
   let rows:any[]=[];
   let archiveRows:any[]=[];
   try{
-    const [articles,archive]=await Promise.all([
-      env.DB.prepare("SELECT slug,title,language,created_at,body,sources_json FROM articles WHERE status='PUBLISHED' ORDER BY created_at DESC LIMIT 1000").all<any>(),
-      env.DB.prepare("SELECT id,url,language,title,summary,publisher,published_at,image_url,section,fetched_at FROM news_archive ORDER BY fetched_at DESC LIMIT 1000").all<any>()
-    ]);
-    rows=articles.results||[];
-    archiveRows=archive.results||[];
+    const r=await env.DB.prepare("SELECT slug,title,language,created_at,body,sources_json FROM articles WHERE status='PUBLISHED' ORDER BY created_at DESC LIMIT 1000").all<any>();
+    rows=r.results||[];
   }catch(error){
     console.error("news_sitemap_database_query_failed",error instanceof Error?error.message:String(error));
     return retryableUnavailable("News sitemap temporarily unavailable; retry later.");
+  }
+  try{
+    const archive=await env.DB.prepare("SELECT id,url,language,title,summary,publisher,published_at,fetched_at FROM news_archive ORDER BY fetched_at DESC LIMIT 1000").all<any>();
+    archiveRows=archive.results||[];
+  }catch(error){
+    // Archive diagnostics must not suppress valid full-article URLs.
+    console.error("news_sitemap_archive_diagnostics_failed",error instanceof Error?error.message:String(error));
   }
   const rejectionReasons:Record<string,number>={};
   const eligibleRows:any[]=[];
@@ -88,41 +97,17 @@ export async function newsSitemap(env:Env){
     if(unique.has(key)){rejectionReasons.duplicate_article_url=(rejectionReasons.duplicate_article_url||0)+1;continue;}
     unique.set(key,{slug,title:String(row.title).trim(),language,publishedAt:new Date(String(row.created_at)).toISOString(),url:ORIGIN+"/article/"+encodeURIComponent(slug)+"?lang="+language});
   }
-  let archiveEligibleCount=0;
-  for(const row of archiveRows){
-    const reject=(reason:string)=>{rejectionReasons["archive_"+reason]=(rejectionReasons["archive_"+reason]||0)+1};
-    const id=Number(row.id),title=String(row.title||"").trim(),language=String(row.language||"");
-    const summary=String(row.summary||"").replace(/<script\b[\s\S]*?<\/script>/gi," ").replace(/<style\b[\s\S]*?<\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim();
-    const publisher=String(row.publisher||"").trim(),sourceUrl=String(row.url||"").trim();
-    const fetched=Date.parse(String(row.fetched_at||""));
-    if(!Number.isInteger(id)||id<1){reject("missing_id");continue}
-    if(title.length<8){reject("title_too_short");continue}
-    if(language!=="ar"&&language!=="en"){reject("invalid_language");continue}
-    if(summary.length<120){reject("summary_too_short");continue}
-    if(!publisher){reject("missing_publisher");continue}
-    try{const source=new URL(sourceUrl);if(source.protocol!=="https:"||source.username||source.password){reject("invalid_source_url");continue}}
-    catch{reject("invalid_source_url");continue}
-    if(!Number.isFinite(fetched)){reject("invalid_archive_date");continue}
-    if(fetched>now+5*60*1000){reject("future_archive_date");continue}
-    if(now-fetched>48*60*60*1000){reject("outside_48_hour_window");continue}
-    const safeImage=safePublicImageUrl(row.image_url);
-    if(row.image_url&&!safeImage){reject("unsafe_image");continue}
-    const key=language+":archive:"+id;
-    if(unique.has(key)){reject("duplicate_archive_url");continue}
-    unique.set(key,{slug:"news-archive-"+id,title,language:language as Locale,publishedAt:new Date(fetched).toISOString(),url:ORIGIN+"/news?archive="+id+"&lang="+language});
-    archiveEligibleCount++;
-  }
+  const archiveEligibleCount=archiveRows.filter((row)=>archiveArticleCandidate(row,now)).length;
   const items=[...unique.values()];
-  const totalCandidates=rows.length+archiveRows.length;
   const response=text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">'+items.map(item=>{
     return '<url><loc>'+xml(item.url)+'</loc><news:news><news:publication><news:name>BAYAN</news:name><news:language>'+xml(item.language)+'</news:language></news:publication><news:publication_date>'+xml(item.publishedAt)+'</news:publication_date><news:title>'+xml(item.title)+'</news:title></news:news></url>';
   }).join("")+"</urlset>","application/xml;charset=utf-8");
-  response.headers.set("x-bayan-news-sitemap-candidate-count",String(totalCandidates));
+  response.headers.set("x-bayan-news-sitemap-candidate-count",String(rows.length));
   response.headers.set("x-bayan-news-sitemap-eligible-count",String(items.length));
-  response.headers.set("x-bayan-news-sitemap-rejected-count",String(Math.max(0,totalCandidates-items.length)));
+  response.headers.set("x-bayan-news-sitemap-rejected-count",String(Math.max(0,rows.length-items.length)));
   response.headers.set("x-bayan-news-sitemap-archive-candidate-count",String(archiveRows.length));
-  response.headers.set("x-bayan-news-sitemap-archive-eligible-count",String(archiveEligibleCount));
+  response.headers.set("x-bayan-news-sitemap-archive-ready-for-drafting-count",String(archiveEligibleCount));
   response.headers.set("x-bayan-news-sitemap-rejection-reasons",JSON.stringify(rejectionReasons));
-  console.info("news_sitemap_generation",JSON.stringify({articleCandidates:rows.length,archiveCandidates:archiveRows.length,eligible:items.length,archiveEligible:archiveEligibleCount,rejected:Math.max(0,totalCandidates-items.length),rejectionReasons,freshnessWindowHours:48}));
+  console.info("news_sitemap_generation",JSON.stringify({articleCandidates:rows.length,archiveCandidates:archiveRows.length,eligible:items.length,archiveReadyForArticleDrafting:archiveEligibleCount,rejected:Math.max(0,rows.length-items.length),rejectionReasons,freshnessWindowHours:48}));
   return response;
 }
