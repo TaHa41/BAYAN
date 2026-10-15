@@ -10,8 +10,41 @@ const providerFailureKind=(error:unknown):"timeout"|"connection_failure"|"invali
 const reportProviderFailure=(diagnostics:string[]|undefined,provider:string,error:unknown)=>{if(!diagnostics)return;const kind=providerFailureKind(error);const value=error as {message?:string};const detail=String(value?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").slice(0,140);diagnostics.push(provider+": "+kind+(detail?": "+detail:""));};
 const timeout = async (url:string, ms=2600, diagnostics?:string[], provider="external provider") => {
   const c=new AbortController(); const t=setTimeout(()=>c.abort(),ms);
-  try { const response=await fetch(url,{signal:c.signal,headers:{accept:"application/json,text/plain,*/*","user-agent":"BAYAN/1.2 (+https://bayan.tahaomar411.workers.dev; contact: bayan.contact@yahoo.com)","api-user-agent":"BAYAN/1.2 (https://bayan.tahaomar411.workers.dev)"}});if(!response.ok)diagnostics?.push(provider+": http_"+response.status);return response; }
-  catch(error){reportProviderFailure(diagnostics,provider,error);throw error;}finally{clearTimeout(t);}
+  try {
+    const response=await fetch(url,{signal:c.signal,headers:{accept:"application/json,text/plain,*/*","user-agent":"BAYAN/1.2 (+https://bayan.tahaomar411.workers.dev; contact: bayan.contact@yahoo.com)","api-user-agent":"BAYAN/1.2 (https://bayan.tahaomar411.workers.dev)"}});
+    // fetch() resolves when headers arrive, not when the response body has been
+    // consumed. Keep the abort timer active while reading the body so a slow
+    // provider cannot bypass the advertised timeout after sending headers.
+    const bodyless=response.status===204||response.status===205||response.status===304;
+    let body:ArrayBuffer|null=null;
+    if(!bodyless&&response.body){
+      const reader=response.body.getReader();
+      const chunks:Uint8Array[]=[];
+      let total=0;
+      try{
+        while(true){
+          const part=await reader.read();
+          if(part.done)break;
+          total+=part.value.byteLength;
+          if(total>4*1024*1024){
+            await reader.cancel().catch(()=>{});
+            throw new Error("response_body_too_large");
+          }
+          chunks.push(part.value);
+        }
+      }finally{
+        reader.releaseLock();
+      }
+      const bytes=new Uint8Array(total);
+      let offset=0;
+      for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
+      body=bytes.buffer as ArrayBuffer;
+    }else if(!bodyless){
+      body=new ArrayBuffer(0);
+    }
+    if(!response.ok)diagnostics?.push(provider+": http_"+response.status);
+    return new Response(body,{status:response.status,statusText:response.statusText,headers:response.headers});
+  }catch(error){reportProviderFailure(diagnostics,provider,error);throw error;}finally{clearTimeout(t);}
 };
 const cleanText=(s:string)=>String(s||"").replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim();
 const scoreSource=(publisher:string, title:string, q:string) => {
