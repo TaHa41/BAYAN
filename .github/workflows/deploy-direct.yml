@@ -5,7 +5,7 @@ permissions:
   contents: read
 # Share one release lock with the automatic Worker deployment workflow.
 concurrency:
-  group: bayan-production-release-v4
+  group: bayan-production-search-checks
   cancel-in-progress: false
 jobs:
   deploy:
