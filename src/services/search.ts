@@ -645,7 +645,36 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   // the mismatched summary below rather than discarding the entire source.
   const title=String(x.title||"");
   return language==="ar" ? hasArabic(title) : !hasArabic(title);
-};export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean;draft?:boolean;images?:boolean;background?:(task:Promise<unknown>)=>void}={}):Promise<SearchResponse>{
+};async function searchRecentNewsArchive(env:Env,q:string,language:Locale):Promise<Candidate[]>{
+  const cutoff=new Date(Date.now()-7*24*60*60*1000).toISOString();
+  const future=new Date(Date.now()+5*60*1000).toISOString();
+  try{
+    const response=await env.DB.prepare("SELECT title,summary,url,publisher,published_at,image_url,image_alt,section FROM news_archive WHERE language=? AND fetched_at>=? AND published_at>=? AND published_at<=? AND length(summary)>=80 ORDER BY fetched_at DESC LIMIT 100").bind(language,cutoff,cutoff,future).all<any>();
+    const output:Candidate[]=[];
+    const seenPublishers=new Set<string>();
+    for(const row of response.results||[]){
+      const title=cleanText(String(row.title||""));
+      const summary=cleanText(String(row.summary||"")).slice(0,1200);
+      const url=String(row.url||"").trim();
+      if(!title||!summary||!/^https:\/\//i.test(url))continue;
+      if(!languageSafe({title,summary} as Candidate,language)||!localeSafeText(summary,language))continue;
+      let host="";
+      try{const parsed=new URL(url);if(parsed.protocol!=="https:"||parsed.username||parsed.password)continue;host=parsed.hostname.toLowerCase().replace(/^www\./,"");}catch{continue;}
+      if(!host||/(?:^|\.)(?:bayan\.tahaomar411\.workers\.dev|wikipedia\.org|wikidata\.org|google\.com|googleusercontent\.com|bing\.com|duckduckgo\.com)$/i.test(host))continue;
+      const publisher=cleanText(String(row.publisher||host));
+      if(/google news|bing news|duckduckgo|wikipedia|wikidata|aggregator|ويكيبيديا|ويكي بيانات/i.test(publisher))continue;
+      const candidate:Candidate={title,summary,section:"news",kind:"web",evidence:"mixed",sources:[{title,publisher,url,publishedAt:String(row.published_at||""),imageUrl:safePublicImageUrl(row.image_url)}],url,imageUrl:safePublicImageUrl(row.image_url),imageAlt:String(row.image_alt||title),score:scoreSource(publisher,title,q)+22,provider:"BAYAN Recent News Archive"};
+      if(!relevantCandidate(candidate,q))continue;
+      const publisherKey=publisher.toLowerCase();
+      if(seenPublishers.has(publisherKey))continue;
+      seenPublishers.add(publisherKey);
+      output.push(candidate);
+      if(output.length>=8)break;
+    }
+    return output;
+  }catch{return[]}
+}
+export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean;draft?:boolean;images?:boolean;background?:(task:Promise<unknown>)=>void}={}):Promise<SearchResponse>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   // Reuse a recent, previously verified answer when its evidence is still source-diverse.
   // This avoids re-running the full external-provider fan-out for repeat queries.
@@ -680,7 +709,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
 // Stage discovery: query the local index and compact reference providers first.
   // Broad HTML/RSS providers run only if the first batch lacks relevant evidence,
   // preventing each visitor search from launching a dozen expensive requests at once.
-  let [local, wiki, wikiRest, wd, remote, dd, oa, crossref, pubmed] = await Promise.all([
+  let [local, wiki, wikiRest, wd, remote, dd, oa, crossref, pubmed, archiveNews] = await Promise.all([
     safe(searchArticles(env,q,language,max),[],"BAYAN Knowledge Base"),
     safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language,providerDiagnostics),[],"Wikipedia"),
     safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipediaRestSearch(q,language,providerDiagnostics),[],"Wikipedia REST Search"),
@@ -689,14 +718,15 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     safe(duck(q,language,providerDiagnostics),[],"DuckDuckGo Instant Answers"),
     safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q,providerDiagnostics),[],"OpenAlex"),
     safe((academicQuery&&!personLookup(q))?crossrefSearch(q,providerDiagnostics):Promise.resolve([]),[],"Crossref"),
-    safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language,providerDiagnostics),[],"PubMed / NCBI")
+    safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language,providerDiagnostics),[],"PubMed / NCBI"),
+    safe(searchRecentNewsArchive(env,q,language),[],"BAYAN Recent News Archive")
   ]);
 
   let google:Candidate[]=[];
-  const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers"];
+  const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers","BAYAN Recent News Archive"];
   providerAttempted.push(...providerDiagnostics);
   const candidates:Candidate[]=[
-    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wikiRest,...wd,...oa,...crossref,...pubmed,...remote,...dd,...google
+    ...local.map(x=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wikiRest,...wd,...oa,...crossref,...pubmed,...remote,...dd,...archiveNews,...google
   ];
   // Use the authenticated Enterprise index as a recovery provider only when
   // primary discovery is empty or thin; avoid token/article requests on every search.
