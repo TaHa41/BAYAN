@@ -626,7 +626,41 @@ const aiSearchNews = async (env: Env, lang: Locale): Promise<Story[]> => {
   } catch { return []; }
 };
 
-export async function news(env: Env, lang: Locale) {
+export async function news(env: Env, lang: Locale, options: {forceRefresh?:boolean} = {}) {
+  const cachedAtStart = await readNewsCache(env, lang);
+  const cacheAge = cachedAtStart?.updatedAt ? Date.now() - Date.parse(cachedAtStart.updatedAt) : Number.POSITIVE_INFINITY;
+  const cachedItems = (cachedAtStart?.items || []).filter((story) => {
+    const published = Date.parse(String(story.publishedAt || ""));
+    return Boolean(story.title && /^https:\/\//i.test(String(story.url || "")) &&
+      Number.isFinite(published) && published <= Date.now() + 5 * 60 * 1000 &&
+      Date.now() - published <= 72 * 60 * 60 * 1000 &&
+      (lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title)) &&
+      isUsableNewsImage(story.imageUrl));
+  });
+  // Public reads must not re-run every RSS parser and image lookup. The scheduled
+  // refresh and self-heal paths explicitly opt into live refresh; visitors receive
+  // recent verified cache entries and avoid exhausting the Free-plan CPU budget.
+  if (!options.forceRefresh && cachedItems.length >= 3) {
+    return {
+      ok: true,
+      stale: !Number.isFinite(cacheAge) || cacheAge > 15 * 60 * 1000,
+      cachedAt: cachedAtStart?.updatedAt,
+      providers: ["BAYAN verified cache"],
+      items: cachedItems.map((story) => ({
+        ...story,
+        publisher: localizedPublisher(story.publisher, lang),
+        summary: languageSafeText(story.summary, lang) ? story.summary : "",
+        sources: [{
+          title: story.title,
+          publisher: localizedPublisher(story.publisher, lang),
+          url: story.url,
+          publishedAt: story.publishedAt,
+          imageUrl: story.imageUrl,
+        } as Source],
+        evidence: "mixed" as const,
+      })),
+    };
+  }
   const providers = feeds(lang);
   const batches = await Promise.all(
     providers.map(([name, url]) => readFeed(name, url)),
@@ -729,7 +763,7 @@ export async function news(env: Env, lang: Locale) {
       Date.parse(String(story.publishedAt)) <= Date.now() + 5 * 60 * 1000);
   await archiveNewsStories(env, lang, archiveCandidates);
 
-  const cached = await readNewsCache(env, lang);
+  const cached = cachedAtStart;
   // Keep a healthy cache behind the live providers. If providers return nothing
   // (or only a partial batch), reuse recent verified stories instead of rendering
   // an empty news page.
