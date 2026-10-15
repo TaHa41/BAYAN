@@ -265,7 +265,7 @@ export async function api(request:Request,env:Env,ctx?:ExecutionContext){const u
   return json({section,items:items.map((item:any)=>({...item,imageUrl:safePublicImageUrl(item.imageUrl)}))})
 }let items:any[]=await listArticles(env,section,lang,24);
 const hasArabic=(value:unknown)=>/[\u0600-\u06ff]/.test(String(value||""));
-const localeSafeItem=(x:any)=>{const title=String(x?.title||""),summary=String(x?.summary||""),bodyText=String(x?.body||"");return lang==="ar"?hasArabic(title)&&(!summary||hasArabic(summary))&&(!bodyText||hasArabic(bodyText)):!hasArabic(title)&&!hasArabic(summary)&&!hasArabic(bodyText);};
+const localeSafeItem=(x:any)=>{const title=String(x?.title||""),summary=String(x?.summary||""),bodyText=String(x?.body||"");return articleLocaleSafe(title,lang)&&(!summary||articleLocaleSafe(summary,lang))&&(!bodyText||articleLocaleSafe(bodyText,lang));};
 const sectionPatterns:Record<string,RegExp>={
  science:/(science|scientific|space|nasa|physics|chemistry|biology|علم|فضاء|ناسا|فيزياء|كيمياء|أحياء|اكتشاف)/i,
  technology:/(technology|artificial intelligence|software|computing|cyber|تقنية|تكنولوجيا|ذكاء اصطناعي|برمج|حوسبة|أمن المعلومات)/i,
@@ -394,7 +394,7 @@ if(items.length<2&&section!=="prices"){
   const completeCount=items.filter((x:any)=>x.slug&&articleBodyQuality(String(x.body||"")).ok&&/^https:\/\//i.test(String(x.imageUrl||""))).length;
   if(completeCount<2){
    const existingTitles=new Set(items.map((x:any)=>String(x.title||"").normalize("NFKC").toLowerCase().trim()));
-   const fallback=(found.results||[]).filter((x:any)=>{const title=String(x?.title||""),summary=String(x?.summary||""),body=String(x?.body||"");return title&&summary&&!existingTitles.has(title.normalize("NFKC").toLowerCase().trim())&&sectionRelevant(x)&&(lang==="ar"?hasArabic(title)&&hasArabic(summary)&&(!body||hasArabic(body)):!hasArabic(title)&&!hasArabic(summary)&&!hasArabic(body));}).slice(0,12).map((x:any)=>({...x,section:section,kind:"evidence"}));
+   const fallback=(found.results||[]).filter((x:any)=>{const title=String(x?.title||""),summary=String(x?.summary||""),body=String(x?.body||"");return title&&summary&&!existingTitles.has(title.normalize("NFKC").toLowerCase().trim())&&sectionRelevant(x)&&articleLocaleSafe(title,lang)&&articleLocaleSafe(summary,lang)&&(!body||articleLocaleSafe(body,lang));}).slice(0,12).map((x:any)=>({...x,section:section,kind:"evidence"}));
    items=[...items,...fallback];
   }
  }catch{}
