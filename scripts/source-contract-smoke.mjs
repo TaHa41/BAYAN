@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 const read = (path) => readFileSync(new URL("../" + path, import.meta.url), "utf8");
 const news = read("src/services/news.ts");
 const search = read("src/services/search.ts");
+const db = read("src/db.ts");
 const ai = read("src/services/ai.ts");
 const repair = read("src/services/repair.ts");
 const wisdom = read("src/wisdom.ts");
