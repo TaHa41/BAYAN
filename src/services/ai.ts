@@ -45,6 +45,35 @@ export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[
     });
   });
 };
+export async function draftArticle(env:Env,question:string,locale:Locale,evidence:SearchResult[]){
+  const publishers=new Set(evidence.flatMap(item=>item.sources||[]).map(source=>String(source.publisher||"").trim().toLowerCase()).filter(Boolean));
+  if(evidence.length<2)return{status:"insufficient" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[])};
+  const compactEvidence=evidence.slice(0,12).map((item,index)=>({
+    title:String(item.title||"").slice(0,240),
+    summary:String(item.summary||"").slice(0,1400),
+    section:String(item.section||""),
+    sources:(item.sources||[]).slice(0,4).map(source=>({title:String(source.title||"").slice(0,180),publisher:String(source.publisher||"").slice(0,120),url:String(source.url||"").slice(0,500)}))
+  }));
+  const evidenceText=JSON.stringify(compactEvidence).slice(0,20000);
+  const system=locale==="ar"
+    ?"أنت محرر معرفي في بيان. اكتب مقالًا عربيًا فصيحًا متكاملًا ومفيدًا، لا مجرد ملخص أو مقتطف. ابدأ بمقدمة تجيب عن الموضوع، ثم استخدم أربعة عناوين فرعية على الأقل وفقرات مترابطة تغطي الخلفية، والحقائق الأساسية، والسياق، والأثر أو الاستخدامات، والحدود أو ما لا يزال غير محسوم، وخلاصة واضحة. استهدف مقالًا تفصيليًا يقارب 700 إلى 1000 كلمة عندما تسمح الأدلة. استخدم الأدلة المرفقة فقط، ولا تضف اسمًا أو رقمًا أو تاريخًا أو ادعاءً محددًا غير مدعوم. لا تكرر الفكرة، ولا تخلط بين أشخاص أو أحداث متشابهة. إذا لم تكف الأدلة لتفصيل معين، فقل ذلك بوضوح بدل اختلاقه. لا تذكر أنك نموذج ذكاء اصطناعي ولا تضع روابط خارجية داخل متن المقال؛ تحفظ المصادر منفصلة في بيان."
+    :"You are a BAYAN knowledge editor. Write a genuinely useful, comprehensive English article, not a short answer or source excerpt. Begin with a direct introduction, then use at least four meaningful section headings and connected paragraphs covering background, established facts, context, impact or practical use, limitations or unresolved questions, and a clear conclusion. Aim for roughly 700–1000 words when the evidence supports it. Use only the supplied evidence; do not invent names, numbers, dates, quotations, or specific claims. Do not repeat ideas or conflate similar people/events. Clearly state when evidence does not establish a detail. Do not mention being an AI and do not put external URLs in the article body; BAYAN stores sources separately.";
+  const messages=[{role:"system",content:system},{role:"user",content:"Topic/question: "+question+"\nEvidence (source records are authoritative; summaries may be incomplete): "+evidenceText}];
+  if(env.OPENAI_API_KEY)try{
+    const response=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(14000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",messages,temperature:.1,max_tokens:2200})});
+    if(response.ok){
+      const data=await response.json<any>();
+      const answer=String(data.choices?.[0]?.message?.content||"").trim();
+      if(answer&&languageConsistent(answer,locale))return{status:publishers.size>=2&&!answerHasUnsupportedSpecifics(answer,evidence,question)?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(item=>item.sources||[])};
+    }
+  }catch{}
+  if(env.AI)try{
+    const response=await env.AI.run("@cf/meta/llama-3.1-8b-instruct",{messages,max_tokens:1800,temperature:.1});
+    const answer=String((response as any)?.response||"").trim();
+    if(answer&&languageConsistent(answer,locale))return{status:publishers.size>=2&&!answerHasUnsupportedSpecifics(answer,evidence,question)?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(item=>item.sources||[])};
+  }catch{}
+  return{status:"mixed" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[])};
+}
 export async function ask(env:Env,question:string,locale:Locale,evidence:SearchResult[]){
   const publishers=new Set(evidence.flatMap(x=>x.sources||[]).map(s=>s.publisher).filter(Boolean));
   if(!evidence.length)return{status:"insufficient" as const,answer:locale==="ar"?"لا أملك أدلة موثقة كافية للإجابة بثقة.":"I do not have enough verified evidence to answer confidently.",sources:[]};
