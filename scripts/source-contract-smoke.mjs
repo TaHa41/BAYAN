@@ -67,6 +67,7 @@ const checks = [
   ["RSS and Atom feeds are both parsed", news.includes('matchAll(/<(item|entry)\\b')],
   ["search headlines match locale; only exact person-profile summaries get a safe localized fallback", search.includes("Use the title to select the requested language") && search.includes('return language==="ar" ? hasArabic(title) : !hasArabic(title)') && search.includes("localeSafeText(x.summary,language)?x.summary:") && search.includes("localizedPersonDescription(x.summary,language)")],
   ["AI rejects English-only sentences in Arabic answers", ai.includes("const languageConsistent") && ai.includes("sentences.every")],
+  ["answer drafting uses Workers AI rather than treating the AI Search retrieval binding as a generation model", ai.includes('env.AI.run("@cf/meta/llama-3.1-8b-instruct"') && ai.includes("AI_SEARCH is a retrieval binding, not the text-generation runtime") && !ai.includes("env.AI_SEARCH.get(env.BAYAN_AI_SEARCH_INSTANCE||\"default\");\n    const r=await instance.chatCompletions")],
   ["short news drafts are not marked as complete analysis", api.includes("const articleBodyQuality=") && api.includes("hasFullAnalysis=quality.ok&&generated.status") && api.includes('status:hasFullAnalysis?generated.status:"source_only"')],
   ["admin exposes content quality metrics", read("src/db.ts").includes("length(trim(body))<1800") && app.includes("analytics.contentQuality?.short_bodies")],
   ["top searches are isolated by language", read("src/db.ts").includes("FROM searches WHERE language=?") && api.includes("analyticsStats(env,lang)")],
