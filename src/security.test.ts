@@ -20,6 +20,13 @@ describe("analytics exclusions", () => {
     expect(analyticsExcluded(request)).toBe(true);
   });
 
+  it.each(["/admin", "/admin/content", "/review", "/api/admin/repair"])("excludes private control-center route from analytics: %s", (path) => {
+    const request = new Request("https://bayan.tahaomar411.workers.dev" + path, {
+      headers: { "user-agent": "Mozilla/5.0 (Android 13; Mobile) AppleWebKit/537.36 Chrome/130.0.0.0 Mobile Safari/537.36" }
+    });
+    expect(analyticsExcluded(request)).toBe(true);
+  });
+
   it("keeps ordinary browser traffic eligible for analytics", () => {
     const request = new Request("https://bayan.tahaomar411.workers.dev/", {
       headers: { "user-agent": "Mozilla/5.0 (Android 13; Mobile) AppleWebKit/537.36 Chrome/130.0.0.0 Mobile Safari/537.36" }
