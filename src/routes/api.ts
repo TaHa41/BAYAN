@@ -344,11 +344,13 @@ if(items.length<2&&section!=="prices"){
  }catch{}
 }
 try{
-  const archived=await env.DB.prepare("SELECT id,title,summary,publisher,published_at,image_url,image_alt,section,fetched_at FROM news_archive WHERE language=? AND section=? ORDER BY COALESCE(published_at,fetched_at) DESC LIMIT 12").bind(lang,section).all<any>();
+  const newsCutoff=new Date(Date.now()-72*60*60*1000).toISOString();
+  const newsFuture=new Date(Date.now()+5*60*1000).toISOString();
+  const archived=await env.DB.prepare("SELECT id,title,summary,publisher,published_at,image_url,image_alt,section,fetched_at FROM news_archive WHERE language=? AND section=? AND fetched_at>=? AND published_at>=? AND published_at<=? AND length(summary)>=120 AND image_url IS NOT NULL AND trim(image_url)<>'' ORDER BY published_at DESC LIMIT 12").bind(lang,section,newsCutoff,newsCutoff,newsFuture).all<any>();
   for(const row of archived.results||[]){
-    const title=String(row.title||""),summary=String(row.summary||"");
-    if(!title||!localeSafeItem({title,summary})||items.some((item:any)=>String(item.title||"").trim().toLowerCase()===title.trim().toLowerCase()))continue;
-    items.push({id:Number(row.id),title,summary,publisher:String(row.publisher||""),publishedAt:row.published_at||null,imageUrl:safePublicImageUrl(row.image_url),imageAlt:String(row.image_alt||title),section,kind:"news_archive",body:summary,slug:"",href:"/news?archive="+encodeURIComponent(String(row.id))+"&lang="+lang,sources:[],archivedAt:String(row.fetched_at||"")});
+    const title=String(row.title||""),summary=String(row.summary||""),imageUrl=safePublicImageUrl(row.image_url);
+    if(!title||summary.length<120||!imageUrl||!localeSafeItem({title,summary})||items.some((item:any)=>String(item.title||"").trim().toLowerCase()===title.trim().toLowerCase()))continue;
+    items.push({id:Number(row.id),title,summary,publisher:String(row.publisher||""),publishedAt:row.published_at||null,imageUrl,imageAlt:String(row.image_alt||title),section,kind:"news_archive",body:summary,slug:"",href:"/news?archive="+encodeURIComponent(String(row.id))+"&lang="+lang,sources:[],archivedAt:String(row.fetched_at||"")});
   }
 }catch{}
 items=items.filter((item:any)=>localeSafeItem(item)&&(()=>{const text=String(item?.body||item?.summary||"");return lang==="ar"?/[؀-ۿ]/.test(text):!/[؀-ۿ]/.test(text)})());
