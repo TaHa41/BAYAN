@@ -86,6 +86,7 @@ export async function newsSitemap(env:Env){
       try{return new URL(String(source?.url||"")).protocol==="https:"}catch{return false}
     });
     const hosts=new Set(validSources.map((source:any)=>hostname(source.url)).filter(Boolean));
+    const publishers=new Set(validSources.map((source:any)=>String(source?.publisher||"").trim().toLowerCase()).filter(Boolean));
     const recognizedNewsPublisher=validSources.some((source:any)=>{
       const host=hostname(source.url);
       return [...NEWS_PUBLISHER_HOSTS].some((known)=>host===known||host.endsWith("."+known));
@@ -103,7 +104,7 @@ export async function newsSitemap(env:Env){
       now-published<=windowMs &&
       plainBody.length>=1200 &&
       hosts.size>=2 &&
-      (recognizedNewsPublisher||recentSource)
+      (recognizedNewsPublisher||recentSource||publishers.size>=2)
     );
   }).map((x)=>({
     slug:x.slug,
