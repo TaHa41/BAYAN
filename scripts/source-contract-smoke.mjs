@@ -235,4 +235,5 @@ for (const [name, ok] of checks) {
   if (!ok) failed++;
 }
 if (failed) process.exit(1);
+  ["search cache TTL and independent source diversity are enforced before reuse", search.includes("new Date(Date.now()-5*60*1000)") && search.includes("hosts.size>=2") && search.includes("substantive>=2") && search.includes("!options.publish&&!options.images&&!options.background")],
 console.log("BAYAN source contract checks passed");
