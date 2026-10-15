@@ -813,7 +813,9 @@ const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia=
         const publishLongArticle=async()=>{
           const longDraft=await Promise.race([draftArticle(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),18000))]);
           if(longDraft.status!=="verified"||!usefulDraft(longDraft.answer,language))return;
-          const imageUrl=results.find(item=>/^https:\/\//i.test(String(item.imageUrl||""))&&String(item.imageAlt||item.title||"").trim().length>0)?.imageUrl||await findRelatedImage(articleTitle,undefined,articleSummary).catch(()=>undefined);
+          const sourceImage=results.find(item=>safePublicImageUrl(item.imageUrl)&&String(item.imageAlt||item.title||"").trim().length>0)?.imageUrl;
+          const imageUrl=safePublicImageUrl(sourceImage)||safePublicImageUrl(await findRelatedImage(articleTitle,undefined,articleSummary).catch(()=>undefined));
+          if(!imageUrl)return;
           const savedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:longDraft.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle});
           if(savedSlug)publishedSlug=savedSlug;
         };
