@@ -1,13 +1,12 @@
 import type {Locale,SearchResult} from "../types";
 
-const hasArabic=(value:string)=>/[\u0600-\u06ff]/.test(String(value||""));
 const normalized=(value:string)=>String(value||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}\s]/gu," ").replace(/\s+/g," ").trim();
 
 /** Classify the article by the subject actually evidenced, not just the search query. */
 export function sectionForOpenedStory(title:string,summary:string){
  const t=normalized(title),s=normalized(summary),all=t+" "+s;
  const biographyIntent=/(?:biography|biographical|who is|who was|life and work|life of|career of|born in|born on|من هو|من هي|سيرة|حياته|حياتها|نشأته|نشأتها|ولد|ولدت|مسيرته|مسيرتها|إرثه|إرثها|حياتها وأبحاثها|حياته وأعماله)/i.test(t);
- const biographicalEvidence=/(?:biography|biographical|physicist|chemist|novelist|writer|author|scientist|poet|inventor|actor|actress|politician|footballer|born in|born on|award winner|سيرة|فيزيائي|فيزيائية|كيميائي|كيميائية|روائي|روائية|كاتب|كاتبة|عالِم|عالمة|شاعر|شاعرة|مخترع|مخترعة|ممثل|ممثلة|ولد في|ولدت في|حصل على جائزة|حصلت على جائزة|جائزة نوبل|مسيرته|مسيرتها)/i.test(s);
+ const biographicalEvidence=/(?:biography|biographical|physicist|chemist|novelist|writer|author|scientist|poet|inventor|actor|actress|politician|footballer|born in|born on|award winner|سيرة|فيزيائي|فيزيائية|كيميائي|كيميائية|روائي|روائية|كاتب|كاتبة|عالم|عالمة|شاعر|شاعرة|مخترع|مخترعة|ممثل|ممثلة|ولد في|ولدت في|حصل على جائزة|حصلت على جائزة|جائزة نوبل|مسيرته|مسيرتها)/i.test(s);
  if(biographyIntent||(biographicalEvidence&&/(?:^|[:—-])/.test(String(title))&&t.split(" ").length<=12))return "people";
  if(/(?:football|soccer|basketball|tennis|league|championship|tournament|match|goal|athlete|coach|sports?|رياضة|مباراة|الدوري|بطولة|منتخب|لاعب|مدرب|هدف|نتيجة المباراة|إحصاءات رياضية)/i.test(all))return "sports";
  if(/(?:health|medical|medicine|hospital|disease|vaccine|doctor|symptom|treatment|clinical trial|صحة|طب|مستشفى|مرض|لقاح|طبيب|أعراض|علاج|تجربة سريرية|دواء|وقاية)/i.test(all))return "health";
@@ -91,7 +90,7 @@ export function articlePromptForTopic(title:string,language:Locale,evidence:Sear
   ?"اكتب مقالًا معرفيًا أصليًا ومترابطًا باللغة العربية الفصحى عن: "
   :"Write a coherent, original knowledge article in English about: ";
  const rules=lang==="ar"
-  ?"\nقواعد إلزامية: استخدم 4 عناوين فرعية أو أكثر عندما تسمح الأدلة، وفقرات مترابطة غير مكررة، ومقدمة وخاتمة واضحتين. استند فقط إلى الأدلة المرفقة؛ اربط الادعاءات المهمة بمصدر محدد في النص بصياغة واضحة مثل (وفقًا لـ...). لا تخترع أسماء أو تواريخ أو أرقامًا أو اقتباسات أو روابط. إذا تعارض مصدران فاشرح التعارض وانسب كل قول لمصدره. إذا لم تدعم الأدلة معلومة فلا تعرضها كحقيقة؛ اذكر أن التحقق غير مكتمل. حافظ على لغة عربية خالصة دون خلط غير ضروري بالإنجليزية، ولا تنسخ فقرات المصادر حرفيًا."
-  :"\nMandatory rules: use at least four subheadings when evidence supports them, with connected non-repetitive paragraphs, a clear introduction and conclusion. Use only the supplied evidence; tie important claims to a specific source in prose. Never invent names, dates, numbers, quotations, or URLs. If sources conflict, explain the conflict and attribute each claim. If evidence does not support a detail, do not state it as fact; mark verification incomplete. Keep the article in English and do not copy source paragraphs verbatim.";
+  ?"\nقواعد إلزامية: استهدف 700 إلى 1000 كلمة عندما تسمح الأدلة، واستخدم 4 عناوين فرعية أو أكثر، وفقرات مترابطة غير مكررة، ومقدمة وخاتمة واضحتين. استند فقط إلى الأدلة المرفقة؛ اربط الادعاءات المهمة بمصدر محدد في النص بصياغة واضحة مثل (وفقًا لـ...). لا تخترع أسماء أو تواريخ أو أرقامًا أو اقتباسات أو روابط. إذا تعارض مصدران فاشرح التعارض وانسب كل قول لمصدره. إذا لم تدعم الأدلة معلومة فلا تعرضها كحقيقة؛ اذكر أن التحقق غير مكتمل. حافظ على لغة عربية خالصة دون خلط غير ضروري بالإنجليزية، ولا تنسخ فقرات المصادر حرفيًا."
+  :"\nMandatory rules: aim for 700–1000 words when the evidence supports that length; use at least four subheadings, connected non-repetitive paragraphs, and a clear introduction and conclusion. Use only the supplied evidence; tie important claims to a specific source in prose. Never invent names, dates, numbers, quotations, or URLs. If sources conflict, explain the conflict and attribute each claim. If evidence does not support a detail, do not state it as fact; mark verification incomplete. Keep the article in English and do not copy source paragraphs verbatim.";
  return lead+title+"\n\n"+structure+rules;
 }
