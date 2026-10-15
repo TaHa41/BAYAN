@@ -12,7 +12,7 @@ const recovery = read("src/services/search-recovery.ts");
 const http = read("src/http.ts");
 const checks = [
   ["news never invents dates or serves expired cached stories as current", !news.includes("publishedAt:new Date().toISOString()") && news.includes("const publishedAt = dateMatch") && news.includes("&& isFreshNews(story)")],
-  ["news fallbacks run concurrently and freshness is rechecked", news.includes("const [google, gdelt, aiSearch, bing, direct] = await Promise.all") && news.lastIndexOf("all = all.filter(isFreshNews)") > news.indexOf("const [google, gdelt, aiSearch, bing, direct]")],
+  ["news fallbacks use bounded non-GDELT providers and freshness is rechecked", news.includes("const [google, aiSearch, bing] = await Promise.all") && !news.includes("gdeltFallback(lang)") && news.lastIndexOf("all = all.filter(isFreshNews)") > news.indexOf("const [google, aiSearch, bing]")],
   ["wisdom endpoint rotates every 30 seconds", wisdom.includes("Date.now()/1000/30")],
   ["wisdom has dedicated news and arts entries", /news:\{ar:/.test(wisdom) && /art:\{ar:/.test(wisdom)],
   ["browser refreshes wisdom every 30 seconds", app.includes("const wisdomTimer = setInterval") && app.includes("}, 30000)")],
