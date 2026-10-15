@@ -389,7 +389,7 @@ return json({section,items:items.map((item:any)=>({...item,imageUrl:safePublicIm
   const redacted=message.replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,"[email redacted]").replace(/\+?\d[\d\s().-]{7,}\d/g,"[phone redacted]").slice(0,1200);
   const category=["display","search","article","image","performance","other"].includes(String(b?.category||""))?String(b?.category):"other";
   await env.DB.prepare("INSERT INTO support_reports(visitor_hash,category,message,path,language,status,created_at) VALUES(?,?,?,?,?,'OPEN',?)").bind(vid,category,redacted,path,lang,new Date().toISOString()).run();
-  try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("INFO","visitor_support_report",JSON.stringify({category,path,language,messageLength:redacted.length}).slice(0,1000),new Date().toISOString()).run()}catch{}
+  try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("INFO","visitor_support_report",JSON.stringify({category,path,language:lang,messageLength:redacted.length}).slice(0,1000),new Date().toISOString()).run()}catch{}
   return json({ok:true,status:"OPEN",message:lang==="ar"?"تم تسجيل البلاغ للمراجعة الفنية دون عرض تفاصيل تقنية داخل الموقع.":"Your report was saved for technical review; internal diagnostic details remain private."},201);
  }
  try{
