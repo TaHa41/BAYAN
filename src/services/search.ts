@@ -652,11 +652,11 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   // the mismatched summary below rather than discarding the entire source.
   const title=String(x.title||"");
   return language==="ar" ? hasArabic(title) : !hasArabic(title);
-};async function searchRecentNewsArchive(env:Env,q:string,language:Locale):Promise<Candidate[]>{
+};async function searchRecentNewsArchive(env:Env,q:string,language:Locale,publicationContext=""):Promise<Candidate[]>{
   const cutoff=new Date(Date.now()-7*24*60*60*1000).toISOString();
   const future=new Date(Date.now()+5*60*1000).toISOString();
   try{
-    const terms=searchTerms(q).slice(0,3);
+    const terms=[...new Set([...searchTerms(q).slice(0,3),...(publicationContext?searchTerms(publicationContext).slice(0,4):[])])].slice(0,6);
     if(!terms.length)return[];
     const predicates=terms.map(()=>"(title LIKE ? OR summary LIKE ?)").join(" OR ");
     const patterns=terms.flatMap(term=>["%"+term+"%","%"+term+"%"]);
@@ -675,7 +675,7 @@ const languageSafe=(x:Candidate,language:Locale)=>{
       const publisher=cleanText(String(row.publisher||host));
       if(/google news|bing news|duckduckgo|wikipedia|wikidata|aggregator|ويكيبيديا|ويكي بيانات/i.test(publisher))continue;
       const candidate:Candidate={title,summary,section:"news",kind:"web",evidence:"mixed",sources:[{title,publisher,url,publishedAt:String(row.published_at||""),imageUrl:safePublicImageUrl(row.image_url)}],url,imageUrl:safePublicImageUrl(row.image_url),imageAlt:String(row.image_alt||title),score:scoreSource(publisher,title,q)+22,provider:"BAYAN Recent News Archive"};
-      if(!relevantCandidate(candidate,q))continue;
+      if(!relevantCandidateWithContext(candidate,q,publicationContext))continue;
       const publisherKey=publisher.toLowerCase();
       if(seenPublishers.has(publisherKey))continue;
       seenPublishers.add(publisherKey);
@@ -788,7 +788,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   // The local news archive is a cheap, bounded recovery source; query it only
   // when primary retrieval lacks independent publishers, reducing work on healthy searches.
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
-    const archiveNews=await safe(searchRecentNewsArchive(env,q,language),[],"BAYAN Recent News Archive");
+    const archiveNews=await safe(searchRecentNewsArchive(env,q,language,publicationResearch?publicationContext:""),[],"BAYAN Recent News Archive");
     providerAttempted.push("BAYAN Recent News Archive");
     if(archiveNews.length)candidates.push(...archiveNews);
   }
