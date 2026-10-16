@@ -2,12 +2,13 @@ import{resolvePublishedImageUrl,safePublicImageUrl}from"../image-url";
 import type {Env,Locale,SearchResponse,SearchResult,Source} from "../types";
 import {searchArticles,saveSearch,publishVerifiedResearch,publicationRejectionReason} from "../db";
 import {boundedLikeKeywords,escapedLikePattern} from "../search-patterns";
+import {recordRuntimeEventLimited} from "../runtime-events";
 import {ask,draftArticle,answerHasUnsupportedSpecifics} from "./ai";
 import {findRelatedImage,searchNewsFeed} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 const publicationErrorMessage=(error:unknown)=>String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
 const publicationFailureReason=(error:unknown)=>{const message=publicationErrorMessage(error);return /429|rate.?limit|timeout|timed out|abort|quota|neurons|overload|openai|workers ai|ai unavailable/i.test(message)?"ai_unavailable":"exception:"+message;};
-async function recordPublicationWarning(env:Env,message:string){try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","news_archive_article_generation",message.replace(/https?:\/\/[^\s]+/g,"[url]").slice(0,350),new Date().toISOString()).run()}catch{}}
+async function recordPublicationWarning(env:Env,message:string){await recordRuntimeEventLimited(env,"news_archive_article_generation","publication_warning",message);}
 
 
 type Candidate = SearchResult & {score:number; provider:string; identityAliases?:string[]};
