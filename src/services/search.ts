@@ -933,6 +933,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   if(results.length&&exactPersonConfirmed&&options.draft!==false){
     try{
       const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:"",reason:"ai_unavailable"}),7500))]);
+      if("reason" in drafted&&drafted.reason==="ai_unavailable"&&options.publish!==false)publishReason="ai_unavailable";
       if(drafted?.answer){answer=drafted.answer;answerStatus=independentlyVerified?drafted.status:"mixed";}
       else if(options.publish!==false)publishReason="ai_unavailable";
       const articleTitle=results.find(x=>x.title&&x.summary)?.title||"";

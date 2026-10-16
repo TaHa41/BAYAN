@@ -251,6 +251,8 @@ const checks = [
 
   ["self-heal verifies fresh archive publication and a neutral search without polluting user search logs", read("src/services/repair.ts").includes('["news_publication_rate"') && read("src/services/repair.ts").includes('["search_availability"') && read("src/services/repair.ts").includes('search(env,"photosynthesis","en",{publish:false,draft:false,healthCheck:true})') && read("src/services/search.ts").includes("healthCheck?:boolean") && read("src/services/search.ts").includes("!options.healthCheck") && read("src/services/search.ts").includes("if(!options.healthCheck)try{await saveSearch")],
 
+  ["AI provider failures are bounded and logged while fallbacks return an explicit unavailable reason", read("src/services/ai.ts").includes("recordAiFailure") && read("src/services/ai.ts").includes('catch(error){await recordAiFailure(env,"OpenAI draft"') && read("src/services/ai.ts").includes('catch(error){await recordAiFailure(env,"Workers AI draft"') && read("src/services/ai.ts").includes('reason:"ai_unavailable" as const') && read("src/services/ai.ts").includes("slice(0,350)") && read("src/services/search.ts").includes('if("reason" in drafted&&drafted.reason==="ai_unavailable"&&options.publish!==false)publishReason="ai_unavailable";')],
+
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
