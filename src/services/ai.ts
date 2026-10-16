@@ -49,7 +49,7 @@ export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[
   });
 };
 const independentSourceCount=(env:Env,evidence:SearchResult[])=>new Set(evidence.flatMap(item=>item.sources||[]).map(source=>{
-  try{const host=new URL(String(source.url||"")).hostname.toLowerCase().replace(/^www\\./,"");if(host)return host}catch(error){void recordRuntimeEventLimited(env,"ai_source_url","invalid_evidence_source_url",error)}
+  try{const host=new URL(String(source.url||"")).hostname.toLowerCase().replace(/^www\./,"");if(host)return host}catch(error){void recordRuntimeEventLimited(env,"ai_source_url","invalid_evidence_source_url",error)}
   return String(source.publisher||"").trim().toLowerCase();
 }).filter(Boolean)).size;
 
