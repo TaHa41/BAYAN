@@ -295,6 +295,8 @@ export async function selfHeal(env:Env){
     ["articles",async()=>{const r=await env.DB.prepare("SELECT COUNT(*) count FROM articles WHERE status='PUBLISHED'").first<any>();return Number(r?.count||0)>0}],
     ["sections",async()=>{return (await sectionHealth(env)).length===0}],
     ["news_cache",async()=>await newsCacheHealthy(env)],
+    ["news_publication_rate",async()=>{const eligible=await env.DB.prepare("SELECT COUNT(*) count FROM news_archive WHERE article_slug IS NULL AND length(summary)>=120 AND published_at>=datetime('now','-48 hours') AND published_at<=datetime('now','+5 minutes') AND fetched_at>=datetime('now','-48 hours')").first<any>();if(Number(eligible?.count||0)===0)return true;const published=await env.DB.prepare("SELECT COUNT(*) count FROM news_archive n JOIN articles a ON a.slug=n.article_slug WHERE n.article_slug IS NOT NULL AND a.status='PUBLISHED' AND a.created_at>=?").bind(new Date(Date.now()-24*60*60*1000).toISOString()).first<any>();return Number(published?.count||0)>0;}],
+    ["search_availability",async()=>{const result=await search(env,"photosynthesis","en",{publish:false,draft:false,healthCheck:true});return Array.isArray(result.results)&&result.results.length>0;}],
     ["images",async()=>await imageHealth(env)],
     ["contributions",async()=>{await env.DB.prepare("SELECT 1 FROM contributions LIMIT 1").first();return true}],
     ["repair_state",async()=>{await env.DB.prepare("SELECT 1 FROM repair_jobs LIMIT 1").first();return true}],

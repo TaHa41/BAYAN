@@ -248,6 +248,8 @@ const checks = [
 
   ["AI drafting timeouts are distinguished from verification rejection", search.includes('setTimeout(()=>resolve({status:"mixed",answer:"",reason:"ai_unavailable"}),7500)') && search.includes('setTimeout(()=>resolve({status:"mixed",answer:"",reason:"ai_unavailable"}),18000)') && search.includes('if(longDraft?.reason==="ai_unavailable"){publishReason="ai_unavailable";return;}')],
 
+  ["self-heal verifies fresh archive publication and a neutral search without polluting user search logs", read("src/services/repair.ts").includes('["news_publication_rate"') && read("src/services/repair.ts").includes('["search_availability"') && read("src/services/repair.ts").includes('search(env,"photosynthesis","en",{publish:false,draft:false,healthCheck:true})') && read("src/services/search.ts").includes("healthCheck?:boolean") && read("src/services/search.ts").includes("!options.healthCheck") && read("src/services/search.ts").includes("if(!options.healthCheck)try{await saveSearch")],
+
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
