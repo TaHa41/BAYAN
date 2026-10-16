@@ -26,9 +26,16 @@ export async function publishNextArchivedNewsArticle(env:Env){
     const result=await search(env,title,language,{publish:true,draft:true,images:true});
     const slug=String(result.articleSlug||"").trim();
     if(!slug){
+      const sourceRecords=(Array.isArray(result.results)?result.results:[]).flatMap((item:any)=>Array.isArray(item.sources)?item.sources:[]);
+      const independentSources=sourceRecords.filter((source:any)=>{const publisher=String(source.publisher||"").trim();const url=String(source.url||"");if(!url||/wikipedia|wikidata|google news|bing|duckduckgo|bayan recent news archive/i.test(publisher))return false;try{const parsed=new URL(url);return parsed.protocol==="https:"&&!/wikipedia\\.org|wikidata\\.org|news\\.google\\.com|bing\\.com|duckduckgo\\.com/i.test(parsed.hostname)}catch{return false}});
+      const independentPublisherCount=new Set(independentSources.map((source:any)=>String(source.publisher||new URL(String(source.url)).hostname).trim().toLowerCase())).size;
+      const independentHostCount=new Set(independentSources.map((source:any)=>{try{return new URL(String(source.url)).hostname.toLowerCase().replace(/^www\\./,"")}catch{return ""}}).filter(Boolean)).size;
+      const attempts=Array.isArray(result.providerAttempted)?result.providerAttempted.map((value:any)=>String(value)):[];
+      const expandedSearchAttempted=attempts.some((value:string)=>value.includes("Expanded topic variants"));
+      const providerFailures=attempts.filter((value:string)=>/timeout|failed|unavailable|HTTP [45]\\d{2}/i.test(value)).map((value:string)=>value.split(/\\s+/).slice(0,3).join(" ")).slice(0,3);
       const publishReason=String(result.publishReason||"publish_rejected").slice(0,350);
       await env.DB.prepare("UPDATE news_archive SET article_last_reason=? WHERE id=?").bind(publishReason,id).run();
-      return{status:"attempted_no_publish" as const,id,language,searchStatus:result.status,publishReason,resultCount:Array.isArray(result.results)?result.results.length:0,sourceCount:new Set((result.results||[]).flatMap((item:any)=>item.sources||[]).map((source:any)=>String(source.url||"").trim()).filter(Boolean)).size,providers:Array.isArray(result.providers)?result.providers.slice(0,8):[]};
+      return{status:"attempted_no_publish" as const,id,language,searchStatus:result.status,publishReason,resultCount:Array.isArray(result.results)?result.results.length:0,sourceCount:new Set(sourceRecords.map((source:any)=>String(source.url||"").trim()).filter(Boolean)).size,independentPublisherCount,independentHostCount,expandedSearchAttempted,providerFailures,providers:Array.isArray(result.providers)?result.providers.slice(0,4):[]};
     }
     await env.DB.prepare("UPDATE news_archive SET article_slug=?,article_last_reason=NULL WHERE id=?").bind(slug,id).run();
     return{status:"published" as const,id,language,slug};
