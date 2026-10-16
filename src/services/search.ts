@@ -308,7 +308,7 @@ async function bingWebSearch(q:string,language:Locale,diagnostics?:string[]):Pro
       try{const parsed=new URL(target);if(parsed.hostname==="www.bing.com"||parsed.hostname.endsWith(".bing.com"))continue;}catch{continue;}
       if(!title||!/^https:\/\//i.test(target))continue;
       const snippet=cleanText(decodeXml(block.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)?.[1]?.replace(/<[^>]*>/g," ")||"")).slice(0,1200);
-      let publisher="Web result";try{publisher=new URL(target).hostname.replace(/^www\./i,"");}catch{}
+      let publisher="Web result";try{publisher=new URL(target).hostname.replace(/^www\./i,"");}catch(error){reportProviderFailure(diagnostics,"Bing Web result URL",error)}
       out.push({title,summary:snippet,section:"world",kind:"web",evidence:"mixed",sources:[source(title,publisher,target)],url:target,score:scoreSource(publisher,title,q)+9,provider:"Bing Web Search"});
     }
     return out;
@@ -326,7 +326,7 @@ async function bingWebRssSearch(q:string,language:Locale,diagnostics?:string[]):
       const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
       const title=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1200);
       if(!title||!/^https:\/\//i.test(url))continue;
-      let publisher="Bing Web";try{publisher=new URL(url).hostname.replace(/^www\./i,"")}catch{}
+      let publisher="Bing Web";try{publisher=new URL(url).hostname.replace(/^www\./i,"")}catch(error){reportProviderFailure(diagnostics,"Bing RSS result URL",error)}
       out.push({title,summary,section:"world",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+8,provider:"Bing Web RSS"});
       if(out.length>=8)break;
     }
@@ -918,7 +918,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
         const publisher=String(src.publisher||"").trim().toLowerCase();
         const url=String(src.url||item.url||"");
         let host="";
-        try{const parsed=new URL(url);if(parsed.protocol==="https:")host=parsed.hostname.toLowerCase().replace(/^www\./,"");}catch{}
+        try{const parsed=new URL(url);if(parsed.protocol==="https:")host=parsed.hostname.toLowerCase().replace(/^www\./,"");}catch(error){await recordRuntimeEventLimited(env,"candidate_source_url","invalid_candidate_source_url",error)}
         if(!host||/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com|news\.yahoo\.com/.test(host))continue;
         if(/wikipedia|wikidata|google news|bing news|duckduckgo|news aggregator|ويكيبيديا|ويكي بيانات/i.test(publisher))continue;
         publishers.add(publisher||host);
