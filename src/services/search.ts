@@ -502,11 +502,13 @@ const personLookup=(q:string)=>{
   // explicitly asks "من هو/من هي", avoiding the restrictive person-only filter.
   return /^[A-Z][a-z]+(?:[ '-]+[A-Z][a-z]+){1,3}$/.test(raw);
 };
-async function expandedSearch(env:Env,q:string,language:Locale,person=false,identitySummary="",diagnostics:string[]=[],identityAliases:string[]=[],publicationResearch=false):Promise<Candidate[]>{
+async function expandedSearch(env:Env,q:string,language:Locale,person=false,identitySummary="",diagnostics:string[]=[],identityAliases:string[]=[],publicationResearch=false,publicationContext=""):Promise<Candidate[]>{
   // Recovery uses distinct query formulations, not just the same phrase with a suffix.
   // Keep the fan-out bounded so broader recall does not create unbounded latency/subrequests.
   const normalized=q.normalize("NFKC").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[“”‘’]/g,'"').replace(/[؟?!،,;；]+/g," ").replace(/\s+/g," ").trim();
   const compact=searchTerms(normalized).slice(0,6).join(" ");
+  const contextCompact=searchTerms(String(publicationContext||"").normalize("NFKC")).slice(0,6).join(" ");
+  const generalCompact=publicationResearch&&contextCompact?[compact,contextCompact].filter(Boolean).join(" "):compact;
   const identity=String(identitySummary||"");
   const sportsProfile=isSportsPersonProfile(identity);
   const writerProfile=/(writer|author|novelist|poet|كاتب|مؤلف|روائي|شاعر)/i.test(identity);
@@ -525,7 +527,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
       : (sportsProfile
         ? [q+" latest news",q+" transfer news",q+" official profile"]
         : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
-    : (language==="ar" ? [compact+" معلومات ومصادر موثوقة",compact+" آخر الأخبار",q+" شرح"] : [compact+" reliable sources",compact+" latest news",q+" overview"]);
+    : (language==="ar" ? [generalCompact+" معلومات ومصادر موثوقة",generalCompact+" آخر الأخبار",q+" شرح"] : [generalCompact+" reliable sources",generalCompact+" latest news",q+" overview"]);
   // Run the first variant alone, then fan out remaining bounded variants only
   // when evidence is still sparse. This avoids unnecessary provider load while
   // keeping the worst-case recovery window short enough for the browser request.
@@ -682,7 +684,7 @@ const languageSafe=(x:Candidate,language:Locale)=>{
     return output;
   }catch{return[]}
 }
-export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean;draft?:boolean;images?:boolean;healthCheck?:boolean;background?:(task:Promise<unknown>)=>void}={}):Promise<SearchResponse>{
+export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean;draft?:boolean;images?:boolean;healthCheck?:boolean;publicationContext?:string;background?:(task:Promise<unknown>)=>void}={}):Promise<SearchResponse>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   // Reuse a recent, previously verified answer when its evidence is still source-diverse.
   // This avoids re-running the full external-provider fan-out for repeat queries.
@@ -802,7 +804,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   }
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
     providerAttempted.push("Expanded topic variants: Wikipedia REST Search, Google News Search, Bing Web RSS Search","OpenAI Web Search (fallback)");
-    const expanded=await safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||""),providerAttempted,identityAliases,options.images===true),[]);
+    const expanded=await safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||""),providerAttempted,identityAliases,options.images===true,options.publicationContext||""),[]);
     candidates.push(...expanded.slice(0,12));
     // OpenAI web search is the final recovery path, not a parallel request on
     // every weak first pass. Skip it as soon as independent evidence is adequate.
