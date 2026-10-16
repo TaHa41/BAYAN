@@ -256,7 +256,7 @@ export async function api(request:Request,env:Env,ctx?:ExecutionContext){const u
   const live=await news(env,lang);
   const items=(live.items||[]).map((story:any)=>({...story,section:"news",kind:"news",body:String(story.summary||story.title||""),sources:[]}));
   try{
-    const archived=await env.DB.prepare("SELECT id,title,summary,publisher,published_at,image_url,image_alt,section,fetched_at FROM news_archive WHERE language=? AND section='news' ORDER BY COALESCE(published_at,fetched_at) DESC LIMIT 24").bind(lang).all<any>();
+    const archived=await env.DB.prepare("SELECT id,title,summary,publisher,published_at,image_url,image_alt,section,fetched_at FROM news_archive WHERE language=? AND section='news' ORDER BY fetched_at DESC LIMIT 24").bind(lang).all<any>();
     for(const row of archived.results||[]){
       if(items.some((item:any)=>String(item.title||"").trim().toLowerCase()===String(row.title||"").trim().toLowerCase()))continue;
       items.push({id:Number(row.id),title:String(row.title||""),summary:String(row.summary||""),publisher:String(row.publisher||""),publishedAt:row.published_at||null,imageUrl:safePublicImageUrl(row.image_url),imageAlt:String(row.image_alt||row.title||""),section:"news",kind:"news_archive",body:String(row.summary||""),slug:"",href:"/news?archive="+encodeURIComponent(String(row.id))+"&lang="+lang,sources:[],archivedAt:String(row.fetched_at||"")});
