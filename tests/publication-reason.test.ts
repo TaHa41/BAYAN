@@ -2,18 +2,19 @@ import { describe, expect, it } from "vitest";
 import { publicationRejectionReason } from "../src/db";
 
 const imageUrl = "https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png";
+const longParagraph = (lead: string) => lead + " This paragraph explains the available evidence, context, limitations, and practical implications in clear language. It distinguishes established information from interpretation and avoids adding unsupported names, dates, numbers, or conclusions. ".repeat(4);
 const validBody = [
   "# Introduction",
-  "This paragraph explains the topic and gives enough context for a reader to understand the subject clearly.",
+  longParagraph("The introduction establishes the topic."),
   "## Background",
-  "This paragraph provides background information and distinguishes established facts from interpretation.",
+  longParagraph("The background section provides context."),
   "## Evidence",
-  "This paragraph explains what the available evidence supports without adding unsupported names, dates, or numbers.",
+  longParagraph("The evidence section describes the sources."),
   "## Limitations",
-  "This paragraph describes uncertainty and limitations in the available information and the boundaries of the conclusion.",
+  longParagraph("The limitations section explains uncertainty."),
   "## Conclusion",
-  "This paragraph summarizes the supported findings and identifies what remains unknown."
-].join("\n\n");
+  longParagraph("The conclusion summarizes supported findings.")
+].join("\\n\\n");.join("\n\n");
 const base = {
   title: "A verified English research topic",
   summary: "A concise summary of the evidence and its implications for the topic.",
