@@ -26,7 +26,7 @@ function assertNoBlockedImageHosts(payload,label){
   const candidates=[];
   const add=(value)=>{if(typeof value==="string"&&/^https?:\/\//i.test(value.trim()))candidates.push(value.trim());};
   let parsed;
-  try{parsed=JSON.parse(raw)}catch{}
+  try{parsed=JSON.parse(raw)}catch(error){void error;}
   if(parsed&&typeof parsed==="object"){
     const visit=(value)=>{
       if(!value||typeof value!=="object")return;
