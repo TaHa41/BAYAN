@@ -6,22 +6,33 @@ const publicationTitleMatch=(a:string,b:string)=>{
  const common=[...left].filter(word=>right.has(word)).length;
  return publicationTextKey(a)===publicationTextKey(b)||(Math.min(left.size,right.size)>=3&&common/Math.max(1,Math.min(left.size,right.size))>=0.82);
 };
-const publicationQuality=(input:{title:string;summary:string;body:string;language:Locale;sources:any[];imageUrl?:string})=>{
+type PublicationInput={title:string;summary:string;body:string;language:Locale;sources:any[];imageUrl?:string};
+export function publicationRejectionReason(input:PublicationInput):string|undefined{
  const body=String(input.body||"").trim(),title=String(input.title||"").trim(),summary=String(input.summary||"").trim();
+ const image=safePublicImageUrl(input.imageUrl);
+ if(!image)return "no_image";
+ if(title.length<8)return "title_too_short";
+ if(summary.length<40)return "summary_too_short";
+ if(body.length<1800)return "body_too_short";
  const headings=(body.match(/^#{1,3}\s+.+$/gm)||[]).length;
+ if(headings<4)return "insufficient_headings";
  const paragraphs=body.split(/\n\s*\n/).map(p=>p.trim()).filter(p=>p.length>=65&&!/^#{1,4}\s/.test(p)&&!/^([-*+] |\d+[.)] )/.test(p));
+ if(paragraphs.length<5)return "insufficient_substantive_paragraphs";
  const normalizedParagraphs=paragraphs.map(p=>publicationTextKey(p));
  const uniqueParagraphs=new Set(normalizedParagraphs);
- const noDuplicateParagraphs=uniqueParagraphs.size===normalizedParagraphs.length;
+ if(uniqueParagraphs.size<5||uniqueParagraphs.size!==normalizedParagraphs.length)return "duplicate_or_repetitive_paragraphs";
  const hasArabic=/[\u0600-\u06ff]/.test(title+" "+summary+" "+body);
  const localeConsistent=input.language==="ar"
   ? hasArabic&&[title,summary,...paragraphs].every(part=>/[\u0600-\u06ff]/.test(part)||!/[A-Za-z]{5,}/.test(part))
   : !hasArabic;
+ if(!localeConsistent)return "language_mismatch";
  const hosts=new Set((input.sources||[]).flatMap(source=>{try{const url=new URL(String(source?.url||""));return url.protocol==="https:"?[url.hostname.toLowerCase().replace(/^www\./,"")]:[]}catch{return []}}));
+ if(hosts.size<2)return "insufficient_independent_source_hosts";
  const publishers=new Set((input.sources||[]).map(source=>String(source?.publisher||"").trim().toLowerCase()).filter(Boolean));
- const image=safePublicImageUrl(input.imageUrl);
- return title.length>=8&&summary.length>=40&&body.length>=1800&&headings>=4&&paragraphs.length>=5&&uniqueParagraphs.size>=5&&noDuplicateParagraphs&&localeConsistent&&hosts.size>=2&&publishers.size>=2&&Boolean(image);
-};
+ if(publishers.size<2)return "insufficient_independent_publishers";
+ return undefined;
+}
+const publicationQuality=(input:PublicationInput)=>publicationRejectionReason(input)===undefined;
 export async function publishVerifiedResearch(env:Env,input:{title:string;summary:string;body:string;section:string;language:Locale;sources:any[];imageUrl?:string;imageAlt?:string}){
  const imageUrl=safePublicImageUrl(input.imageUrl);
  if(!imageUrl||!publicationQuality({...input,imageUrl}))return null;
