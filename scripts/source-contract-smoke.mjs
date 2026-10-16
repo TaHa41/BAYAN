@@ -245,6 +245,8 @@ const checks = [
   ["news archive article publication records an explicit gate reason and persists it per item", search.includes('publishReason="no_independent_sources"') && search.includes('publishReason="draft_not_verified"') && search.includes('publishReason="draft_not_useful"') && search.includes('publishReason="no_image"') && search.includes('publishReason="publish_rejected"') && search.includes("publicationFailureReason(error)") && read("src/services/news-article-publisher.ts").includes("article_last_reason=?") && read("src/schema.ts").includes('article_last_reason:"TEXT"') && read("migrations_v1/0034_news_archive_article_reason.sql").includes("CREATE TABLE IF NOT EXISTS bayan_migration_0034_article_reason_marker") && read("migrations_v1/0034_news_archive_article_reason.sql").includes("prior cancelled release")],
   ["publication exceptions are bounded and logged without exposing raw upstream URLs or common API secrets", search.includes("recordPublicationWarning") && search.includes('slice(0,350)') && search.includes('[redacted]') && read("src/services/news-article-publisher.ts").includes('publishReason.slice(0,350)')],
 
+  ["AI drafting timeouts are distinguished from verification rejection", search.includes('setTimeout(()=>resolve({status:"mixed",answer:"",reason:"ai_unavailable"}),7500)') && search.includes('setTimeout(()=>resolve({status:"mixed",answer:"",reason:"ai_unavailable"}),18000)') && search.includes('if(longDraft?.reason==="ai_unavailable"){publishReason="ai_unavailable";return;}')],
+
 ];
 let failed = 0;
 for (const [name, ok] of checks) {

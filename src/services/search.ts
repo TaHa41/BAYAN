@@ -932,7 +932,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   if(options.publish!==false&&options.draft===false)publishReason="draft_not_verified";
   if(results.length&&exactPersonConfirmed&&options.draft!==false){
     try{
-      const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),7500))]);
+      const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:"",reason:"ai_unavailable"}),7500))]);
       if(drafted?.answer){answer=drafted.answer;answerStatus=independentlyVerified?drafted.status:"mixed";}
       else if(options.publish!==false)publishReason="ai_unavailable";
       const articleTitle=results.find(x=>x.title&&x.summary)?.title||"";
@@ -944,12 +944,13 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
           const publishLongArticle=async()=>{
             let longDraft:any;
             try{
-              longDraft=await Promise.race([draftArticle(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),18000))]);
+              longDraft=await Promise.race([draftArticle(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:"",reason:"ai_unavailable"}),18000))]);
             }catch(error){
               publishReason=publicationFailureReason(error);
               await recordPublicationWarning(env,publishReason);
               return;
             }
+            if(longDraft?.reason==="ai_unavailable"){publishReason="ai_unavailable";return;}
             if(longDraft?.status!=="verified"){publishReason="draft_not_verified";return;}
             if(!usefulDraft(longDraft.answer,language)){publishReason="draft_not_useful";return;}
             const sourceImage=results.find(item=>safePublicImageUrl(item.imageUrl)&&String(item.imageAlt||item.title||"").trim().length>0)?.imageUrl;
