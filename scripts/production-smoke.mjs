@@ -217,14 +217,14 @@ try{
   if(!storyPage.text.includes('property="og:title"')||!storyPage.text.includes('application/ld+json')||!storyPage.text.includes("story="))throw new Error("news_story_seo_metadata_missing");
   if(!storyPage.text.includes('class="seo-news-story"')||!storyPage.text.includes("<h1>")||!storyPage.text.includes('class="seo-news-summary"'))throw new Error("news_story_server_rendered_content_missing");
   if(first.imageUrl&&!storyPage.text.includes('class="seo-news-image"'))throw new Error("news_story_server_rendered_image_missing");
-  if(process.env.BAYAN_SMOKE_AI_ARTICLE==="1"){
+  if(process.env.BAYAN_SMOKE_AI_PROBES==="1"){
   const articlePath="/api/news/article?title="+encodeURIComponent(first.title)+"&image="+encodeURIComponent(first.imageUrl||"")+"&summary="+encodeURIComponent(first.summary||"")+"&url="+encodeURIComponent(first.url||"")+"&publisher="+encodeURIComponent(first.publisher||"")+"&publishedAt="+encodeURIComponent(first.publishedAt||"")+"&lang=ar";
     const a=await fetch(origin+articlePath,{headers:{accept:"application/json"},signal:AbortSignal.timeout(30000)}); const articleText=await a.text(); const ad=JSON.parse(articleText);
     if(a.status===422&&["article_evidence_insufficient","article_identity_ambiguous"].includes(String(ad.error||""))){console.log("SAFE ARTICLE WITHHELD",ad.error);}
     else if(!a.ok||!ad.article?.title||!ad.article?.body)throw new Error("news_article_incomplete");
     if(/[A-Za-z]{5,}/.test(String(first.title))&&!/[\u0600-\u06ff]/.test(String(first.title)))throw new Error("arabic_news_title_missing");
 }else{
-  console.log("NEWS ARTICLE AI probe skipped: routine production smoke must not consume provider quota; set BAYAN_SMOKE_AI_ARTICLE=1 for an explicit deep check.");
+  console.log("NEWS ARTICLE AI probe skipped: routine production smoke must not consume provider quota; set BAYAN_SMOKE_AI_PROBES=1 for an explicit deep check.");
 }
 }catch(e){console.error("NEWS",e);bad++}
 try{
@@ -254,16 +254,20 @@ try{
   const a=await get("/api/article?slug=who-is-naguib-mahfouz-en&lang=en"); const ad=JSON.parse(a.text);
   if(!ad.title||!ad.body||/[\u0600-\u06ff]/.test(String(ad.title))||/[\u0600-\u06ff]/.test(String(ad.body)))throw new Error("english_article_language_mismatch");
 }catch(e){console.error("ARTICLE_EN",e);bad++}
-try{
-  const ar=await fetch(origin+"/api/ask?lang=ar",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:"من هو نجيب محفوظ؟"}),signal:AbortSignal.timeout(30000)});
-  const d=await ar.json(); if(!ar.ok||!d.status||!d.answer)throw new Error("ask_ar_unavailable");
-  if(/[A-Za-z]{8,}/.test(String(d.answer))&&!/[\u0600-\u06ff]/.test(String(d.answer)))throw new Error("ask_ar_language_mismatch");
-}catch(e){console.error("ASK_AR",e);bad++}
-try{
-  const en=await fetch(origin+"/api/ask?lang=en",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:"Who was Naguib Mahfouz?"}),signal:AbortSignal.timeout(30000)});
-  const d=await en.json(); if(!en.ok||!d.status||!d.answer)throw new Error("ask_en_unavailable");
-  if(/[\u0600-\u06ff]/.test(String(d.answer)))throw new Error("ask_en_language_mismatch");
-}catch(e){console.error("ASK_EN",e);bad++}
+if(process.env.BAYAN_SMOKE_AI_PROBES==="1"){
+  try{
+    const ar=await fetch(origin+"/api/ask?lang=ar",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:"من هو نجيب محفوظ؟"}),signal:AbortSignal.timeout(30000)});
+    const d=await ar.json(); if(!ar.ok||!d.status||!d.answer)throw new Error("ask_ar_unavailable");
+    if(/[A-Za-z]{8,}/.test(String(d.answer))&&!/[\u0600-\u06ff]/.test(String(d.answer)))throw new Error("ask_ar_language_mismatch");
+  }catch(e){console.error("ASK_AR",e);bad++}
+  try{
+    const en=await fetch(origin+"/api/ask?lang=en",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({question:"Who was Naguib Mahfouz?"}),signal:AbortSignal.timeout(30000)});
+    const d=await en.json(); if(!en.ok||!d.status||!d.answer)throw new Error("ask_en_unavailable");
+    if(/[\u0600-\u06ff]/.test(String(d.answer)))throw new Error("ask_en_language_mismatch");
+  }catch(e){console.error("ASK_EN",e);bad++}
+}else{
+  console.log("AI ASK probes skipped: set BAYAN_SMOKE_AI_PROBES=1 for explicit provider testing.");
+}
 try{
   const x=await fetch(origin+"/api/admin/ai-repair",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({problem:"production smoke authorization test"}),signal:AbortSignal.timeout(10000)});
   if(x.status!==401)throw new Error("ai_repair_auth_not_enforced");
@@ -282,69 +286,77 @@ try{
   if(!/[\u0600-\u06ff]/.test(String(ad.title)))throw new Error("arabic_article_missing");
   if(!/[\u0600-\u06ff]/.test(String(ad.body)))throw new Error("arabic_article_body_missing");
 }catch(e){console.error("ARTICLE",e);bad++}
-try{
-  const s=await get("/api/search?q=%D9%86%D8%AC%D9%8A%D8%A8%20%D9%85%D8%AD%D9%81%D9%88%D8%B8&lang=ar"); const d=JSON.parse(s.text);
-  if(!Array.isArray(d.results)||d.results.length<1)throw new Error("person_search_empty");
-  const salah=await get("/api/search?q=%D9%85%D8%AD%D9%85%D8%AF%20%D8%B5%D9%84%D8%A7%D8%AD&lang=ar"); const sd=JSON.parse(salah.text);
-  console.log("PERSON_SEARCH_DIAGNOSTICS",JSON.stringify({titles:(sd.results||[]).map(x=>({title:x.title,section:x.section,sources:(x.sources||[]).map(source=>({publisher:source.publisher,url:source.url}))})),providers:sd.providers,providerAttempted:sd.providerAttempted}));
-  if(!Array.isArray(sd.results)||!sd.results.some(x=>String(x.title||"").trim()==="محمد صلاح"))throw new Error("exact_person_subject_missing");
-  const profile=sd.results.find(x=>String(x.title||"").trim()==="محمد صلاح");
-  const related=sd.results.filter(x=>String(x.title||"").trim()!=="محمد صلاح");
-  if(related.length<2)console.warn("PERSON_SEARCH_LIMITED_RECALL: only the exact identity profile was available; expanded web providers were still attempted.");
-  const independentNews=related.filter(x=>(x.sources||[]).some(source=>/^https:\/\//i.test(String(source.url||""))&&!/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(source.publisher||""))));
-  const newsPublishers=new Set(independentNews.flatMap(x=>(x.sources||[]).filter(source=>/^https:\/\//i.test(String(source.url||""))&&!/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(source.publisher||""))).map(source=>String(source.publisher||"").trim().toLowerCase())).filter(Boolean));
-  if(independentNews.length<2||newsPublishers.size<2)console.warn("PERSON_SEARCH_LIMITED_INDEPENDENT_NEWS: live news providers did not return two distinct relevant publishers in this run; do not present the encyclopedia profile as independently verified.");
-  if(!Array.isArray(sd.providerAttempted)||!sd.providerAttempted.some(x=>String(x).includes("Expanded topic variants"))||!sd.providerAttempted.some(x=>String(x).includes("Bing Web RSS Search")))throw new Error("person_search_did_not_expand_web_providers");
-  if(sd.results.some(x=>String(x.title||"").trim()!=="محمد صلاح"&&((x.sources||[]).some(source=>/ويكيبيديا|ويكي بيانات|Wikipedia|Wikidata/i.test(String(source.publisher||"")))||/محمد صلاح\s*(?:دندراوي|زكريا|مصطفى|العزب|\(جندي\)|\(توضيح\))/i.test(String(x.title||"")))))throw new Error("same_name_people_mixed_into_biography");
-  if(!profile?.imageUrl)throw new Error("exact_person_subject_image_missing");
-  if(sd.results.find(x=>String(x.title||"").trim()==="محمد صلاح")?.section!=="people")throw new Error("exact_person_section_mismatch");
-  if(sd.results.some(x=>/طرابزون\s*سبور/i.test(String(x.summary||""))&&/ليفربول/i.test(String(x.summary||""))&&/(يلعب|ناديه الحالي|currently plays for|current club)/i.test(String(x.summary||""))))throw new Error("contradictory_current_club_claim_displayed");
-  if(!Array.isArray(d.providerAttempted)||d.providerAttempted.length<5)throw new Error("provider_coverage_missing");
-  const topic=await get("/api/search?q=%D8%A7%D9%83%D8%AA%D8%B4%D8%A7%D9%81%D8%A7%D8%AA%20%D8%A7%D9%84%D9%81%D8%B6%D8%A7%D8%A1&lang=ar"); const td=JSON.parse(topic.text);
-  if(!Array.isArray(td.results)||td.results.length<1)throw new Error("general_topic_search_empty");
-  if(td.results.some(x=>!/[\u0600-\u06ff]/.test(String(x.title||""))))throw new Error("general_topic_result_language_mismatch");
-  const en=await get("/api/search?q=NASA%20Artemis%20mission&lang=en"); const ed=JSON.parse(en.text);
-  if(!Array.isArray(ed.results)||ed.results.length<1)throw new Error("english_topic_search_empty");
-  if(!Array.isArray(ed.providerAttempted)||ed.providerAttempted.length<5)throw new Error("english_provider_coverage_missing");
-  if(ed.results.some(x=>/[\u0600-\u06ff]/.test(String(x.title||""))))throw new Error("english_topic_result_language_mismatch");
-}catch(e){console.error("SEARCH",e);bad++}
-try{
-  // General-search regression matrix: coverage must not be special-cased to one name or one subject.
-  const generalQueries=[
-    {q:"التغير المناخي",lang:"ar"},
-    {q:"الذكاء الاصطناعي",lang:"ar"},
-    {q:"أسباب التضخم",lang:"ar"},
-    {q:"الطاقة الشمسية",lang:"ar"},
-    {q:"تاريخ الأهرامات",lang:"ar"},
-    {q:"climate change",lang:"en"},
-    {q:"artificial intelligence",lang:"en"},
-    {q:"inflation causes",lang:"en"},
-    {q:"solar energy",lang:"en"},
-    {q:"history of pyramids",lang:"en"}
-  ];
-  const hostCoverage=new Set();
-  const outcomes=[];
-  // Use two concurrent queries at a time to reduce wall-clock time without flooding providers.
-  await inBatches(generalQueries,1,async item=>{
-    try{
-      const response=await get("/api/search?q="+encodeURIComponent(item.q)+"&lang="+item.lang);
-      const data=JSON.parse(response.text);
-      if(!Array.isArray(data.results)||data.results.length<1)throw new Error("general_search_empty_"+item.lang+"_"+item.q);
-      if(!Array.isArray(data.providerAttempted)||data.providerAttempted.length<5)throw new Error("general_search_provider_coverage_missing_"+item.lang+"_"+item.q);
-      for(const result of data.results){
-        const title=String(result.title||"");
-        if(item.lang==="ar"?(!/[\u0600-\u06ff]/.test(title)):(/[\u0600-\u06ff]/.test(title)))throw new Error("general_search_title_language_mismatch_"+item.lang+"_"+item.q);
-        for(const source of result.sources||[]){
-          try{const url=new URL(String(source.url||""));if(url.protocol==="https:"&&!/wikipedia.org|wikidata.org|news.google.com/i.test(url.hostname))hostCoverage.add(url.hostname.toLowerCase().replace(/^www\./,""))}catch{}
+if(process.env.BAYAN_SMOKE_AI_PROBES==="1"){
+  try{
+    const s=await get("/api/search?q=%D9%86%D8%AC%D9%8A%D8%A8%20%D9%85%D8%AD%D9%81%D9%88%D8%B8&lang=ar"); const d=JSON.parse(s.text);
+    if(!Array.isArray(d.results)||d.results.length<1)throw new Error("person_search_empty");
+    const salah=await get("/api/search?q=%D9%85%D8%AD%D9%85%D8%AF%20%D8%B5%D9%84%D8%A7%D8%AD&lang=ar"); const sd=JSON.parse(salah.text);
+    console.log("PERSON_SEARCH_DIAGNOSTICS",JSON.stringify({titles:(sd.results||[]).map(x=>({title:x.title,section:x.section,sources:(x.sources||[]).map(source=>({publisher:source.publisher,url:source.url}))})),providers:sd.providers,providerAttempted:sd.providerAttempted}));
+    if(!Array.isArray(sd.results)||!sd.results.some(x=>String(x.title||"").trim()==="محمد صلاح"))throw new Error("exact_person_subject_missing");
+    const profile=sd.results.find(x=>String(x.title||"").trim()==="محمد صلاح");
+    const related=sd.results.filter(x=>String(x.title||"").trim()!=="محمد صلاح");
+    if(related.length<2)console.warn("PERSON_SEARCH_LIMITED_RECALL: only the exact identity profile was available; expanded web providers were still attempted.");
+    const independentNews=related.filter(x=>(x.sources||[]).some(source=>/^https:\/\//i.test(String(source.url||""))&&!/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(source.publisher||""))));
+    const newsPublishers=new Set(independentNews.flatMap(x=>(x.sources||[]).filter(source=>/^https:\/\//i.test(String(source.url||""))&&!/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(source.publisher||""))).map(source=>String(source.publisher||"").trim().toLowerCase())).filter(Boolean));
+    if(independentNews.length<2||newsPublishers.size<2)console.warn("PERSON_SEARCH_LIMITED_INDEPENDENT_NEWS: live news providers did not return two distinct relevant publishers in this run; do not present the encyclopedia profile as independently verified.");
+    if(!Array.isArray(sd.providerAttempted)||!sd.providerAttempted.some(x=>String(x).includes("Expanded topic variants"))||!sd.providerAttempted.some(x=>String(x).includes("Bing Web RSS Search")))throw new Error("person_search_did_not_expand_web_providers");
+    if(sd.results.some(x=>String(x.title||"").trim()!=="محمد صلاح"&&((x.sources||[]).some(source=>/ويكيبيديا|ويكي بيانات|Wikipedia|Wikidata/i.test(String(source.publisher||"")))||/محمد صلاح\s*(?:دندراوي|زكريا|مصطفى|العزب|\(جندي\)|\(توضيح\))/i.test(String(x.title||"")))))throw new Error("same_name_people_mixed_into_biography");
+    if(!profile?.imageUrl)throw new Error("exact_person_subject_image_missing");
+    if(sd.results.find(x=>String(x.title||"").trim()==="محمد صلاح")?.section!=="people")throw new Error("exact_person_section_mismatch");
+    if(sd.results.some(x=>/طرابزون\s*سبور/i.test(String(x.summary||""))&&/ليفربول/i.test(String(x.summary||""))&&/(يلعب|ناديه الحالي|currently plays for|current club)/i.test(String(x.summary||""))))throw new Error("contradictory_current_club_claim_displayed");
+    if(!Array.isArray(d.providerAttempted)||d.providerAttempted.length<5)throw new Error("provider_coverage_missing");
+    const topic=await get("/api/search?q=%D8%A7%D9%83%D8%AA%D8%B4%D8%A7%D9%81%D8%A7%D8%AA%20%D8%A7%D9%84%D9%81%D8%B6%D8%A7%D8%A1&lang=ar"); const td=JSON.parse(topic.text);
+    if(!Array.isArray(td.results)||td.results.length<1)throw new Error("general_topic_search_empty");
+    if(td.results.some(x=>!/[\u0600-\u06ff]/.test(String(x.title||""))))throw new Error("general_topic_result_language_mismatch");
+    const en=await get("/api/search?q=NASA%20Artemis%20mission&lang=en"); const ed=JSON.parse(en.text);
+    if(!Array.isArray(ed.results)||ed.results.length<1)throw new Error("english_topic_search_empty");
+    if(!Array.isArray(ed.providerAttempted)||ed.providerAttempted.length<5)throw new Error("english_provider_coverage_missing");
+    if(ed.results.some(x=>/[\u0600-\u06ff]/.test(String(x.title||""))))throw new Error("english_topic_result_language_mismatch");
+  }catch(e){console.error("SEARCH",e);bad++}
+}else{
+  console.log("LIVE SEARCH regression probes skipped: internal bounded search health check remains enabled; set BAYAN_SMOKE_AI_PROBES=1 for explicit provider testing.");
+}
+if(process.env.BAYAN_SMOKE_AI_PROBES==="1"){
+  try{
+    // General-search regression matrix: coverage must not be special-cased to one name or one subject.
+    const generalQueries=[
+      {q:"التغير المناخي",lang:"ar"},
+      {q:"الذكاء الاصطناعي",lang:"ar"},
+      {q:"أسباب التضخم",lang:"ar"},
+      {q:"الطاقة الشمسية",lang:"ar"},
+      {q:"تاريخ الأهرامات",lang:"ar"},
+      {q:"climate change",lang:"en"},
+      {q:"artificial intelligence",lang:"en"},
+      {q:"inflation causes",lang:"en"},
+      {q:"solar energy",lang:"en"},
+      {q:"history of pyramids",lang:"en"}
+    ];
+    const hostCoverage=new Set();
+    const outcomes=[];
+    // Use two concurrent queries at a time to reduce wall-clock time without flooding providers.
+    await inBatches(generalQueries,1,async item=>{
+      try{
+        const response=await get("/api/search?q="+encodeURIComponent(item.q)+"&lang="+item.lang);
+        const data=JSON.parse(response.text);
+        if(!Array.isArray(data.results)||data.results.length<1)throw new Error("general_search_empty_"+item.lang+"_"+item.q);
+        if(!Array.isArray(data.providerAttempted)||data.providerAttempted.length<5)throw new Error("general_search_provider_coverage_missing_"+item.lang+"_"+item.q);
+        for(const result of data.results){
+          const title=String(result.title||"");
+          if(item.lang==="ar"?(!/[\u0600-\u06ff]/.test(title)):(/[\u0600-\u06ff]/.test(title)))throw new Error("general_search_title_language_mismatch_"+item.lang+"_"+item.q);
+          for(const source of result.sources||[]){
+            try{const url=new URL(String(source.url||""));if(url.protocol==="https:"&&!/wikipedia.org|wikidata.org|news.google.com/i.test(url.hostname))hostCoverage.add(url.hostname.toLowerCase().replace(/^www\./,""))}catch{}
+          }
         }
-      }
-      if(!data.results.some(result=>/^https:\/\//i.test(String(result.url||""))||(result.sources||[]).some(source=>/^https:\/\//i.test(String(source.url||"")))))throw new Error("general_search_sources_missing_"+item.lang+"_"+item.q);
-      outcomes.push({query:item.q,language:item.lang,count:data.results.length});
-    }catch(e){console.error("GENERAL_SEARCH_QUERY",item.q,item.lang,e);bad++}
-  });
-  console.log("GENERAL_SEARCH_MATRIX",JSON.stringify({outcomes,independentSourceHosts:hostCoverage.size}));
-  if(hostCoverage.size<4)throw new Error("general_search_source_diversity_too_low");
-}catch(e){console.error("GENERAL_SEARCH_MATRIX",e);bad++}
+        if(!data.results.some(result=>/^https:\/\//i.test(String(result.url||""))||(result.sources||[]).some(source=>/^https:\/\//i.test(String(source.url||"")))))throw new Error("general_search_sources_missing_"+item.lang+"_"+item.q);
+        outcomes.push({query:item.q,language:item.lang,count:data.results.length});
+      }catch(e){console.error("GENERAL_SEARCH_QUERY",item.q,item.lang,e);bad++}
+    });
+    console.log("GENERAL_SEARCH_MATRIX",JSON.stringify({outcomes,independentSourceHosts:hostCoverage.size}));
+    if(hostCoverage.size<4)throw new Error("general_search_source_diversity_too_low");
+  }catch(e){console.error("GENERAL_SEARCH_MATRIX",e);bad++}
+}else{
+  console.log("GENERAL_SEARCH_MATRIX skipped in routine smoke to avoid repeated AI-provider calls.");
+}
 const sectionChecks=sections.filter(section=>section!=="prices").flatMap(section=>["ar","en"].map(language=>({section,language})));
 await inBatches(sectionChecks,2,async({section,language})=>{
   try{
