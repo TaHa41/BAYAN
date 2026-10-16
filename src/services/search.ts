@@ -311,6 +311,33 @@ async function bingWebSearch(q:string,language:Locale,diagnostics?:string[]):Pro
     return out;
   }catch(error){reportProviderFailure(diagnostics,"Bing Web Search",error);return[]}
 }
+async function gdeltNewsSearch(q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
+  // Free corroboration fallback used only for news-archive publication research.
+  // It runs with a short hard timeout and does not add requests to normal visitor searches.
+  try{
+    const compact=searchTerms(String(q||"").normalize("NFKC")).slice(0,12).join(" ");
+    if(!compact)return[];
+    const url="https://api.gdeltproject.org/api/v2/doc/doc?"+new URLSearchParams({
+      query:compact+" sourcelang:"+(language==="ar"?"arabic":"english"),
+      mode:"ArtList",format:"json",maxrecords:"8",timespan:"7d",sort:"HybridRel"
+    }).toString();
+    const response=await timeout(url,2200,diagnostics,"GDELT News Search");
+    if(!response.ok)return[];
+    const data=await response.json<any>();
+    const out:Candidate[]=[];
+    for(const article of Array.isArray(data?.articles)?data.articles:[]){
+      const title=cleanText(String(article?.title||""));
+      const articleUrl=String(article?.url||"").trim();
+      if(!title||!/^https:\/\//i.test(articleUrl))continue;
+      let parsed:URL;try{parsed=new URL(articleUrl)}catch{continue}
+      if(parsed.protocol!=="https:"||/gdeltproject\.org|google\.com|bing\.com|facebook\.com/i.test(parsed.hostname))continue;
+      const publisher=cleanText(String(article?.domain||parsed.hostname).replace(/^www\./i,"")).slice(0,120);
+      out.push({title,summary:"",section:"world",kind:"news",evidence:"mixed",sources:[source(title,publisher,parsed.href)],url:parsed.href,score:scoreSource(publisher,title,q)+8,provider:"GDELT News Search"});
+      if(out.length>=8)break;
+    }
+    return out;
+  }catch(error){reportProviderFailure(diagnostics,"GDELT News Search",error);return[]}
+}
 async function bingWebRssSearch(q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
   // Bing's RSS endpoint is a lighter fallback than parsing the changing HTML search page.
   try{
@@ -533,21 +560,23 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   // keeping the worst-case recovery window short enough for the browser request.
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,publicationResearch?2:1);
   const labels=["Wikipedia REST Search","Google News Search","Bing Web RSS Search"];
-  const runVariant=async(variant:string,variantIndex:number):Promise<Candidate[]>=>{
+  const runVariant=async(variant:string,variantIndex:number,includeGdelt=false):Promise<Candidate[]>=>{
     // GDELT repeatedly timed out in production and amplified request fan-out.
     // Keep each recovery variant to three independent providers; try a second
     // wording only when the first one still lacks useful independent evidence.
     const results=await Promise.all([
       wikipediaRestSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Wikipedia REST Search",error);return[]}),
       googleNewsSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Google News Search",error);return[]}),
-      bingWebRssSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing Web RSS Search",error);return[]})
+      bingWebRssSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing Web RSS Search",error);return[]}),
+      includeGdelt ? gdeltNewsSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"GDELT News Search",error);return[]}) : Promise.resolve([])
     ]);
-    diagnostics.push("Expanded variant "+(variantIndex+1)+" result counts: "+labels.map((label,index)=>label+"="+(results[index]?.length||0)).join(", "));
+    const labelsForRun=includeGdelt?[...labels,"GDELT News Search"]:labels;
+    diagnostics.push("Expanded variant "+(variantIndex+1)+" result counts: "+labelsForRun.map((label,index)=>label+"="+(results[index]?.length||0)).join(", "));
     return results.flat();
   };
   const batches:Candidate[][]=[];
   if(uniqueVariants.length){
-    batches.push(await runVariant(uniqueVariants[0],0));
+    batches.push(await runVariant(uniqueVariants[0],0,publicationResearch));
     const recovered=batches.flat().filter(item=>relevantCandidate(item,q)&&languageSafe(item,language));
     const hosts=new Set(recovered.flatMap(item=>(item.sources||[]).map(src=>{
       try{return new URL(String(src.url||"")).hostname.toLowerCase().replace(/^www\./,"")}
