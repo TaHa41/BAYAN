@@ -38,14 +38,25 @@ export async function resolvePublishedImageUrl(value: unknown): Promise<string |
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 3500);
   try {
-    const response = await fetch(original.href, {
+    let response = await fetch(original.href, {
       method: "HEAD",
       redirect: "follow",
       signal: controller.signal,
       headers: { accept: "image/*,*/*;q=0.8" },
     });
-    const finalUrl = new URL(response.url || original.href);
+    let finalUrl = new URL(response.url || original.href);
     await response.body?.cancel().catch(() => undefined);
+    if (!response.ok || finalUrl.protocol !== "https:" ||
+        finalUrl.hostname.toLowerCase() !== "upload.wikimedia.org") {
+      response = await fetch(original.href, {
+        method: "GET",
+        redirect: "follow",
+        signal: controller.signal,
+        headers: { accept: "image/*,*/*;q=0.8", range: "bytes=0-0" },
+      });
+      finalUrl = new URL(response.url || original.href);
+      await response.body?.cancel().catch(() => undefined);
+    }
     if (!response.ok || finalUrl.protocol !== "https:" ||
         finalUrl.hostname.toLowerCase() !== "upload.wikimedia.org") return undefined;
     return finalUrl.href;
