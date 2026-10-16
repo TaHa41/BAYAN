@@ -285,7 +285,7 @@ async function resolveVerifiedLegacyJobs(env:Env){
     const result=await env.DB.prepare("UPDATE repair_jobs SET "+assignments.join(",")+" WHERE status='WAITING_AI' AND (signature LIKE '%generated is not defined%' OR signature LIKE '%resolveWikimediaEditorialImage is not defined%' OR signature LIKE '%manual Telegram diagnostic report%' OR signature LIKE '%predictive runtime degradation: /search%')").bind(...values).run();
     await record(env,"info","legacy_job_cleanup","Resolved stale legacy repair jobs; changed="+Number(result.meta?.changes||0));
   }catch(error){
-    await record(env,"warn","legacy_job_cleanup","Could not resolve stale legacy repair jobs: "+String(error).replace(/https?:\/\/[^\s]+/g,"[url]").slice(0,350));
+    await record(env,"warn","legacy_job_cleanup","Could not resolve stale legacy repair jobs: "+String(error).replaceAll("https://","[url]/").replaceAll("http://","[url]/").slice(0,350));
   }
 }
 
@@ -319,7 +319,7 @@ export async function selfHeal(env:Env){
       if(columns.has("last_verified_at"))assignments.push("last_verified_at=datetime('now')");
       if(columns.has("updated_at")){assignments.push("updated_at=?");values.push(now());}
       await env.DB.prepare("UPDATE repair_jobs SET "+assignments.join(",")+" WHERE status IN ('REVIEW','REPAIRED') AND (signature LIKE '%news_cache%' OR signature LIKE '%images%')").bind(...values).run();
-    }catch(error){await record(env,"warn","legacy_job_cleanup","Could not mark verified cache/image repair jobs resolved: "+String(error).replace(/https?:\/\/[^\s]+/g,"[url]").slice(0,300));}
+    }catch(error){await record(env,"warn","legacy_job_cleanup","Could not mark verified cache/image repair jobs resolved: "+String(error).replaceAll("https://","[url]/").replaceAll("http://","[url]/").slice(0,300));}
     await record(env,"info","health","AI self-healing checks passed");
     return{ok:true,failures:[],actions:[],verification:"healthy",message:"All runtime checks passed; no repair was necessary."}
   }
