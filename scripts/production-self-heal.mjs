@@ -8,20 +8,31 @@ function smoke(label){
   console.log("\n=== "+label+" ===");
   const result=spawnSync(process.execPath,["scripts/production-smoke.mjs"],{
     env:{...process.env,BAYAN_ORIGIN:origin},
-    stdio:"inherit",
+    stdio:"pipe",
+    encoding:"utf8",
     timeout,
-    maxBuffer:1024*1024
+    maxBuffer:8*1024*1024
   });
+  const stdout=String(result.stdout||""),stderr=String(result.stderr||"");
+  if(stdout)process.stdout.write(stdout);
+  if(stderr)process.stderr.write(stderr);
   if(result.error)console.error(label+" could not complete:",String(result.error));
-  return result.status===0;
+  const output=stdout+"\n"+stderr;
+  const infrastructureFailure=/(?:status 50[023]|HTTP 50[023]|temporarily unavailable|database_unavailable|internal_error|D1_ERROR|daily row read limit)/i.test(output);
+  return {passed:result.status===0,infrastructureFailure};
 }
 
-if(smoke("Initial production verification")){
+const initial=smoke("Initial production verification");
+if(initial.passed){
   console.log("Production verification passed; no repair was needed.");
   process.exit(0);
 }
 
 console.error("Production verification failed.");
+if(initial.infrastructureFailure){
+  console.error("Infrastructure/database failure detected. Skipping blind runtime repair retries; the underlying service condition must recover before verification can pass.");
+  process.exit(1);
+}
 if(!token){
   console.error("Automatic runtime repair was not invoked because BAYAN_AI_MANAGER_TOKEN is not configured as a GitHub Actions secret. Configure that secret to enable authenticated repair-and-retest.");
   process.exit(1);
