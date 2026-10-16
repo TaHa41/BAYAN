@@ -11,7 +11,7 @@ for(const [name,value] of [["x-content-type-options","nosniff"],["x-frame-option
 const sitemapResponse=await fetch(origin+"/news-sitemap.xml",{headers:{accept:"application/xml"},signal:AbortSignal.timeout(12000)});
 if(!sitemapResponse.ok)throw new Error("news sitemap returned HTTP "+sitemapResponse.status);
 const sitemapXml=await sitemapResponse.text();
-const sitemapCount=[...sitemapXml.matchAll(/<loc>(.*?)<\\/loc>/g)].length;
+const sitemapCount=[...sitemapXml.matchAll(/<loc>(.*?)<\/loc>/g)].length;
 const archiveReady=Number(sitemapResponse.headers.get("x-bayan-news-sitemap-archive-ready-for-drafting-count")||0);
 const eligible=Number(sitemapResponse.headers.get("x-bayan-news-sitemap-eligible-count")||0);
 console.log("BAYAN news publication health "+JSON.stringify({sitemapCount,archiveReady,eligible}));
