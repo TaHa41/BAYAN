@@ -40,7 +40,7 @@ const sourceExcerpt=(value:string,max=1000)=>{const text=String(value||"").repla
 const articleEvidenceQuality=(sources:any[])=>{
  const rows=Array.isArray(sources)?sources:[];
  const hosts=new Set<string>(),publishers=new Set<string>();
- for(const source of rows){try{const url=new URL(String(source?.url||""));if(url.protocol!=="https:")continue;hosts.add(url.hostname.toLowerCase().replace(/^www\./,""));const publisher=String(source?.publisher||"").trim().toLowerCase();if(publisher)publishers.add(publisher);}catch(error){await recordRuntimeEventLimited(env,"api_suppressed_failure","operation_failed",error)}}
+ for(const source of rows){try{const url=new URL(String(source?.url||""));if(url.protocol!=="https:")continue;hosts.add(url.hostname.toLowerCase().replace(/^www\./,""));const publisher=String(source?.publisher||"").trim().toLowerCase();if(publisher)publishers.add(publisher);}catch(error){void error}}
  return hosts.size>=2&&publishers.size>=2;
 };
 const articleBodyQuality=(value:string)=>{
