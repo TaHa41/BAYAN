@@ -661,7 +661,7 @@ export async function news(env: Env, lang: Locale, options: {forceRefresh?:boole
       })),
     };
   }
-  const providers = feeds(lang).slice(0, 4);
+  const providers = feeds(lang).slice(0, 7);
   const batches = await Promise.all(
     providers.map(([name, url]) => readFeed(name, url)),
   );
@@ -680,10 +680,12 @@ export async function news(env: Env, lang: Locale, options: {forceRefresh?:boole
   };
   all = all.filter(isFreshNews);
 
-  // If live RSS feeds are thin or unavailable, query all independent fallbacks
-  // together. Serial retries repeatedly queried Google News and could exhaust the
-  // Worker time budget before any stories reached the page.
-  if (all.length < 3) {
+  const distinctPublisherCount = (stories: Story[]) =>
+    new Set(stories.map((story) => String(story.publisher || "").trim().toLowerCase()).filter(Boolean)).size;
+
+  // If the feed batch has too few items OR too few independent publishers, broaden
+  // discovery. A large batch from one or two feeds is not source diversity.
+  if (all.length < 3 || distinctPublisherCount(all) < 3) {
     const [google, aiSearch, bing] = await Promise.all([
       lang === "ar" ? googleArabicFallback() : googleEnglishFallback(),
       aiSearchNews(env, lang),
@@ -694,6 +696,55 @@ export async function news(env: Env, lang: Locale, options: {forceRefresh?:boole
       .map((story) => ({ ...story, summary: languageSafeText(story.summary, lang) ? story.summary : "" }))
       .filter(isFreshNews);
     all = [...all, ...fallback];
+
+    // When upstream feeds still collapse to a narrow set of publishers, use only
+    // recent, dated, image-backed stories already archived from independent feeds.
+    // Resolve the publisher from the article URL rather than trusting photo-credit
+    // strings that some RSS feeds place in their publisher field.
+    if (distinctPublisherCount(all) < 3) {
+      try {
+        const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
+        const futureLimit = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+        const archived = await env.DB.prepare(
+          "SELECT title,summary,url,published_at,image_url,image_alt FROM news_archive WHERE language=? AND published_at>=? AND published_at<=? AND length(summary)>=100 AND image_url IS NOT NULL AND trim(image_url)<>'' ORDER BY published_at DESC LIMIT 80",
+        ).bind(lang, cutoff, futureLimit).all<any>();
+        const publisherForUrl = (value: string) => {
+          try {
+            const url = new URL(value);
+            if (url.protocol !== "https:" || url.username || url.password) return "";
+            const host = url.hostname.toLowerCase().replace(/^www\./, "");
+            if (host.endsWith("bbc.co.uk") || host === "bbc.com") return lang === "ar" ? "بي بي سي عربي" : "BBC News";
+            if (host === "aljazeera.com") return lang === "ar" ? "الجزيرة" : "Al Jazeera English";
+            if (host === "dw.com") return lang === "ar" ? "DW عربية" : "DW English";
+            if (host === "france24.com") return lang === "ar" ? "فرانس 24 عربي" : "France 24 English";
+            if (host === "theguardian.com") return "The Guardian";
+            if (host === "reuters.com") return lang === "ar" ? "رويترز" : "Reuters";
+            if (host === "apnews.com") return lang === "ar" ? "أسوشيتد برس" : "Associated Press";
+            if (/(?:^|\.)(?:news\.google\.com|bing\.com|duckduckgo\.com|wikipedia\.org|wikidata\.org)$/i.test(host)) return "";
+            return host;
+          } catch { return ""; }
+        };
+        const archivedStories: Story[] = (archived.results || []).map((row: any) => {
+          const url = String(row.url || "").trim();
+          return {
+            title: String(row.title || "").trim(),
+            summary: languageSafeText(String(row.summary || ""), lang) ? String(row.summary || "") : "",
+            url,
+            publisher: publisherForUrl(url),
+            publishedAt: String(row.published_at || ""),
+            imageUrl: String(row.image_url || "").replace(/&amp;/g, "&"),
+            imageAlt: String(row.image_alt || row.title || ""),
+          };
+        }).filter((story: Story) =>
+          Boolean(story.title && story.summary && story.publisher) &&
+          (lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title)) &&
+          !/(?:\/video\/|\/tv-shows\/|\/liveblog\/|youtube\.com|youtu\.be|vimeo\.com)/i.test(story.url) &&
+          isUsableNewsImage(story.imageUrl) &&
+          isFreshNews(story),
+        );
+        all = [...all, ...archivedStories];
+      } catch { /* The primary and independent fallback providers remain available. */ }
+    }
   }
 
   // Recheck freshness after merging fallbacks, then display newest first.
