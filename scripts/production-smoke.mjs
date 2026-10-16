@@ -224,7 +224,7 @@ try{
     else if(!a.ok||!ad.article?.title||!ad.article?.body)throw new Error("news_article_incomplete");
     if(/[A-Za-z]{5,}/.test(String(first.title))&&!/[\u0600-\u06ff]/.test(String(first.title)))throw new Error("arabic_news_title_missing");
 }else{
-  console.log("NEWS ARTICLE AI probe skipped: routine production smoke must not consume provider quota; set BAYAN_SMOKE_AI_ARTICLE=1 for an explicit deep check.");
+  console.log("NEWS ARTICLE AI probe skipped: routine production smoke must not consume provider quota; set BAYAN_SMOKE_AI_PROBES=1 for an explicit deep check.");
 }
 }catch(e){console.error("NEWS",e);bad++}
 try{
