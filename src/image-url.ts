@@ -12,6 +12,14 @@ export function safePublicImageUrl(value: unknown): string | undefined {
       host === "gstatic.com" ||
       host.endsWith(".gstatic.com")
     ) return undefined;
+    if (host === "thumb.wikimedia.org" && url.pathname.startsWith("/wikipedia/commons/thumb/")) {
+      // Normalize Wikimedia's thumbnail alias to the stable upload host and remove tracking-only parameters.
+      url.hostname = "upload.wikimedia.org";
+      for (const key of [...url.searchParams.keys()]) {
+        if (key.toLowerCase().startsWith("utm_")) url.searchParams.delete(key);
+      }
+      url.hash = "";
+    }
     return url.href;
   } catch {
     return undefined;

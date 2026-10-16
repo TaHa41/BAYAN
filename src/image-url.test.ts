@@ -6,6 +6,11 @@ describe("safePublicImageUrl", () => {
     expect(safePublicImageUrl("https://images.example.org/story/photo.jpg")).toBe("https://images.example.org/story/photo.jpg");
   });
 
+  it("normalizes Wikimedia thumbnail aliases to stable upload URLs and removes tracking parameters", () => {
+    expect(safePublicImageUrl("https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Example.jpg/640px-Example.jpg?utm_source=ar.wikipedia.org&utm_campaign=api&utm_content=thumbnail"))
+      .toBe("https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Example.jpg/640px-Example.jpg");
+  });
+
   it.each([
     "https://googleusercontent.com/photo.jpg",
     "https://lh3.googleusercontent.com/photo.jpg",
