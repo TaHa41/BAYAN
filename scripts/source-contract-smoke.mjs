@@ -261,6 +261,8 @@ const checks = [
 
   ["archive publication stops before AI drafting when independent evidence is insufficient", search.includes('if(results.length&&exactPersonConfirmed&&options.draft!==false&&!(options.publicationContext!==undefined&&options.publish!==false&&!independentlyVerified))') && search.includes('let publishReason:string|undefined=options.publish!==false&&!independentlyVerified?"no_independent_sources":undefined') && search.includes("corroboration.publishers.size>=configuredMin&&corroboration.hosts.size>=2")],
 
+  ["publication summary context broadens candidate recall without lowering independent-source thresholds", read("src/services/search.ts").includes('const relevantCandidateWithContext=(x:Candidate,q:string,context="")=>relevantCandidate(x,q)||Boolean(context&&relevantCandidate(x,context))') && read("src/services/search.ts").includes("const candidateMatches=(x:Candidate)=>relevantCandidateWithContext(x,q,publicationContext)") && read("src/services/search.ts").includes("safeCandidates.filter(candidateMatches)") && read("src/services/search.ts").includes('const articleTitle=options.publicationContext!==undefined?q:(results.find(x=>x.title&&x.summary)?.title||"")') && search.includes("corroboration.publishers.size>=configuredMin&&corroboration.hosts.size>=2")],
+
 ];
 let failed = 0;
 for (const [name, ok] of checks) {

@@ -95,6 +95,7 @@ const relevanceScore=(x:Candidate,q:string)=>{const terms=searchTerms(q);if(!ter
 // Do not reject a relevant result solely because a multi-word query is absent verbatim from its title.
 // Use the summary and all query terms too, then fall back to the best locale-safe candidates if providers are weak.
 const relevantCandidate=(x:Candidate,q:string)=>{const terms=searchTerms(q);const score=relevanceScore(x,q);if(!terms.length)return false;const normalize=(v:string)=>String(v||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"");const title=normalize(x.title),summary=normalize(x.summary),combined=title+" "+summary;const titleHits=matchingSearchTerms(title,terms);const hits=matchingSearchTerms(combined,terms);const person=personLookup(q)||nameOnlyArabicQuery(q);if(personIdentityMatches(combined,personQueryName(q),x.identityAliases))return true;if(person){if(titleHits===0){const provider=String(x.provider||"")+" "+(x.sources||[]).map(source=>source.publisher||"").join(" ");const encyclopedia=/wikipedia|wikidata/i.test(provider);return encyclopedia?hits>0&&score>=20:hits>=Math.min(2,terms.length)&&score>=16;}return titleHits>=Math.min(1,terms.length)&& (hits>=Math.min(1,terms.length)||score>=25);}if(terms.length<=1)return hits>=1&&score>=4;return hits>=Math.min(2,terms.length);};
+const relevantCandidateWithContext=(x:Candidate,q:string,context="")=>relevantCandidate(x,q)||Boolean(context&&relevantCandidate(x,context));
 async function wikipedia(env:Env,q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
   const api=language==="ar"?"https://ar.wikipedia.org/w/api.php":"https://en.wikipedia.org/w/api.php";
   const stop=new Set(["في","من","على","عن","إلى","الى","ما","ماذا","كيف","لماذا","هل","هو","هي","هذا","هذه","التي","الذي","مع","the","and","for","with","from","about","what","when","where","who","how","why","is","are"]);
@@ -548,7 +549,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   const batches:Candidate[][]=[];
   if(uniqueVariants.length){
     batches.push(await runVariant(uniqueVariants[0],0));
-    const recovered=batches.flat().filter(item=>relevantCandidate(item,q)&&languageSafe(item,language));
+    const recovered=batches.flat().filter(item=>relevantCandidateWithContext(item,q,publicationResearch?publicationContext:"")&&languageSafe(item,language));
     const hosts=new Set(recovered.flatMap(item=>(item.sources||[]).map(src=>{
       try{return new URL(String(src.url||"")).hostname.toLowerCase().replace(/^www\./,"")}
       catch{return ""}
@@ -558,7 +559,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
       // outbound requests when the first pass is already resource-constrained.
       for(let index=1;index<uniqueVariants.length;index++){
         batches.push(await runVariant(uniqueVariants[index],index));
-        const accumulated=batches.flat().filter(item=>relevantCandidate(item,q)&&languageSafe(item,language));
+        const accumulated=batches.flat().filter(item=>relevantCandidateWithContext(item,q,publicationResearch?publicationContext:"")&&languageSafe(item,language));
         const accumulatedHosts=new Set(accumulated.flatMap(item=>(item.sources||[]).map(src=>{
           try{return new URL(String(src.url||"")).hostname.toLowerCase().replace(/^www\./,"")}
           catch{return ""}
@@ -764,7 +765,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     for(const item of candidates){item.identityAliases=identityAliases;if(normalizedEntityTitle(item.title)===exactName){item.summary=sanitizeConflictingCurrentClubClaims(item.summary||"");item.section="people";}}
   }
   if(personQuery){const exactProfile=await wikipediaExactPersonPage(q,language);if(exactProfile.length)candidates.unshift(...exactProfile);for(const item of candidates)item.identityAliases=identityAliases;}
-  const firstPassMatches=()=>candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&relevantCandidate(x,q));
+  const publicationContext=String(options.publicationContext||"").slice(0,500);const candidateMatches=(x:Candidate)=>relevantCandidateWithContext(x,q,publicationContext);const candidateRelevance=(x:Candidate)=>Math.max(relevanceScore(x,q),publicationContext?relevanceScore(x,publicationContext):0);const firstPassMatches=()=>candidates.filter(x=>languageSafe(x,language)&&!disallowedContent(x.title+" "+x.summary)&&candidateMatches(x));
   const firstPassCount=()=>{const matching=firstPassMatches();return personQuery?isolateExactPerson(q,matching).length:matching.length;};
   // Count evidence diversity, not just result cards. Duplicate hits from Wikipedia
   // or one publisher must not suppress the broader search pass for any query type.
@@ -817,7 +818,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   // Expanded providers are appended after the first-pass identity cleanup; sanitize them too before ranking.
   for(const candidate of candidates){candidate.summary=sanitizeConflictingCurrentClubClaims(candidate.summary||"");}
   const safeCandidates=candidates.filter(x=>(language==="ar"?hasArabic(x.title):!hasArabic(x.title))&&!disallowedContent(x.title+" "+x.summary)&&!hasConflictingCurrentClubClaims(x.summary));
-  let ranked=safeCandidates.filter(x=>relevantCandidate(x,q)).sort((a,b)=>relevanceScore(b,q)-relevanceScore(a,q));
+  let ranked=safeCandidates.filter(candidateMatches).sort((a,b)=>candidateRelevance(b)-candidateRelevance(a));
   ranked=isolateExactPerson(q,ranked);
   // If strict matching rejected every result, recover candidates with a real
   // query-term match in the headline or at least two matches in the snippet.
@@ -938,7 +939,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
       if("reason" in drafted&&drafted.reason==="ai_unavailable"&&options.publish!==false)publishReason="ai_unavailable";
       if(drafted?.answer){answer=drafted.answer;answerStatus=independentlyVerified?drafted.status:"mixed";}
       else if(options.publish!==false)publishReason="ai_unavailable";
-      const articleTitle=results.find(x=>x.title&&x.summary)?.title||"";
+      const articleTitle=options.publicationContext!==undefined?q:(results.find(x=>x.title&&x.summary)?.title||"");
       const articleSummary=results.find(x=>x.title&&x.summary)?.summary||q;
       if(options.publish!==false){
         if(!independentlyVerified)publishReason="no_independent_sources";
