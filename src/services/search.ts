@@ -704,9 +704,9 @@ export async function search(env:Env,q:string,language:Locale,options:{publish?:
       const hosts=new Set<string>();
       for(const item of cachedResults){
         for(const source of item.sources||[]){
-          try{const url=new URL(String(source?.url||""));if(url.protocol==="https:"&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/i.test(url.hostname))hosts.add(url.hostname.toLowerCase().replace(/^www\./,""))}catch{}
+          try{const url=new URL(String(source?.url||""));if(url.protocol==="https:"&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/i.test(url.hostname))hosts.add(url.hostname.toLowerCase().replace(/^www\./,""))}catch(error){void recordRuntimeEventLimited(env,"candidate_source_url","invalid_candidate_source_url",error)}
         }
-        if(item.url){try{const url=new URL(String(item.url));if(url.protocol==="https:"&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/i.test(url.hostname))hosts.add(url.hostname.toLowerCase().replace(/^www\./,""))}catch{}}
+        if(item.url){try{const url=new URL(String(item.url));if(url.protocol==="https:"&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/i.test(url.hostname))hosts.add(url.hostname.toLowerCase().replace(/^www\./,""))}catch(error){void recordRuntimeEventLimited(env,"candidate_source_url","invalid_candidate_source_url",error)}}
       }
       const substantive=cachedResults.filter(item=>String(item.summary||"").trim().length>=100).length;
       const localeSafe=cachedResults.every(item=>language==="ar"?hasArabic(item.title)&&hasArabic(item.summary):!hasArabic(item.title)&&!hasArabic(item.summary));
@@ -781,7 +781,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
       for(const src of item.sources||[]){
         const publisher=String(src.publisher||"").trim().toLowerCase();
         if(publisher&&!/wikipedia|wikidata|ويكيبيديا|ويكي بيانات|google news|bing news|duckduckgo/i.test(publisher))publishers.add(publisher);
-        try{const url=new URL(String(src.url||item.url||""));if(url.protocol==="https:"&&!/wikipedia.org|wikidata.org|news.google.com/i.test(url.hostname))hosts.add(url.hostname.toLowerCase().replace(/^www\./,""));}catch{}
+        try{const url=new URL(String(src.url||item.url||""));if(url.protocol==="https:"&&!/wikipedia.org|wikidata.org|news.google.com/i.test(url.hostname))hosts.add(url.hostname.toLowerCase().replace(/^www\./,""));}catch(error){void recordRuntimeEventLimited(env,"candidate_source_url","invalid_candidate_source_url",error)}
       }
     }
     const substantive=matching.filter(item=>String(item.summary||"").trim().length>=100).length;
@@ -901,7 +901,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   if(personQuery&&options.images!==false){
     const canonical=results.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
     if(canonical&&!safePublicImageUrl(canonical.imageUrl)){
-      const image=await Promise.race([findRelatedImage(String(canonical.title||q),String(canonical.url||canonical.sources?.[0]?.url||""),String(canonical.summary||"")),new Promise<undefined>(resolve=>setTimeout(()=>resolve(undefined),4500))]).catch(()=>undefined);
+      const image=await Promise.race([findRelatedImage(String(canonical.title||q),String(canonical.url||canonical.sources?.[0]?.url||""),String(canonical.summary||""),env),new Promise<undefined>(resolve=>setTimeout(()=>resolve(undefined),4500))]).catch(async error=>{await recordRuntimeEventLimited(env,"search_result_image","search_result_image_lookup_failed",error);return undefined});
       if(safePublicImageUrl(image)){canonical.imageUrl=safePublicImageUrl(image);canonical.imageAlt=String(canonical.title||q);}
     }
   }
