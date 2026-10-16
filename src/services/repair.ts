@@ -369,7 +369,7 @@ export async function selfHeal(env:Env){
   }
   verification=remainingFailures.length===0?"verified_runtime":"needs_deployment_or_manual_review";
   const signature=failures.join(",");
-  const nextStatus=verification==="verified_runtime"?"REPAIRED":"REVIEW";
+  const nextStatus=verification==="verified_runtime"?"RESOLVED":"WAITING_AI";
   let shouldNotify=true;
   try{
     const previous=await env.DB.prepare("SELECT status,updated_at FROM repair_jobs WHERE signature=?").bind(signature).first<any>();
