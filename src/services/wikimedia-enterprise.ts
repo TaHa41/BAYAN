@@ -54,7 +54,7 @@ export async function resolveWikimediaImageUrl(value: unknown): Promise<string |
         headers: { accept: "image/*", range: "bytes=0-0" },
         signal: AbortSignal.timeout(1800)
       });
-      await response.body?.cancel().catch(() => undefined);
+      await response.body?.cancel().catch(error => { void error; return undefined; });
     }
     if (!response.ok) return undefined;
     const finalUrl = safePublicImageUrl(response.url || candidate);
