@@ -123,7 +123,7 @@ export async function gold(env:Env){
       const match=html.match(/(?:عيار 24|24K)[^0-9]{0,120}([0-9][0-9,]*(?:\.[0-9]+)?)/i);
       const price=Number((match?.[1]||"").replace(/,/g,""));
       if(Number.isFinite(price)&&price>=1000&&price<=20000){
-        return{ok:true,provider:"GoldPriceO Egypt",price,unit:"EGP/g (24K reference)",markets:await extraMarkets(),updatedAt:new Date().toISOString(),stale:false};
+        return{ok:true,provider:"GoldPriceO Egypt",price,unit:"EGP/g (24K reference)",markets:await extraMarkets(env),updatedAt:new Date().toISOString(),stale:false};
       }
     }
   }catch(error){await recordRuntimeEventLimited(env,"gold_fallback_provider","goldprice_fallback_failed",error)}
