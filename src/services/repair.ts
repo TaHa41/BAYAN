@@ -305,7 +305,24 @@ export async function selfHeal(env:Env){
   const failures:string[]=[];
   for(const[c,fn]of checks)try{if(!(await fn())){failures.push(c);await record(env,"error","health",c+" check failed")}}catch(e){failures.push(c);await record(env,"error","health",c+" failed: "+String(e))}
   if(!failures.some((failure)=>["database","articles","sections"].includes(failure)))await resolveVerifiedLegacyJobs(env);
-  if(!failures.length){try{await env.DB.prepare("UPDATE repair_jobs SET status='RESOLVED',verification='verified_runtime',diagnosis=COALESCE(diagnosis,'')||' | News cache and image health now pass',updated_at=? WHERE status IN ('REVIEW','REPAIRED') AND (signature LIKE '%news_cache%' OR signature LIKE '%images%')").bind(now()).run()}catch{}await record(env,"info","health","AI self-healing checks passed");return{ok:true,failures:[],actions:[],verification:"healthy",message:"All runtime checks passed; no repair was necessary."}}
+  if(!failures.length){
+    try{
+      const info=await env.DB.prepare("PRAGMA table_info(repair_jobs)").all<any>();
+      const columns=new Set((info.results||[]).map((column:any)=>String(column.name)));
+      const assignments=["status='RESOLVED'","diagnosis=COALESCE(diagnosis,'')||' | News cache, image, publication and search checks passed'"];
+      const values:any[]=[];
+      if(columns.has("last_action")){assignments.push("last_action=?");values.push("Runtime health checks verified");}
+      else if(columns.has("action")){assignments.push("action=?");values.push("Runtime health checks verified");}
+      if(columns.has("verification_json")){assignments.push("verification_json=?");values.push(JSON.stringify({status:"verified_runtime",verifiedAt:now(),checks:["news_cache","images","news_article_publication_24h","search_returns_results"]}));}
+      else if(columns.has("verification")){assignments.push("verification=?");values.push("verified_runtime");}
+      if(columns.has("resolved_at"))assignments.push("resolved_at=COALESCE(resolved_at,datetime('now'))");
+      if(columns.has("last_verified_at"))assignments.push("last_verified_at=datetime('now')");
+      if(columns.has("updated_at")){assignments.push("updated_at=?");values.push(now());}
+      await env.DB.prepare("UPDATE repair_jobs SET "+assignments.join(",")+" WHERE status IN ('REVIEW','REPAIRED') AND (signature LIKE '%news_cache%' OR signature LIKE '%images%')").bind(...values).run();
+    }catch(error){await record(env,"warn","legacy_job_cleanup","Could not mark verified cache/image repair jobs resolved: "+String(error).replace(/https?:\\/\\/[^\\s]+/g,"[url]").slice(0,300));}
+    await record(env,"info","health","AI self-healing checks passed");
+    return{ok:true,failures:[],actions:[],verification:"healthy",message:"All runtime checks passed; no repair was necessary."}
+  }
   const lease=await acquireSelfHealLease(env);
   if(!lease){
     await record(env,"warn","self_heal_duplicate","Skipped overlapping self-healing run; another run owns the repair lease.");
