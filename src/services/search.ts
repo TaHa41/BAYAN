@@ -1,4 +1,4 @@
-import{safePublicImageUrl}from"../image-url";
+import{resolvePublishedImageUrl,safePublicImageUrl}from"../image-url";
 import type {Env,Locale,SearchResponse,SearchResult,Source} from "../types";
 import {searchArticles,saveSearch,publishVerifiedResearch} from "../db";
 import {ask,draftArticle} from "./ai";
@@ -960,7 +960,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
               try{relatedImage=await findRelatedImage(articleTitle,undefined,articleSummary);}
               catch(error){await recordPublicationWarning(env,publicationFailureReason(error));}
             }
-            const imageUrl=safePublicImageUrl(sourceImage)||safePublicImageUrl(relatedImage);
+            const imageCandidate=safePublicImageUrl(sourceImage)||safePublicImageUrl(relatedImage);const imageUrl=await resolvePublishedImageUrl(imageCandidate);
             if(!imageUrl){publishReason="no_image";return;}
             let savedSlug:string|null;
             try{
