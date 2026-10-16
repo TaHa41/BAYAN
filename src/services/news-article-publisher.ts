@@ -25,11 +25,18 @@ export async function publishNextArchivedNewsArticle(env:Env){
   try{
     const result=await search(env,title,language,{publish:true,draft:true,images:true});
     const slug=String(result.articleSlug||"").trim();
-    if(!slug)return{status:"attempted_no_publish" as const,id,language,searchStatus:result.status,resultCount:Array.isArray(result.results)?result.results.length:0,sourceCount:new Set((result.results||[]).flatMap((item:any)=>item.sources||[]).map((source:any)=>String(source.url||"").trim()).filter(Boolean)).size,providers:Array.isArray(result.providers)?result.providers.slice(0,8):[]};
-    await env.DB.prepare("UPDATE news_archive SET article_slug=? WHERE id=?").bind(slug,id).run();
+    if(!slug){
+      const publishReason=String(result.publishReason||"publish_rejected").slice(0,350);
+      await env.DB.prepare("UPDATE news_archive SET article_last_reason=? WHERE id=?").bind(publishReason,id).run();
+      return{status:"attempted_no_publish" as const,id,language,searchStatus:result.status,publishReason,resultCount:Array.isArray(result.results)?result.results.length:0,sourceCount:new Set((result.results||[]).flatMap((item:any)=>item.sources||[]).map((source:any)=>String(source.url||"").trim()).filter(Boolean)).size,providers:Array.isArray(result.providers)?result.providers.slice(0,8):[]};
+    }
+    await env.DB.prepare("UPDATE news_archive SET article_slug=?,article_last_reason=NULL WHERE id=?").bind(slug,id).run();
     return{status:"published" as const,id,language,slug};
   }catch(error){
-    try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","news_archive_article_generation",String(error).slice(0,350),new Date().toISOString()).run()}catch{}
-    return{status:"attempted_failed" as const,id,language};
+    const detail=String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
+    const publishReason=/429|rate.?limit|timeout|timed out|abort|quota|neurons|overload|openai|workers ai|ai unavailable/i.test(detail)?"ai_unavailable":"exception:"+detail;
+    try{await env.DB.prepare("UPDATE news_archive SET article_last_reason=? WHERE id=?").bind(publishReason.slice(0,350),id).run()}catch{}
+    try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","news_archive_article_generation",publishReason.slice(0,350),new Date().toISOString()).run()}catch{}
+    return{status:"attempted_failed" as const,id,language,publishReason};
   }
 }

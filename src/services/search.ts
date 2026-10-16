@@ -4,6 +4,10 @@ import {searchArticles,saveSearch,publishVerifiedResearch} from "../db";
 import {ask,draftArticle} from "./ai";
 import {findRelatedImage,searchNewsFeed} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
+const publicationErrorMessage=(error:unknown)=>String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
+const publicationFailureReason=(error:unknown)=>{const message=publicationErrorMessage(error);return /429|rate.?limit|timeout|timed out|abort|quota|neurons|overload|openai|workers ai|ai unavailable/i.test(message)?"ai_unavailable":"exception:"+message;};
+async function recordPublicationWarning(env:Env,message:string){try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","news_archive_article_generation",message.replace(/https?:\/\/[^\s]+/g,"[url]").slice(0,350),new Date().toISOString()).run()}catch{}}
+
 
 type Candidate = SearchResult & {score:number; provider:string; identityAliases?:string[]};
 const providerFailureKind=(error:unknown):"timeout"|"connection_failure"|"invalid_response"|"request_failure"=>{const value=error as {name?:string;message?:string};const name=String(value?.name||"");const message=String(value?.message||error||"").toLowerCase();if(name==="AbortError"||name==="TimeoutError"||/timeout|timed out|aborted/.test(message))return"timeout";if(name==="SyntaxError"||/json|parse|unexpected token/.test(message))return"invalid_response";if(name==="TypeError"||/fetch failed|network|connection|dns|socket|econn/.test(message))return"connection_failure";return"request_failure";};
@@ -920,35 +924,67 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   const independentlyVerified=corroboration.publishers.size>=configuredMin&&corroboration.hosts.size>=2;
   const status=results.length===0?"insufficient":independentlyVerified?"verified":"mixed";
   let publishedSlug:string|undefined;
+  let publishReason:string|undefined=options.publish!==false&&!independentlyVerified?"no_independent_sources":undefined;
   let answer:string|undefined;
   let answerStatus:SearchResponse["status"]|undefined;
   const exactPersonConfirmed=!personQuery||results.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
+  if(options.publish!==false&&independentlyVerified&&!exactPersonConfirmed)publishReason="draft_not_verified";
+  if(options.publish!==false&&options.draft===false)publishReason="draft_not_verified";
   if(results.length&&exactPersonConfirmed&&options.draft!==false){
     try{
       const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),7500))]);
-      if(drafted.answer){answer=drafted.answer;answerStatus=independentlyVerified?drafted.status:"mixed";}
+      if(drafted?.answer){answer=drafted.answer;answerStatus=independentlyVerified?drafted.status:"mixed";}
+      else if(options.publish!==false)publishReason="ai_unavailable";
       const articleTitle=results.find(x=>x.title&&x.summary)?.title||"";
       const articleSummary=results.find(x=>x.title&&x.summary)?.summary||q;
-      // Search answers stay concise; long-form publication gets a separate
-      // evidence-gated draft so a short answer is never mistaken for a complete article.
-      if(options.publish!==false&&independentlyVerified&&articleTitle&&!disallowedContent(articleTitle+" "+articleSummary)){
-        const publishLongArticle=async()=>{
-          const longDraft=await Promise.race([draftArticle(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),18000))]);
-          if(longDraft.status!=="verified"||!usefulDraft(longDraft.answer,language))return;
-          const sourceImage=results.find(item=>safePublicImageUrl(item.imageUrl)&&String(item.imageAlt||item.title||"").trim().length>0)?.imageUrl;
-          const imageUrl=safePublicImageUrl(sourceImage)||safePublicImageUrl(await findRelatedImage(articleTitle,undefined,articleSummary).catch(()=>undefined));
-          if(!imageUrl)return;
-          const savedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:longDraft.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle});
-          if(savedSlug)publishedSlug=savedSlug;
-        };
-        if(options.background){try{options.background(publishLongArticle().catch(()=>undefined))}catch{}}
-        else await publishLongArticle();
+      if(options.publish!==false){
+        if(!independentlyVerified)publishReason="no_independent_sources";
+        else if(!articleTitle||disallowedContent(articleTitle+" "+articleSummary))publishReason="draft_not_useful";
+        else{
+          const publishLongArticle=async()=>{
+            let longDraft:any;
+            try{
+              longDraft=await Promise.race([draftArticle(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:""}),18000))]);
+            }catch(error){
+              publishReason=publicationFailureReason(error);
+              await recordPublicationWarning(env,publishReason);
+              return;
+            }
+            if(longDraft?.status!=="verified"){publishReason="draft_not_verified";return;}
+            if(!usefulDraft(longDraft.answer,language)){publishReason="draft_not_useful";return;}
+            const sourceImage=results.find(item=>safePublicImageUrl(item.imageUrl)&&String(item.imageAlt||item.title||"").trim().length>0)?.imageUrl;
+            let relatedImage:string|undefined;
+            if(!sourceImage){
+              try{relatedImage=await findRelatedImage(articleTitle,undefined,articleSummary);}
+              catch(error){await recordPublicationWarning(env,publicationFailureReason(error));}
+            }
+            const imageUrl=safePublicImageUrl(sourceImage)||safePublicImageUrl(relatedImage);
+            if(!imageUrl){publishReason="no_image";return;}
+            let savedSlug:string|null;
+            try{
+              savedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:longDraft.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle});
+            }catch(error){
+              publishReason=publicationFailureReason(error);
+              await recordPublicationWarning(env,publishReason);
+              return;
+            }
+            if(savedSlug){publishedSlug=savedSlug;publishReason=undefined;}
+            else publishReason="publish_rejected";
+          };
+          if(options.background){
+            try{options.background(publishLongArticle().catch(async error=>{publishReason=publicationFailureReason(error);await recordPublicationWarning(env,publishReason||"exception:unknown");}));}
+            catch(error){publishReason=publicationFailureReason(error);await recordPublicationWarning(env,publishReason);}
+          }else await publishLongArticle();
+        }
       }
-    }catch{}
+    }catch(error){
+      if(options.publish!==false)publishReason=publicationFailureReason(error);
+      await recordPublicationWarning(env,publicationFailureReason(error));
+    }
   }
-  const failedProviderNames=new Set([...providerDiagnostics,...providerAttempted].filter(item=>/(?:timeout|connection_failure|invalid_response|request_failure|http_\d{3})/i.test(item)).map(item=>item.split(":")[0]));const allExternalFailed=results.length===0&&failedProviderNames.size>=3;const message=results.length?undefined:allExternalFailed?(language==="ar"?"تعذر الاتصال بعدة مزودين للبحث الخارجي. سجّل بيان أسباب الفشل وأعاد المحاولة عبر المصادر البديلة؛ لم تُعرض نتائج غير موثوقة. حاول مجددًا بعد قليل.":"Several external search providers failed to respond. BAYAN recorded failure categories and attempted fallback sources; no unverified results were shown. Please retry shortly."):(language==="ar"?"لم تُرجع محاولات البحث المتاحة نتائج ذات صلة كافية. جرّب إضافة سياق أو كتابة الاسم الكامل أو استخدام صياغة أخرى؛ لن يعرض بيان نتائج غير مرتبطة لمجرد ملء الصفحة.":"The available search attempts did not return sufficiently relevant results. Add context, use the full name, or try another phrasing; BAYAN will not show unrelated results just to fill the page.");
+    const failedProviderNames=new Set([...providerDiagnostics,...providerAttempted].filter(item=>/(?:timeout|connection_failure|invalid_response|request_failure|http_\d{3})/i.test(item)).map(item=>item.split(":")[0]));const allExternalFailed=results.length===0&&failedProviderNames.size>=3;const message=results.length?undefined:allExternalFailed?(language==="ar"?"تعذر الاتصال بعدة مزودين للبحث الخارجي. سجّل بيان أسباب الفشل وأعاد المحاولة عبر المصادر البديلة؛ لم تُعرض نتائج غير موثوقة. حاول مجددًا بعد قليل.":"Several external search providers failed to respond. BAYAN recorded failure categories and attempted fallback sources; no unverified results were shown. Please retry shortly."):(language==="ar"?"لم تُرجع محاولات البحث المتاحة نتائج ذات صلة كافية. جرّب إضافة سياق أو كتابة الاسم الكامل أو استخدام صياغة أخرى؛ لن يعرض بيان نتائج غير مرتبطة لمجرد ملء الصفحة.":"The available search attempts did not return sufficiently relevant results. Add context, use the full name, or try another phrasing; BAYAN will not show unrelated results just to fill the page.");
   providerAttempted.push(...providerDiagnostics.filter(item=>!providerAttempted.includes(item)));try{await saveSearch(env,q,language,intent(q),status,results.length,classifySection(q,results,language),results)}catch{}
-  return {query:q,locale:language,results,providers,providerAttempted,status,message,answer,answerStatus,articleSlug:publishedSlug};
+  return {query:q,locale:language,results,providers,providerAttempted,status,message,answer,answerStatus,articleSlug:publishedSlug,publishReason};
 }
 function intent(q:string){
   const s=q.toLowerCase();
