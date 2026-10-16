@@ -1,4 +1,4 @@
-import type{Env}from"../types";import{now}from"../config";import{notify}from"./telegram";import{findRelatedImage,news}from"./news";import{search}from"./search";
+import type{Env}from"../types";import{recordRuntimeEventLimited}from"../runtime-events";import{now}from"../config";import{notify}from"./telegram";import{findRelatedImage,news}from"./news";import{search}from"./search";
 async function newsCacheHealthy(env:Env){
   const rows=await env.DB.prepare("SELECT language,payload FROM news_cache WHERE language IN ('ar','en')").all<any>();
   const cache=rows.results||[];
@@ -56,7 +56,7 @@ const CANONICAL_SECTIONS=["science","technology","economy","politics","health","
 const CONTENT_SECTIONS=["science","technology","economy","politics","health","history","people","sports","travel","art","trends","egypt","arab","world"] as const;
 
 export async function record(env:Env,level:string,kind:string,message:string){
-  try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind(level,kind,message.slice(0,4000),now()).run()}catch{}
+  try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind(level,kind,message.slice(0,4000),now()).run()}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
 }
 
 const SELF_HEAL_LEASE_MS=4*60*1000;
@@ -73,18 +73,18 @@ async function acquireSelfHealLease(env:Env):Promise<string|undefined>{
   }
 }
 async function releaseSelfHealLease(env:Env,lease:string){
-  try{await env.DB.prepare("UPDATE admin_settings SET value='',updated_at=? WHERE key='self_heal_lock' AND value=?").bind(now(),lease).run()}catch{}
+  try{await env.DB.prepare("UPDATE admin_settings SET value='',updated_at=? WHERE key='self_heal_lock' AND value=?").bind(now(),lease).run()}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
 }
 
 async function diagnose(env:Env,failures:string[]){
   let history="No recorded repair history for this failure signature.";
-  try{const rows=await env.DB.prepare("SELECT attempt_no,diagnosis,action,verification,created_at FROM repair_attempts WHERE signature=? ORDER BY attempt_no DESC LIMIT 5").bind(failures.join(",")).all<any>();if((rows.results||[]).length)history=(rows.results||[]).map((row:any)=>"Attempt "+row.attempt_no+"; verification="+row.verification+"; action="+String(row.action||"").slice(0,700)+"; diagnosis="+String(row.diagnosis||"").slice(0,500)).join("\n")}catch{}
+  try{const rows=await env.DB.prepare("SELECT attempt_no,diagnosis,action,verification,created_at FROM repair_attempts WHERE signature=? ORDER BY attempt_no DESC LIMIT 5").bind(failures.join(",")).all<any>();if((rows.results||[]).length)history=(rows.results||[]).map((row:any)=>"Attempt "+row.attempt_no+"; verification="+row.verification+"; action="+String(row.action||"").slice(0,700)+"; diagnosis="+String(row.diagnosis||"").slice(0,500)).join("\n")}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
   const prompt="BAYAN self-healing diagnostic. Confirmed failing checks: "+failures.join(", ")+".\nPrevious attempts (do not repeat a failed action unchanged):\n"+history+"\nReturn evidence, likely cause, and one safest reversible action that improves on prior attempts. Never propose destructive SQL, authentication changes, secret exposure, or unverified code mutation.";
   if(env.OPENAI_API_KEY)try{
     const r=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(12000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",instructions:"You are a conservative reliability engineer. Separate evidence from hypothesis.",input:prompt,store:false})});
     if(r.ok){const d=await r.json<any>();return String(d.output_text||"").slice(0,3000)}
-  }catch{}
-  if(env.AI)try{const d=await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast",{prompt});return String((d as any)?.response||"").slice(0,3000)}catch{}
+  }catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
+  if(env.AI)try{const d=await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast",{prompt});return String((d as any)?.response||"").slice(0,3000)}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
   return"AI diagnostic unavailable; deterministic health evidence recorded.";
 }
 
@@ -96,7 +96,7 @@ async function repairTaxonomy(env:Env){
     ["sports","sports-%"],["travel","travel-%"],["art","art-%"],["trends","trends-%"]
   ] as const;
   for(const [section,pattern] of canonical){
-    try{await env.DB.prepare("UPDATE articles SET section=? WHERE slug LIKE ?").bind(section,pattern).run()}catch{}
+    try{await env.DB.prepare("UPDATE articles SET section=? WHERE slug LIKE ?").bind(section,pattern).run()}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
   }
   const legacy=[
     ["people",["who-is-naguib-mahfouz-ar","who-is-naguib-mahfouz-en"]],
@@ -108,9 +108,9 @@ async function repairTaxonomy(env:Env){
     ["world",["what-is-a-news-story-ar","what-is-a-news-story-en","how-stories-are-built-ar","how-stories-are-built-en"]],
     ["egypt",["egypt-at-a-glance-ar","egypt-at-a-glance-en"]]
   ] as const;
-  for(const [section,slugs] of legacy)for(const slug of slugs)try{await env.DB.prepare("UPDATE articles SET section=? WHERE slug=?").bind(section,slug).run()}catch{}
-  try{await env.DB.prepare("UPDATE articles SET status='PUBLISHED' WHERE section='trends' AND slug LIKE 'trends-%'").run()}catch{}
-  try{await env.DB.prepare("UPDATE articles SET status='ARCHIVED' WHERE section IN ('guides','topics','stories')").run()}catch{}
+  for(const [section,slugs] of legacy)for(const slug of slugs)try{await env.DB.prepare("UPDATE articles SET section=? WHERE slug=?").bind(section,slug).run()}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
+  try{await env.DB.prepare("UPDATE articles SET status='PUBLISHED' WHERE section='trends' AND slug LIKE 'trends-%'").run()}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
+  try{await env.DB.prepare("UPDATE articles SET status='ARCHIVED' WHERE section IN ('guides','topics','stories')").run()}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
   actions.push("approved taxonomy enforced; legacy section assignments neutralized");
   return actions;
 }
@@ -134,9 +134,9 @@ const SECTION_REPAIR_QUERIES:Record<string,{ar:string;en:string}>={
 async function attemptSectionContentRepair(env:Env,missing:string[]){
   if(!missing.length)return "No section content repair target was available.";
   let cursor=0;
-  try{const row=await env.DB.prepare("SELECT value FROM admin_settings WHERE key='section_repair_cursor'").first<any>();cursor=Math.max(0,Number(row?.value||0)||0)}catch{}
+  try{const row=await env.DB.prepare("SELECT value FROM admin_settings WHERE key='section_repair_cursor'").first<any>();cursor=Math.max(0,Number(row?.value||0)||0)}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
   const target=missing[cursor%missing.length];
-  try{await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES('section_repair_cursor',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(String(cursor+1),now()).run()}catch{}
+  try{await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES('section_repair_cursor',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(String(cursor+1),now()).run()}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
   const match=String(target).match(/^([a-z]+)_(ar|en)=/);
   if(!match)return "Section content repair skipped because the gap signature was not recognized: "+target;
   const section=match[1],language=match[2] as "ar"|"en";
@@ -156,20 +156,20 @@ async function attemptSectionContentRepair(env:Env,missing:string[]){
 async function repairRuntime(env:Env,failures:string[]){
   const actions:string[]=[];
   try{await env.DB.prepare("SELECT 1").first();actions.push("database verified")}catch{
-    try{await env.DB.prepare("CREATE TABLE IF NOT EXISTS runtime_events(id INTEGER PRIMARY KEY AUTOINCREMENT,level TEXT NOT NULL,kind TEXT NOT NULL,message TEXT NOT NULL,created_at TEXT NOT NULL)").run();actions.push("runtime_events recreated")}catch{}
+    try{await env.DB.prepare("CREATE TABLE IF NOT EXISTS runtime_events(id INTEGER PRIMARY KEY AUTOINCREMENT,level TEXT NOT NULL,kind TEXT NOT NULL,message TEXT NOT NULL,created_at TEXT NOT NULL)").run();actions.push("runtime_events recreated")}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
   }
-  try{await env.DB.prepare("CREATE TABLE IF NOT EXISTS repair_jobs(id INTEGER PRIMARY KEY AUTOINCREMENT,signature TEXT NOT NULL UNIQUE,status TEXT NOT NULL DEFAULT 'DETECTED',diagnosis TEXT,action TEXT,verification TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL)").run();actions.push("repair_jobs verified")}catch{}
+  try{await env.DB.prepare("CREATE TABLE IF NOT EXISTS repair_jobs(id INTEGER PRIMARY KEY AUTOINCREMENT,signature TEXT NOT NULL UNIQUE,status TEXT NOT NULL DEFAULT 'DETECTED',diagnosis TEXT,action TEXT,verification TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL)").run();actions.push("repair_jobs verified")}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
   try{
     const defaults:Record<string,string>={min_sources:"2",max_sources:"8",image_required:"0",image_fallback:"1",auto_repair:"1",news_items:"12",search_timeout_ms:"7000",source_wikipedia:"1",source_wikidata:"1",source_gdelt:"1",source_openalex:"1",source_ai_search:"1"};
     for(const key of Object.keys(defaults)){const row=await env.DB.prepare("SELECT value FROM admin_settings WHERE key=?").bind(key).first<any>();if(!row)await env.DB.prepare("INSERT OR IGNORE INTO admin_settings(key,value,updated_at) VALUES(?,?,?)").bind(key,defaults[key],now()).run()}
     actions.push("admin settings verified")
-  }catch{}
+  }catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
   actions.push(...await repairTaxonomy(env));
   // Avoid a permanent deadlock: when both checks fail, the old logic refreshed
   // news on every run and deferred images on every run. Alternate bounded passes.
   let previousAction="";
   if(failures.includes("news_cache")&&failures.includes("images")){
-    try{const previous=await env.DB.prepare("SELECT action FROM repair_jobs WHERE signature=?").bind(failures.join(",")).first<any>();previousAction=String(previous?.action||"")}catch{}
+    try{const previous=await env.DB.prepare("SELECT action FROM repair_jobs WHERE signature=?").bind(failures.join(",")).first<any>();previousAction=String(previous?.action||"")}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
   }
   // Alternate the bounded work based on the last completed action, not on whether
   // any historical news refresh ever happened. A historical count caused image-only
@@ -193,7 +193,7 @@ async function repairRuntime(env:Env,failures:string[]){
     if(failures.includes("articles"))try{
     const row=await env.DB.prepare("SELECT COUNT(*) count FROM articles WHERE status='PUBLISHED'").first<any>();
     if(Number(row?.count||0)===0)actions.push("no published articles; deployment/content seed review required");
-  }catch{}
+  }catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
   if(failures.includes("sections"))try{
     const missing=await sectionHealth(env);
     if(missing.length)actions.push("section coverage failure: fewer than 2 complete, locale-pure, source-backed, imaged articles: "+missing.join(", "));
@@ -203,7 +203,7 @@ async function repairRuntime(env:Env,failures:string[]){
   if(failures.includes("images")&&sectionOnlyPass){actions.push("image repair deferred until the next run after section content repair pass")}else if(failures.includes("images")&&failures.includes("news_cache")&&!imageOnlyPass){actions.push("image repair deferred until the next run to preserve Worker subrequest budget after news refresh")}else if(failures.includes("images"))try{
     const rows=await env.DB.prepare("SELECT id,title,summary,sources_json FROM articles WHERE status='PUBLISHED' AND (image_url IS NULL OR trim(image_url)='') ORDER BY updated_at DESC LIMIT 4").all<any>();
     let filledArticles=0;
-    for(const row of rows.results||[])try{let sourceUrl="";try{const sources=JSON.parse(String(row.sources_json||"[]"));sourceUrl=String(sources.find((item:any)=>String(item.url||"").startsWith("https://"))?.url||"")}catch{}const url=await findRelatedImage(String(row.title||""),sourceUrl||undefined);if(url){await env.DB.prepare("UPDATE articles SET image_url=?,updated_at=? WHERE id=? AND (image_url IS NULL OR trim(image_url)='')").bind(url,now(),row.id).run();filledArticles++}else await record(env,"warn","image_repair_no_match","No topic-matched image found for article "+String(row.id)+" ("+String(row.title||"").slice(0,180)+")")}catch(error){await record(env,"warn","image_repair_article_error","Article "+String(row.id)+": "+String(error).slice(0,300))}
+    for(const row of rows.results||[])try{let sourceUrl="";try{const sources=JSON.parse(String(row.sources_json||"[]"));sourceUrl=String(sources.find((item:any)=>String(item.url||"").startsWith("https://"))?.url||"")}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}const url=await findRelatedImage(String(row.title||""),sourceUrl||undefined);if(url){await env.DB.prepare("UPDATE articles SET image_url=?,updated_at=? WHERE id=? AND (image_url IS NULL OR trim(image_url)='')").bind(url,now(),row.id).run();filledArticles++}else await record(env,"warn","image_repair_no_match","No topic-matched image found for article "+String(row.id)+" ("+String(row.title||"").slice(0,180)+")")}catch(error){await record(env,"warn","image_repair_article_error","Article "+String(row.id)+": "+String(error).slice(0,300))}
     let filledNews=0;
     for(const language of ["ar","en"] as const)try{
       const row=await env.DB.prepare("SELECT payload FROM news_cache WHERE language=? LIMIT 1").bind(language).first<any>();
@@ -212,12 +212,12 @@ async function repairRuntime(env:Env,failures:string[]){
       const items:any[]=Array.isArray(parsed)?parsed:(Array.isArray(parsed?.items)?parsed.items:[]);
       let changed=false;
       for(const item of items.filter((entry:any)=>!String(entry.imageUrl||"").trim()&&String(entry.title||"").trim()).slice(0,3)){
-        const url=await findRelatedImage(String(item.title||""),String(item.url||""));
+        const url=await findRelatedImage(String(item.title||""),String(item.url||""),"",env);
         if(url){item.imageUrl=url;item.imageAlt=String(item.title||"");filledNews++;changed=true}else await record(env,"warn","image_repair_news_no_match","No topic-matched image found for cached "+language+" story: "+String(item.title||"").slice(0,180))
       }
       if(changed&&Array.isArray(parsed))await env.DB.prepare("UPDATE news_cache SET payload=?,updated_at=? WHERE language=?").bind(JSON.stringify(items.slice(0,40)),now(),language).run();
       else if(changed&&parsed&&Array.isArray(parsed.items))await env.DB.prepare("UPDATE news_cache SET payload=?,updated_at=? WHERE language=?").bind(JSON.stringify({...parsed,items:items.slice(0,40)}),now(),language).run();
-    }catch{}
+    }catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
     actions.push("image repair filled "+filledArticles+" article(s) and "+filledNews+" cached news image(s); attempted up to 4 articles and 3 stories per locale");
   }catch{actions.push("image repair failed before completion; inspect runtime_events for database or image-provider errors")}
   actions.push("news cache diagnostics after repair: "+await newsCacheDiagnostics(env));
@@ -253,7 +253,7 @@ const completeSectionArticle=(row:any,language:string)=>{
   let sources:any[]=[];try{sources=JSON.parse(String(row?.sources_json||"[]"))}catch{return false}
   if(!Array.isArray(sources))return false;
   const hosts=new Set<string>(),publishers=new Set<string>();
-  for(const source of sources){try{const url=new URL(String(source?.url||""));if(url.protocol!=="https:")continue;hosts.add(url.hostname.toLowerCase().replace(/^www\./,""));const publisher=String(source?.publisher||"").trim().toLowerCase();if(publisher)publishers.add(publisher)}catch{}}
+  for(const source of sources){try{const url=new URL(String(source?.url||""));if(url.protocol!=="https:")continue;hosts.add(url.hostname.toLowerCase().replace(/^www\./,""));const publisher=String(source?.publisher||"").trim().toLowerCase();if(publisher)publishers.add(publisher)}catch(error){void error}}
   return hosts.size>=2&&publishers.size>=2;
 };
 

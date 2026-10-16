@@ -1,11 +1,8 @@
 import type { Env } from "../types";
+import { recordRuntimeEventLimited } from "../runtime-events";
 
 async function recordDeliveryFailure(env: Env, message: string) {
-  try {
-    await env.DB.prepare(
-      "INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)",
-    ).bind("WARN", "telegram_delivery", message.slice(0, 500), new Date().toISOString()).run();
-  } catch {}
+  await recordRuntimeEventLimited(env, "telegram_delivery", "telegram_delivery_failed", message);
 }
 
 export async function notify(env: Env, message: string): Promise<boolean> {
@@ -28,7 +25,7 @@ export async function notify(env: Env, message: string): Promise<boolean> {
       },
     );
     if (response.ok) return true;
-    const detail = (await response.text().catch(() => "")).slice(0, 250);
+    const detail = (await response.text().catch(async error => { await recordRuntimeEventLimited(env, "telegram_response_body", "telegram_response_read_failed", error); return ""; })).slice(0, 250);
     await recordDeliveryFailure(env, "Telegram HTTP " + response.status + ": " + detail);
     return false;
   } catch (error) {

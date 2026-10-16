@@ -1,4 +1,5 @@
 import {ORIGIN,SECTIONS} from "./config";
+import {recordRuntimeEventLimited} from "./runtime-events";
 import type {Env,Locale} from "./types";
 import {text}from"./http";
 
@@ -32,7 +33,7 @@ export async function sitemap(env:Env){
     return '<url><loc>'+xml(item.url)+'</loc>'+lastmod+'</url>';
   }).join("")+"</urlset>","application/xml;charset=utf-8");
 }
-const newsSitemapEligibility=(row:any,now:number)=>{
+const newsSitemapEligibility=async(row:any,now:number,env:Env)=>{
   const reject=(reason:string)=>({eligible:false,reason});
   const slug=String(row?.slug||"").trim(),title=String(row?.title||"").trim(),language=String(row?.language||"");
   if(!slug)return reject("missing_slug");
@@ -45,7 +46,7 @@ const newsSitemapEligibility=(row:any,now:number)=>{
   const body=String(row?.body||"").replace(/<script\b[\s\S]*?<\/script>/gi," ").replace(/<style\b[\s\S]*?<\/style>/gi," ").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim();
   if(body.length<500)return reject("body_too_short");
   let sources:any[]=[];
-  try{const parsed=JSON.parse(String(row?.sources_json||"[]"));sources=Array.isArray(parsed)?parsed:[]}catch{}
+  try{const parsed=JSON.parse(String(row?.sources_json||"[]"));sources=Array.isArray(parsed)?parsed:[]}catch(error){await recordRuntimeEventLimited(env,"news_sitemap_sources_parse","news_sitemap_sources_json_invalid",error)}
   const hosts=new Set<string>();
   for(const source of sources){
     try{
@@ -54,7 +55,7 @@ const newsSitemapEligibility=(row:any,now:number)=>{
       const host=url.hostname.toLowerCase().replace(/^www\./,"").replace(/\.$/,"");
       if(!host||host==="localhost"||host.endsWith(".localhost"))continue;
       hosts.add(host);
-    }catch{}
+    }catch(error){await recordRuntimeEventLimited(env,"news_sitemap_source_url","news_sitemap_source_url_invalid",error)}
   }
   if(hosts.size<2)return reject("fewer_than_two_https_source_hosts");
   return {eligible:true,reason:""};
@@ -89,7 +90,7 @@ export async function newsSitemap(env:Env){
   const rejectionReasons:Record<string,number>={};
   const eligibleRows:any[]=[];
   for(const row of rows){
-    const result=newsSitemapEligibility(row,now);
+    const result=await newsSitemapEligibility(row,now,env);
     if(result.eligible)eligibleRows.push(row);
     else rejectionReasons[result.reason]=(rejectionReasons[result.reason]||0)+1;
   }

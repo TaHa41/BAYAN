@@ -1,4 +1,4 @@
-import{safePublicImageUrl}from"./image-url";import type{Article,Env,Locale}from"./types";import{now}from"./config";import{findRelatedImage}from"./services/news";import{boundedLikeKeywords,escapedLikePattern}from"./search-patterns";export async function listArticles(env:Env,section:string,language:Locale,limit=12):Promise<Article[]>{const r=await env.DB.prepare("SELECT * FROM articles WHERE section=? AND language=? AND status='PUBLISHED' ORDER BY updated_at DESC LIMIT ?").bind(section,language,limit).all<any>();return(r.results||[]).map(row=>({...row,sources:JSON.parse(row.sources_json||"[]"),createdAt:row.created_at,updatedAt:row.updated_at,imageUrl:row.image_url,imageAlt:row.image_alt}))}export async function listSectionArticles(env:Env,section:string,language:Locale,limit=12){return listArticles(env,section,language,limit)}export async function getArticle(env:Env,slug:string,language:Locale){const r=await env.DB.prepare("SELECT * FROM articles WHERE slug=? AND language=? AND status='PUBLISHED' LIMIT 1").bind(slug,language).first<any>();return r?({...r,sources:JSON.parse(r.sources_json||"[]"),createdAt:r.created_at,updatedAt:r.updated_at,imageUrl:r.image_url,imageAlt:r.image_alt}as Article):null}export async function searchArticles(env:Env,q:string,language:Locale,limit=12){
+import{safePublicImageUrl}from"./image-url";import type{Article,Env,Locale}from"./types";import{now}from"./config";import{findRelatedImage}from"./services/news";import{boundedLikeKeywords,escapedLikePattern}from"./search-patterns";import{recordRuntimeEventLimited}from"./runtime-events";export async function listArticles(env:Env,section:string,language:Locale,limit=12):Promise<Article[]>{const r=await env.DB.prepare("SELECT * FROM articles WHERE section=? AND language=? AND status='PUBLISHED' ORDER BY updated_at DESC LIMIT ?").bind(section,language,limit).all<any>();return(r.results||[]).map(row=>({...row,sources:JSON.parse(row.sources_json||"[]"),createdAt:row.created_at,updatedAt:row.updated_at,imageUrl:row.image_url,imageAlt:row.image_alt}))}export async function listSectionArticles(env:Env,section:string,language:Locale,limit=12){return listArticles(env,section,language,limit)}export async function getArticle(env:Env,slug:string,language:Locale){const r=await env.DB.prepare("SELECT * FROM articles WHERE slug=? AND language=? AND status='PUBLISHED' LIMIT 1").bind(slug,language).first<any>();return r?({...r,sources:JSON.parse(r.sources_json||"[]"),createdAt:r.created_at,updatedAt:r.updated_at,imageUrl:r.image_url,imageAlt:r.image_alt}as Article):null}export async function searchArticles(env:Env,q:string,language:Locale,limit=12){
  const rawTerms=String(q||"").normalize("NFKC").replace(/[^\p{L}\p{N}%_!\s]/gu," ").split(/\s+/).filter(Boolean);
  const terms=boundedLikeKeywords(rawTerms,6);
  if(!terms.length)return[];
@@ -51,7 +51,7 @@ export async function publishVerifiedResearch(env:Env,input:{title:string;summar
  const t=now();
  const sourceMap=new Map<string,any>();
  for(const source of [...(existing?JSON.parse(String(existing.sources_json||"[]")):[]),...(input.sources||[])]){
-  try{const url=new URL(String(source?.url||""));if(url.protocol==="https:")sourceMap.set(url.toString(),source)}catch{}
+  try{const url=new URL(String(source?.url||""));if(url.protocol==="https:")sourceMap.set(url.toString(),source)}catch(error){await recordRuntimeEventLimited(env,"publication_source_url","invalid_publication_source_url",error)}
  }
  const mergedSources=[...sourceMap.values()].slice(0,20);
  if(existing){
@@ -101,18 +101,18 @@ export async function addContribution(env:Env,title:string,body:string,source:st
   if(language==="ar"?(!hasArabic(title)||!hasArabic(body)):hasArabic(title+" "+body))throw new Error("contribution_language_mismatch");
   const urls=[String(c.source||""),...(body.match(/https:\/\/[^\s)\]}>,]+/gi)||[])].flatMap((value:string)=>{try{const url=new URL(value.trim());return url.protocol==="https:"?[url.toString()]:[]}catch{return[]}});
   const sourceMap=new Map<string,any>();
-  for(const value of urls){try{const url=new URL(value);const host=url.hostname.toLowerCase().replace(/^www\./,"");sourceMap.set(host,{title:host,publisher:host,url:url.toString()})}catch{}}
+  for(const value of urls){try{const url=new URL(value);const host=url.hostname.toLowerCase().replace(/^www\./,"");sourceMap.set(host,{title:host,publisher:host,url:url.toString()})}catch(error){void recordRuntimeEventLimited(env,"contribution_source_url","invalid_contribution_source_url",error)}}
   const sources=[...sourceMap.values()];
   if(new Set(sources.map(s=>new URL(s.url).hostname)).size<2)throw new Error("contribution_needs_independent_sources");
   const summary=body.replace(/^#{1,4}\s+/gm,"").replace(/\s+/g," ").slice(0,500);
   if(summary.length<40)throw new Error("contribution_summary_missing");
-  const image=await findRelatedImage(title,sources[0]?.url);
+  const image=await findRelatedImage(title,sources[0]?.url,"",env);
   if(!image||!/^https:\/\//i.test(image))throw new Error("contribution_image_unavailable");
   const published=await publishVerifiedResearch(env,{title,summary,body,section:String(c.section||"world"),language,sources,imageUrl:image,imageAlt:title});
   if(!published)throw new Error("contribution_article_not_publishable");
  }
  await env.DB.prepare("UPDATE contributions SET status=?,reviewer_note=?,reviewed_at=? WHERE id=?").bind(action==="APPROVE"?"APPROVED":"REJECTED",note||null,now(),id).run();
-}export async function track(env:Env,visitor:string,event:string,path:string,language:Locale){if(visitor==="owner-excluded")return;try{await env.DB.prepare("INSERT INTO analytics(visitor_hash,event,path,language,created_at) VALUES(?,?,?,?,?)").bind(visitor,event,path,language,now()).run()}catch{}}
+}export async function track(env:Env,visitor:string,event:string,path:string,language:Locale){if(visitor==="owner-excluded")return;try{await env.DB.prepare("INSERT INTO analytics(visitor_hash,event,path,language,created_at) VALUES(?,?,?,?,?)").bind(visitor,event,path,language,now()).run()}catch(error){await recordRuntimeEventLimited(env,"analytics_tracking","analytics_event_write_failed",error)}}
 export async function analyticsStats(env:Env,language:Locale="ar"){
   const day=new Date(Date.now()-86400000).toISOString(),week=new Date(Date.now()-604800000).toISOString(),month=new Date(Date.now()-2592000000).toISOString();
   const r=await env.DB.batch([

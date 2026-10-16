@@ -46,14 +46,14 @@ export async function resolvePublishedImageUrl(value: unknown): Promise<string |
       headers: { accept: "image/*,*/*;q=0.8" }
     });
     let finalUrl = new URL(response.url || original.href);
-    await response.body?.cancel().catch(() => undefined);
+    await response.body?.cancel().catch(error => { void error; return undefined; });
     if (!response.ok || finalUrl.protocol !== "https:" || finalUrl.hostname.toLowerCase() !== "upload.wikimedia.org") {
       response = await fetch(original.href, {
         method: "GET", redirect: "follow", signal: controller.signal,
         headers: { accept: "image/*,*/*;q=0.8", range: "bytes=0-0" }
       });
       finalUrl = new URL(response.url || original.href);
-      await response.body?.cancel().catch(() => undefined);
+      await response.body?.cancel().catch(error => { void error; return undefined; });
     }
     if (!response.ok || finalUrl.protocol !== "https:" || finalUrl.hostname.toLowerCase() !== "upload.wikimedia.org") return undefined;
     const type = response.headers.get("content-type") || "";

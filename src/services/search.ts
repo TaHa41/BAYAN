@@ -2,12 +2,13 @@ import{resolvePublishedImageUrl,safePublicImageUrl}from"../image-url";
 import type {Env,Locale,SearchResponse,SearchResult,Source} from "../types";
 import {searchArticles,saveSearch,publishVerifiedResearch,publicationRejectionReason} from "../db";
 import {boundedLikeKeywords,escapedLikePattern} from "../search-patterns";
+import {recordRuntimeEventLimited} from "../runtime-events";
 import {ask,draftArticle,answerHasUnsupportedSpecifics} from "./ai";
 import {findRelatedImage,searchNewsFeed} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 const publicationErrorMessage=(error:unknown)=>String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
 const publicationFailureReason=(error:unknown)=>{const message=publicationErrorMessage(error);return /429|rate.?limit|timeout|timed out|abort|quota|neurons|overload|openai|workers ai|ai unavailable/i.test(message)?"ai_unavailable":"exception:"+message;};
-async function recordPublicationWarning(env:Env,message:string){try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","news_archive_article_generation",message.replace(/https?:\/\/[^\s]+/g,"[url]").slice(0,350),new Date().toISOString()).run()}catch{}}
+async function recordPublicationWarning(env:Env,message:string){await recordRuntimeEventLimited(env,"news_archive_article_generation","publication_warning",message);}
 
 
 type Candidate = SearchResult & {score:number; provider:string; identityAliases?:string[]};
@@ -24,7 +25,7 @@ const timeout = async (url:string, ms=2600, diagnostics?:string[], provider="ext
     const maxBytes=/text\/html/.test(contentType)?256*1024:/xml|rss|text\/plain/.test(contentType)?384*1024:768*1024;
     const declaredSize=Number(response.headers.get("content-length")||0);
     if(declaredSize>maxBytes){
-      await response.body?.cancel().catch(()=>{});
+      await response.body?.cancel().catch(error=>{void error});
       throw new Error("response_body_too_large");
     }
     const bodyless=response.status===204||response.status===205||response.status===304;
@@ -39,7 +40,7 @@ const timeout = async (url:string, ms=2600, diagnostics?:string[], provider="ext
           if(part.done)break;
           total+=part.value.byteLength;
           if(total>maxBytes){
-            await reader.cancel().catch(()=>{});
+            await reader.cancel().catch(error=>{void error});
             throw new Error("response_body_too_large");
           }
           chunks.push(part.value);
@@ -307,7 +308,7 @@ async function bingWebSearch(q:string,language:Locale,diagnostics?:string[]):Pro
       try{const parsed=new URL(target);if(parsed.hostname==="www.bing.com"||parsed.hostname.endsWith(".bing.com"))continue;}catch{continue;}
       if(!title||!/^https:\/\//i.test(target))continue;
       const snippet=cleanText(decodeXml(block.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)?.[1]?.replace(/<[^>]*>/g," ")||"")).slice(0,1200);
-      let publisher="Web result";try{publisher=new URL(target).hostname.replace(/^www\./i,"");}catch{}
+      let publisher="Web result";try{publisher=new URL(target).hostname.replace(/^www\./i,"");}catch(error){reportProviderFailure(diagnostics,"Bing Web result URL",error)}
       out.push({title,summary:snippet,section:"world",kind:"web",evidence:"mixed",sources:[source(title,publisher,target)],url:target,score:scoreSource(publisher,title,q)+9,provider:"Bing Web Search"});
     }
     return out;
@@ -325,7 +326,7 @@ async function bingWebRssSearch(q:string,language:Locale,diagnostics?:string[]):
       const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
       const title=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1200);
       if(!title||!/^https:\/\//i.test(url))continue;
-      let publisher="Bing Web";try{publisher=new URL(url).hostname.replace(/^www\./i,"")}catch{}
+      let publisher="Bing Web";try{publisher=new URL(url).hostname.replace(/^www\./i,"")}catch(error){reportProviderFailure(diagnostics,"Bing RSS result URL",error)}
       out.push({title,summary,section:"world",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+8,provider:"Bing Web RSS"});
       if(out.length>=8)break;
     }
@@ -690,7 +691,7 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   }catch(error){throw error;}
 }
 export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean;draft?:boolean;images?:boolean;healthCheck?:boolean;publicationContext?:string;background?:(task:Promise<unknown>)=>void}={}):Promise<SearchResponse>{
-  if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
+  if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch(error){await recordRuntimeEventLimited(env,"search_log_persistence","blocked_search_log_write_failed",error)}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   // Reuse a recent, previously verified answer when its evidence is still source-diverse.
   // This avoids re-running the full external-provider fan-out for repeat queries.
   if(!options.publish&&!options.images&&!options.background&&!options.healthCheck){
@@ -698,26 +699,26 @@ export async function search(env:Env,q:string,language:Locale,options:{publish?:
       const since=new Date(Date.now()-5*60*1000).toISOString();
       const cached=await env.DB.prepare("SELECT results_json,status,created_at FROM searches WHERE query=? AND language=? AND created_at>=? AND status IN ('verified','mixed') ORDER BY created_at DESC LIMIT 1").bind(q,language,since).first<any>();
       let parsed:any[]=[];
-      try{const value=JSON.parse(String(cached?.results_json||"[]"));if(Array.isArray(value))parsed=value}catch{}
+      try{const value=JSON.parse(String(cached?.results_json||"[]"));if(Array.isArray(value))parsed=value}catch(error){await recordRuntimeEventLimited(env,"search_cache_parse","cached_results_json_invalid",error)}
       const cachedResults:Candidate[]=parsed.filter((item:any)=>String(item?.title||"").trim()&&String(item?.summary||"").trim()).slice(0,12).map((item:any)=>({...item,score:70,kind:item.kind||"evidence",evidence:item.evidence||"mixed",provider:"BAYAN verified search cache",sources:Array.isArray(item.sources)?item.sources:[]}));
       const hosts=new Set<string>();
       for(const item of cachedResults){
         for(const source of item.sources||[]){
-          try{const url=new URL(String(source?.url||""));if(url.protocol==="https:"&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/i.test(url.hostname))hosts.add(url.hostname.toLowerCase().replace(/^www\./,""))}catch{}
+          try{const url=new URL(String(source?.url||""));if(url.protocol==="https:"&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/i.test(url.hostname))hosts.add(url.hostname.toLowerCase().replace(/^www\./,""))}catch(error){void recordRuntimeEventLimited(env,"candidate_source_url","invalid_candidate_source_url",error)}
         }
-        if(item.url){try{const url=new URL(String(item.url));if(url.protocol==="https:"&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/i.test(url.hostname))hosts.add(url.hostname.toLowerCase().replace(/^www\./,""))}catch{}}
+        if(item.url){try{const url=new URL(String(item.url));if(url.protocol==="https:"&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/i.test(url.hostname))hosts.add(url.hostname.toLowerCase().replace(/^www\./,""))}catch(error){void recordRuntimeEventLimited(env,"candidate_source_url","invalid_candidate_source_url",error)}}
       }
       const substantive=cachedResults.filter(item=>String(item.summary||"").trim().length>=100).length;
       const localeSafe=cachedResults.every(item=>language==="ar"?hasArabic(item.title)&&hasArabic(item.summary):!hasArabic(item.title)&&!hasArabic(item.summary));
       if(cached&&cachedResults.length>=3&&hosts.size>=2&&substantive>=2&&localeSafe){
         let drafted:any=null;
         if(options.draft!==false){
-          try{drafted=await Promise.race([ask(env,q,language,cachedResults),new Promise(resolve=>setTimeout(()=>resolve(null),2500))])}catch{}
+          try{drafted=await Promise.race([ask(env,q,language,cachedResults),new Promise(resolve=>setTimeout(()=>resolve(null),2500))])}catch(error){await recordRuntimeEventLimited(env,"search_cache_draft","cached_answer_draft_failed",error)}
         }
         const status:SearchResponse["status"]=cached.status==="verified"?"verified":"mixed";
         return{query:q,locale:language,results:cachedResults,providers:["BAYAN verified search cache"],providerAttempted:["BAYAN verified search cache"],status,answer:drafted?.answer||undefined,answerStatus:drafted?.answer?(status==="verified"&&drafted.status==="verified"?"verified":"mixed"):undefined};
       }
-    }catch{}
+    }catch(error){await recordRuntimeEventLimited(env,"search_cache_read","cached_search_lookup_failed",error)}
   }
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const providerDiagnostics:string[]=[];const safe=async<T>(task:Promise<T>,fallback:T,provider="external provider"):Promise<T>=>{try{return await task}catch(error){reportProviderFailure(providerDiagnostics,provider,error);return fallback}};const academicQuery=/(research|paper|papers|study|studies|journal|doi|scholar|academic|citation|crossref|openalex|pubmed|clinical trial|systematic review|بحث علمي|أبحاث|دراسة|دراسات|مجلة علمية|ورقة بحثية|مصدر أكاديمي|دراسات سريرية|مراجعة منهجية)/i.test(q);
 const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|medicine|health study|بحث طبي|دراسة طبية|دراسات سريرية|تجربة سريرية|مراجعة منهجية)/i.test(q);
@@ -780,7 +781,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
       for(const src of item.sources||[]){
         const publisher=String(src.publisher||"").trim().toLowerCase();
         if(publisher&&!/wikipedia|wikidata|ويكيبيديا|ويكي بيانات|google news|bing news|duckduckgo/i.test(publisher))publishers.add(publisher);
-        try{const url=new URL(String(src.url||item.url||""));if(url.protocol==="https:"&&!/wikipedia.org|wikidata.org|news.google.com/i.test(url.hostname))hosts.add(url.hostname.toLowerCase().replace(/^www\./,""));}catch{}
+        try{const url=new URL(String(src.url||item.url||""));if(url.protocol==="https:"&&!/wikipedia.org|wikidata.org|news.google.com/i.test(url.hostname))hosts.add(url.hostname.toLowerCase().replace(/^www\./,""));}catch(error){void recordRuntimeEventLimited(env,"candidate_source_url","invalid_candidate_source_url",error)}
       }
     }
     const substantive=matching.filter(item=>String(item.summary||"").trim().length>=100).length;
@@ -900,7 +901,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   if(personQuery&&options.images!==false){
     const canonical=results.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
     if(canonical&&!safePublicImageUrl(canonical.imageUrl)){
-      const image=await Promise.race([findRelatedImage(String(canonical.title||q),String(canonical.url||canonical.sources?.[0]?.url||""),String(canonical.summary||"")),new Promise<undefined>(resolve=>setTimeout(()=>resolve(undefined),4500))]).catch(()=>undefined);
+      const image=await Promise.race([findRelatedImage(String(canonical.title||q),String(canonical.url||canonical.sources?.[0]?.url||""),String(canonical.summary||""),env),new Promise<undefined>(resolve=>setTimeout(()=>resolve(undefined),4500))]).catch(async error=>{await recordRuntimeEventLimited(env,"search_result_image","search_result_image_lookup_failed",error);return undefined});
       if(safePublicImageUrl(image)){canonical.imageUrl=safePublicImageUrl(image);canonical.imageAlt=String(canonical.title||q);}
     }
   }
@@ -917,7 +918,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
         const publisher=String(src.publisher||"").trim().toLowerCase();
         const url=String(src.url||item.url||"");
         let host="";
-        try{const parsed=new URL(url);if(parsed.protocol==="https:")host=parsed.hostname.toLowerCase().replace(/^www\./,"");}catch{}
+        try{const parsed=new URL(url);if(parsed.protocol==="https:")host=parsed.hostname.toLowerCase().replace(/^www\./,"");}catch(error){void recordRuntimeEventLimited(env,"candidate_source_url","invalid_candidate_source_url",error)}
         if(!host||/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com|news\.yahoo\.com/.test(host))continue;
         if(/wikipedia|wikidata|google news|bing news|duckduckgo|news aggregator|ويكيبيديا|ويكي بيانات/i.test(publisher))continue;
         publishers.add(publisher||host);
@@ -970,7 +971,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
             const sourceImage=results.find(item=>safePublicImageUrl(item.imageUrl)&&String(item.imageAlt||item.title||"").trim().length>0)?.imageUrl;
             let relatedImage:string|undefined;
             if(!sourceImage){
-              try{relatedImage=await findRelatedImage(articleTitle,undefined,articleSummary);}
+              try{relatedImage=await findRelatedImage(articleTitle,undefined,articleSummary,env);}
               catch(error){await recordPublicationWarning(env,publicationFailureReason(error));}
             }
             const imageCandidate=safePublicImageUrl(sourceImage)||safePublicImageUrl(relatedImage);const imageUrl=await resolvePublishedImageUrl(imageCandidate);
@@ -1000,7 +1001,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     }
   }
     const failedProviderNames=new Set([...providerDiagnostics,...providerAttempted].filter(item=>/(?:timeout|connection_failure|invalid_response|request_failure|http_\d{3})/i.test(item)).map(item=>item.split(":")[0]));const allExternalFailed=results.length===0&&failedProviderNames.size>=3;const message=results.length?undefined:allExternalFailed?(language==="ar"?"تعذر الاتصال بعدة مزودين للبحث الخارجي. سجّل بيان أسباب الفشل وأعاد المحاولة عبر المصادر البديلة؛ لم تُعرض نتائج غير موثوقة. حاول مجددًا بعد قليل.":"Several external search providers failed to respond. BAYAN recorded failure categories and attempted fallback sources; no unverified results were shown. Please retry shortly."):(language==="ar"?"لم تُرجع محاولات البحث المتاحة نتائج ذات صلة كافية. جرّب إضافة سياق أو كتابة الاسم الكامل أو استخدام صياغة أخرى؛ لن يعرض بيان نتائج غير مرتبطة لمجرد ملء الصفحة.":"The available search attempts did not return sufficiently relevant results. Add context, use the full name, or try another phrasing; BAYAN will not show unrelated results just to fill the page.");
-  providerAttempted.push(...providerDiagnostics.filter(item=>!providerAttempted.includes(item)));if(!options.healthCheck)try{await saveSearch(env,q,language,intent(q),status,results.length,classifySection(q,results,language),results)}catch{}
+  providerAttempted.push(...providerDiagnostics.filter(item=>!providerAttempted.includes(item)));if(!options.healthCheck)try{await saveSearch(env,q,language,intent(q),status,results.length,classifySection(q,results,language),results)}catch(error){await recordRuntimeEventLimited(env,"search_log_persistence","search_log_write_failed",error)}
   return {query:q,locale:language,results,providers,providerAttempted,status,message,answer,answerStatus,articleSlug:publishedSlug,publishReason,publishReasonDetail};
 }
 function intent(q:string){

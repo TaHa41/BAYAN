@@ -1,6 +1,6 @@
-import type {Env} from "../types";
+import type {Env} from "../types";import{recordRuntimeEventLimited}from"../runtime-events";
 const timeout=async(url:string,ms=5000)=>{const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);try{return await fetch(url,{signal:c.signal,headers:{accept:"application/json"}})}finally{clearTimeout(t)}};
-export async function weather(cityInput?:string){
+export async function weather(cityInput?:string,env?:Env){
   const city=String(cityInput||"Hurghada").trim().slice(0,100)||"Hurghada";
   try{
     const geo=await timeout("https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(city)+"&count=1&language=en&format=json",3500);
@@ -11,10 +11,10 @@ export async function weather(cityInput?:string){
     const r=await timeout(url,5000);if(!r.ok)throw new Error("weather_forecast");
     const d=await r.json<any>();
     return{ok:true,provider:"Open-Meteo",city:place.name,region:place.admin1||"",country:place.country||"",latitude:place.latitude,longitude:place.longitude,current:d.current,timezone:d.timezone,stale:false,updatedAt:new Date().toISOString()};
-  }catch{return{ok:false,provider:"Open-Meteo",stale:true,city,message:"Weather provider temporarily unavailable"}}
+  }catch(error){if(env)await recordRuntimeEventLimited(env,"weather_provider","weather_lookup_failed",error);return{ok:false,provider:"Open-Meteo",stale:true,city,message:"Weather provider temporarily unavailable"}}
 }
-export async function fx(){try{const r=await timeout("https://api.frankfurter.dev/v2/rates?base=USD&quotes=EGP,EUR,GBP,SAR,AED,KWD,QAR,BHD,OMR,JOD,TRY,JPY,CNY,CAD,AUD,CHF,INR,ILS,LYD,TND,MAD,ZAR");if(!r.ok)throw 0;const d=await r.json<any>();const rates=Array.isArray(d)?Object.fromEntries(d.map((x:any)=>[String(x.quote).toUpperCase(),Number(x.rate)])):d.rates;if(!rates?.EGP)throw new Error("fx_data");return{ok:true,provider:"Frankfurter v2",base:"USD",rates,updatedAt:new Date().toISOString(),stale:false}}catch{return{ok:false,provider:"Frankfurter",stale:true,message:"FX provider temporarily unavailable"}}}
-async function stooqQuote(symbol:string,stooqSymbol:string){
+export async function fx(env?:Env){try{const r=await timeout("https://api.frankfurter.dev/v2/rates?base=USD&quotes=EGP,EUR,GBP,SAR,AED,KWD,QAR,BHD,OMR,JOD,TRY,JPY,CNY,CAD,AUD,CHF,INR,ILS,LYD,TND,MAD,ZAR");if(!r.ok)throw 0;const d=await r.json<any>();const rates=Array.isArray(d)?Object.fromEntries(d.map((x:any)=>[String(x.quote).toUpperCase(),Number(x.rate)])):d.rates;if(!rates?.EGP)throw new Error("fx_data");return{ok:true,provider:"Frankfurter v2",base:"USD",rates,updatedAt:new Date().toISOString(),stale:false}}catch(error){if(env)await recordRuntimeEventLimited(env,"fx_provider","fx_lookup_failed",error);return{ok:false,provider:"Frankfurter",stale:true,message:"FX provider temporarily unavailable"}}}
+async function stooqQuote(symbol:string,stooqSymbol:string,env?:Env){
   try{
     const r=await timeout("https://stooq.com/q/l/?s="+encodeURIComponent(stooqSymbol)+"&i=d",3500);
     if(!r.ok)return null;
@@ -26,9 +26,9 @@ async function stooqQuote(symbol:string,stooqSymbol:string){
     const updatedAt=new Date(Date.UTC(year,month,day)).toISOString();
     if(Date.now()-Date.parse(updatedAt)>10*86400000)return null;
     return{symbol,price,currency:"USD",provider:"Stooq (daily close)",updatedAt,stale:true};
-  }catch{return null}
+  }catch(error){if(env)await recordRuntimeEventLimited(env,"market_stooq_provider","stooq_quote_failed",error);return null}
 }
-async function preciousMetalQuote(symbol:string,metal:"XAG"){
+async function preciousMetalQuote(symbol:string,metal:"XAG",env?:Env){
   try{
     const r=await timeout("https://api.gold-api.com/price/"+metal,3500);
     if(!r.ok)return null;
@@ -36,9 +36,9 @@ async function preciousMetalQuote(symbol:string,metal:"XAG"){
     if(!Number.isFinite(price)||price<=0)return null;
     const stamp=Date.parse(String(d?.updatedAt||d?.updated_at||d?.timestamp||""));
     return{symbol,price,currency:"USD",provider:"Gold API",updatedAt:Number.isFinite(stamp)?new Date(stamp).toISOString():new Date().toISOString(),stale:!Number.isFinite(stamp)};
-  }catch{return null}
+  }catch(error){if(env)await recordRuntimeEventLimited(env,"market_precious_metal_provider","precious_metal_quote_failed",error);return null}
 }
-async function cryptoQuote(symbol:string,id:string,pair:string){
+async function cryptoQuote(symbol:string,id:string,pair:string,env?:Env){
   const [coingecko,binance]=await Promise.all([
     (async()=>{try{
       const r=await timeout("https://api.coingecko.com/api/v3/simple/price?ids="+encodeURIComponent(id)+"&vs_currencies=usd&include_last_updated_at=true",3500);
@@ -46,18 +46,18 @@ async function cryptoQuote(symbol:string,id:string,pair:string){
       const d=await r.json<any>(),row=d?.[id],price=Number(row?.usd),stamp=Number(row?.last_updated_at);
       if(!Number.isFinite(price)||price<=0)return null;
       return{symbol,price,currency:"USD",provider:"CoinGecko",updatedAt:stamp?new Date(stamp*1000).toISOString():new Date().toISOString(),stale:!stamp};
-    }catch{return null}})(),
+    }catch(error){if(env)await recordRuntimeEventLimited(env,"market_crypto_provider","coingecko_quote_failed",error);return null}})(),
     (async()=>{try{
       const r=await timeout("https://api.binance.com/api/v3/ticker/price?symbol="+encodeURIComponent(pair),3500);
       if(!r.ok)return null;
       const d=await r.json<any>(),price=Number(d?.price);
       if(!Number.isFinite(price)||price<=0)return null;
       return{symbol,price,currency:"USDT",provider:"Binance",updatedAt:new Date().toISOString(),stale:true};
-    }catch{return null}})()
+    }catch(error){if(env)await recordRuntimeEventLimited(env,"market_crypto_provider","binance_quote_failed",error);return null}})()
   ]);
   return coingecko||binance;
 }
-async function marketQuote(symbol:string){
+async function marketQuote(symbol:string,env?:Env){
   const yahooHosts=["query1.finance.yahoo.com"]; // Avoid duplicate quote requests per symbol; fallback providers run only if needed.
   const yahoo=await Promise.all(yahooHosts.map(async host=>{
     try{
@@ -66,18 +66,18 @@ async function marketQuote(symbol:string){
       const d=await r.json<any>(),meta=d?.chart?.result?.[0]?.meta,price=Number(meta?.regularMarketPrice);
       if(!Number.isFinite(price)||price<=0)return null;
       return{symbol,price,currency:String(meta?.currency||"USD"),provider:"Yahoo Finance",updatedAt:meta?.regularMarketTime?new Date(Number(meta.regularMarketTime)*1000).toISOString():new Date().toISOString(),stale:false};
-    }catch{return null}
+    }catch(error){if(env)await recordRuntimeEventLimited(env,"market_yahoo_provider","yahoo_quote_failed",error);return null}
   }));
   const quote=yahoo.find(Boolean);
   if(quote)return quote;
-  if(symbol==="BTC-USD")return cryptoQuote(symbol,"bitcoin","BTCUSDT");
-  if(symbol==="ETH-USD")return cryptoQuote(symbol,"ethereum","ETHUSDT");
-  if(symbol==="SI=F")return (await preciousMetalQuote(symbol,"XAG"))||await stooqQuote(symbol,"si.f");
+  if(symbol==="BTC-USD")return cryptoQuote(symbol,"bitcoin","BTCUSDT",env);
+  if(symbol==="ETH-USD")return cryptoQuote(symbol,"ethereum","ETHUSDT",env);
+  if(symbol==="SI=F")return (await preciousMetalQuote(symbol,"XAG",env))||await stooqQuote(symbol,"si.f",env);
   const stooq:Record<string,string>={"CL=F":"cl.f","GC=F":"gc.f","^GSPC":"^spx","^IXIC":"^ndq"};
-  return stooq[symbol]?stooqQuote(symbol,stooq[symbol]):null;
+  return stooq[symbol]?stooqQuote(symbol,stooq[symbol],env):null;
 }
-async function extraMarkets(){
-  const quotes=await Promise.all([marketQuote("SI=F"),marketQuote("CL=F"),marketQuote("GC=F"),marketQuote("BTC-USD"),marketQuote("ETH-USD"),marketQuote("^GSPC"),marketQuote("^IXIC")]);
+async function extraMarkets(env?:Env){
+  const quotes=await Promise.all([marketQuote("SI=F",env),marketQuote("CL=F",env),marketQuote("GC=F",env),marketQuote("BTC-USD",env),marketQuote("ETH-USD",env),marketQuote("^GSPC",env),marketQuote("^IXIC",env)]);
   const names:Record<string,{ar:string;en:string;unit:string;unitAr:string;unitEn:string}>={"SI=F":{ar:"الفضة",en:"Silver",unit:"USD / troy ounce",unitAr:"دولار أمريكي / أونصة تروي",unitEn:"USD / troy ounce"},"CL=F":{ar:"النفط الخام",en:"Crude oil",unit:"USD / barrel",unitAr:"دولار أمريكي / برميل",unitEn:"USD / barrel"},"GC=F":{ar:"العقود الآجلة للذهب",en:"Gold futures",unit:"USD / troy ounce",unitAr:"دولار أمريكي / أونصة تروي",unitEn:"USD / troy ounce"},"BTC-USD":{ar:"بيتكوين",en:"Bitcoin",unit:"USD",unitAr:"دولار أمريكي",unitEn:"USD"},"ETH-USD":{ar:"إيثيريوم",en:"Ethereum",unit:"USD",unitAr:"دولار أمريكي",unitEn:"USD"},"^GSPC":{ar:"مؤشر S&P 500",en:"S&P 500",unit:"index points",unitAr:"نقطة مؤشر",unitEn:"index points"},"^IXIC":{ar:"مؤشر ناسداك المركب",en:"Nasdaq Composite",unit:"index points",unitAr:"نقطة مؤشر",unitEn:"index points"}};
   return quotes.filter(Boolean).map((q:any)=>({...q,...names[q.symbol]}));
 }
@@ -102,19 +102,19 @@ export async function gold(env:Env){
           ?Number(data?.["pax-gold"]?.usd)
           :Number(data?.symbols?.[0]?.price??data?.price);
       if(Number.isFinite(price)&&price>0){quote={name,price};break;}
-    }catch{}
+    }catch(error){await recordRuntimeEventLimited(env,"gold_quote_provider","gold_provider_failed",error)}
   }
   if(quote){
     try{
       const [fxResponse,markets]=await Promise.all([
         timeout("https://api.frankfurter.dev/v2/rates?base=USD&quotes=EGP",3500),
-        extraMarkets()
+        extraMarkets(env)
       ]);
       if(!fxResponse.ok)throw new Error("fx");
       const fxData=await fxResponse.json<any>(),egp=Number(fxData.rates?.EGP);
       if(!egp)throw new Error("fx_data");
       return{ok:true,provider:quote.name+" + Frankfurter",price:(quote.price/31.1034768)*egp,unit:"EGP/g (24K reference)",usdPerOunce:quote.price,fx:egp,markets,updatedAt:new Date().toISOString(),stale:false};
-    }catch{}
+    }catch(error){await recordRuntimeEventLimited(env,"gold_fx_conversion","gold_fx_conversion_failed",error)}
   }
   try{
     const response=await timeout("https://goldpriceo.com/egypt.html",3200);
@@ -123,15 +123,15 @@ export async function gold(env:Env){
       const match=html.match(/(?:عيار 24|24K)[^0-9]{0,120}([0-9][0-9,]*(?:\.[0-9]+)?)/i);
       const price=Number((match?.[1]||"").replace(/,/g,""));
       if(Number.isFinite(price)&&price>=1000&&price<=20000){
-        return{ok:true,provider:"GoldPriceO Egypt",price,unit:"EGP/g (24K reference)",markets:await extraMarkets(),updatedAt:new Date().toISOString(),stale:false};
+        return{ok:true,provider:"GoldPriceO Egypt",price,unit:"EGP/g (24K reference)",markets:await extraMarkets(env),updatedAt:new Date().toISOString(),stale:false};
       }
     }
-  }catch{}
+  }catch(error){await recordRuntimeEventLimited(env,"gold_fallback_provider","goldprice_fallback_failed",error)}
   // Do not start seven additional quote chains when the gold quote itself failed.
   return{ok:false,provider:"gold providers unavailable",stale:true,message:"Gold providers temporarily unavailable",markets:[]};
 }
 
-export async function prayerTimes(cityInput?:string,countryInput?:string){
+export async function prayerTimes(cityInput?:string,countryInput?:string,env?:Env){
  const city=String(cityInput||"Hurghada").trim().slice(0,100)||"Hurghada",country=String(countryInput||"Egypt").trim().slice(0,100)||"Egypt";
  try{
   let data:any=null,displayCity=city,displayCountry=country;
@@ -147,18 +147,18 @@ export async function prayerTimes(cityInput?:string,countryInput?:string){
      if(r.ok){const payload=await r.json<any>();if(payload?.code===200&&payload?.data?.timings&&payload?.data?.date?.hijri)data=payload.data;}
     }
    }
-  }catch{}
+  }catch(error){if(env)await recordRuntimeEventLimited(env,"prayer_geocoding","prayer_geocoding_failed",error)}
   if(!data){
    const r=await timeout("https://api.aladhan.com/v1/timingsByCity?city="+encodeURIComponent(city)+"&country="+encodeURIComponent(country)+"&method=5",6000);if(!r.ok)throw new Error("prayer_provider");
    const payload=await r.json<any>();if(payload?.code!==200||!payload?.data?.timings||!payload?.data?.date?.hijri)throw new Error("prayer_payload");data=payload.data;
   }
   const hijri=data.date.hijri;let ramadan:any=null,eidFitr:any=null,eidAdha:any=null;
   const hy=Number(hijri.year),hm=Number(hijri.month?.number||0),hd=Number(hijri.day||1),ry=hm>=9?hy+1:hy,fy=hm>=10?hy+1:hy,ay=hm===12&&hd>10?hy+1:hy;
-  const convert=async(date:string)=>{try{const r=await timeout("https://api.aladhan.com/v1/hToG/"+date,3500);if(!r.ok)return null;const p=await r.json<any>();return p?.code===200?p.data?.gregorian:null}catch{return null}};
+  const convert=async(date:string)=>{try{const r=await timeout("https://api.aladhan.com/v1/hToG/"+date,3500);if(!r.ok)return null;const p=await r.json<any>();return p?.code===200?p.data?.gregorian:null}catch(error){if(env)await recordRuntimeEventLimited(env,"prayer_hijri_conversion","hijri_date_conversion_failed",error);return null}};
   const [rd,fd,ad]=await Promise.all([convert("01-09-"+ry),convert("01-10-"+fy),convert("10-12-"+ay)]);
   if(rd)ramadan={date:rd.date,readable:rd.date,hijriYear:ry,certainty:"calculated_estimate"};
   if(fd)eidFitr={date:fd.date,readable:fd.date,certainty:"calculated_estimate",prayerTime:null};
   if(ad)eidAdha={date:ad.date,readable:ad.date,certainty:"calculated_estimate",prayerTime:null};
   return{ok:true,provider:"AlAdhan",city:displayCity,country:displayCountry,timezone:data.meta?.timezone||"",gregorian:data.date?.gregorian,hijri:{day:hijri.day,month:hijri.month?.en,monthAr:hijri.month?.ar,year:hijri.year,designation:hijri.designation?.abbreviated},timings:{Fajr:data.timings.Fajr,Sunrise:data.timings.Sunrise,Dhuhr:data.timings.Dhuhr,Asr:data.timings.Asr,Maghrib:data.timings.Maghrib,Isha:data.timings.Isha},events:{ramadan,eidFitr,eidAdha},eidPrayerNotice:"Eid prayer time is announced locally by the relevant religious authority; no unverified time is shown.",updatedAt:new Date().toISOString(),stale:false};
- }catch{return{ok:false,provider:"AlAdhan",city,country,stale:true,message:"Prayer times are temporarily unavailable"}}
+ }catch(error){if(env)await recordRuntimeEventLimited(env,"prayer_provider","prayer_times_lookup_failed",error);return{ok:false,provider:"AlAdhan",city,country,stale:true,message:"Prayer times are temporarily unavailable"}}
 }
