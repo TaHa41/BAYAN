@@ -1,6 +1,6 @@
 import type{Env,Locale,SearchResult}from"../types";
 const aiFailureDetail=(error:unknown)=>String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
-async function recordAiFailure(env:Env,provider:string,detail:string){try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","ai_generation",(provider+": "+detail).replace(/https?:\/\/[^\s]+/g,"[url]").slice(0,350),new Date().toISOString()).run()}catch{}}
+async function recordAiFailure(env:Env,provider:string,detail:string){await recordRuntimeEventLimited(env,"ai_generation","ai_provider_failure",provider+": "+detail);}
 
 const languageConsistent=(answer:string,locale:Locale)=>{
   if(!answer.trim())return false;
