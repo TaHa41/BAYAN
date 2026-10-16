@@ -1,6 +1,7 @@
 import{resolvePublishedImageUrl,safePublicImageUrl}from"../image-url";
 import type {Env,Locale,SearchResponse,SearchResult,Source} from "../types";
 import {searchArticles,saveSearch,publishVerifiedResearch} from "../db";
+import {boundedLikeKeywords,escapedLikePattern} from "../search-patterns";
 import {ask,draftArticle} from "./ai";
 import {findRelatedImage,searchNewsFeed} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
@@ -656,10 +657,13 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   const cutoff=new Date(Date.now()-7*24*60*60*1000).toISOString();
   const future=new Date(Date.now()+5*60*1000).toISOString();
   try{
-    const terms=[...new Set([...searchTerms(q).slice(0,3),...(publicationContext?searchTerms(publicationContext).slice(0,4):[])])].slice(0,6);
+    const requestedTerms=[...new Set([...searchTerms(q).slice(0,3),...(publicationContext?searchTerms(publicationContext).slice(0,4):[])])];
+    // A title/query can contain a single oversized token. Split by UTF-8 byte
+    // length and escape LIKE metacharacters; never pass a full title as pattern.
+    const terms=boundedLikeKeywords(requestedTerms,6);
     if(!terms.length)return[];
-    const predicates=terms.map(()=>"(title LIKE ? OR summary LIKE ?)").join(" OR ");
-    const patterns=terms.flatMap(term=>["%"+term+"%","%"+term+"%"]);
+    const predicates=terms.map(()=>"(title LIKE ? ESCAPE '!' OR summary LIKE ? ESCAPE '!')").join(" OR ");
+    const patterns=terms.flatMap(term=>[escapedLikePattern(term),escapedLikePattern(term)]);
     const response=await env.DB.prepare("SELECT title,summary,url,publisher,published_at,image_url,image_alt,section FROM news_archive WHERE language=? AND fetched_at>=? AND published_at>=? AND published_at<=? AND length(summary)>=80 AND ("+predicates+") ORDER BY fetched_at DESC LIMIT 60").bind(language,cutoff,cutoff,future,...patterns).all<any>();
     const output:Candidate[]=[];
     const seenPublishers=new Set<string>();
