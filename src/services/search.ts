@@ -332,7 +332,7 @@ async function gdeltNewsSearch(q:string,language:Locale,diagnostics?:string[]):P
       let parsed:URL;try{parsed=new URL(articleUrl)}catch{continue}
       if(parsed.protocol!=="https:"||/gdeltproject\.org|google\.com|bing\.com|facebook\.com/i.test(parsed.hostname))continue;
       const publisher=cleanText(String(article?.domain||parsed.hostname).replace(/^www\./i,"")).slice(0,120);
-      out.push({title,summary:"",section:"world",kind:"news",evidence:"mixed",sources:[source(title,publisher,parsed.href)],url:parsed.href,score:scoreSource(publisher,title,q)+8,provider:"GDELT News Search"});
+      out.push({title,summary:"",section:"world",kind:"web",evidence:"mixed",sources:[source(title,publisher,parsed.href)],url:parsed.href,score:scoreSource(publisher,title,q)+8,provider:"GDELT News Search"});
       if(out.length>=8)break;
     }
     return out;
