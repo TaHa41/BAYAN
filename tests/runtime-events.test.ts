@@ -12,9 +12,10 @@ describe("rate-limited runtime event logging", () => {
       DB: {
         prepare(sql: string) {
           expect(sql).toContain("INSERT INTO runtime_events");
+          expect(sql).toContain("WHERE NOT EXISTS");
           return {
             bind(...args: unknown[]) {
-              return { run: async () => { writes.push(args); } };
+              return { run: async () => { writes.push(args); return { meta: { changes: 1 } }; } };
             }
           };
         }
@@ -51,7 +52,7 @@ describe("rate-limited runtime event logging", () => {
           return {
             bind(_level: unknown, _kind: unknown, message: string) {
               savedMessage = message;
-              return { run: async () => undefined };
+              return { run: async () => ({ meta: { changes: 1 } }) };
             }
           };
         }
