@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS news_archive (
   title TEXT NOT NULL, summary TEXT NOT NULL DEFAULT '', publisher TEXT NOT NULL DEFAULT '',
   published_at TEXT, image_url TEXT, image_alt TEXT, section TEXT NOT NULL DEFAULT 'news',
   fetched_at TEXT NOT NULL, article_slug TEXT, article_attempts INTEGER NOT NULL DEFAULT 0,
-  article_last_attempt_at TEXT, article_last_reason TEXT,
+  article_last_attempt_at TEXT, article_last_reason TEXT, article_last_detail TEXT,
   UNIQUE(url,language)
 );
 CREATE INDEX IF NOT EXISTS idx_news_archive_language_published ON news_archive(language,published_at DESC);
