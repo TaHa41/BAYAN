@@ -12,12 +12,19 @@ const languageConsistent=(answer:string,locale:Locale)=>{
   return sentences.every(sentence=>/[\u0600-\u06ff]/.test(sentence)||!/[A-Za-z]{5,}/.test(sentence));
 };
 export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[],question="")=>{
-  const generic=new Set(["the","this","these","those","according","based","however","therefore","overall","summary","conclusion","answer","key","main","important","first","second","third","one","two","three","it","they","he","she","we","you","and","but","because","during","after","before","global","world","health","history","science","technology","economy","politics","sports","travel","art","bayan","من","هو","هي","ما","ماذا","كيف","متى","أين","اين","لماذا","هل","عن","حول","آخر","اخر","أخبار","اخبار","ماهو","ماهي","ماهي","مع","في","إلى","الى","من","the","what","who","when","where","why","how","does","did","is","are","was","were","current","club","player","play","about","explain","tell","me","latest","news"]);
+  const generic=new Set(["the","this","these","those","according","based","however","therefore","overall","summary","conclusion","answer","key","main","important","first","second","third","one","two","three","it","they","he","she","we","you","and","but","because","during","after","before","global","world","health","history","science","technology","economy","politics","sports","travel","art","bayan","من","هو","هي","ما","ماذا","كيف","متى","أين","اين","لماذا","هل","عن","حول","آخر","اخر","أخبار","اخبار","ماهو","ماهي","مع","في","إلى","الى","what","who","when","where","why","how","does","did","is","are","was","were","current","club","player","play","about","explain","tell","me","latest","news"]);
   const normalizeDigits=(value:string)=>value.replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[٬,]/g,"");
   const cleanAnswer=answer.replace(/^\s*\d+[.)]\s/gm,"");
   const sentences=cleanAnswer.split(/[\n.!؟?]+/).map(sentence=>sentence.trim()).filter(Boolean);
   const questionTokens=(question.normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]+/gu)||[]).filter(token=>!generic.has(token));
   const subjectTokens=questionTokens.length>=2?questionTokens.slice(0,4):[];
+  // Build one corpus for support checks: a sentence may synthesize separate
+  // facts from different evidence records, but every specific must still occur
+  // in at least one supplied record. This removes false rejection without
+  // allowing unsupported names or numbers.
+  const corpus=evidence.map(item=>[item.title,item.summary,...(item.sources||[]).flatMap(source=>[source.title,source.publisher])].filter(Boolean).join(" ")).join(" ").normalize("NFKC").toLowerCase();
+  const corpusTokens=new Set(corpus.match(/[\p{L}\p{N}&.-]+/gu)||[]);
+  const corpusNumbers=new Set(normalizeDigits(corpus).match(/[0-9]+/g)||[]);
   const arabicEntityPatterns=[
     /(?:نادي|فريق|الفريق|المنتخب|المدرب|المغني|المغنية|المطرب|المطربة|الممثل|الممثلة|الفنان|الفنانة|الكاتب|الكاتبة|المؤلف|المؤلفة|الروائي|الروائية)\s+([\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){0,1})/g,
     /(?:يلعب(?:\s+حاليًا)?\s+مع|انتقل(?:ت)?\s+إلى|انضم(?:ت)?\s+إلى|تعاقد\s+مع)\s+(?:نادي\s+|فريق\s+)?([\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){0,1})/g
@@ -36,16 +43,11 @@ export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[
       }
     }
     if(!names.length&&!numbers.length&&!arabicEntities.length)return false;
-    return !evidence.some(item=>{
-      const itemText=[item.title,item.summary,...(item.sources||[]).flatMap(source=>[source.title,source.publisher])].filter(Boolean).join(" ").normalize("NFKC").toLowerCase();
-      const itemTokens=new Set(itemText.match(/[\p{L}\p{N}&.-]+/gu)||[]);
-      const itemNumbers=new Set(normalizeDigits(itemText).match(/[0-9]+/g)||[]);
-      const namesSupported=names.every(name=>itemTokens.has(name.toLowerCase()));
-      const numbersSupported=numbers.every(number=>itemNumbers.has(number));
-      const subjectSupported=!arabicEntities.length||!subjectTokens.length||subjectTokens.every(token=>itemTokens.has(token));
-      const arabicEntitiesSupported=arabicEntities.every(entity=>entity.hasAlias||entity.phrase.split(/\s+/).every(token=>itemTokens.has(token.toLowerCase())));
-      return namesSupported&&numbersSupported&&subjectSupported&&arabicEntitiesSupported;
-    });
+    const namesSupported=names.every(name=>corpusTokens.has(name.toLowerCase()));
+    const numbersSupported=numbers.every(number=>corpusNumbers.has(number));
+    const subjectSupported=!subjectTokens.length||subjectTokens.every(token=>corpusTokens.has(token));
+    const arabicEntitiesSupported=arabicEntities.every(entity=>entity.hasAlias||entity.phrase.split(/\s+/).every(token=>corpusTokens.has(token.toLowerCase())));
+    return !(namesSupported&&numbersSupported&&subjectSupported&&arabicEntitiesSupported);
   });
 };
 const independentSourceCount=(env:Env,evidence:SearchResult[])=>new Set(evidence.flatMap(item=>item.sources||[]).map(source=>{
