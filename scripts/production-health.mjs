@@ -8,4 +8,12 @@ if(data.ok!==true||data.database!==true||!data.checkedAt)throw new Error("health
 for(const [name,value] of [["x-content-type-options","nosniff"],["x-frame-options","DENY"],["referrer-policy","strict-origin-when-cross-origin"]]){
   if(response.headers.get(name)!==value)throw new Error("health endpoint missing security header "+name);
 }
-console.log("BAYAN post-deploy health passed; database readiness and security headers confirmed.");
+const sitemapResponse=await fetch(origin+"/news-sitemap.xml",{headers:{accept:"application/xml"},signal:AbortSignal.timeout(12000)});
+if(!sitemapResponse.ok)throw new Error("news sitemap returned HTTP "+sitemapResponse.status);
+const sitemapXml=await sitemapResponse.text();
+const sitemapCount=[...sitemapXml.matchAll(/<loc>(.*?)<\/loc>/g)].length;
+const archiveReady=Number(sitemapResponse.headers.get("x-bayan-news-sitemap-archive-ready-for-drafting-count")||0);
+const eligible=Number(sitemapResponse.headers.get("x-bayan-news-sitemap-eligible-count")||0);
+console.log("BAYAN news publication health "+JSON.stringify({sitemapCount,archiveReady,eligible}));
+if(sitemapCount===0&&archiveReady>0)throw new Error("news_publication_gap: archive has "+archiveReady+" candidates ready for article drafting but the news sitemap contains no published articles");
+console.log("BAYAN post-deploy health passed; database readiness, security headers and news publication coverage confirmed.");
