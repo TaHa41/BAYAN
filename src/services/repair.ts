@@ -269,7 +269,25 @@ async function sectionHealth(env:Env){
   return CONTENT_SECTIONS.flatMap(section=>["ar","en"].filter(language=>(counts.get(section+"_"+language)||0)<2).map(language=>section+"_"+language+"="+(counts.get(section+"_"+language)||0)+"/2_complete"));
 }
 
-async function resolveVerifiedLegacyJobs(env:Env){try{await env.DB.prepare("UPDATE repair_jobs SET status='RESOLVED',diagnosis=COALESCE(diagnosis,'')||' | Closed as historical after current runtime checks passed',action='No runtime mutation required; current runtime checks passed; historical signature not reproduced',verification='verified_in_current_release',updated_at=? WHERE status='WAITING_AI' AND (signature LIKE '%generated is not defined%' OR signature LIKE '%resolveWikimediaEditorialImage is not defined%' OR signature LIKE '%manual Telegram diagnostic report%' OR signature LIKE '%predictive runtime degradation: /search%')").bind(now()).run()}catch{}}
+async function resolveVerifiedLegacyJobs(env:Env){
+  try{
+    const info=await env.DB.prepare("PRAGMA table_info(repair_jobs)").all<any>();
+    const columns=new Set((info.results||[]).map((column:any)=>String(column.name)));
+    const actionColumn=columns.has("last_action")?"last_action":columns.has("action")?"action":undefined;
+    const verificationColumn=columns.has("verification_json")?"verification_json":columns.has("verification")?"verification":undefined;
+    const stamp=now();
+    const assignments=["status='RESOLVED'","diagnosis=COALESCE(diagnosis,'')||' | Closed as historical after current runtime checks passed'","updated_at=?"];
+    const values:any[]=[stamp];
+    if(actionColumn){assignments.push(actionColumn+"=?");values.push("No runtime mutation required; current runtime checks passed; historical signature not reproduced");}
+    if(verificationColumn){assignments.push(verificationColumn+"=?");values.push(verificationColumn==="verification_json"?JSON.stringify({status:"verified_in_current_release",verifiedAt:stamp,method:"current runtime checks; historical signature not reproduced"}):"verified_in_current_release");}
+    if(columns.has("resolved_at")){assignments.push("resolved_at=COALESCE(resolved_at,?)");values.push(stamp);}
+    if(columns.has("last_verified_at")){assignments.push("last_verified_at=?");values.push(stamp);}
+    const result=await env.DB.prepare("UPDATE repair_jobs SET "+assignments.join(",")+" WHERE status='WAITING_AI' AND (signature LIKE '%generated is not defined%' OR signature LIKE '%resolveWikimediaEditorialImage is not defined%' OR signature LIKE '%manual Telegram diagnostic report%' OR signature LIKE '%predictive runtime degradation: /search%')").bind(...values).run();
+    await record(env,"info","legacy_job_cleanup","Resolved stale legacy repair jobs; changed="+Number(result.meta?.changes||0));
+  }catch(error){
+    await record(env,"warn","legacy_job_cleanup","Could not resolve stale legacy repair jobs: "+String(error).replace(/https?:\/\/[^\s]+/g,"[url]").slice(0,350));
+  }
+}
 
 export async function selfHeal(env:Env){
   const checks:[string,()=>Promise<boolean>][]=[
