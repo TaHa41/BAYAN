@@ -502,7 +502,7 @@ const personLookup=(q:string)=>{
   // explicitly asks "من هو/من هي", avoiding the restrictive person-only filter.
   return /^[A-Z][a-z]+(?:[ '-]+[A-Z][a-z]+){1,3}$/.test(raw);
 };
-async function expandedSearch(env:Env,q:string,language:Locale,person=false,identitySummary="",diagnostics:string[]=[],identityAliases:string[]=[]):Promise<Candidate[]>{
+async function expandedSearch(env:Env,q:string,language:Locale,person=false,identitySummary="",diagnostics:string[]=[],identityAliases:string[]=[],publicationResearch=false):Promise<Candidate[]>{
   // Recovery uses distinct query formulations, not just the same phrase with a suffix.
   // Keep the fan-out bounded so broader recall does not create unbounded latency/subrequests.
   const normalized=q.normalize("NFKC").replace(/[\u064B-\u065F\u0670]/g,"").replace(/[“”‘’]/g,'"').replace(/[؟?!،,;；]+/g," ").replace(/\s+/g," ").trim();
@@ -529,7 +529,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   // Run the first variant alone, then fan out remaining bounded variants only
   // when evidence is still sparse. This avoids unnecessary provider load while
   // keeping the worst-case recovery window short enough for the browser request.
-  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,2);
+  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,publicationResearch?2:1);
   const labels=["Wikipedia REST Search","Google News Search","Bing Web RSS Search"];
   const runVariant=async(variant:string,variantIndex:number):Promise<Candidate[]>=>{
     // GDELT repeatedly timed out in production and amplified request fan-out.
@@ -802,7 +802,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   }
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
     providerAttempted.push("Expanded topic variants: Wikipedia REST Search, Google News Search, Bing Web RSS Search","OpenAI Web Search (fallback)");
-    const expanded=await safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||""),providerAttempted,identityAliases),[]);
+    const expanded=await safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||""),providerAttempted,identityAliases,options.images===true),[]);
     candidates.push(...expanded.slice(0,12));
     // OpenAI web search is the final recovery path, not a parallel request on
     // every weak first pass. Skip it as soon as independent evidence is adequate.
