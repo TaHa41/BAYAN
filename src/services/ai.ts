@@ -48,8 +48,8 @@ export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[
     });
   });
 };
-const independentSourceCount=(evidence:SearchResult[])=>new Set(evidence.flatMap(item=>item.sources||[]).map(source=>{
-  try{const host=new URL(String(source.url||"")).hostname.toLowerCase().replace(/^www\./,"");if(host)return host}catch{}
+const independentSourceCount=(env:Env,evidence:SearchResult[])=>new Set(evidence.flatMap(item=>item.sources||[]).map(source=>{
+  try{const host=new URL(String(source.url||"")).hostname.toLowerCase().replace(/^www\\./,"");if(host)return host}catch(error){void recordRuntimeEventLimited(env,"ai_source_url","invalid_evidence_source_url",error)}
   return String(source.publisher||"").trim().toLowerCase();
 }).filter(Boolean)).size;
 
@@ -71,7 +71,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
     if(response.ok){
       const data=await response.json<any>();
       const answer=String(data.choices?.[0]?.message?.content||"").trim();
-      if(answer&&languageConsistent(answer,locale))return{status:independentSourceCount(evidence)>=2&&!answerHasUnsupportedSpecifics(answer,evidence,question)?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(item=>item.sources||[])};
+      if(answer&&languageConsistent(answer,locale))return{status:independentSourceCount(env,evidence)>=2&&!answerHasUnsupportedSpecifics(answer,evidence,question)?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(item=>item.sources||[])};
       await recordAiFailure(env,"OpenAI draft",answer?"language_mismatch":"empty_response");
     }else await recordAiFailure(env,"OpenAI draft","http_"+response.status);
   }catch(error){await recordAiFailure(env,"OpenAI draft",aiFailureDetail(error));}
