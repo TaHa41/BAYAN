@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { boundedLikeKeywords, escapedLikePattern, MAX_LIKE_KEYWORD_UTF8_BYTES, utf8ByteLength } from "../src/search-patterns";
 import { searchRecentNewsArchive } from "../src/services/search";
+import { searchArticles } from "../src/db";
 
 describe("bounded LIKE search patterns", () => {
   it("keeps long Arabic and English keyword patterns under SQLite's byte limit", () => {
@@ -70,4 +71,32 @@ describe("bounded LIKE search patterns", () => {
     } as any;
     await expect(searchRecentNewsArchive(env, "long title", "en")).rejects.toThrow("LIKE or GLOB pattern too complex");
   });
+  it.each([
+    ["ar", "م".repeat(90) + "ن".repeat(90)],
+    ["en", "supercalifragilisticexpialidocious".repeat(4)]
+  ] as const)("returns internal knowledge-base results for a very long %s query without oversized LIKE patterns", async (language, title) => {
+    let capturedSql = "";
+    let capturedBindings: unknown[] = [];
+    const env = {
+      DB: {
+        prepare(sql: string) {
+          capturedSql = sql;
+          return {
+            bind(...args: unknown[]) {
+              capturedBindings = args;
+              return { all: async () => ({ results: [{ title, summary: "A matching knowledge article", section: "science", slug: "matching-article", sources_json: "[]" }] }) };
+            }
+          };
+        }
+      }
+    } as any;
+    const results = await searchArticles(env, title, language);
+    expect(results).toHaveLength(1);
+    expect(results[0].title).toBe(title);
+    expect(capturedSql).toContain("title LIKE ? ESCAPE '!'");
+    const patterns = capturedBindings.slice(1, -1) as string[];
+    expect(patterns.length).toBeGreaterThan(0);
+    for (const pattern of patterns) expect(utf8ByteLength(pattern)).toBeLessThanOrEqual(MAX_LIKE_KEYWORD_UTF8_BYTES + 2);
+  });
+
 });
