@@ -33,6 +33,8 @@ export async function publishNextArchivedNewsArticle(env:Env){
       const attempts=Array.isArray(result.providerAttempted)?result.providerAttempted.map((value:any)=>String(value)):[];
       const expandedSearchAttempted=attempts.some((value:string)=>value.includes("Expanded topic variants")||value.includes("Expanded variant "));
       const providerFailures=attempts.filter((value:string)=>/timeout|failed|unavailable|HTTP [45][0-9]{2}/i.test(value)).map((value:string)=>value.split(" ").slice(0,3).join(" ")).slice(0,3);
+      const providerDiagnostic=attempts.slice(-8).map((value:string)=>value.replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").replace(/\s+/g," ").slice(0,100)).join(" | ").slice(0,350);
+      if(providerDiagnostic)await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","news_archive_provider_diagnostics",providerDiagnostic,new Date().toISOString()).run().catch(()=>undefined);
       const publishReason=String(result.publishReason||"publish_rejected").slice(0,350);
       await env.DB.prepare("UPDATE news_archive SET article_last_reason=? WHERE id=?").bind(publishReason,id).run();
       return{status:"attempted_no_publish" as const,id,language,searchStatus:result.status,publishReason,resultCount:Array.isArray(result.results)?result.results.length:0,sourceCount:new Set(sourceRecords.map((source:any)=>String(source.url||"").trim()).filter(Boolean)).size,independentPublisherCount,independentHostCount,expandedSearchAttempted,providerFailures,providers:Array.isArray(result.providers)?result.providers.slice(0,4):[]};
