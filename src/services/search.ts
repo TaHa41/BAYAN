@@ -932,7 +932,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   const exactPersonConfirmed=!personQuery||results.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
   if(options.publish!==false&&independentlyVerified&&!exactPersonConfirmed)publishReason="draft_not_verified";
   if(options.publish!==false&&options.draft===false)publishReason="draft_not_verified";
-  if(results.length&&exactPersonConfirmed&&options.draft!==false){
+  if(results.length&&exactPersonConfirmed&&options.draft!==false&&!(options.publicationContext!==undefined&&options.publish!==false&&!independentlyVerified)){
     try{
       const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:"",reason:"ai_unavailable"}),7500))]);
       if("reason" in drafted&&drafted.reason==="ai_unavailable"&&options.publish!==false)publishReason="ai_unavailable";
