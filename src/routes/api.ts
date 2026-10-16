@@ -126,8 +126,8 @@ const persistOpenedNewsArticle=async(env:Env,article:{title:string;summary:strin
   const imageFromEvidence=sources.some(s=>String(s.imageUrl||"").trim()===image);
   if(!/^https:\/\//i.test(image)||!imageFromEvidence){
    const firstSource=sources.find(s=>/^https:\/\//i.test(String(s.url||"")));
-   image=await bounded(findRelatedImage(title,firstSource?.url),3500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","initial_image_lookup_failed",error);return undefined})||"";
-   if(!/^https:\/\//i.test(image))image=await bounded(findRelatedImage(title+" "+summary.slice(0,180)),3500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","summary_image_lookup_failed",error);return undefined})||"";
+   image=await bounded(findRelatedImage(title,firstSource?.url,"",env),3500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","initial_image_lookup_failed",error);return undefined})||"";
+   if(!/^https:\/\//i.test(image))image=await bounded(findRelatedImage(title+" "+summary.slice(0,180),"","",env),3500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","summary_image_lookup_failed",error);return undefined})||"";
   }
   if(!/^https:\/\//i.test(image))return null;
   return await publishVerifiedResearch(env,{title,summary,body:normalizedBody.body,section:editorialSectionForOpenedStory(title,summary),language:lang,sources,imageUrl:image,imageAlt:title});
@@ -175,7 +175,7 @@ export async function api(request:Request,env:Env,ctx?:ExecutionContext){const u
     if(!found.results.length&&(summary||storyUrl)){
       const safeUrl=storyUrl.startsWith("https://")?storyUrl:"";
       const sourceSummary=(lang==="ar"?/[؀-ۿ]/.test(summary):!/[؀-ۿ]/.test(summary))?summary:"";
-      if(!image&&safeUrl){image=await bounded(findRelatedImage(title,safeUrl,sourceSummary),2200).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","safe_url_image_lookup_failed",error);return undefined})||"";}
+      if(!image&&safeUrl){image=await bounded(findRelatedImage(title,safeUrl,sourceSummary,env),2200).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","safe_url_image_lookup_failed",error);return undefined})||"";}
       const sources=safeUrl?[{title,publisher:publisher||(lang==="ar"?"مصدر إخباري":"News source"),url:safeUrl,publishedAt,imageUrl:image||undefined} as Source]:[];
       const article={title,summary:sourceSummary||title,body:sourceSummary||title,sources,image:image||null,status:"source_only",providerCount:sources.length?1:0,publishedAt};
       return json({ok:true,article:{...article,section:editorialSectionForOpenedStory(title,article.summary)}});
@@ -184,7 +184,7 @@ export async function api(request:Request,env:Env,ctx?:ExecutionContext){const u
       const live=await bounded(news(env,lang),7000);
       const story=live.items?.find((x:any)=>String(x.title).trim()===title.trim())||live.items?.find((x:any)=>String(x.title).includes(title.slice(0,80)));
       if(!story)return json({error:"article_source_unavailable",status:"insufficient"},503);
-      if(!image)image=story.imageUrl||await bounded(findRelatedImage(story.title||title),3500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","story_image_lookup_failed",error);return undefined})||"";
+      if(!image)image=story.imageUrl||await bounded(findRelatedImage(story.title||title,"","",env),3500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","story_image_lookup_failed",error);return undefined})||"";
       const article={title:story.title,summary:story.summary||"",body:story.summary||story.title,sources:story.sources||[],image:image||null,status:"source_only",providerCount:1,publishedAt:story.publishedAt};const savedSlug=await persistOpenedNewsArticle(env,article,lang);return json({ok:true,article:{...article,section:editorialSectionForOpenedStory(story.title,story.summary||""),savedSlug}});
     }
     // Enrich short snippets with readable text from a few independent, allow-listed source pages.
@@ -228,13 +228,13 @@ export async function api(request:Request,env:Env,ctx?:ExecutionContext){const u
       const referenceSummary=sourceExcerpt(String(referenceCandidate?.summary||summary||""),1000);
       const referenceTitle=String(referenceCandidate?.title||title).trim().slice(0,500);
       if(referenceCandidate&&referenceSummary){
-        if(!image)image=String(referenceCandidate.imageUrl||"")||await bounded(findRelatedImage(referenceTitle,referenceCandidate.url,referenceSummary),2500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","reference_image_lookup_failed",error);return undefined})||"";
+        if(!image)image=String(referenceCandidate.imageUrl||"")||await bounded(findRelatedImage(referenceTitle,referenceCandidate.url,referenceSummary,env),2500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","reference_image_lookup_failed",error);return undefined})||"";
         return json({ok:true,article:{title:referenceTitle,summary:referenceSummary,body:referenceSummary,sources:referenceSources,image:image||null,status:"source_only",providerCount:referenceSources.length,section:editorialSectionForOpenedStory(referenceTitle,referenceSummary),publishedAt}});
       }
       return json({error:"article_evidence_insufficient",status:"insufficient",message:lang==="ar"?"لم تتوفر مصادر مستقلة كافية لإعداد مقال موثق.":"There were not enough independent sources to prepare a verified article."},422);
     }
     const articleBody=generatedBody;
-    const sources=evidenceSources.slice(0,12);const exactSubject=found.results.find((x:any)=>identityNormalized(String(x.title||""))===identityNormalized(title));if(!image)image=exactSubject?.imageUrl||exactSubject?.sources?.find((source:any)=>/^https:\/\//i.test(String(source.imageUrl||"")) )?.imageUrl||found.results.find((x:any)=>/^https:\/\//i.test(String(x.imageUrl||"")) )?.imageUrl||sources.find((source:any)=>/^https:\/\//i.test(String(source.imageUrl||"")) )?.imageUrl||await bounded(findRelatedImage(title,exactSubject?.url||exactSubject?.sources?.[0]?.url,found.results[0]?.summary||""),3500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","verified_article_image_lookup_failed",error);return undefined})||"";
+    const sources=evidenceSources.slice(0,12);const exactSubject=found.results.find((x:any)=>identityNormalized(String(x.title||""))===identityNormalized(title));if(!image)image=exactSubject?.imageUrl||exactSubject?.sources?.find((source:any)=>/^https:\/\//i.test(String(source.imageUrl||"")) )?.imageUrl||found.results.find((x:any)=>/^https:\/\//i.test(String(x.imageUrl||"")) )?.imageUrl||sources.find((source:any)=>/^https:\/\//i.test(String(source.imageUrl||"")) )?.imageUrl||await bounded(findRelatedImage(title,exactSubject?.url||exactSubject?.sources?.[0]?.url,found.results[0]?.summary||"",env),3500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","verified_article_image_lookup_failed",error);return undefined})||"";
     const article={title,summary:found.results[0]?.summary||"",body:articleBody,sources,image:image||null,status:hasFullAnalysis?generated.status:"source_only",providerCount:new Set(sources.map((s:any)=>s.publisher).filter(Boolean)).size};const savedSlug=await persistOpenedNewsArticle(env,article,lang);return json({ok:true,article:{...article,section:editorialSectionForOpenedStory(title,article.summary),savedSlug}});
   }catch(error){await track(env,vid,"news_article_error","/news",lang);return json({error:"news_article_failed",status:"unavailable"},502)}
 }if(u.pathname==="/api/news/archive"){
