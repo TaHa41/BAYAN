@@ -212,7 +212,7 @@ async function repairRuntime(env:Env,failures:string[]){
       const items:any[]=Array.isArray(parsed)?parsed:(Array.isArray(parsed?.items)?parsed.items:[]);
       let changed=false;
       for(const item of items.filter((entry:any)=>!String(entry.imageUrl||"").trim()&&String(entry.title||"").trim()).slice(0,3)){
-        const url=await findRelatedImage(String(item.title||""),String(item.url||""));
+        const url=await findRelatedImage(String(item.title||""),String(item.url||""),"",env);
         if(url){item.imageUrl=url;item.imageAlt=String(item.title||"");filledNews++;changed=true}else await record(env,"warn","image_repair_news_no_match","No topic-matched image found for cached "+language+" story: "+String(item.title||"").slice(0,180))
       }
       if(changed&&Array.isArray(parsed))await env.DB.prepare("UPDATE news_cache SET payload=?,updated_at=? WHERE language=?").bind(JSON.stringify(items.slice(0,40)),now(),language).run();
