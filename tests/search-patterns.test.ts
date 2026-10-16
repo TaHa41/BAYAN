@@ -55,7 +55,19 @@ describe("bounded LIKE search patterns", () => {
   });
 
   it("surfaces an internal provider query failure so the caller can record it and continue with other providers", async () => {
-    const env = { DB: { prepare() { return { bind() { return { all: async () => { throw new Error("LIKE or GLOB pattern too complex"); } }; } } } } as any;
+    const env = {
+      DB: {
+        prepare() {
+          return {
+            bind() {
+              return {
+                all: async () => { throw new Error("LIKE or GLOB pattern too complex"); }
+              };
+            }
+          };
+        }
+      }
+    } as any;
     await expect(searchRecentNewsArchive(env, "long title", "en")).rejects.toThrow("LIKE or GLOB pattern too complex");
   });
 });
