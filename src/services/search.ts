@@ -653,7 +653,7 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   // the mismatched summary below rather than discarding the entire source.
   const title=String(x.title||"");
   return language==="ar" ? hasArabic(title) : !hasArabic(title);
-};async function searchRecentNewsArchive(env:Env,q:string,language:Locale,publicationContext=""):Promise<Candidate[]>{
+};export async function searchRecentNewsArchive(env:Env,q:string,language:Locale,publicationContext=""):Promise<Candidate[]>{
   const cutoff=new Date(Date.now()-7*24*60*60*1000).toISOString();
   const future=new Date(Date.now()+5*60*1000).toISOString();
   try{
@@ -687,7 +687,7 @@ const languageSafe=(x:Candidate,language:Locale)=>{
       if(output.length>=8)break;
     }
     return output;
-  }catch{return[]}
+  }catch(error){throw error;}
 }
 export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean;draft?:boolean;images?:boolean;healthCheck?:boolean;publicationContext?:string;background?:(task:Promise<unknown>)=>void}={}):Promise<SearchResponse>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
