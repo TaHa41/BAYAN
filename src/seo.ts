@@ -68,17 +68,19 @@ const archiveArticleCandidate=(row:any,now:number)=>{
 };
 export async function newsSitemap(env:Env){
   const now=Date.now();
+  const recentCutoff=new Date(now-48*60*60*1000).toISOString();
+  const futureLimit=new Date(now+5*60*1000).toISOString();
   let rows:any[]=[];
   let archiveRows:any[]=[];
   try{
-    const r=await env.DB.prepare("SELECT slug,title,language,created_at,body,sources_json FROM articles WHERE status='PUBLISHED' AND language IN ('ar','en') AND julianday(created_at)>=julianday('now','-48 hours') AND julianday(created_at)<=julianday('now','+5 minutes') AND length(body)>=500 ORDER BY created_at DESC LIMIT 200").all<any>();
+    const r=await env.DB.prepare("SELECT slug,title,language,created_at,body,sources_json FROM articles WHERE status='PUBLISHED' AND language IN ('ar','en') AND created_at>=? AND created_at<=? AND length(body)>=500 ORDER BY created_at DESC LIMIT 200").bind(recentCutoff,futureLimit).all<any>();
     rows=r.results||[];
   }catch(error){
     console.error("news_sitemap_database_query_failed",error instanceof Error?error.message:String(error));
     return retryableUnavailable("News sitemap temporarily unavailable; retry later.");
   }
   try{
-    const archive=await env.DB.prepare("SELECT id,url,language,title,summary,publisher,published_at,fetched_at FROM news_archive WHERE language IN ('ar','en') AND julianday(fetched_at)>=julianday('now','-48 hours') AND julianday(fetched_at)<=julianday('now','+5 minutes') AND length(summary)>=120 ORDER BY fetched_at DESC LIMIT 200").all<any>();
+    const archive=await env.DB.prepare("SELECT id,url,language,title,summary,publisher,published_at,fetched_at FROM news_archive WHERE language IN ('ar','en') AND fetched_at>=? AND fetched_at<=? AND length(summary)>=120 ORDER BY fetched_at DESC LIMIT 200").bind(recentCutoff,futureLimit).all<any>();
     archiveRows=archive.results||[];
   }catch(error){
     // Archive diagnostics must not suppress valid full-article URLs.
