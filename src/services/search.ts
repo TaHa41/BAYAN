@@ -525,11 +525,11 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
       : (sportsProfile
         ? [q+" latest news",q+" transfer news",q+" official profile"]
         : writerProfile ? [q+" latest news",q+" interview",q+" bibliography"] : [q+" latest news",q+" interview",q+" official profile"]))
-    : (language==="ar" ? [compact+" معلومات ومصادر موثوقة",q+" شرح"] : [compact+" reliable sources",q+" overview"]);
+    : (language==="ar" ? [compact+" معلومات ومصادر موثوقة",compact+" آخر الأخبار",q+" شرح"] : [compact+" reliable sources",compact+" latest news",q+" overview"]);
   // Run the first variant alone, then fan out remaining bounded variants only
   // when evidence is still sparse. This avoids unnecessary provider load while
   // keeping the worst-case recovery window short enough for the browser request.
-  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,person?2:1);
+  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,2);
   const labels=["Wikipedia REST Search","Google News Search","Bing Web RSS Search"];
   const runVariant=async(variant:string,variantIndex:number):Promise<Candidate[]>=>{
     // GDELT repeatedly timed out in production and amplified request fan-out.
