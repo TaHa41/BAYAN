@@ -192,7 +192,7 @@ export async function searchNewsFeed(query: string, lang: Locale): Promise<Story
   });
 }
 
-const sourceImage = async (url: string): Promise<string | undefined> => {
+const sourceImage = async (url: string, env?: Env): Promise<string | undefined> => {
   try {
     const response = await fetch(url, {
       signal: AbortSignal.timeout(2500),
@@ -213,9 +213,10 @@ const sourceImage = async (url: string): Promise<string | undefined> => {
       )?.[1]
     );
     let absolute: string | undefined;
-    try { absolute = candidate ? new URL(candidate, url).toString() : undefined; } catch {}
+    try { absolute = candidate ? new URL(candidate, url).toString() : undefined; } catch (error) { if(env) await recordRuntimeEventLimited(env,"news_image_url","invalid_publisher_image_url",error) }
     return isUsableNewsImage(absolute) ? absolute : undefined;
-  } catch {
+  } catch (error) {
+    if(env) await recordRuntimeEventLimited(env,"news_source_image","publisher_image_lookup_failed",error);
     return;
   }
 };
@@ -227,7 +228,7 @@ const terms = (value: string) =>
     .split(/\s+/)
     .filter((term) => term.length > 2);
 
-const wikidataImage = async (query: string, context = ""): Promise<string | undefined> => {
+const wikidataImage = async (query: string, context = "", env?: Env): Promise<string | undefined> => {
   const normalize = (value: string) => String(value || "").normalize("NFKC").toLowerCase()
     .replace(/[\u064B-\u065F\u0670]/g, "")
     .replace(/[^\p{L}\p{N}]+/gu, " ").trim();
@@ -272,11 +273,11 @@ const wikidataImage = async (query: string, context = ""): Promise<string | unde
       const filename = entityData.entities?.[ids[0]]?.claims?.P18?.[0]?.mainsnak?.datavalue?.value;
       if (filename) return "https://commons.wikimedia.org/wiki/Special:Redirect/file/" + encodeURIComponent(filename);
     }
-  } catch {}
+  } catch (error) { if(env) await recordRuntimeEventLimited(env,"wikidata_image","wikidata_image_lookup_failed",error) }
   return;
 };
 
-const wikipediaSummaryImage = async (query: string): Promise<string | undefined> => {
+const wikipediaSummaryImage = async (query: string, env?: Env): Promise<string | undefined> => {
   const lookup = async (language: string) => {
     try {
       const title = query.trim().replace(/\s+/g, "_");
@@ -288,14 +289,15 @@ const wikipediaSummaryImage = async (query: string): Promise<string | undefined>
       if (!response.ok) return undefined;
       const data = await response.json<any>();
       return data.thumbnail?.source || data.originalimage?.source;
-    } catch {
+    } catch (error) {
+      if(env) await recordRuntimeEventLimited(env,"wikipedia_summary_image","wikipedia_summary_image_lookup_failed",error);
       return undefined;
     }
   };
   const images = await Promise.all([lookup("ar"), lookup("en")]);
   return images.find((image) => Boolean(image));
 };
-const wikipediaImage = async (query: string): Promise<string | undefined> => {
+const wikipediaImage = async (query: string, env?: Env): Promise<string | undefined> => {
   try {
     const url =
       "https://ar.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=" +
@@ -309,12 +311,13 @@ const wikipediaImage = async (query: string): Promise<string | undefined> => {
     const data = await response.json<any>();
     const pages = Object.values(data.query?.pages || {}) as any[];
     return pages.find((page) => page.thumbnail?.source)?.thumbnail?.source;
-  } catch {
+  } catch (error) {
+    if(env) await recordRuntimeEventLimited(env,"wikipedia_image","wikipedia_image_lookup_failed",error);
     return;
   }
 };
 
-const wikipediaExactImage=async(query:string):Promise<string|undefined>=>{
+const wikipediaExactImage=async(query:string,env?:Env):Promise<string|undefined>=>{
   const lookup = async (lang:string) => {
     try {
       const u="https://"+lang+".wikipedia.org/w/api.php?action=query&prop=pageimages|pageprops&piprop=thumbnail&titles="+encodeURIComponent(query)+"&format=json&origin=*";
@@ -324,13 +327,13 @@ const wikipediaExactImage=async(query:string):Promise<string|undefined>=>{
       const p=Object.values(d.query?.pages||{})[0] as any;
       if(!p||p.missing||p.pageprops?.disambiguation!==undefined)return undefined;
       return p?.thumbnail?.source as string|undefined;
-    } catch { return undefined; }
+    } catch (error) { if(env) await recordRuntimeEventLimited(env,"wikipedia_exact_image","wikipedia_exact_image_lookup_failed",error); return undefined; }
   };
   const images=await Promise.all([lookup("ar"),lookup("en")]);
   return images.find((image)=>Boolean(image));
 };
 
-export async function findRelatedImage(query: string, sourceUrl?: string, context = ""): Promise<string | undefined> {
+export async function findRelatedImage(query: string, sourceUrl?: string, context = "", env?: Env): Promise<string | undefined> {
   // Prefer the publisher article image when the URL is a normal public HTTPS host.
   if (sourceUrl) {
     try {
@@ -338,7 +341,7 @@ export async function findRelatedImage(query: string, sourceUrl?: string, contex
       const host = parsed.hostname.toLowerCase();
       const looksPrivate = !host.includes(".") || host === "localhost" || host.endsWith(".local") || host.endsWith(".internal") || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) || host.startsWith("[");
       if (parsed.protocol === "https:" && !looksPrivate) {
-        const publisherImage = await sourceImage(parsed.toString());
+        const publisherImage = await sourceImage(parsed.toString(), env);
         if (isUsableNewsImage(publisherImage)) return publisherImage;
       }
     } catch {}
@@ -358,21 +361,21 @@ export async function findRelatedImage(query: string, sourceUrl?: string, contex
     !/(weather|temperature|price|gold|dollar|currency|history|science|technology|economy|politics|football|sports|climate|energy|space|travel|health|art|طقس|حرارة|سعر|ذهب|دولار|عملة|تاريخ|علوم|تقنية|اقتصاد|سياسة|رياضة|مناخ|طاقة|فضاء|سفر|صحة|فن|شرح|مفهوم|تعريف)/i.test(headline);
   const personContext = /footballer|soccer player|football player|athlete|politician|writer|author|novelist|poet|actor|actress|scientist|researcher|coach|president|minister|لاعب كرة قدم|لاعب كرة القدم|رياضي|سياسي|كاتب|مؤلف|روائي|شاعر|ممثل|ممثلة|عالم|باحث|مدرب|رئيس|وزير/i.test(context);
   for (const candidate of imageQueries) {
-    const exact = await wikipediaExactImage(candidate);
+    const exact = await wikipediaExactImage(candidate,env);
     if (exact && /^https:\/\//i.test(exact)) return exact;
-    const summaryImage = await wikipediaSummaryImage(candidate);
+    const summaryImage = await wikipediaSummaryImage(candidate,env);
     if (summaryImage && /^https:\/\//i.test(summaryImage)) return summaryImage;
   }
   // For people, never fall through to broad search results: another person with
   // the same name is not an acceptable portrait. Exact page lookups and context-
   // matched Wikidata are the only person-image providers.
   if (bareName || personContext) {
-    const structuredSubjectImage = await wikidataImage(headline, context || cleanQuery.slice(headline.length));
+    const structuredSubjectImage = await wikidataImage(headline, context || cleanQuery.slice(headline.length), env);
     if (structuredSubjectImage && /^https:\/\//i.test(structuredSubjectImage)) return structuredSubjectImage;
     return undefined;
   }
 
-  const relatedWikipediaImage = await wikipediaImage(headline);
+  const relatedWikipediaImage = await wikipediaImage(headline,env);
   if (relatedWikipediaImage && /^https:\/\//i.test(relatedWikipediaImage)) return relatedWikipediaImage;
 
   // Wikidata is a separate subject-image provider and can recover non-person topics
@@ -785,10 +788,10 @@ export async function news(env: Env, lang: Locale, options: {forceRefresh?:boole
     if (isUsableNewsImage(story.imageUrl)) return story;
     // Keep publisher-image fetches bounded so feed refresh stays within Worker limits.
     if (index >= 3) return story;
-    const direct = await sourceImage(story.url);
+    const direct = await sourceImage(story.url, env);
     if (isUsableNewsImage(direct)) return { ...story, imageUrl: direct, imageAlt: story.imageAlt || story.title };
     if (index < 2) {
-      const image = await findRelatedImage(story.title, story.url);
+      const image = await findRelatedImage(story.title, story.url, "", env);
       if (isUsableNewsImage(image)) return { ...story, imageUrl: image, imageAlt: story.title };
     }
     return story;
