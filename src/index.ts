@@ -256,9 +256,43 @@ ensureMeta("name","twitter:description",description);
 ensureMeta("name","twitter:image",socialImage);
 const headers=new Headers(asset.headers);headers.set("Cache-Control","no-store");headers.set("X-Content-Type-Options","nosniff");headers.set("Referrer-Policy","strict-origin-when-cross-origin");headers.set("X-Frame-Options","DENY");headers.set("Permissions-Policy","camera=(), microphone=(), geolocation=()");
 headers.set("CDN-Cache-Control","no-store");headers.set("X-BAYAN-Build",BUILD);if(/^\/(?:admin|review)(?:\/|$)/.test(u.pathname)&&u.searchParams.get("bayan_owner")!=="0")headers.append("Set-Cookie","bayan_exclude_analytics=1; Max-Age=31536000; Path=/; SameSite=Lax; Secure");if(u.searchParams.get("bayan_owner")==="1")headers.append("Set-Cookie","bayan_exclude_analytics=1; Max-Age=31536000; Path=/; SameSite=Lax; Secure");if(u.searchParams.get("bayan_owner")==="0")headers.append("Set-Cookie","bayan_exclude_analytics=; Max-Age=0; Path=/; SameSite=Lax; Secure");return new Response(html,{status:asset.status,headers});}
-export default{async fetch(request:Request,env:Env,ctx?:ExecutionContext){const u=new URL(request.url);if(u.pathname.startsWith("/api/")){try{await ensureSchema(env)}catch{return new Response(JSON.stringify({error:"database_unavailable"}),{status:503,headers:{"content-type":"application/json;charset=utf-8","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})}try{return await api(request,env,ctx)}catch(error){const message=String(error).slice(0,800);try{await notify(env,"BAYAN API ERROR\
-Path: "+u.pathname+"\
-Error: "+message)}catch{}return new Response(JSON.stringify({error:"internal_error"}),{status:500,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})}}let seoPath=u.pathname;while(seoPath.length>1&&seoPath.endsWith("/"))seoPath=seoPath.slice(0,-1);
+type PublicApiCacheEntry={expiresAt:number;body:string;status:number;headers:Array<[string,string]>};
+const publicApiResponseCache=new Map<string,PublicApiCacheEntry>();
+const publicApiCacheTtl=(request:Request,url:URL):number=>{
+ if(request.method!=="GET")return 0;
+ if(url.pathname==="/api/section"||url.pathname==="/api/news")return 45_000;
+ if(url.pathname==="/api/live/weather"||url.pathname==="/api/live/fx"||url.pathname==="/api/live/gold")return 60_000;
+ if(url.pathname==="/api/live/prayer")return 300_000;
+ if(url.pathname==="/api/wisdom")return 60_000;
+ return 0;
+};
+export default{async fetch(request:Request,env:Env,ctx?:ExecutionContext){const u=new URL(request.url);
+const apiCacheTtl=publicApiCacheTtl(request,u),apiCacheKey=u.pathname+u.search;
+if(apiCacheTtl){
+ const cached=publicApiResponseCache.get(apiCacheKey);
+ if(cached&&cached.expiresAt>Date.now())return new Response(cached.body,{status:cached.status,headers:cached.headers});
+ if(cached)publicApiResponseCache.delete(apiCacheKey);
+}
+if(u.pathname.startsWith("/api/")){
+ try{await ensureSchema(env)}catch{return new Response(JSON.stringify({error:"database_unavailable"}),{status:503,headers:{"content-type":"application/json;charset=utf-8","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})}
+ try{
+  const response=await api(request,env,ctx);
+  if(apiCacheTtl&&response.ok){
+   const bodyText=await response.clone().text();
+   if(bodyText.length<=512*1024){
+    const headers:Array<[string,string]>=[];
+    response.headers.forEach((value,key)=>headers.push([key,value]));
+    if(publicApiResponseCache.size>=160){const oldest=publicApiResponseCache.keys().next().value;if(oldest)publicApiResponseCache.delete(oldest);}
+    publicApiResponseCache.set(apiCacheKey,{expiresAt:Date.now()+apiCacheTtl,body:bodyText,status:response.status,headers});
+   }
+  }
+  return response;
+ }catch(error){
+  const message=String(error).slice(0,800);
+  try{await notify(env,"BAYAN API ERROR\\nPath: "+u.pathname+"\\nError: "+message)}catch{}
+  return new Response(JSON.stringify({error:"internal_error"}),{status:500,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})
+ }
+}let seoPath=u.pathname;while(seoPath.length>1&&seoPath.endsWith("/"))seoPath=seoPath.slice(0,-1);
 if(seoPath==="/llms.txt"){const body=`# BAYAN | بيان\n\n> Evidence-first Arabic and English knowledge, verified news, research summaries, and live data. Evidence before claims.\n\n## Public pages\n- [Homepage](${ORIGIN}/): BAYAN knowledge center.\n- [Search](${ORIGIN}/search?lang=ar): Search across available sources.\n- [Verified news in Arabic](${ORIGIN}/news?lang=ar): Arabic news and source checks.\n- [Verified news in English](${ORIGIN}/news?lang=en): English news and source checks.\n- [Science and understanding](${ORIGIN}/science?lang=ar): Science explainers.\n- [Technology and AI](${ORIGIN}/technology?lang=ar): Technology and AI.\n- [Economy and money](${ORIGIN}/economy?lang=ar): Economic information.\n- [Health and medicine](${ORIGIN}/health?lang=ar): Health information.\n- [History and culture](${ORIGIN}/history?lang=ar): History and culture.\n- [Methodology](${ORIGIN}/methodology?lang=ar): Evidence and verification approach.\n- [About BAYAN](${ORIGIN}/about?lang=ar): About the project.\n- [Sitemap](${ORIGIN}/sitemap.xml): Public indexable pages.\n- [News sitemap](${ORIGIN}/news-sitemap.xml): Recent eligible news pages.\n\n## Language versions\nUse the lang=ar parameter for Arabic pages and lang=en for English pages.\n\n## Editorial principles\nBAYAN aims to distinguish sourced evidence from summaries, avoid fabricated claims, and identify uncertainty when evidence is insufficient.\n`;return new Response(body,{status:200,headers:{"Content-Type":"text/markdown; charset=utf-8","Cache-Control":"public, max-age=3600","X-Content-Type-Options":"nosniff","Referrer-Policy":"strict-origin-when-cross-origin","X-Frame-Options":"DENY","Permissions-Policy":"camera=(), microphone=(), geolocation=()"}})}
 if(seoPath==="/ai-catalog.json"||seoPath==="/.well-known/ai-catalog.json"){const catalog={specVersion:"1.0",host:{displayName:"BAYAN | بيان",identifier:"bayan.tahaomar411.workers.dev",documentationUrl:ORIGIN+"/methodology?lang=en"},entries:[]};return new Response(JSON.stringify(catalog,null,2),{status:200,headers:{"Content-Type":"application/ai-catalog+json; charset=utf-8","Cache-Control":"public, max-age=3600","X-Content-Type-Options":"nosniff","Referrer-Policy":"strict-origin-when-cross-origin","X-Frame-Options":"DENY","Permissions-Policy":"camera=(), microphone=(), geolocation=()","Link":'<'+ORIGIN+'/.well-known/ai-catalog.json>; rel="self"'}})}
 if(seoPath==="/robots.txt")return robots();
