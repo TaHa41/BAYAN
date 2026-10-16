@@ -4,7 +4,7 @@ import { searchRecentNewsArchive } from "../src/services/search";
 
 describe("bounded LIKE search patterns", () => {
   it("keeps long Arabic and English keyword patterns under SQLite's byte limit", () => {
-    for (const text of ["م".repeat(180), "supercalifragilisticexpialidocious".repeat(5)]) {
+    for (const text of ["م".repeat(90) + "ن".repeat(90), "supercalifragilisticexpialidocious".repeat(5)]) {
       const terms = boundedLikeKeywords([text], 6);
       expect(terms.length).toBeGreaterThan(1);
       for (const term of terms) {
