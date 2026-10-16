@@ -17,14 +17,12 @@ export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[
   const cleanAnswer=answer.replace(/^\s*\d+[.)]\s/gm,"");
   const sentences=cleanAnswer.split(/[\n.!؟?]+/).map(sentence=>sentence.trim()).filter(Boolean);
   const questionTokens=(question.normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]+/gu)||[]).filter(token=>!generic.has(token));
-  const subjectTokens=questionTokens.length>=2?questionTokens.slice(0,4):[];
-  // Build one corpus for support checks: a sentence may synthesize separate
-  // facts from different evidence records, but every specific must still occur
-  // in at least one supplied record. This removes false rejection without
-  // allowing unsupported names or numbers.
-  const corpus=evidence.map(item=>[item.title,item.summary,...(item.sources||[]).flatMap(source=>[source.title,source.publisher])].filter(Boolean).join(" ")).join(" ").normalize("NFKC").toLowerCase();
-  const corpusTokens=new Set(corpus.match(/[\p{L}\p{N}&.-]+/gu)||[]);
-  const corpusNumbers=new Set(normalizeDigits(corpus).match(/[0-9]+/g)||[]);
+  const subjectTokens=questionTokens.length>=2?questionTokens.slice(0,2):questionTokens.length?[questionTokens[0]]:[];
+  const evidenceItems=evidence.map(item=>{
+    const text=[item.title,item.summary,...(item.sources||[]).flatMap(source=>[source.title,source.publisher])].filter(Boolean).join(" ").normalize("NFKC").toLowerCase();
+    return {tokens:new Set(text.match(/[\p{L}\p{N}&.-]+/gu)||[]),numbers:new Set(normalizeDigits(text).match(/[0-9]+/g)||[])};
+  });
+  const corpusTokens=new Set(evidenceItems.flatMap(item=>Array.from(item.tokens)));
   const arabicEntityPatterns=[
     /(?:نادي|فريق|الفريق|المنتخب|المدرب|المغني|المغنية|المطرب|المطربة|الممثل|الممثلة|الفنان|الفنانة|الكاتب|الكاتبة|المؤلف|المؤلفة|الروائي|الروائية)\s+([\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){0,1})/g,
     /(?:يلعب(?:\s+حاليًا)?\s+مع|انتقل(?:ت)?\s+إلى|انضم(?:ت)?\s+إلى|تعاقد\s+مع)\s+(?:نادي\s+|فريق\s+)?([\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){0,1})/g
@@ -43,10 +41,15 @@ export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[
       }
     }
     if(!names.length&&!numbers.length&&!arabicEntities.length)return false;
-    const namesSupported=names.every(name=>corpusTokens.has(name.toLowerCase()));
-    const numbersSupported=numbers.every(number=>corpusNumbers.has(number));
-    const subjectSupported=!subjectTokens.length||subjectTokens.every(token=>corpusTokens.has(token));
-    const arabicEntitiesSupported=arabicEntities.every(entity=>entity.hasAlias||entity.phrase.split(/\s+/).every(token=>corpusTokens.has(token.toLowerCase())));
+    const anchorTokens=subjectTokens.length?subjectTokens:names.length>=2?names.slice(0,2).map(name=>name.toLowerCase()):[];
+    const itemHasAnchor=(item:{tokens:Set<string>;numbers:Set<string>})=>anchorTokens.every(token=>item.tokens.has(token));
+    const namesSupported=names.every(name=>{
+      const token=name.toLowerCase();
+      return evidenceItems.some(item=>item.tokens.has(token)&&(!anchorTokens.length||itemHasAnchor(item)));
+    });
+    const numbersSupported=numbers.every(number=>evidenceItems.some(item=>item.numbers.has(number)&&(!anchorTokens.length||itemHasAnchor(item))));
+    const subjectSupported=subjectTokens.every(token=>corpusTokens.has(token));
+    const arabicEntitiesSupported=arabicEntities.every(entity=>entity.hasAlias||entity.phrase.split(/\s+/).every(token=>evidenceItems.some(item=>item.tokens.has(token.toLowerCase())&&(!anchorTokens.length||itemHasAnchor(item)))));
     return !(namesSupported&&numbersSupported&&subjectSupported&&arabicEntitiesSupported);
   });
 };
