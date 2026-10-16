@@ -3,7 +3,7 @@ import { newsSitemap, sitemap } from "./seo";
 
 describe("newsSitemap database failure handling", () => {
   it("returns a retryable 503 instead of disguising a database error as empty XML", async () => {
-    const env = { DB: { prepare: () => ({ all: async () => { throw new Error("database unavailable"); } }) } } as any;
+    const env = { DB: { prepare: () => ({ bind(){return this;}, all: async () => { throw new Error("database unavailable"); } }) } } as any;
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       const response = await newsSitemap(env);
@@ -18,7 +18,7 @@ describe("newsSitemap database failure handling", () => {
   it("reports fresh archive candidates without treating summary-only archive pages as full news articles", async () => {
     const fetchedAt = new Date(Date.now() - 20 * 60 * 1000).toISOString();
     const sourcePublished = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-    const env = { DB: { prepare: (sql:string) => ({ all: async () => sql.includes("FROM news_archive") ? ({results:[
+    const env = { DB: { prepare: (sql:string) => ({ bind(){return this;}, all: async () => sql.includes("FROM news_archive") ? ({results:[
       {id:42,url:"https://news.example.org/story",language:"en",title:"A substantial current news report",summary:"A meaningful archived news summary with context and relevant details. ".repeat(4),publisher:"Example News",published_at:sourcePublished,image_url:"https://images.example.org/story.jpg",section:"news",fetched_at:fetchedAt},
       {id:43,url:"https://news.example.org/old",language:"en",title:"Old archived report",summary:"An old archived news summary with enough text. ".repeat(4),publisher:"Example News",published_at:sourcePublished,image_url:null,section:"news",fetched_at:new Date(Date.now()-60*60*60*1000).toISOString()}
     ]}):({results:[]})}) } } as any;
@@ -33,7 +33,7 @@ describe("newsSitemap database failure handling", () => {
   });
 
   it("returns valid empty XML only when the database query succeeds with no eligible articles", async () => {
-    const env = { DB: { prepare: () => ({ all: async () => ({ results: [] }) }) } } as any;
+    const env = { DB: { prepare: () => ({ bind(){return this;}, all: async () => ({ results: [] }) }) } } as any;
     const response = await newsSitemap(env);
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("application/xml");
@@ -45,7 +45,7 @@ describe("newsSitemap database failure handling", () => {
   it("includes recent verified topical news with independent HTTPS sources even when publisher labels are absent", async () => {
     const recent = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const old = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
-    const env = { DB: { prepare: () => ({ all: async () => ({ results: [
+    const env = { DB: { prepare: () => ({ bind(){return this;}, all: async () => ({ results: [
       { slug: "recent-ar-news", title: "عنوان خبر عربي حديث", language: "ar", created_at: recent, body: "محتوى خبر حديث موثق. ".repeat(35), sources_json: JSON.stringify([{ url: "https://news.example.com/a" }, { url: "https://wire.example.org/a" }]) },
       { slug: "old-news", title: "Older news article", language: "en", created_at: old, body: "Older article body. ".repeat(100), sources_json: JSON.stringify([{ url: "https://news.example.com/a" }, { url: "https://wire.example.org/a" }]) },
       { slug: "duplicate-hosts", title: "Repeated source host", language: "en", created_at: recent, body: "A verified article body. ".repeat(35), sources_json: JSON.stringify([{ url: "https://news.example.com/a" }, { url: "https://www.news.example.com/b" }]) },
@@ -64,7 +64,7 @@ describe("newsSitemap database failure handling", () => {
 
 describe("sitemap database failure handling", () => {
   it("returns 503 rather than silently omitting published article URLs when the database fails", async () => {
-    const env = { DB: { prepare: () => ({ all: async () => { throw new Error("database unavailable"); } }) } } as any;
+    const env = { DB: { prepare: () => ({ bind(){return this;}, all: async () => { throw new Error("database unavailable"); } }) } } as any;
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       const response = await sitemap(env);
@@ -76,7 +76,7 @@ describe("sitemap database failure handling", () => {
   });
 
   it("does not publish articles with unsupported language or missing slugs", async () => {
-    const env = { DB: { prepare: () => ({ all: async () => ({ results: [
+    const env = { DB: { prepare: () => ({ bind(){return this;}, all: async () => ({ results: [
       { slug: "valid-ar", language: "ar", updated_at: "2026-10-14T00:00:00Z" },
       { slug: "invalid-lang", language: "fr", updated_at: "2026-10-14T00:00:00Z" },
       { slug: "", language: "en", updated_at: "2026-10-14T00:00:00Z" }
