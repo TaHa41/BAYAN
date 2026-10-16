@@ -84,7 +84,8 @@ for(let attempt=1;attempt<=maxRepairPasses;attempt++){
   }
 }
 
-if(smoke("Post-repair production verification")){
+const finalVerification=smoke("Post-repair production verification");
+if(finalVerification.passed){
   console.log("Production verification passed after the repair attempt.");
   process.exit(0);
 }
