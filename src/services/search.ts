@@ -1,7 +1,8 @@
 import{resolvePublishedImageUrl,safePublicImageUrl}from"../image-url";
 import type {Env,Locale,SearchResponse,SearchResult,Source} from "../types";
-import {searchArticles,saveSearch,publishVerifiedResearch} from "../db";
-import {ask,draftArticle} from "./ai";
+import {searchArticles,saveSearch,publishVerifiedResearch,publicationRejectionReason} from "../db";
+import {boundedLikeKeywords,escapedLikePattern} from "../search-patterns";
+import {ask,draftArticle,answerHasUnsupportedSpecifics} from "./ai";
 import {findRelatedImage,searchNewsFeed} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 const publicationErrorMessage=(error:unknown)=>String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
@@ -652,14 +653,17 @@ const languageSafe=(x:Candidate,language:Locale)=>{
   // the mismatched summary below rather than discarding the entire source.
   const title=String(x.title||"");
   return language==="ar" ? hasArabic(title) : !hasArabic(title);
-};async function searchRecentNewsArchive(env:Env,q:string,language:Locale,publicationContext=""):Promise<Candidate[]>{
+};export async function searchRecentNewsArchive(env:Env,q:string,language:Locale,publicationContext=""):Promise<Candidate[]>{
   const cutoff=new Date(Date.now()-7*24*60*60*1000).toISOString();
   const future=new Date(Date.now()+5*60*1000).toISOString();
   try{
-    const terms=[...new Set([...searchTerms(q).slice(0,3),...(publicationContext?searchTerms(publicationContext).slice(0,4):[])])].slice(0,6);
+    const requestedTerms=[...new Set([...searchTerms(q).slice(0,3),...(publicationContext?searchTerms(publicationContext).slice(0,4):[])])];
+    // A title/query can contain a single oversized token. Split by UTF-8 byte
+    // length and escape LIKE metacharacters; never pass a full title as pattern.
+    const terms=boundedLikeKeywords(requestedTerms,6);
     if(!terms.length)return[];
-    const predicates=terms.map(()=>"(title LIKE ? OR summary LIKE ?)").join(" OR ");
-    const patterns=terms.flatMap(term=>["%"+term+"%","%"+term+"%"]);
+    const predicates=terms.map(()=>"(title LIKE ? ESCAPE '!' OR summary LIKE ? ESCAPE '!')").join(" OR ");
+    const patterns=terms.flatMap(term=>[escapedLikePattern(term),escapedLikePattern(term)]);
     const response=await env.DB.prepare("SELECT title,summary,url,publisher,published_at,image_url,image_alt,section FROM news_archive WHERE language=? AND fetched_at>=? AND published_at>=? AND published_at<=? AND length(summary)>=80 AND ("+predicates+") ORDER BY fetched_at DESC LIMIT 60").bind(language,cutoff,cutoff,future,...patterns).all<any>();
     const output:Candidate[]=[];
     const seenPublishers=new Set<string>();
@@ -683,7 +687,7 @@ const languageSafe=(x:Candidate,language:Locale)=>{
       if(output.length>=8)break;
     }
     return output;
-  }catch{return[]}
+  }catch(error){throw error;}
 }
 export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean;draft?:boolean;images?:boolean;healthCheck?:boolean;publicationContext?:string;background?:(task:Promise<unknown>)=>void}={}):Promise<SearchResponse>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch{}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
@@ -928,22 +932,23 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   const status=results.length===0?"insufficient":independentlyVerified?"verified":"mixed";
   let publishedSlug:string|undefined;
   let publishReason:string|undefined=options.publish!==false&&!independentlyVerified?"no_independent_sources":undefined;
+  let publishReasonDetail:string|undefined=publishReason?("independent_evidence_below_threshold:publishers="+corroboration.publishers.size+";hosts="+corroboration.hosts.size+";required="+configuredMin):undefined;
   let answer:string|undefined;
   let answerStatus:SearchResponse["status"]|undefined;
   const exactPersonConfirmed=options.publicationContext!==undefined||!personQuery||results.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
-  if(options.publish!==false&&independentlyVerified&&!exactPersonConfirmed)publishReason="draft_not_verified";
-  if(options.publish!==false&&options.draft===false)publishReason="draft_not_verified";
+  if(options.publish!==false&&independentlyVerified&&!exactPersonConfirmed){publishReason="draft_not_verified";publishReasonDetail="entity_identity_unconfirmed";}
+  if(options.publish!==false&&options.draft===false){publishReason="draft_not_verified";publishReasonDetail="drafting_disabled_by_caller";}
   if(results.length&&exactPersonConfirmed&&options.draft!==false&&!(options.publicationContext!==undefined&&options.publish!==false&&!independentlyVerified)){
     try{
       const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:"",reason:"ai_unavailable"}),7500))]);
-      if("reason" in drafted&&drafted.reason==="ai_unavailable"&&options.publish!==false)publishReason="ai_unavailable";
+      if("reason" in drafted&&drafted.reason==="ai_unavailable"&&options.publish!==false){publishReason="ai_unavailable";publishReasonDetail="short_answer_ai_unavailable";}
       if(drafted?.answer){answer=drafted.answer;answerStatus=independentlyVerified?drafted.status:"mixed";}
-      else if(options.publish!==false)publishReason="ai_unavailable";
+      else if(options.publish!==false){publishReason="ai_unavailable";publishReasonDetail="short_answer_empty_or_ai_unavailable";}
       const articleTitle=options.publicationContext!==undefined?q:(results.find(x=>x.title&&x.summary)?.title||"");
       const articleSummary=results.find(x=>x.title&&x.summary)?.summary||q;
       if(options.publish!==false){
-        if(!independentlyVerified)publishReason="no_independent_sources";
-        else if(!articleTitle||disallowedContent(articleTitle+" "+articleSummary))publishReason="draft_not_useful";
+        if(!independentlyVerified){publishReason="no_independent_sources";publishReasonDetail="independent_evidence_below_threshold:publishers="+corroboration.publishers.size+";hosts="+corroboration.hosts.size+";required="+configuredMin;}
+        else if(!articleTitle||disallowedContent(articleTitle+" "+articleSummary)){publishReason="draft_not_useful";publishReasonDetail="article_title_or_summary_missing_or_disallowed";}
         else{
           const publishLongArticle=async()=>{
             let longDraft:any;
@@ -951,12 +956,17 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
               longDraft=await Promise.race([draftArticle(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:"",reason:"ai_unavailable"}),18000))]);
             }catch(error){
               publishReason=publicationFailureReason(error);
+              publishReasonDetail="article_draft_exception:"+publishReason;
               await recordPublicationWarning(env,publishReason);
               return;
             }
-            if(longDraft?.reason==="ai_unavailable"){publishReason="ai_unavailable";return;}
-            if(longDraft?.status!=="verified"){publishReason="draft_not_verified";return;}
-            if(!usefulDraft(longDraft.answer,language)){publishReason="draft_not_useful";return;}
+            if(longDraft?.reason==="ai_unavailable"){publishReason="ai_unavailable";publishReasonDetail="article_draft_all_providers_unavailable";return;}
+            if(longDraft?.status!=="verified"){
+              publishReason="draft_not_verified";
+              publishReasonDetail=!String(longDraft?.answer||"").trim()?"draft_empty_or_insufficient_evidence":answerHasUnsupportedSpecifics(String(longDraft.answer),results,q)?"unsupported_specifics": "verification_status_"+String(longDraft?.status||"missing");
+              return;
+            }
+            if(!usefulDraft(longDraft.answer,language)){publishReason="draft_not_useful";publishReasonDetail="article_draft_failed_usefulness_checks";return;}
             const sourceImage=results.find(item=>safePublicImageUrl(item.imageUrl)&&String(item.imageAlt||item.title||"").trim().length>0)?.imageUrl;
             let relatedImage:string|undefined;
             if(!sourceImage){
@@ -964,32 +974,34 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
               catch(error){await recordPublicationWarning(env,publicationFailureReason(error));}
             }
             const imageCandidate=safePublicImageUrl(sourceImage)||safePublicImageUrl(relatedImage);const imageUrl=await resolvePublishedImageUrl(imageCandidate);
-            if(!imageUrl){publishReason="no_image";return;}
+            if(!imageUrl){publishReason="no_image";publishReasonDetail="no_safe_resolvable_topic_image";return;}
             let savedSlug:string|null;
             try{
-              savedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:longDraft.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle});
+              const publicationInput={title:articleTitle,summary:articleSummary,body:longDraft.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle};
+              savedSlug=await publishVerifiedResearch(env,publicationInput);
             }catch(error){
               publishReason=publicationFailureReason(error);
+              publishReasonDetail="publish_verified_research_exception:"+publishReason;
               await recordPublicationWarning(env,publishReason);
               return;
             }
-            if(savedSlug){publishedSlug=savedSlug;publishReason=undefined;}
-            else publishReason="publish_rejected";
+            if(savedSlug){publishedSlug=savedSlug;publishReason=undefined;publishReasonDetail=undefined;}
+            else {publishReason="publish_rejected";publishReasonDetail="publication_quality:"+(publicationRejectionReason({title:articleTitle,summary:articleSummary,body:longDraft.answer,language,sources:results.flatMap(x=>x.sources||[]),imageUrl})||"null_without_quality_reason");}
           };
           if(options.background){
-            try{options.background(publishLongArticle().catch(async error=>{publishReason=publicationFailureReason(error);await recordPublicationWarning(env,publishReason||"exception:unknown");}));}
-            catch(error){publishReason=publicationFailureReason(error);await recordPublicationWarning(env,publishReason);}
+            try{options.background(publishLongArticle().catch(async error=>{publishReason=publicationFailureReason(error);publishReasonDetail="background_publication_exception:"+publishReason;await recordPublicationWarning(env,publishReason||"exception:unknown");}));}
+            catch(error){publishReason=publicationFailureReason(error);publishReasonDetail="background_schedule_exception:"+publishReason;await recordPublicationWarning(env,publishReason);}
           }else await publishLongArticle();
         }
       }
     }catch(error){
-      if(options.publish!==false)publishReason=publicationFailureReason(error);
+      if(options.publish!==false){publishReason=publicationFailureReason(error);publishReasonDetail="search_draft_exception:"+publishReason;}
       await recordPublicationWarning(env,publicationFailureReason(error));
     }
   }
     const failedProviderNames=new Set([...providerDiagnostics,...providerAttempted].filter(item=>/(?:timeout|connection_failure|invalid_response|request_failure|http_\d{3})/i.test(item)).map(item=>item.split(":")[0]));const allExternalFailed=results.length===0&&failedProviderNames.size>=3;const message=results.length?undefined:allExternalFailed?(language==="ar"?"تعذر الاتصال بعدة مزودين للبحث الخارجي. سجّل بيان أسباب الفشل وأعاد المحاولة عبر المصادر البديلة؛ لم تُعرض نتائج غير موثوقة. حاول مجددًا بعد قليل.":"Several external search providers failed to respond. BAYAN recorded failure categories and attempted fallback sources; no unverified results were shown. Please retry shortly."):(language==="ar"?"لم تُرجع محاولات البحث المتاحة نتائج ذات صلة كافية. جرّب إضافة سياق أو كتابة الاسم الكامل أو استخدام صياغة أخرى؛ لن يعرض بيان نتائج غير مرتبطة لمجرد ملء الصفحة.":"The available search attempts did not return sufficiently relevant results. Add context, use the full name, or try another phrasing; BAYAN will not show unrelated results just to fill the page.");
   providerAttempted.push(...providerDiagnostics.filter(item=>!providerAttempted.includes(item)));if(!options.healthCheck)try{await saveSearch(env,q,language,intent(q),status,results.length,classifySection(q,results,language),results)}catch{}
-  return {query:q,locale:language,results,providers,providerAttempted,status,message,answer,answerStatus,articleSlug:publishedSlug,publishReason};
+  return {query:q,locale:language,results,providers,providerAttempted,status,message,answer,answerStatus,articleSlug:publishedSlug,publishReason,publishReasonDetail};
 }
 function intent(q:string){
   const s=q.toLowerCase();
