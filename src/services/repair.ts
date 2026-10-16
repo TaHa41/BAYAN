@@ -269,6 +269,53 @@ async function sectionHealth(env:Env){
   return CONTENT_SECTIONS.flatMap(section=>["ar","en"].filter(language=>(counts.get(section+"_"+language)||0)<2).map(language=>section+"_"+language+"="+(counts.get(section+"_"+language)||0)+"/2_complete"));
 }
 
+async function persistSelfHealRepairJob(env:Env,input:{signature:string;status:string;diagnosis:string;action:string;verification:string;initialFailures:string[];remainingFailures:string[]}){
+  const info=await env.DB.prepare("PRAGMA table_info(repair_jobs)").all<any>();
+  const columns=new Set((info.results||[]).map((column:any)=>String(column.name)));
+  if(!columns.has("signature"))throw new Error("repair_jobs.signature column is missing");
+  const stamp=now(),verified=input.verification==="verified_runtime";
+  const values:Record<string,any>={signature:input.signature};
+  const set=(name:string,value:any)=>{if(columns.has(name))values[name]=value};
+  set("context",input.signature);
+  set("error_text",input.initialFailures.join(", ").slice(0,1500));
+  set("status",input.status);
+  set("diagnosis",input.diagnosis.slice(0,1500));
+  set("created_at",stamp);
+  set("updated_at",stamp);
+  set("resolved_at",verified?stamp:null);
+  set("last_verified_at",verified?stamp:null);
+  set("phase",verified?"VERIFIED":"REVIEW");
+  set("root_cause",input.diagnosis.slice(0,1500));
+  set("risk_level","AI_FIX_VERIFY");
+  set("attempts",1);
+  const actionColumn=columns.has("last_action")?"last_action":columns.has("action")?"action":undefined;
+  const verificationColumn=columns.has("verification_json")?"verification_json":columns.has("verification")?"verification":undefined;
+  if(actionColumn)values[actionColumn]=input.action.slice(0,1500);
+  if(verificationColumn)values[verificationColumn]=verificationColumn==="verification_json"?JSON.stringify({status:input.verification,verifiedAt:verified?stamp:null,initialFailures:input.initialFailures,remainingFailures:input.remainingFailures}):input.verification;
+  const entries=Object.entries(values);
+  const updates=entries.filter(([name])=>name!=="signature"&&name!=="created_at").map(([name])=>name==="attempts"?"attempts=repair_jobs.attempts+1":name+"=excluded."+name);
+  const sql="INSERT INTO repair_jobs ("+entries.map(([name])=>name).join(",")+") VALUES ("+entries.map(()=>"?").join(",")+") ON CONFLICT(signature) DO UPDATE SET "+updates.join(",");
+  await env.DB.prepare(sql).bind(...entries.map(([,value])=>value)).run();
+}
+async function resolveHealthyRepairJobs(env:Env){
+  try{
+    const info=await env.DB.prepare("PRAGMA table_info(repair_jobs)").all<any>();
+    const columns=new Set((info.results||[]).map((column:any)=>String(column.name)));
+    const stamp=now(),assignments=["status='RESOLVED'"],values:any[]=[];
+    if(columns.has("updated_at")){assignments.push("updated_at=?");values.push(stamp)}
+    if(columns.has("diagnosis"))assignments.push("diagnosis=COALESCE(diagnosis,'')||' | News cache and image health passed current runtime checks'");
+    const actionColumn=columns.has("last_action")?"last_action":columns.has("action")?"action":undefined;
+    const verificationColumn=columns.has("verification_json")?"verification_json":columns.has("verification")?"verification":undefined;
+    if(actionColumn){assignments.push(actionColumn+"=?");values.push("Closed after current news cache and image health checks passed")}
+    if(verificationColumn){assignments.push(verificationColumn+"=?");values.push(verificationColumn==="verification_json"?JSON.stringify({status:"verified_runtime",verifiedAt:stamp,method:"scheduled news cache and image health checks"}):"verified_runtime")}
+    if(columns.has("resolved_at")){assignments.push("resolved_at=COALESCE(resolved_at,?)");values.push(stamp)}
+    if(columns.has("last_verified_at")){assignments.push("last_verified_at=?");values.push(stamp)}
+    const result=await env.DB.prepare("UPDATE repair_jobs SET "+assignments.join(",")+" WHERE status IN ('REVIEW','REPAIRED','WAITING_AI') AND (signature LIKE '%news_cache%' OR signature LIKE '%images%')").bind(...values).run();
+    if(Number(result.meta?.changes||0)>0)await record(env,"info","healthy_repair_jobs_closed","Closed "+Number(result.meta?.changes||0)+" news-cache/image repair jobs after runtime verification");
+  }catch(error){
+    await record(env,"warn","healthy_repair_job_cleanup_failed",String(error).slice(0,350));
+  }
+}
 async function resolveVerifiedLegacyJobs(env:Env){
   try{
     const info=await env.DB.prepare("PRAGMA table_info(repair_jobs)").all<any>();
@@ -305,7 +352,7 @@ export async function selfHeal(env:Env){
   const failures:string[]=[];
   for(const[c,fn]of checks)try{if(!(await fn())){failures.push(c);await record(env,"error","health",c+" check failed")}}catch(e){failures.push(c);await record(env,"error","health",c+" failed: "+String(e))}
   if(!failures.some((failure)=>["database","articles","sections"].includes(failure)))await resolveVerifiedLegacyJobs(env);
-  if(!failures.length){try{await env.DB.prepare("UPDATE repair_jobs SET status='RESOLVED',verification='verified_runtime',diagnosis=COALESCE(diagnosis,'')||' | News cache and image health now pass',updated_at=? WHERE status IN ('REVIEW','REPAIRED') AND (signature LIKE '%news_cache%' OR signature LIKE '%images%')").bind(now()).run()}catch{}await record(env,"info","health","AI self-healing checks passed");return{ok:true,failures:[],actions:[],verification:"healthy",message:"All runtime checks passed; no repair was necessary."}}
+  if(!failures.length){await resolveHealthyRepairJobs(env);await record(env,"info","health","AI self-healing checks passed");return{ok:true,failures:[],actions:[],verification:"healthy",message:"All runtime checks passed; no repair was necessary."}}
   const lease=await acquireSelfHealLease(env);
   if(!lease){
     await record(env,"warn","self_heal_duplicate","Skipped overlapping self-healing run; another run owns the repair lease.");
@@ -328,9 +375,9 @@ export async function selfHeal(env:Env){
     const previous=await env.DB.prepare("SELECT status,updated_at FROM repair_jobs WHERE signature=?").bind(signature).first<any>();
     const previousTime=Date.parse(String(previous?.updated_at||""));
     if(previous&&previous.status===nextStatus&&Number.isFinite(previousTime)&&Date.now()-previousTime<30*60*1000)shouldNotify=false;
-  }catch{}
-  try{await env.DB.prepare("INSERT INTO repair_jobs(signature,status,diagnosis,action,verification,created_at,updated_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(signature) DO UPDATE SET status=excluded.status,diagnosis=excluded.diagnosis,action=excluded.action,verification=excluded.verification,updated_at=excluded.updated_at").bind(signature,nextStatus,diagnosis,actions.join("; ")||"No safe runtime action available",verification,now(),now()).run()}catch{}
-  try{const count=await env.DB.prepare("SELECT COALESCE(MAX(attempt_no),0) AS n FROM repair_attempts WHERE signature=?").bind(signature).first<any>();const attemptNo=Number(count?.n||0)+1;await env.DB.prepare("INSERT INTO repair_attempts(signature,attempt_no,diagnosis,action,verification,created_at) VALUES(?,?,?,?,?,?)").bind(signature,attemptNo,diagnosis,actions.join("; ")||"No safe runtime action available",verification,now()).run()}catch{}
+  }catch(error){await record(env,"warn","repair_job_previous_state_read_failed",String(error).slice(0,350))}
+  try{await persistSelfHealRepairJob(env,{signature,status:nextStatus,diagnosis,action:actions.join("; ")||"No safe runtime action available",verification,initialFailures:failures,remainingFailures})}catch(error){await record(env,"warn","repair_job_persist_failed",String(error).slice(0,350))}
+  try{const count=await env.DB.prepare("SELECT COALESCE(MAX(attempt_no),0) AS n FROM repair_attempts WHERE signature=?").bind(signature).first<any>();const attemptNo=Number(count?.n||0)+1;await env.DB.prepare("INSERT INTO repair_attempts(signature,attempt_no,diagnosis,action,verification,created_at) VALUES(?,?,?,?,?,?)").bind(signature,attemptNo,diagnosis,actions.join("; ")||"No safe runtime action available",verification,now()).run()}catch(error){await record(env,"warn","repair_attempt_persist_failed",String(error).slice(0,350))}
   await record(env,verification==="verified_runtime"?"info":"error","self_heal",JSON.stringify({initialFailures:failures,remainingFailures,actions,verification}).slice(0,3800));
   if(shouldNotify)await notify(env,"BAYAN AI Self-Healing\nInitial failures: "+failures.join(", ")+"\nRemaining failures: "+(remainingFailures.join(", ")||"none")+"\nAction: "+(actions.join("; ")||"none")+"\nVerification: "+verification);
   return{ok:verification==="verified_runtime",failures:remainingFailures,initialFailures:failures,diagnosis,actions,verification};
