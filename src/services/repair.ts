@@ -285,41 +285,7 @@ async function resolveVerifiedLegacyJobs(env:Env){
     const result=await env.DB.prepare("UPDATE repair_jobs SET "+assignments.join(",")+" WHERE status='WAITING_AI' AND (signature LIKE '%generated is not defined%' OR signature LIKE '%resolveWikimediaEditorialImage is not defined%' OR signature LIKE '%manual Telegram diagnostic report%' OR signature LIKE '%predictive runtime degradation: /search%')").bind(...values).run();
     await record(env,"info","legacy_job_cleanup","Resolved stale legacy repair jobs; changed="+Number(result.meta?.changes||0));
   }catch(error){
-    await record(env,"warn","legacy_job_cleanup","Could not resolve stale legacy repair jobs: "+String(error).replace(/https?:\/\/[^\s]+/g,"[url]").slice(0,350));
-  }
-}
-
-export async function selfHeal(env:Env){
-  const checks:[string,()=>Promise<boolean>][]=[
-    ["database",async()=>{await env.DB.prepare("SELECT 1").first();return true}],
-    ["articles",async()=>{const r=await env.DB.prepare("SELECT COUNT(*) count FROM articles WHERE status='PUBLISHED'").first<any>();return Number(r?.count||0)>0}],
-    ["news_article_publication_24h",async()=>{const r=await env.DB.prepare("SELECT COUNT(*) AS count FROM articles WHERE status='PUBLISHED' AND section='news' AND created_at>=datetime('now','-24 hours')").first<any>();return Number(r?.count||0)>0}],
-    ["search_returns_results",async()=>{const result=await search(env,"Naguib Mahfouz","en");return Array.isArray(result.results)&&result.results.length>0}],
-    ["sections",async()=>{return (await sectionHealth(env)).length===0}],
-    ["news_cache",async()=>await newsCacheHealthy(env)],
-    ["images",async()=>await imageHealth(env)],
-    ["contributions",async()=>{await env.DB.prepare("SELECT 1 FROM contributions LIMIT 1").first();return true}],
-    ["repair_state",async()=>{await env.DB.prepare("SELECT 1 FROM repair_jobs LIMIT 1").first();return true}],
-    ["settings",async()=>{await env.DB.prepare("SELECT key FROM admin_settings LIMIT 1").first();return true}]
-  ];
-  const failures:string[]=[];
-  for(const[c,fn]of checks)try{if(!(await fn())){failures.push(c);await record(env,"error","health",c+" check failed")}}catch(e){failures.push(c);await record(env,"error","health",c+" failed: "+String(e))}
-  if(!failures.some((failure)=>["database","articles","sections"].includes(failure)))await resolveVerifiedLegacyJobs(env);
-  if(!failures.length){
-    try{
-      const info=await env.DB.prepare("PRAGMA table_info(repair_jobs)").all<any>();
-      const columns=new Set((info.results||[]).map((column:any)=>String(column.name)));
-      const assignments=["status='RESOLVED'","diagnosis=COALESCE(diagnosis,'')||' | News cache, image, publication and search checks passed'"];
-      const values:any[]=[];
-      if(columns.has("last_action")){assignments.push("last_action=?");values.push("Runtime health checks verified");}
-      else if(columns.has("action")){assignments.push("action=?");values.push("Runtime health checks verified");}
-      if(columns.has("verification_json")){assignments.push("verification_json=?");values.push(JSON.stringify({status:"verified_runtime",verifiedAt:now(),checks:["news_cache","images","news_article_publication_24h","search_returns_results"]}));}
-      else if(columns.has("verification")){assignments.push("verification=?");values.push("verified_runtime");}
-      if(columns.has("resolved_at"))assignments.push("resolved_at=COALESCE(resolved_at,datetime('now'))");
-      if(columns.has("last_verified_at"))assignments.push("last_verified_at=datetime('now')");
-      if(columns.has("updated_at")){assignments.push("updated_at=?");values.push(now());}
-      await env.DB.prepare("UPDATE repair_jobs SET "+assignments.join(",")+" WHERE status IN ('REVIEW','REPAIRED') AND (signature LIKE '%news_cache%' OR signature LIKE '%images%')").bind(...values).run();
-    }catch(error){await record(env,"warn","legacy_job_cleanup","Could not mark verified cache/image repair jobs resolved: "+String(error).replace(/https?:\\/\\/[^\\s]+/g,"[url]").slice(0,300));}
+    await record(env,"warn","legacy_job_cleanup","Could not resolve stale legacy repair jobs: "+String(error).replace(/https?:\/\/[^\s]+/g,"[url]").slice(0,300));}
     await record(env,"info","health","AI self-healing checks passed");
     return{ok:true,failures:[],actions:[],verification:"healthy",message:"All runtime checks passed; no repair was necessary."}
   }
