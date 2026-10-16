@@ -106,7 +106,7 @@ export async function addContribution(env:Env,title:string,body:string,source:st
   if(new Set(sources.map(s=>new URL(s.url).hostname)).size<2)throw new Error("contribution_needs_independent_sources");
   const summary=body.replace(/^#{1,4}\s+/gm,"").replace(/\s+/g," ").slice(0,500);
   if(summary.length<40)throw new Error("contribution_summary_missing");
-  const image=await findRelatedImage(title,sources[0]?.url);
+  const image=await findRelatedImage(title,sources[0]?.url,"",env);
   if(!image||!/^https:\/\//i.test(image))throw new Error("contribution_image_unavailable");
   const published=await publishVerifiedResearch(env,{title,summary,body,section:String(c.section||"world"),language,sources,imageUrl:image,imageAlt:title});
   if(!published)throw new Error("contribution_article_not_publishable");
