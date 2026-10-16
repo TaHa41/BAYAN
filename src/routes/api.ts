@@ -1,4 +1,4 @@
-import{safePublicImageUrl}from"../image-url";
+import{safePublicImageUrl}from"../image-url";import{recordRuntimeEventLimited}from"../runtime-events";
 import type{Env,Locale,Source}from"../types";import{json,locale,body}from"../http";import{search,isolateArticleSubject}from"../services/search";import{externalSearchRecovery}from"../services/search-recovery";import{weather,fx,gold,prayerTimes}from"../services/live";import{news,findRelatedImage}from"../services/news";import{ask}from"../services/ai";import{addContribution,getArticle,listArticles,reviewContribution,track,analyticsStats,publishVerifiedResearch}from"../db";import{analyticsExcluded,clean,manager,visitorId}from"../security";import{notify}from"../services/telegram";import{sectionBySlug}from"../sections";import{articlePromptForTopic,sectionForOpenedStory as editorialSectionForOpenedStory}from"../services/editorial";import{wisdomFor}from"../wisdom";import{selfHeal,aiRepairRequest}from"../services/repair";const bounded=<T,>(promise:Promise<T>,ms:number):Promise<T>=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error("operation_timeout")),ms);promise.then(value=>{clearTimeout(timer);resolve(value)},error=>{clearTimeout(timer);reject(error)})});const sourceDescription=async(url:string,lang:"ar"|"en")=>{try{const u=new URL(url),hosts=["aljazeera.net","aljazeera.com","bbc.com","bbc.co.uk","france24.com","dw.com","apnews.com","reuters.com","theguardian.com","skynewsarabia.com","independentarabia.com","aawsat.com","news.google.com","wikipedia.org","wikidata.org","openalex.org","who.int","un.org","worldbank.org","imf.org","ourworldindata.org","britannica.com","nature.com","science.org","kooora.com","goal.com","btolat.com","youm7.com","yallakora.com","filgoal.com","kingfut.com","cafonline.com","premierleague.com","liverpoolfc.com","uefa.com","fifa.com","masrawy.com","almasryalyoum.com","alarabiya.net","egypttoday.com"];if(u.protocol!=="https:"||!hosts.some(host=>u.hostname===host||u.hostname.endsWith("."+host)))return"";const r=await fetch(u.toString(),{signal:AbortSignal.timeout(3500),headers:{accept:"text/html"}});if(!r.ok)return"";const html=(await r.text()).slice(0,600000);const raw=html.match(/<meta[^>]+(?:property|name)=["\x27](?:og:description|description)["\x27][^>]+content=["\x27]([^"\x27]+)["\x27]/i)?.[1]||html.match(/<meta[^>]+content=["\x27]([^"\x27]+)["\x27][^>]+(?:property|name)=["\x27](?:og:description|description)["\x27]/i)?.[1]||"";const value=String(raw).replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim().slice(0,1500);const arabic=/[\u0600-\u06ff]/.test(value);return value&&(lang==="ar"?arabic:!arabic)?value:""}catch{return""}};
 const articleHasNamesakeContamination=(title:string,bodyText:string,sources:any[])=>{
  const normalized=(value:string)=>String(value||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").trim();
@@ -126,8 +126,8 @@ const persistOpenedNewsArticle=async(env:Env,article:{title:string;summary:strin
   const imageFromEvidence=sources.some(s=>String(s.imageUrl||"").trim()===image);
   if(!/^https:\/\//i.test(image)||!imageFromEvidence){
    const firstSource=sources.find(s=>/^https:\/\//i.test(String(s.url||"")));
-   image=await bounded(findRelatedImage(title,firstSource?.url),3500).catch(()=>undefined)||"";
-   if(!/^https:\/\//i.test(image))image=await bounded(findRelatedImage(title+" "+summary.slice(0,180)),3500).catch(()=>undefined)||"";
+   image=await bounded(findRelatedImage(title,firstSource?.url),3500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","initial_image_lookup_failed",error);return undefined})||"";
+   if(!/^https:\/\//i.test(image))image=await bounded(findRelatedImage(title+" "+summary.slice(0,180)),3500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","summary_image_lookup_failed",error);return undefined})||"";
   }
   if(!/^https:\/\//i.test(image))return null;
   return await publishVerifiedResearch(env,{title,summary,body:normalizedBody.body,section:editorialSectionForOpenedStory(title,summary),language:lang,sources,imageUrl:image,imageAlt:title});
@@ -141,7 +141,7 @@ export async function api(request:Request,env:Env,ctx?:ExecutionContext){const u
   if(isVideoUrl(storyUrl))return json({error:"video_source_not_article",kind:"video",message:lang==="ar"?"هذا رابط فيديو، وليس مقالًا مكتوبًا. افتح الفيديو كمصدر منفصل، ولا تُنشئ منه مقالًا دون نص موثوق ومصادر مكتوبة مستقلة.":"This is a video, not a written article. Open it as a separate source; do not draft an article without a reliable transcript and independent written sources."},422);
   try{
     let found:any={results:[],status:"insufficient"};
-    try{found=await bounded(search(env,title,lang,{publish:false,draft:false,images:false}),11000)}catch{}
+    try{found=await bounded(search(env,title,lang,{publish:false,draft:false,images:false}),11000)}catch(error){await recordRuntimeEventLimited(env,"news_article_evidence_search","evidence_search_failed",error)}
     found.results=isolateArticleSubject(title,(Array.isArray(found.results)?found.results:[]).filter((candidate:any)=>newsArticleEvidenceRelevant(title,candidate)&&!hasMixedPersonIdentities(title,String(candidate.summary||""))&&!isVideoUrl(String(candidate.url||candidate.sources?.[0]?.url||""))) as any);
     // If the first pass only found encyclopedias, make one bounded, query-derived
     // recovery pass to find independent reporting or primary sources. This is
@@ -175,7 +175,7 @@ export async function api(request:Request,env:Env,ctx?:ExecutionContext){const u
     if(!found.results.length&&(summary||storyUrl)){
       const safeUrl=storyUrl.startsWith("https://")?storyUrl:"";
       const sourceSummary=(lang==="ar"?/[؀-ۿ]/.test(summary):!/[؀-ۿ]/.test(summary))?summary:"";
-      if(!image&&safeUrl){image=await bounded(findRelatedImage(title,safeUrl,sourceSummary),2200).catch(()=>undefined)||"";}
+      if(!image&&safeUrl){image=await bounded(findRelatedImage(title,safeUrl,sourceSummary),2200).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","safe_url_image_lookup_failed",error);return undefined})||"";}
       const sources=safeUrl?[{title,publisher:publisher||(lang==="ar"?"مصدر إخباري":"News source"),url:safeUrl,publishedAt,imageUrl:image||undefined} as Source]:[];
       const article={title,summary:sourceSummary||title,body:sourceSummary||title,sources,image:image||null,status:"source_only",providerCount:sources.length?1:0,publishedAt};
       return json({ok:true,article:{...article,section:editorialSectionForOpenedStory(title,article.summary)}});
@@ -184,7 +184,7 @@ export async function api(request:Request,env:Env,ctx?:ExecutionContext){const u
       const live=await bounded(news(env,lang),7000);
       const story=live.items?.find((x:any)=>String(x.title).trim()===title.trim())||live.items?.find((x:any)=>String(x.title).includes(title.slice(0,80)));
       if(!story)return json({error:"article_source_unavailable",status:"insufficient"},503);
-      if(!image)image=story.imageUrl||await bounded(findRelatedImage(story.title||title),3500).catch(()=>undefined)||"";
+      if(!image)image=story.imageUrl||await bounded(findRelatedImage(story.title||title),3500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","story_image_lookup_failed",error);return undefined})||"";
       const article={title:story.title,summary:story.summary||"",body:story.summary||story.title,sources:story.sources||[],image:image||null,status:"source_only",providerCount:1,publishedAt:story.publishedAt};const savedSlug=await persistOpenedNewsArticle(env,article,lang);return json({ok:true,article:{...article,section:editorialSectionForOpenedStory(story.title,story.summary||""),savedSlug}});
     }
     // Enrich short snippets with readable text from a few independent, allow-listed source pages.
@@ -201,11 +201,11 @@ export async function api(request:Request,env:Env,ctx?:ExecutionContext){const u
           const readable=articleReadableHosts.some(allowed=>host===allowed||host.endsWith("."+allowed));
           if(parsed.protocol!=="https:"||!readable||articleEvidenceHosts.has(host)||articleEvidenceUrls.includes(parsed.toString()))continue;
           articleEvidenceHosts.add(host);articleEvidenceUrls.push(parsed.toString());break;
-        }catch{}
+        }catch(error){await recordRuntimeEventLimited(env,"article_source_url","candidate_source_url_invalid",error)}
       }
       if(articleEvidenceUrls.length>=2)break;
     }
-    const articleEvidenceText=await Promise.all(articleEvidenceUrls.map(url=>bounded(sourceArticleText(url,lang),4500).catch(()=> "")));
+    const articleEvidenceText=await Promise.all(articleEvidenceUrls.map(url=>bounded(sourceArticleText(url,lang),4500).catch(async error=>{await recordRuntimeEventLimited(env,"article_source_fetch","source_article_fetch_failed",error);return ""})));
     const evidenceByUrl=new Map(articleEvidenceUrls.map((url,index)=>[url,articleEvidenceText[index]]));
     found.results=found.results.map((candidate:any)=>{
       const candidateUrls=[candidate.url,...(Array.isArray(candidate.sources)?candidate.sources.map((item:any)=>item?.url):[])].map((value:any)=>String(value||""));
@@ -213,7 +213,7 @@ export async function api(request:Request,env:Env,ctx?:ExecutionContext){const u
       return extra?{...candidate,summary:[String(candidate.summary||"").trim(),extra].filter(Boolean).join("\n\n").slice(0,5000)}:candidate;
     });
     let generated:{status:string;answer?:string;sources?:Source[]}={status:"mixed"};
-    try{generated=await bounded(ask(env,articlePromptForTopic(title,lang,found.results),lang,found.results),14000)}catch{}
+    try{generated=await bounded(ask(env,articlePromptForTopic(title,lang,found.results),lang,found.results),14000)}catch(error){await recordRuntimeEventLimited(env,"article_draft_generation","draft_generation_failed",error)}
     const evidenceBody=String(found.results[0]?.summary||"").trim();
     const evidenceSources=found.results.flatMap((x:any)=>x.sources||[]).filter(Boolean);
     const hasIndependentSources=articleEvidenceQuality(evidenceSources);
@@ -228,7 +228,7 @@ export async function api(request:Request,env:Env,ctx?:ExecutionContext){const u
       const referenceSummary=sourceExcerpt(String(referenceCandidate?.summary||summary||""),1000);
       const referenceTitle=String(referenceCandidate?.title||title).trim().slice(0,500);
       if(referenceCandidate&&referenceSummary){
-        if(!image)image=String(referenceCandidate.imageUrl||"")||await bounded(findRelatedImage(referenceTitle,referenceCandidate.url,referenceSummary),2500).catch(()=>undefined)||"";
+        if(!image)image=String(referenceCandidate.imageUrl||"")||await bounded(findRelatedImage(referenceTitle,referenceCandidate.url,referenceSummary),2500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","reference_image_lookup_failed",error);return undefined})||"";
         return json({ok:true,article:{title:referenceTitle,summary:referenceSummary,body:referenceSummary,sources:referenceSources,image:image||null,status:"source_only",providerCount:referenceSources.length,section:editorialSectionForOpenedStory(referenceTitle,referenceSummary),publishedAt}});
       }
       return json({error:"article_evidence_insufficient",status:"insufficient",message:lang==="ar"?"لم تتوفر مصادر مستقلة كافية لإعداد مقال موثق.":"There were not enough independent sources to prepare a verified article."},422);
@@ -249,7 +249,7 @@ export async function api(request:Request,env:Env,ctx?:ExecutionContext){const u
     const items=(rows.results||[]).map((row:any)=>({id:Number(row.id),title:String(row.title||""),summary:String(row.summary||""),url:String(row.url||""),publisher:String(row.publisher||""),publishedAt:row.published_at||null,imageUrl:safePublicImageUrl(row.image_url),imageAlt:String(row.image_alt||row.title||""),section:String(row.section||"news"),language:lang,archivedAt:String(row.fetched_at||""),sources:[{title:String(row.title||""),publisher:String(row.publisher||""),url:String(row.url||""),publishedAt:row.published_at||undefined,imageUrl:safePublicImageUrl(row.image_url)}]}));
     return json({ok:true,language:lang,section,items,count:items.length});
   }catch(error){
-    try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","news_archive_read",String(error).slice(0,300),new Date().toISOString()).run()}catch{}
+    await recordRuntimeEventLimited(env,"news_archive_read","archive_read_failed",error)
     return json({ok:false,language:lang,items:[],error:"news_archive_unavailable"},503);
   }
 }if(u.pathname==="/api/news")return json(await news(env,lang),200,"public, max-age=45, stale-while-revalidate=180");if(u.pathname==="/api/image"){const q=clean(u.searchParams.get("q")||"",500);if(!q)return json({error:"query_required"},400);return json({ok:true,imageUrl:safePublicImageUrl(await findRelatedImage(q))});}if(u.pathname==="/api/wisdom"){const section=clean(u.searchParams.get("section")||"world",80);if(!sectionBySlug(section))return json({error:"invalid_section"},400);return json({section,wisdom:wisdomFor(section,lang)});}if(u.pathname==="/api/section"){const section=clean(u.searchParams.get("section")||"",80);if(!section||!sectionBySlug(section))return json({error:"invalid_section"},400);if(section==="news"){
@@ -261,7 +261,7 @@ export async function api(request:Request,env:Env,ctx?:ExecutionContext){const u
       if(items.some((item:any)=>String(item.title||"").trim().toLowerCase()===String(row.title||"").trim().toLowerCase()))continue;
       items.push({id:Number(row.id),title:String(row.title||""),summary:String(row.summary||""),publisher:String(row.publisher||""),publishedAt:row.published_at||null,imageUrl:safePublicImageUrl(row.image_url),imageAlt:String(row.image_alt||row.title||""),section:"news",kind:"news_archive",body:String(row.summary||""),slug:"",href:"/news?archive="+encodeURIComponent(String(row.id))+"&lang="+lang,sources:[],archivedAt:String(row.fetched_at||"")});
     }
-  }catch{}
+  }catch(error){await recordRuntimeEventLimited(env,"section_news_archive","section_archive_query_failed",error)}
   return json({section,items:items.map((item:any)=>({...item,imageUrl:safePublicImageUrl(item.imageUrl)}))})
 }let items:any[]=await listArticles(env,section,lang,24);
 const hasArabic=(value:unknown)=>/[\u0600-\u06ff]/.test(String(value||""));
@@ -323,7 +323,7 @@ if(items.length<2&&section!=="prices"){
    const cached=await env.DB.prepare("SELECT results_json FROM searches WHERE language=? AND topic_section=? AND created_at>=? ORDER BY created_at DESC LIMIT 4").bind(lang,section,since).all<any>();
    const seenCached=new Set<string>();
    for(const row of cached.results||[]){
-    let parsed:any[]=[];try{const value=JSON.parse(String(row.results_json||"[]"));if(Array.isArray(value))parsed=value;}catch{}
+    let parsed:any[]=[];try{const value=JSON.parse(String(row.results_json||"[]"));if(Array.isArray(value))parsed=value;}catch(error){await recordRuntimeEventLimited(env,"search_cache_parse","section_cached_results_invalid",error)}
     for(const item of parsed){
      const title=String(item?.title||""),summary=String(item?.summary||"");
      const key=title.normalize("NFKC").toLowerCase().trim();
@@ -360,7 +360,7 @@ if(u.pathname==="/api/admin/article/expand"&&request.method==="POST"){
   if(!slug)return json({error:"invalid_article"},400);
   const row=await env.DB.prepare("SELECT slug,language,title,summary,body,section,sources_json FROM articles WHERE slug=? AND language=? LIMIT 1").bind(slug,language).first<any>();
   if(!row)return json({error:"article_not_found"},404);
-  let storedSources:any[]=[];try{storedSources=JSON.parse(String(row.sources_json||"[]"))}catch{}
+  let storedSources:any[]=[];try{storedSources=JSON.parse(String(row.sources_json||"[]"))}catch(error){await recordRuntimeEventLimited(env,"article_sources_parse","stored_article_sources_invalid",error)}
   const discovery=await bounded(search(env,String(row.title),language,{publish:false}),7000).catch(()=>({results:[] as any[]}));
   const discovered=Array.isArray(discovery.results)?discovery.results.slice(0,5):[];
   const combinedSources=[...storedSources,...discovered.flatMap((item:any)=>item.sources||[])];
