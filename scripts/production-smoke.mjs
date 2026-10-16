@@ -55,7 +55,7 @@ function assertNoBlockedImageHosts(payload,label){
       if(host==="googleusercontent.com"||host.endsWith(".googleusercontent.com")||
          host==="news.google.com"||host.endsWith(".news.google.com")||
          host==="gstatic.com"||host.endsWith(".gstatic.com")) blocked.push(host);
-    }catch{}
+    }catch(error){void error;}
   }
   if(blocked.length)throw new Error(label+"_contains_blocked_image_host:"+[...new Set(blocked)].join(","));
 }
@@ -344,7 +344,7 @@ if(process.env.BAYAN_SMOKE_AI_PROBES==="1"){
           const title=String(result.title||"");
           if(item.lang==="ar"?(!/[\u0600-\u06ff]/.test(title)):(/[\u0600-\u06ff]/.test(title)))throw new Error("general_search_title_language_mismatch_"+item.lang+"_"+item.q);
           for(const source of result.sources||[]){
-            try{const url=new URL(String(source.url||""));if(url.protocol==="https:"&&!/wikipedia.org|wikidata.org|news.google.com/i.test(url.hostname))hostCoverage.add(url.hostname.toLowerCase().replace(/^www\./,""))}catch{}
+            try{const url=new URL(String(source.url||""));if(url.protocol==="https:"&&!/wikipedia.org|wikidata.org|news.google.com/i.test(url.hostname))hostCoverage.add(url.hostname.toLowerCase().replace(/^www\./,""))}catch(error){void error;}
           }
         }
         if(!data.results.some(result=>/^https:\/\//i.test(String(result.url||""))||(result.sources||[]).some(source=>/^https:\/\//i.test(String(source.url||"")))))throw new Error("general_search_sources_missing_"+item.lang+"_"+item.q);
