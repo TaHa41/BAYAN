@@ -963,7 +963,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
             if(!imageUrl){publishReason="no_image";return;}
             let savedSlug:string|null;
             try{
-              savedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:longDraft.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle});
+              const articleSources=results.flatMap(x=>x.sources||[]);const imageAttributionUrl=[sourceImage,relatedImage].find(value=>{const candidate=String(value||"");return candidate.startsWith("https://commons.wikimedia.org/")&&(candidate.includes("Special:FilePath")||candidate.includes("Special:Redirect/file"));});if(imageAttributionUrl)articleSources.push(source(articleTitle+" image","Wikimedia Commons",imageAttributionUrl));savedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:longDraft.answer,section:classifySection(q,results,language),language,sources:articleSources,imageUrl,imageAlt:articleTitle});
             }catch(error){
               publishReason=publicationFailureReason(error);
               await recordPublicationWarning(env,publishReason);
