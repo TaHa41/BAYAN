@@ -25,7 +25,7 @@ const timeout = async (url:string, ms=2600, diagnostics?:string[], provider="ext
     const maxBytes=/text\/html/.test(contentType)?256*1024:/xml|rss|text\/plain/.test(contentType)?384*1024:768*1024;
     const declaredSize=Number(response.headers.get("content-length")||0);
     if(declaredSize>maxBytes){
-      await response.body?.cancel().catch(()=>{});
+      await response.body?.cancel().catch(error=>{void error});
       throw new Error("response_body_too_large");
     }
     const bodyless=response.status===204||response.status===205||response.status===304;
@@ -40,7 +40,7 @@ const timeout = async (url:string, ms=2600, diagnostics?:string[], provider="ext
           if(part.done)break;
           total+=part.value.byteLength;
           if(total>maxBytes){
-            await reader.cancel().catch(()=>{});
+            await reader.cancel().catch(error=>{void error});
             throw new Error("response_body_too_large");
           }
           chunks.push(part.value);
