@@ -76,7 +76,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
     }else await recordAiFailure(env,"OpenAI draft","http_"+response.status);
   }catch(error){await recordAiFailure(env,"OpenAI draft",aiFailureDetail(error));}
   if(env.AI)try{
-    const response=await env.AI.run("@cf/meta/llama-3.1-8b-instruct",{messages,max_tokens:1800,temperature:.1});
+    const response=await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast",{messages,max_tokens:1800,temperature:.1});
     const answer=String((response as any)?.response||"").trim();
     if(answer&&languageConsistent(answer,locale))return{status:independentSourceCount(evidence)>=2&&!answerHasUnsupportedSpecifics(answer,evidence,question)?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(item=>item.sources||[])};
     await recordAiFailure(env,"Workers AI draft",answer?"language_mismatch":"empty_response");
@@ -98,7 +98,7 @@ export async function ask(env:Env,question:string,locale:Locale,evidence:SearchR
     const system=locale==="ar"
       ?"أنت بيان. أجب بالعربية الفصحى فقط وبالاعتماد على الأدلة المرفقة وحدها. لا تخترع أسماء أو أرقامًا أو مصادر. ميّز الحقائق من الاستنتاجات، واذكر بوضوح ما لا تثبته الأدلة."
       :"You are BAYAN. Answer in English only using only the supplied evidence. Do not invent names, numbers, or sources. Distinguish facts from inference and state clearly what the evidence does not establish.";
-    const r=await env.AI.run("@cf/meta/llama-3.1-8b-instruct",{messages:[{role:"system",content:system},{role:"user",content:"Question: "+question+"\nEvidence: "+evidenceText}],max_tokens:1200,temperature:0.1});
+    const r=await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast",{messages:[{role:"system",content:system},{role:"user",content:"Question: "+question+"\nEvidence: "+evidenceText}],max_tokens:1200,temperature:0.1});
     const answer=String((r as any)?.response||"").trim();
     if(answer && languageConsistent(answer,locale))return{status:independentSourceCount(evidence)>=2&&!answerHasUnsupportedSpecifics(answer,evidence,question)?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(x=>x.sources)};
     await recordAiFailure(env,"Workers AI answer",answer?"language_mismatch":"empty_response");
