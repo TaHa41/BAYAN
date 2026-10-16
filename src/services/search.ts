@@ -1,4 +1,4 @@
-import{safePublicImageUrl}from"../image-url";
+import{resolvePublishedImageUrl,safePublicImageUrl}from"../image-url";
 import type {Env,Locale,SearchResponse,SearchResult,Source} from "../types";
 import {searchArticles,saveSearch,publishVerifiedResearch} from "../db";
 import {ask,draftArticle} from "./ai";
@@ -960,11 +960,11 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
               try{relatedImage=await findRelatedImage(articleTitle,undefined,articleSummary);}
               catch(error){await recordPublicationWarning(env,publicationFailureReason(error));}
             }
-            const imageUrl=safePublicImageUrl(sourceImage)||safePublicImageUrl(relatedImage);
+            const imageCandidate=safePublicImageUrl(sourceImage)||safePublicImageUrl(relatedImage);const imageUrl=await resolvePublishedImageUrl(imageCandidate);
             if(!imageUrl){publishReason="no_image";return;}
             let savedSlug:string|null;
             try{
-              savedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:longDraft.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle});
+              const articleSources=results.flatMap(x=>x.sources||[]);const imageAttributionUrl=[sourceImage,relatedImage].find(value=>{const candidate=String(value||"");return candidate.startsWith("https://commons.wikimedia.org/")&&(candidate.includes("Special:FilePath")||candidate.includes("Special:Redirect/file"));});if(imageAttributionUrl)articleSources.push(source(articleTitle+" image","Wikimedia Commons",imageAttributionUrl));savedSlug=await publishVerifiedResearch(env,{title:articleTitle,summary:articleSummary,body:longDraft.answer,section:classifySection(q,results,language),language,sources:articleSources,imageUrl,imageAlt:articleTitle});
             }catch(error){
               publishReason=publicationFailureReason(error);
               await recordPublicationWarning(env,publishReason);
@@ -985,6 +985,8 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     }
   }
     const failedProviderNames=new Set([...providerDiagnostics,...providerAttempted].filter(item=>/(?:timeout|connection_failure|invalid_response|request_failure|http_\d{3})/i.test(item)).map(item=>item.split(":")[0]));const allExternalFailed=results.length===0&&failedProviderNames.size>=3;const message=results.length?undefined:allExternalFailed?(language==="ar"?"تعذر الاتصال بعدة مزودين للبحث الخارجي. سجّل بيان أسباب الفشل وأعاد المحاولة عبر المصادر البديلة؛ لم تُعرض نتائج غير موثوقة. حاول مجددًا بعد قليل.":"Several external search providers failed to respond. BAYAN recorded failure categories and attempted fallback sources; no unverified results were shown. Please retry shortly."):(language==="ar"?"لم تُرجع محاولات البحث المتاحة نتائج ذات صلة كافية. جرّب إضافة سياق أو كتابة الاسم الكامل أو استخدام صياغة أخرى؛ لن يعرض بيان نتائج غير مرتبطة لمجرد ملء الصفحة.":"The available search attempts did not return sufficiently relevant results. Add context, use the full name, or try another phrasing; BAYAN will not show unrelated results just to fill the page.");
+  if(options.publish!==false&&!publishedSlug&&!publishReason)publishReason="publish_rejected";
+  if(options.publish!==false&&publishReason)await recordPublicationWarning(env,publishReason);
   providerAttempted.push(...providerDiagnostics.filter(item=>!providerAttempted.includes(item)));if(!options.healthCheck)try{await saveSearch(env,q,language,intent(q),status,results.length,classifySection(q,results,language),results)}catch{}
   return {query:q,locale:language,results,providers,providerAttempted,status,message,answer,answerStatus,articleSlug:publishedSlug,publishReason};
 }
