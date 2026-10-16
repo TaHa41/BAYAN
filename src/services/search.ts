@@ -918,7 +918,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
         const publisher=String(src.publisher||"").trim().toLowerCase();
         const url=String(src.url||item.url||"");
         let host="";
-        try{const parsed=new URL(url);if(parsed.protocol==="https:")host=parsed.hostname.toLowerCase().replace(/^www\./,"");}catch(error){await recordRuntimeEventLimited(env,"candidate_source_url","invalid_candidate_source_url",error)}
+        try{const parsed=new URL(url);if(parsed.protocol==="https:")host=parsed.hostname.toLowerCase().replace(/^www\./,"");}catch(error){void recordRuntimeEventLimited(env,"candidate_source_url","invalid_candidate_source_url",error)}
         if(!host||/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com|news\.yahoo\.com/.test(host))continue;
         if(/wikipedia|wikidata|google news|bing news|duckduckgo|news aggregator|ويكيبيديا|ويكي بيانات/i.test(publisher))continue;
         publishers.add(publisher||host);
