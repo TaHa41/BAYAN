@@ -536,6 +536,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   const compact=searchTerms(normalized).slice(0,6).join(" ");
   const contextCompact=searchTerms(String(publicationContext||"").normalize("NFKC")).slice(0,6).join(" ");
   const generalCompact=publicationResearch&&contextCompact?[compact,contextCompact].filter(Boolean).join(" "):compact;
+  const gdeltQuery=[compact,contextCompact].filter(Boolean).join(" ");
   const identity=String(identitySummary||"");
   const sportsProfile=isSportsPersonProfile(identity);
   const writerProfile=/(writer|author|novelist|poet|كاتب|مؤلف|روائي|شاعر)/i.test(identity);
@@ -568,7 +569,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
       wikipediaRestSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Wikipedia REST Search",error);return[]}),
       googleNewsSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Google News Search",error);return[]}),
       bingWebRssSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing Web RSS Search",error);return[]}),
-      includeGdelt ? gdeltNewsSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"GDELT News Search",error);return[]}) : Promise.resolve([])
+      includeGdelt ? gdeltNewsSearch(gdeltQuery,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"GDELT News Search",error);return[]}) : Promise.resolve([])
     ]);
     const labelsForRun=includeGdelt?[...labels,"GDELT News Search"]:labels;
     diagnostics.push("Expanded variant "+(variantIndex+1)+" result counts: "+labelsForRun.map((label,index)=>label+"="+(results[index]?.length||0)).join(", "));
