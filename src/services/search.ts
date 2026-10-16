@@ -788,7 +788,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   // The local news archive is a cheap, bounded recovery source; query it only
   // when primary retrieval lacks independent publishers, reducing work on healthy searches.
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
-    const archiveNews=await safe(searchRecentNewsArchive(env,q,language,publicationResearch?publicationContext:""),[],"BAYAN Recent News Archive");
+    const archiveNews=await safe(searchRecentNewsArchive(env,q,language,options.publicationContext!==undefined?String(options.publicationContext).slice(0,500):""),[],"BAYAN Recent News Archive");
     providerAttempted.push("BAYAN Recent News Archive");
     if(archiveNews.length)candidates.push(...archiveNews);
   }
