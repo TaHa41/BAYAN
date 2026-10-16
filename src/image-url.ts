@@ -38,8 +38,8 @@ export async function resolvePublishedImageUrl(value: unknown): Promise<string |
   const host = original.hostname.toLowerCase();
   if (host === "upload.wikimedia.org") return original.href;
   if (host !== "commons.wikimedia.org" ||
-      !(/\\/wiki\\/Special:FilePath\\//i.test(original.pathname) ||
-        /Special:Redirect\\/file/i.test(original.search))) return safe;
+      !(/\/wiki\/Special:FilePath\//i.test(original.pathname) ||
+        /Special:Redirect\/file/i.test(original.search))) return safe;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 3500);
