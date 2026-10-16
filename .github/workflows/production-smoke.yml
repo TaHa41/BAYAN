@@ -47,13 +47,13 @@ jobs:
           echo "::error::Timed out waiting for the production deployment to finish."
           exit 1
       - name: Run deployed-site smoke tests
-        if: github.event_name != 'schedule'
+        if: github.event_name == 'workflow_dispatch'
         env:
           BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
           BAYAN_AI_MANAGER_TOKEN: ${{ secrets.BAYAN_AI_MANAGER_TOKEN }}
         run: node scripts/production-self-heal.mjs
       - name: Run lightweight scheduled health check
-        if: github.event_name == 'schedule'
+        if: github.event_name != 'workflow_dispatch'
         env:
           BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
         run: node scripts/production-health.mjs
