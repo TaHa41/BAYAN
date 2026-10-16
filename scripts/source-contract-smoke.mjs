@@ -273,7 +273,7 @@ const checks = [
     "src/services/ai.ts","src/services/editorial.ts","src/services/live.ts","src/services/news-article-publisher.ts","src/services/news.ts","src/services/repair.ts","src/services/search-recovery.ts","src/services/search.ts","src/services/telegram.ts","src/services/wikimedia-enterprise.ts",
     "scripts/inject-build-id.mjs","scripts/news-sitemap-diagnostics.mjs","scripts/production-health.mjs","scripts/production-self-heal.mjs","scripts/production-smoke.mjs","scripts/seed-article-quality-smoke.mjs",
     "tests/api.test.ts","tests/editorial.test.ts","tests/publication-reason.test.ts","tests/search-patterns.test.ts","tests/search-recovery.test.ts","tests/unit.test.ts","tests/runtime-events.test.ts"
-  ].every(path=>!(/catch\\s*(?:\\([^)]*\\))?\\s*\\{\\s*\\}|\\.catch\\(\\s*(?:\\(\\s*\\w*\\s*\\)|\\w+)\\s*=>\\s*(?:null|undefined|\\{\\s*\\})\\s*\\)/.test(read(path))))],
+  ].every(path=>!(/catch\s*(?:\([^)]*\))?\s*\{\s*\}|\.catch\(\s*(?:\(\s*\w*\s*\)|\w+)\s*=>\s*(?:null|undefined|\{\s*\})\s*\)/.test(read(path))))],
 
 ];
 let failed = 0;
