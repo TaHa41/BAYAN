@@ -18,7 +18,7 @@ function smoke(label){
   if(stderr)process.stderr.write(stderr);
   if(result.error)console.error(label+" could not complete:",String(result.error));
   const output=stdout+"\n"+stderr;
-  const infrastructureFailure=/(?:status 50[023]|HTTP 50[023]|temporarily unavailable|database_unavailable|internal_error|D1_ERROR|daily row read limit)/i.test(output);
+  const infrastructureFailure=Boolean(result.error)||result.status===null||/(?:status 50[023]|HTTP 50[023]|temporarily unavailable|database_unavailable|internal_error|D1_ERROR|daily row read limit)/i.test(output);
   return {passed:result.status===0,infrastructureFailure};
 }
 
