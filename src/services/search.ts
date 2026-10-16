@@ -930,7 +930,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   let publishReason:string|undefined=options.publish!==false&&!independentlyVerified?"no_independent_sources":undefined;
   let answer:string|undefined;
   let answerStatus:SearchResponse["status"]|undefined;
-  const exactPersonConfirmed=!personQuery||results.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
+  const exactPersonConfirmed=options.publicationContext!==undefined||!personQuery||results.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
   if(options.publish!==false&&independentlyVerified&&!exactPersonConfirmed)publishReason="draft_not_verified";
   if(options.publish!==false&&options.draft===false)publishReason="draft_not_verified";
   if(results.length&&exactPersonConfirmed&&options.draft!==false&&!(options.publicationContext!==undefined&&options.publish!==false&&!independentlyVerified)){
