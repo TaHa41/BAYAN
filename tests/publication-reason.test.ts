@@ -14,7 +14,7 @@ const validBody = [
   longParagraph("The limitations section explains uncertainty."),
   "## Conclusion",
   longParagraph("The conclusion summarizes supported findings.")
-].join("\\n\\n");.join("\n\n");
+].join("\n\n");
 const base = {
   title: "A verified English research topic",
   summary: "A concise summary of the evidence and its implications for the topic.",
