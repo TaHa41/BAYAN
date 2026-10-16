@@ -101,7 +101,7 @@ const readFeed = async (name: string, url: string): Promise<Story[]> => {
       const maxFeedBytes = 384 * 1024;
       const declaredSize = Number(response.headers.get("content-length") || 0);
       if (declaredSize > maxFeedBytes) {
-        await response.body?.cancel().catch(() => {});
+        await response.body?.cancel().catch(error => { void error; });
         return [];
       }
       if (response.body) {
@@ -114,7 +114,7 @@ const readFeed = async (name: string, url: string): Promise<Story[]> => {
             if (part.done) break;
             total += part.value.byteLength;
             if (total > maxFeedBytes) {
-              await reader.cancel().catch(() => {});
+              await reader.cancel().catch(error => { void error; });
               return [];
             }
             chunks.push(part.value);
@@ -344,7 +344,7 @@ export async function findRelatedImage(query: string, sourceUrl?: string, contex
         const publisherImage = await sourceImage(parsed.toString(), env);
         if (isUsableNewsImage(publisherImage)) return publisherImage;
       }
-    } catch {}
+    } catch (error) { if(env) await recordRuntimeEventLimited(env,"wikimedia_commons_image","commons_image_search_failed",error) }
   }
   const cleanQuery = String(query || "").replace(/https?:\/\/\S+/g, " ").replace(/\s+/g, " ").trim().slice(0, 220);
   if (!cleanQuery) return undefined;
@@ -412,7 +412,7 @@ export async function findRelatedImage(query: string, sourceUrl?: string, contex
         (meaningful.length >= 2 ? item.matches >= 2 : item.matches === 1))
         .sort((a, b) => b.matches - a.matches);
       if (ranked[0]?.url) return ranked[0].url;
-    } catch {}
+    } catch (error) { if(env) await recordRuntimeEventLimited(env,"wikipedia_headline_image","wikipedia_headline_image_failed",error) }
   }
 
   try {
@@ -437,7 +437,7 @@ export async function findRelatedImage(query: string, sourceUrl?: string, contex
       const image = ranked[0]?.page?.thumbnail?.source;
       if (typeof image === "string" && image.startsWith("https://")) return image;
     }
-  } catch {}
+  } catch (error) { if(env) await recordRuntimeEventLimited(env,"wikipedia_headline_image","wikipedia_headline_search_failed",error) }
   return undefined;
 }
 
@@ -565,7 +565,7 @@ const gdeltFallback = async (lang: Locale): Promise<Story[]> => {
   } catch { return []; }
 };
 
-const directNewsPageFallback = async (lang: Locale): Promise<Story[]> => {
+const directNewsPageFallback = async (lang: Locale, env?: Env): Promise<Story[]> => {
   const pages = lang === "ar"
     ? [["الجزيرة", "https://www.aljazeera.net/news/"]]
     : [["Al Jazeera English", "https://www.aljazeera.com/news/"]];
@@ -591,7 +591,7 @@ const directNewsPageFallback = async (lang: Locale): Promise<Story[]> => {
         out.push({title,summary:"",url:href,publisher:name,publishedAt,imageAlt:title});
         if (out.length >= 8) break;
       }
-    } catch {}
+    } catch (error) { if(env) await recordRuntimeEventLimited(env,"direct_news_page_fallback","direct_news_page_fetch_failed",error) }
   }
   return out;
 };
