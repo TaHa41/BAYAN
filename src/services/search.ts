@@ -971,7 +971,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
             const sourceImage=results.find(item=>safePublicImageUrl(item.imageUrl)&&String(item.imageAlt||item.title||"").trim().length>0)?.imageUrl;
             let relatedImage:string|undefined;
             if(!sourceImage){
-              try{relatedImage=await findRelatedImage(articleTitle,undefined,articleSummary);}
+              try{relatedImage=await findRelatedImage(articleTitle,undefined,articleSummary,env);}
               catch(error){await recordPublicationWarning(env,publicationFailureReason(error));}
             }
             const imageCandidate=safePublicImageUrl(sourceImage)||safePublicImageUrl(relatedImage);const imageUrl=await resolvePublishedImageUrl(imageCandidate);
