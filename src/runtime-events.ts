@@ -34,10 +34,12 @@ export async function recordRuntimeEventLimited(
 
   const message = sanitize(String(reasonCode || "runtime_failure") + (detail === undefined ? "" : ": " + String(detail)));
   try {
-    await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)")
-      .bind("WARN", safeKind, message, new Date(now).toISOString())
-      .run();
-    return true;
+    const result = await env.DB.prepare(
+      "INSERT INTO runtime_events(level,kind,message,created_at) " +
+      "SELECT ?,?,?,? WHERE NOT EXISTS (" +
+      "SELECT 1 FROM runtime_events WHERE kind=? AND created_at>=?)"
+    ).bind("WARN", safeKind, message, new Date(now).toISOString(), safeKind, new Date(now - WINDOW_MS).toISOString()).run();
+    return Number(result?.meta?.changes || 0) > 0;
   } catch (loggingError) {
     // Deliberately best-effort: do not recurse or throw when telemetry itself fails.
     void loggingError;
