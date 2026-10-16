@@ -253,7 +253,7 @@ const completeSectionArticle=(row:any,language:string)=>{
   let sources:any[]=[];try{sources=JSON.parse(String(row?.sources_json||"[]"))}catch{return false}
   if(!Array.isArray(sources))return false;
   const hosts=new Set<string>(),publishers=new Set<string>();
-  for(const source of sources){try{const url=new URL(String(source?.url||""));if(url.protocol!=="https:")continue;hosts.add(url.hostname.toLowerCase().replace(/^www\./,""));const publisher=String(source?.publisher||"").trim().toLowerCase();if(publisher)publishers.add(publisher)}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}}
+  for(const source of sources){try{const url=new URL(String(source?.url||""));if(url.protocol!=="https:")continue;hosts.add(url.hostname.toLowerCase().replace(/^www\./,""));const publisher=String(source?.publisher||"").trim().toLowerCase();if(publisher)publishers.add(publisher)}catch(error){void recordRuntimeEventLimited(env,"self_heal_operation","invalid_evidence_source_url",error)}}
   return hosts.size>=2&&publishers.size>=2;
 };
 
