@@ -274,7 +274,8 @@ if(apiCacheTtl){
  if(cached)publicApiResponseCache.delete(apiCacheKey);
 }
 if(u.pathname.startsWith("/api/")){
- try{await ensureSchema(env)}catch{return new Response(JSON.stringify({error:"database_unavailable"}),{status:503,headers:{"content-type":"application/json;charset=utf-8","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})}
+ const schemaOptional=u.pathname==="/api/search";
+ try{await ensureSchema(env)}catch{if(!schemaOptional)return new Response(JSON.stringify({error:"database_unavailable"}),{status:503,headers:{"content-type":"application/json;charset=utf-8","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})}
  try{
   const response=await api(request,env,ctx);
   if(apiCacheTtl&&response.ok){
