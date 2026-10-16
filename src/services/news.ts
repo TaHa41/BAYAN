@@ -1,4 +1,5 @@
 import type { Env, Locale, Source } from "../types";
+import { recordRuntimeEventLimited } from "../runtime-events";
 import { sectionForOpenedStory } from "./editorial";
 
 type Story = {
@@ -486,10 +487,7 @@ const readNewsCache = async (env: Env, lang: Locale): Promise<{items: Story[]; u
     const items = JSON.parse(String(row.payload));
     return Array.isArray(items) ? {items, updatedAt} : null;
   } catch (error) {
-    try {
-      await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)")
-        .bind("WARN", "news_cache_read", String(error).slice(0, 500), new Date().toISOString()).run();
-    } catch {}
+    await recordRuntimeEventLimited(env, "news_cache_read", "news_cache_read_failed", error);
     return null;
   }
 };
@@ -500,10 +498,7 @@ const writeNewsCache = async (env: Env, lang: Locale, items: Story[]) => {
       "INSERT INTO news_cache(language,payload,updated_at) VALUES(?,?,?) ON CONFLICT(language) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at"
     ).bind(lang, JSON.stringify(items.slice(0, 40)), new Date().toISOString()).run();
   } catch (error) {
-    try {
-      await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)")
-        .bind("WARN", "news_cache_write", String(error).slice(0, 500), new Date().toISOString()).run();
-    } catch {}
+    await recordRuntimeEventLimited(env, "news_cache_write", "news_cache_write_failed", error);
   }
 };
 const classifyNewsSection = (story: Story): string => {
@@ -525,8 +520,7 @@ const archiveNewsStories = async (env: Env, lang: Locale, items: Story[]) => {
   if (statements.length) {
     try { await env.DB.batch(statements); }
     catch (error) {
-      try { await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)")
-        .bind("WARN", "news_archive_write", String(error).slice(0, 400), fetchedAt).run(); } catch {}
+      await recordRuntimeEventLimited(env, "news_archive_write", "news_archive_batch_write_failed", error);
     }
   }
 };
