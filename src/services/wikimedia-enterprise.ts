@@ -34,6 +34,41 @@ async function accessToken(env: Env): Promise<string> {
 
 const clean = (value: unknown) => String(value ?? "").replace(/<[^>]*>/g, " ").replace(/&nbsp;|&#160;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim();
 
+/** Resolve Wikimedia file redirects before exposing image URLs to browsers.
+ * Only final HTTPS Wikimedia hosts are accepted; failed lookups never invent URLs.
+ */
+export async function resolveWikimediaImageUrl(value: unknown): Promise<string | undefined> {
+  const candidate = safePublicImageUrl(value);
+  if (!candidate) return undefined;
+  try {
+    const initial = new URL(candidate);
+    const host = initial.hostname.toLowerCase().replace(/\.$/, "");
+    if (host === "upload.wikimedia.org") return candidate;
+    let response = await fetch(candidate, {
+      method: "HEAD", redirect: "follow",
+      headers: { accept: "image/*" }, signal: AbortSignal.timeout(1800)
+    });
+    if (!response.ok && [403, 405, 501].includes(response.status)) {
+      response = await fetch(candidate, {
+        method: "GET", redirect: "follow",
+        headers: { accept: "image/*", range: "bytes=0-0" },
+        signal: AbortSignal.timeout(1800)
+      });
+      await response.body?.cancel().catch(() => undefined);
+    }
+    if (!response.ok) return undefined;
+    const finalUrl = safePublicImageUrl(response.url || candidate);
+    if (!finalUrl) return undefined;
+    const finalHost = new URL(finalUrl).hostname.toLowerCase().replace(/\.$/, "");
+    if (finalHost !== "wikimedia.org" && !finalHost.endsWith(".wikimedia.org")) return undefined;
+    const type = response.headers.get("content-type") || "";
+    if (type && !type.toLowerCase().startsWith("image/")) return undefined;
+    return finalUrl;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function searchWikimediaEnterprise(
   env: Env, titles: string[], language: Locale
 ): Promise<SearchResult[]> {
@@ -52,7 +87,7 @@ export async function searchWikimediaEnterprise(
         },
         body: JSON.stringify({
           filters: [{ field: "is_part_of.identifier", value: project }],
-          fields: ["name", "abstract", "url", "image.content_url", "article_body", "date_modified"],
+          fields: ["name", "abstract", "url", "image.content_url", "image.alt_text", "image.alt", "image.caption", "article_body", "date_modified"],
           limit: 1
         }),
         signal: AbortSignal.timeout(2500)
@@ -64,7 +99,7 @@ export async function searchWikimediaEnterprise(
       const abstract = clean(article.abstract || "");
       const body = clean(article.article_body || "");
       const summary = (abstract || body).slice(0, 5000);
-      const imageUrl = safePublicImageUrl(article.image?.content_url || article.image?.url || article.image?.thumbnail?.url || article.thumbnail?.url);
+      const imageUrl = await resolveWikimediaImageUrl(article.image?.content_url || article.image?.url || article.image?.thumbnail?.url || article.thumbnail?.url);
       if (!summary) return null;
       const url = /^https:\/\//i.test(String(article.url || "")) ? String(article.url) : "https://" + (language === "ar" ? "ar" : "en") + ".wikipedia.org/wiki/" + encodeURIComponent(String(article.name).replace(/ /g, "_"));
       const result: SearchResult & { score?: number; provider?: string } = {
@@ -75,7 +110,7 @@ export async function searchWikimediaEnterprise(
         evidence: "mixed",
         sources: [{ title: clean(article.name), publisher: language === "ar" ? "ويكيميديا إنتربرايز" : "Wikimedia Enterprise", url, imageUrl }],
         imageUrl,
-        imageAlt: clean(article.name),
+        imageAlt: clean(article.image?.alt_text || article.image?.alt || article.image?.caption || article.name),
         url
       };
       return result;
