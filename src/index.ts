@@ -320,7 +320,7 @@ try{return await page(request,env)}catch(error){const message=String((error as a
 },async scheduled(event:ScheduledEvent,env:Env){
   try{await ensureSchema(env)}catch(error){await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}
   // Keep each cron invocation to one expensive task. Preserve news refresh every 15 minutes;
-  // use the second maintenance slot for publication on most cycles, reserving one slot per hour
+  // use the second maintenance slot for publication on most cycles, reserving two slots per hour
   // for self-healing. Each publication invocation still claims at most one row and uses bounded AI calls.
   // Visitor-facing search runs in its own request and is not awaited on by this scheduled task.
   const scheduleSlot=Math.floor(Number(event.scheduledTime||Date.now())/(5*60*1000));
@@ -342,7 +342,7 @@ try{return await page(request,env)}catch(error){const message=String((error as a
     }catch(error){
       try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","scheduled_news_archive_refresh",String(error).slice(0,300),new Date().toISOString()).run()}catch(error){await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}
     }
-  }else if(task===1||(task===2&&scheduleSlot%12!==2)){
+  }else if(task===1||(task===2&&scheduleSlot%12!==2&&scheduleSlot%12!==8)){
     try{
       const result=await publishNextArchivedNewsArticle(env);
       if(result.status!=="idle"){
