@@ -8,9 +8,9 @@ const D1_READ_RESERVATION=120;
 // Rank a bounded, recent candidate set without deleting archive rows. Exact normalized
 // title duplicates are represented once; publisher diversity is counted by source host.
 const normalizeArchiveTitle=(value:string)=>String(value||"").normalize("NFKC").toLocaleLowerCase()
-  .replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/[^\\p{L}\\p{N}]+/gu," ").trim().replace(/\\s+/g," ");
+  .replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").trim().replace(/\s+/g," ");
 const archivePublisherKey=(row:any)=>{
-  try{const host=new URL(String(row.url||"")).hostname.toLowerCase().replace(/^www\\./,"");if(host)return host}catch{}
+  try{const host=new URL(String(row.url||"")).hostname.toLowerCase().replace(/^www\./,"");if(host)return host}catch{}
   return String(row.publisher||"").trim().toLocaleLowerCase();
 };
 export function rankNewsArchiveCandidates(rows:any[],now=Date.now()){
