@@ -4,6 +4,52 @@ import {recordRuntimeEventLimited} from "../runtime-events";
 
 const DAILY_D1_READ_CALL_LIMIT=12000;
 const D1_READ_RESERVATION=120;
+
+// Rank a bounded, recent candidate set without deleting archive rows. Exact normalized
+// title duplicates are represented once; publisher diversity is counted by source host.
+const normalizeArchiveTitle=(value:string)=>String(value||"").normalize("NFKC").toLocaleLowerCase()
+  .replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/[^\\p{L}\\p{N}]+/gu," ").trim().replace(/\\s+/g," ");
+const archivePublisherKey=(row:any)=>{
+  try{const host=new URL(String(row.url||"")).hostname.toLowerCase().replace(/^www\\./,"");if(host)return host}catch{}
+  return String(row.publisher||"").trim().toLocaleLowerCase();
+};
+export function rankNewsArchiveCandidates(rows:any[],now=Date.now()){
+  const cutoff=now-48*60*60*1000;
+  const futureLimit=now+5*60*1000;
+  const eligible=rows.filter(row=>{
+    const published=Date.parse(String(row.published_at||""));
+    return Number(row.id)>0&&String(row.title||"").trim()&&!row.article_slug&&Number(row.article_attempts||0)<2
+      &&Number.isFinite(published)&&published>=cutoff&&published<=futureLimit;
+  });
+  const groups=new Map<string,any[]>();
+  for(const row of eligible){
+    const titleKey=normalizeArchiveTitle(row.title)||("id:"+row.id);
+    const group=groups.get(titleKey)||[];
+    group.push(row);groups.set(titleKey,group);
+  }
+  const ranked:any[]=[];
+  let duplicates=0;
+  for(const group of groups.values()){
+    if(group.length>1)duplicates+=group.length-1;
+    const publishers=new Set(group.map(archivePublisherKey).filter(Boolean));
+    const ordered=[...group].sort((a,b)=>{
+      const dateDelta=Date.parse(String(b.published_at||""))-Date.parse(String(a.published_at||""));
+      if(dateDelta)return dateDelta;
+      const imageDelta=Number(Boolean(String(b.image_url||"").trim()))-Number(Boolean(String(a.image_url||"").trim()));
+      return imageDelta||Number(b.id)-Number(a.id);
+    });
+    ranked.push({...ordered[0],independentPublisherCount:publishers.size,duplicateArchiveRows:group.length-1});
+  }
+  ranked.sort((a,b)=>{
+    const dateDelta=Date.parse(String(b.published_at||""))-Date.parse(String(a.published_at||""));
+    if(dateDelta)return dateDelta;
+    const publisherDelta=Number(b.independentPublisherCount||0)-Number(a.independentPublisherCount||0);
+    if(publisherDelta)return publisherDelta;
+    const imageDelta=Number(Boolean(String(b.image_url||"").trim()))-Number(Boolean(String(a.image_url||"").trim()));
+    return imageDelta||Date.parse(String(b.fetched_at||""))-Date.parse(String(a.fetched_at||""))||Number(b.id)-Number(a.id);
+  });
+  return{candidates:ranked,duplicateRows:duplicates,eligibleRows:eligible.length};
+}
 type ReadCounter={reads:number;limit:number};
 const wrapReadStatement=(statement:any,sql:string,counter:ReadCounter):any=>new Proxy(statement,{
   get(target,property){
@@ -55,7 +101,12 @@ async function publishNextArchivedNewsArticleInner(env:Env){
   let setting:any=null;try{setting=await env.DB.prepare("SELECT value FROM admin_settings WHERE key=? LIMIT 1").bind("news_article_queue_language").first<any>()}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","settings_read_failed",error)}
   const preferred:Locale=String(setting?.value||"ar")==="en"?"en":"ar";
   const futureLimit=new Date(now+5*60*1000).toISOString();
-  const pick=async(language:Locale)=>env.DB.prepare("SELECT id,title,summary,language,article_attempts,publisher,image_url FROM news_archive WHERE language=? AND article_slug IS NULL AND article_attempts<2 AND length(summary)>=120 AND published_at>=? AND published_at<=? AND fetched_at>=? AND (article_last_attempt_at IS NULL OR article_last_attempt_at<=?) AND (article_last_reason IS NULL OR article_last_reason!='skipped_low_evidence' OR article_last_attempt_at<=?) ORDER BY published_at DESC,CASE WHEN publisher=(SELECT value FROM admin_settings WHERE key='news_article_queue_last_publisher' LIMIT 1) THEN 1 ELSE 0 END,CASE WHEN image_url IS NOT NULL AND trim(image_url)!='' THEN 0 ELSE 1 END,fetched_at DESC,id DESC LIMIT 1").bind(language,cutoff,futureLimit,cutoff,retryBefore,lowEvidenceRetryBefore).first<any>();
+  const pick=async(language:Locale)=>{
+    const result=await env.DB.prepare("SELECT id,url,title,summary,language,article_attempts,article_last_attempt_at,article_last_reason,publisher,image_url,published_at,fetched_at,article_slug FROM news_archive WHERE language=? AND article_slug IS NULL AND article_attempts<2 AND length(summary)>=120 AND published_at>=? AND published_at<=? AND fetched_at>=? AND (article_last_attempt_at IS NULL OR article_last_attempt_at<=?) AND (article_last_reason IS NULL OR article_last_reason!='skipped_low_evidence' OR article_last_attempt_at<=?) ORDER BY published_at DESC LIMIT 100").bind(language,cutoff,futureLimit,cutoff,retryBefore,lowEvidenceRetryBefore).all<any>();
+    const ranked=rankNewsArchiveCandidates(result.results||[],now);
+    if(ranked.duplicateRows)await recordRuntimeEventLimited(env,"news_archive_queue","duplicate_candidates_skipped","language="+language+";duplicate_rows="+ranked.duplicateRows+";bounded_candidates="+ranked.eligibleRows);
+    return ranked.candidates[0]||null;
+  };
   let row=await pick(preferred);
   if(!row)row=await pick(preferred==="ar"?"en":"ar");
   if(!row)return{status:"idle" as const};
