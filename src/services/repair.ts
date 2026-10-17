@@ -293,8 +293,8 @@ export async function selfHeal(env:Env){
   const checks:[string,()=>Promise<boolean>][]=[
     ["database",async()=>{await env.DB.prepare("SELECT 1").first();return true}],
     ["articles",async()=>{const r=await env.DB.prepare("SELECT COUNT(*) count FROM articles WHERE status='PUBLISHED'").first<any>();return Number(r?.count||0)>0}],
-    ["news_article_publication_24h",async()=>{const r=await env.DB.prepare("SELECT COUNT(*) AS count FROM articles WHERE status='PUBLISHED' AND section='news' AND created_at>=datetime('now','-24 hours')").first<any>();return Number(r?.count||0)>0}],
-    ["search_returns_results",async()=>{const result=await search(env,"photosynthesis","en",{publish:false,draft:false,healthCheck:true});return Array.isArray(result.results)&&result.results.length>0}],
+    ["news_publication_rate",async()=>{const r=await env.DB.prepare("SELECT COUNT(*) AS count FROM news_archive n JOIN articles a ON a.slug=n.article_slug AND a.language=n.language WHERE n.article_slug IS NOT NULL AND a.status='PUBLISHED' AND a.created_at>=datetime('now','-24 hours')").first<any>();return Number(r?.count||0)>0}],
+    ["search_availability",async()=>{const result=await search(env,"photosynthesis","en",{publish:false,draft:false,healthCheck:true});return Array.isArray(result.results)&&result.results.length>0}],
     ["sections",async()=>{return (await sectionHealth(env)).length===0}],
     ["news_cache",async()=>await newsCacheHealthy(env)],
     ["images",async()=>await imageHealth(env)],
