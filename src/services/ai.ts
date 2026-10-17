@@ -55,8 +55,17 @@ export const answerUnsupportedSpecificsDetail=(answer:string,evidence:SearchResu
     }
     const allSpecificTokens=[...new Set([...names.map(name=>name.toLowerCase()),...arabicEntities.flatMap(entity=>entity.phrase.toLowerCase().split(/\s+/)),...numbers])];
     const reasons:string[]=[];
+    // A two-token subject name (e.g. Mohamed Salah) is acceptable when both
+    // tokens co-occur in one evidence record. Additional names in the claim
+    // (e.g. a club after "plays for") still require claim-context support.
+    const subjectPair=names.length>=2?names.slice(0,2).map(name=>name.toLowerCase()):[];
+    const subjectPairSupported=subjectPair.length===2&&evidenceItems.some(item=>subjectPair.every(token=>item.tokens.has(token)));
+    const queryTokens=new Set(tokenize(question));
     for(const name of names){
-      if(!supportedWithContext([name.toLowerCase()],[],tokens,allSpecificTokens))reasons.push("names="+name);
+      const normalized=name.toLowerCase();
+      const querySubjectSupported=queryTokens.has(normalized)&&evidenceItems.some(item=>item.tokens.has(normalized));
+      const pairSubjectSupported=subjectPairSupported&&subjectPair.includes(normalized);
+      if(!querySubjectSupported&&!pairSubjectSupported&&!supportedWithContext([normalized],[],tokens,allSpecificTokens))reasons.push("names="+name);
     }
     for(const number of numbers){
       if(!supportedWithContext([], [number], tokens,allSpecificTokens))reasons.push("numbers="+number);
