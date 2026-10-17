@@ -21,3 +21,15 @@
 - **Targeted production baseline:** News archive item `11686` (English) had two `draft_not_verified` attempts; runtime logs show OpenAI `http_429` during both attempts, but the exact final fallback verification rejection was not recorded historically. Item `11759` (Arabic) had `publish_rejected` with 7 sources and 5 publishers. Their new detail fields remain null because retry counters were not reset and those rows have not been retried.
 - **Rate-limited catch logging:** A follow-up branch `repair/phase-1-rate-limited-runtime-events` adds `recordRuntimeEventLimited`, which caps each event kind to one D1 log write per minute per Worker isolate, sanitizes secrets/URLs, and never throws if telemetry itself fails. It has not yet been merged or deployed; CI is pending.
 - **Remaining:** Observe two scheduled publication cycles after the latest deployment and inspect their reasons/results; complete the catch-logging branch and its CI/deployment; finish the isolated D1 export/restore row-count comparison; then address any dominant rejection reason without relaxing validation.
+
+## Phase A — evidence-attributed news drafting (2026-10-17, in progress)
+
+- **Changes committed on branch `fix/evidence-attributed-news-drafts`:** `src/services/ai.ts` now sends bounded title/summary/source-title/publisher excerpts rather than full provider records or URLs; requires JSON sentences with source IDs; validates each sentence against only its cited evidence; retries generation once after unsupported specifics and drops any remaining rejected sentences. Existing source-diversity, language, usefulness, image, and publication gates remain in place.
+- **Regression guard:** `scripts/source-contract-smoke.mjs` checks for excerpt-only drafting, sentence-level source IDs, unsupported-sentence validation, and the single correction path.
+- **Commits:** `f87c9eb9b70a930102963f612d6f4c078bf5db94` (drafting change); `4417daf0ca5a68cf440a86865a0d20a50965fa48` (prompt escaping correction); `f6fa9c30a3ab8a1b15deead28637b65c60e0efa7` (regression guard). Pull request: #347.
+- **Data/schema impact:** No D1 writes, no migrations changed, no retry counters reset, and no feature-ledger entries changed.
+- **Tests:** CI status not yet returned for the PR head; do not treat source-contract addition as a passing test run.
+- **Deployment/live verification:** Not deployed. No new Arabic/English article publication has been confirmed from production for this change.
+- **Acceptance:** **Not met yet.** Require passing `npm run check`, deployment, and verified new Arabic and English articles with valid sources, dates, and relevant resolvable images while `news_publication_rate` passes at its existing threshold.
+- **Remaining:** Await CI evidence; correct any failures before merging/deploying. Then inspect the production rejection details, monitor two scheduled cycles, and only then consider the approved last-48-hour retry reset.
+
