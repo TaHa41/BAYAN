@@ -66,7 +66,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
     publishers:[...new Set((item.sources||[]).map(source=>String(source.publisher||"").trim()).filter(Boolean))].slice(0,4),
     sourceTitles:(item.sources||[]).map(source=>String(source.title||"").slice(0,180)).filter(Boolean).slice(0,4)
   }));
-  const evidenceById=new Map(compactEvidence.map((item,index)=>[item.sourceId,evidence[index]]));
+  const evidenceById=new Map<string,SearchResult>(compactEvidence.map((item,index)=>[item.sourceId,evidence[index] as SearchResult] as const));
   const evidenceText=JSON.stringify(compactEvidence).slice(0,16000);
   const system=locale==="ar"
     ?"أنت محرر أدلة في بيان. اكتب مقالًا عربيًا مفيدًا اعتمادًا على المقتطفات المرفقة فقط. أخرج JSON صالحًا فقط بالشكل {\"sections\":[{\"heading\":\"عنوان\",\"sentences\":[{\"text\":\"جملة واحدة\",\"sourceIds\":[\"S1\"]}]}]}. يجب أن تحمل كل جملة sourceIds لمعرف مقتطف واحد على الأقل يدعمها مباشرة. لا تضف أسماء أو أرقامًا أو تواريخ أو حقائق تفصيلية غير موجودة حرفيًا أو بوضوح في المقتطفات المشار إليها. لا تستنتج تفاصيل محددة. لا تضع أكثر من فكرة مستقلة في الجملة. استخدم أربعة عناوين ذات معنى على الأقل عندما تسمح الأدلة. إذا لم تدعم الأدلة جملة مفيدة، فلا تكتبها. لا تضف روابط أو نصًا خارج JSON."
