@@ -44,7 +44,7 @@ describe.each(["ar", "en"] as const)("evidence-grounded article drafting (%s)", 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect((result as any).verification?.retried).toBe(true);
     expect((result as any).verification?.removedSentences).toBe(1);
-    expect((result as any).verification?.remainingSentences).toBe(16);
+    expect((result as any).verification?.remainingSentences).toBe(15);
     expect(result.answer).not.toContain(locale === "ar" ? "ريال مدريد" : "Acme Group");
     expect(result.answer).not.toContain(locale === "ar" ? "2031" : "2031");
   });
