@@ -83,6 +83,8 @@ const independentSourceCount=(env:Env,evidence:SearchResult[])=>new Set(evidence
   return String(source.publisher||"").trim().toLowerCase();
 }).filter(Boolean)).size;
 
+export const normalizeDraftJson=(raw:string)=>raw.trim().replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"").trim();
+
 export async function draftArticle(env:Env,question:string,locale:Locale,evidence:SearchResult[],backgroundBudget=false){
   if(evidence.length<2)return{status:"insufficient" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[])};
   // Give the model bounded evidence excerpts only. URLs and unrelated result
@@ -101,7 +103,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
     :"You are BAYAN's evidence editor. Write a useful article using only the supplied excerpts. Output valid JSON only in this shape: {\"sections\":[{\"heading\":\"Heading\",\"sentences\":[{\"text\":\"one sentence\",\"sourceIds\":[\"S1\"]}]}]}. Every sentence must carry sourceIds for at least one excerpt that directly supports it. Do not add names, numbers, dates, or specific facts unless they are explicitly present in the cited excerpts. Do not infer specific details. Keep each sentence to one independently verifiable claim. Use at least four meaningful headings when evidence permits. Omit claims the evidence cannot support. No URLs and no text outside JSON.";
   const parseDraft=(raw:string)=>{
     try{
-      const value=JSON.parse(raw);
+      const value=JSON.parse(normalizeDraftJson(raw));
       if(!value||!Array.isArray(value.sections)||!value.sections.length)return undefined;
       const sections:any[]=[];
       for(const section of value.sections){
@@ -161,7 +163,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
     return "";
   };
   let raw=await generate("");
-  if(!raw)return{status:"mixed" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[]),reason:"ai_unavailable" as const,verification:{removedSentences:0,remainingSentences:0,retried:false}};
+  if(!raw)return{status:"mixed" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[]),reason:"ai_unavailable" as const,verification:{removedSentences:0,remainingSentences:0,retried:false,failureStage:"all_providers_unavailable"}};
   let retried=false,totalRemoved=0;
   let sections=parseDraft(raw);
   if(!sections){
@@ -169,7 +171,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
     raw=await generate("The prior output was invalid JSON or contained an invalid source ID. Return only valid JSON in the required schema and cite only supplied sourceIds.");
     sections=parseDraft(raw);
   }
-  if(!sections)return{status:"mixed" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[]),reason:"draft_not_verified" as const,verification:{removedSentences:0,remainingSentences:0,retried}};
+  if(!sections)return{status:"mixed" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[]),reason:"draft_not_verified" as const,verification:{removedSentences:0,remainingSentences:0,retried,failureStage:"invalid_json_or_source_id"}};
   let checked=verifySections(sections);
   totalRemoved+=checked.rejected.length;
   if(checked.rejected.length&&!retried){
