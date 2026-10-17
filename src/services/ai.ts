@@ -91,13 +91,17 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
       const sentences:any[]=[];
       for(const sentence of section.sentences){
         const cited=sentence.sourceIds.map((id:string)=>evidenceById.get(id)).filter(Boolean) as SearchResult[];
-        if(!cited.length||answerHasUnsupportedSpecifics(sentence.text,cited,question)){
+        if(!cited.length||answerHasUnsupportedSpecifics(sentence.text,cited,"")){
           rejected.push(sentence.text.slice(0,180));
           continue;
         }
         sentences.push(sentence);
       }
-      if(sentences.length)accepted.push({...section,sentences});
+      if(sentences.length){
+        const citedForHeading=sentences.flatMap((sentence:any)=>sentence.sourceIds.map((id:string)=>evidenceById.get(id)).filter(Boolean)) as SearchResult[];
+        const heading=answerHasUnsupportedSpecifics(section.heading,citedForHeading,"")?(locale==="ar"?"تفاصيل موثقة":"Evidence details"):section.heading;
+        accepted.push({...section,heading,sentences});
+      }
     }
     return{sections:accepted,rejected};
   };
@@ -144,7 +148,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
   const headings=checked.sections.length;
   const sufficientlyUseful=body.length>=1800&&sentenceCount>=12&&headings>=4;
   const independentlySourced=independentSourceCount(env,evidence)>=2;
-  const verified=sufficientlyUseful&&independentlySourced&&languageConsistent(body,locale)&&!answerHasUnsupportedSpecifics(body,evidence,question);
+  const verified=sufficientlyUseful&&independentlySourced&&languageConsistent(body,locale);
   return{status:verified?"verified" as const:"mixed" as const,answer:body,sources:evidence.flatMap(item=>item.sources||[]),reason:verified?undefined:"draft_not_verified" as const,verification:{sentenceCount,headings,rejectedSentences:checked.rejected.length}};
 }
 export async function ask(env:Env,question:string,locale:Locale,evidence:SearchResult[]){
