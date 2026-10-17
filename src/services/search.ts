@@ -962,7 +962,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
               return;
             }
             const verification=longDraft?.verification||{};
-            const draftMetrics=("sentences_removed="+Math.max(0,Number(verification.removedSentences??verification.rejectedSentences)||0)+";sentences_remaining="+Math.max(0,Number(verification.remainingSentences??verification.sentenceCount)||0)+";regenerated="+(verification.retried===true?"true":"false")).slice(0,180);
+            const draftMetrics=("sentences_removed="+Math.max(0,Number(verification.removedSentences??verification.rejectedSentences)||0)+";sentences_remaining="+Math.max(0,Number(verification.remainingSentences??verification.sentenceCount)||0)+";regenerated="+(verification.retried===true?"true":"false")+(verification.failureStage?";failure_stage="+String(verification.failureStage):"")).slice(0,240);
             if(longDraft?.reason==="ai_unavailable"){publishReason="ai_unavailable";publishReasonDetail=("article_draft_all_providers_unavailable;"+draftMetrics).slice(0,300);return;}
             if(longDraft?.status!=="verified"){
               publishReason="draft_not_verified";
