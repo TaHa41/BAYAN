@@ -954,20 +954,22 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
           const publishLongArticle=async()=>{
             let longDraft:any;
             try{
-              longDraft=await Promise.race([draftArticle(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:"",reason:"ai_unavailable"}),18000))]);
+              longDraft=await Promise.race([draftArticle(env,q,language,results,options.publish===true),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:"",reason:"ai_unavailable"}),18000))]);
             }catch(error){
               publishReason=publicationFailureReason(error);
               publishReasonDetail="article_draft_exception:"+publishReason;
               await recordPublicationWarning(env,publishReason);
               return;
             }
-            if(longDraft?.reason==="ai_unavailable"){publishReason="ai_unavailable";publishReasonDetail="article_draft_all_providers_unavailable";return;}
+            const verification=longDraft?.verification||{};
+            const draftMetrics=("sentences_removed="+Math.max(0,Number(verification.removedSentences??verification.rejectedSentences)||0)+";sentences_remaining="+Math.max(0,Number(verification.remainingSentences??verification.sentenceCount)||0)+";regenerated="+(verification.retried===true?"true":"false")).slice(0,180);
+            if(longDraft?.reason==="ai_unavailable"){publishReason="ai_unavailable";publishReasonDetail=("article_draft_all_providers_unavailable;"+draftMetrics).slice(0,300);return;}
             if(longDraft?.status!=="verified"){
               publishReason="draft_not_verified";
-              publishReasonDetail=!String(longDraft?.answer||"").trim()?"draft_empty_or_insufficient_evidence":answerHasUnsupportedSpecifics(String(longDraft.answer),results,q)?"unsupported_specifics": "verification_status_"+String(longDraft?.status||"missing");
+              publishReasonDetail=(!String(longDraft?.answer||"").trim()?"draft_empty_or_insufficient_evidence":answerHasUnsupportedSpecifics(String(longDraft.answer),results,q)?"unsupported_specifics":"verification_status_"+String(longDraft?.status||"missing"))+";"+draftMetrics;
               return;
             }
-            if(!usefulDraft(longDraft.answer,language)){publishReason="draft_not_useful";publishReasonDetail="article_draft_failed_usefulness_checks";return;}
+            if(!usefulDraft(longDraft.answer,language)){publishReason="draft_not_useful";publishReasonDetail=("article_draft_failed_usefulness_checks;"+draftMetrics).slice(0,300);return;}
             const sourceImage=results.find(item=>safePublicImageUrl(item.imageUrl)&&String(item.imageAlt||item.title||"").trim().length>0)?.imageUrl;
             let relatedImage:string|undefined;
             if(!sourceImage){
@@ -975,7 +977,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
               catch(error){await recordPublicationWarning(env,publicationFailureReason(error));}
             }
             const imageCandidate=safePublicImageUrl(sourceImage)||safePublicImageUrl(relatedImage);const imageUrl=await resolvePublishedImageUrl(imageCandidate);
-            if(!imageUrl){publishReason="no_image";publishReasonDetail="no_safe_resolvable_topic_image";return;}
+            if(!imageUrl){publishReason="no_image";publishReasonDetail=("no_safe_resolvable_topic_image;"+draftMetrics).slice(0,300);return;}
             let savedSlug:string|null;
             try{
               const publicationInput={title:articleTitle,summary:articleSummary,body:longDraft.answer,section:classifySection(q,results,language),language,sources:results.flatMap(x=>x.sources||[]),imageUrl,imageAlt:articleTitle};
@@ -986,7 +988,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
               await recordPublicationWarning(env,publishReason);
               return;
             }
-            if(savedSlug){publishedSlug=savedSlug;publishReason=undefined;publishReasonDetail=undefined;}
+            if(savedSlug){publishedSlug=savedSlug;publishReason=undefined;publishReasonDetail=("draft_verified;"+draftMetrics).slice(0,300);}
             else {publishReason="publish_rejected";publishReasonDetail="publication_quality:"+(publicationRejectionReason({title:articleTitle,summary:articleSummary,body:longDraft.answer,language,sources:results.flatMap(x=>x.sources||[]),imageUrl})||"null_without_quality_reason");}
           };
           if(options.background){
