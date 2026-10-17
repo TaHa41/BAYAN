@@ -954,7 +954,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
           const publishLongArticle=async()=>{
             let longDraft:any;
             try{
-              longDraft=await Promise.race([draftArticle(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:"",reason:"ai_unavailable"}),18000))]);
+              longDraft=await Promise.race([draftArticle(env,q,language,results,options.publish===true),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:"",reason:"ai_unavailable"}),18000))]);
             }catch(error){
               publishReason=publicationFailureReason(error);
               publishReasonDetail="article_draft_exception:"+publishReason;
