@@ -12,7 +12,18 @@ export async function publishNextArchivedNewsArticle(env:Env){
   const pick=async(language:Locale)=>env.DB.prepare("SELECT id,title,language,article_attempts FROM news_archive WHERE language=? AND article_slug IS NULL AND article_attempts<2 AND length(summary)>=120 AND published_at>=? AND published_at<=? AND fetched_at>=? AND (article_last_attempt_at IS NULL OR article_last_attempt_at<=?) ORDER BY published_at DESC,fetched_at DESC,id DESC LIMIT 1").bind(language,cutoff,futureLimit,cutoff,retryBefore).first<any>();
   let row=await pick(preferred);
   if(!row)row=await pick(preferred==="ar"?"en":"ar");
-  if(!row)return{status:"idle" as const};
+  if(!row){
+    let queueDiagnostics="queue_diagnostics_unavailable";
+    try{
+      const stats=await env.DB.prepare("SELECT language,COUNT(*) AS unlinked,SUM(CASE WHEN article_attempts>=2 THEN 1 ELSE 0 END) AS exhausted,SUM(CASE WHEN article_attempts<2 AND length(summary)>=120 AND published_at>=? AND published_at<=? AND fetched_at>=? AND (article_last_attempt_at IS NULL OR article_last_attempt_at<=?) THEN 1 ELSE 0 END) AS eligible FROM news_archive WHERE language IN ('ar','en') AND article_slug IS NULL GROUP BY language").bind(cutoff,futureLimit,cutoff,retryBefore).all<any>();
+      queueDiagnostics=(stats.results||[]).map((item:any)=>String(item.language)+"{unlinked="+Number(item.unlinked||0)+",eligible="+Number(item.eligible||0)+",exhausted="+Number(item.exhausted||0)+"}").join(" ");
+    }catch(error){
+      queueDiagnostics="queue_diagnostics_failed:"+String((error as {message?:string})?.message||error||"unknown").replace(/https?:\\/\\/[^\\s]+/g,"[url]").slice(0,180);
+    }
+    const message=("no_publish_candidate "+queueDiagnostics).slice(0,350);
+    try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","news_archive_article_generation",message,new Date().toISOString()).run()}catch{}
+    return{status:"idle" as const,reason:"no_publish_candidate",queueDiagnostics};
+  }
   const id=Number(row.id),language=row.language as Locale,title=String(row.title||"").trim();
   if(!Number.isInteger(id)||id<1||!title)return{status:"invalid_queue_item" as const};
   const stamp=new Date(now).toISOString();
