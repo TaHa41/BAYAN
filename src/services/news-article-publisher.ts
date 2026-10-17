@@ -25,7 +25,7 @@ export async function publishNextArchivedNewsArticle(env:Env){
   const nextLanguage:Locale=language==="ar"?"en":"ar";
   try{await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind("news_article_queue_language",nextLanguage,stamp).run()}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","language_rotation_failed",error)}
   const selectedPublisher=String(row.publisher||"").trim().slice(0,160);
-  if(selectedPublisher)try{await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.value,updated_at=excluded.updated_at").bind("news_article_queue_last_publisher",selectedPublisher,stamp).run()}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","publisher_rotation_failed",error)}
+  if(selectedPublisher)try{await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind("news_article_queue_last_publisher",selectedPublisher,stamp).run()}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","publisher_rotation_failed",error)}
   try{
     const result=await search(env,title,language,{publish:true,draft:true,images:true,publicationContext:String(row.summary||"").slice(0,500)});
     const slug=String(result.articleSlug||"").trim();
