@@ -65,12 +65,25 @@ export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[
     return !(namesSupported&&numbersSupported&&subjectSupported&&arabicEntitiesSupported&&relationshipsSupported);
   });
 };
+const consumeDailyNewsAiCall=async(env:Env)=>{
+  const day=new Date().toISOString().slice(0,10);
+  const stamp=new Date().toISOString();
+  try{
+    const row=await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES('news_ai_budget_daily',?,?) ON CONFLICT(key) DO UPDATE SET value=CASE WHEN substr(admin_settings.value,1,10)=substr(excluded.value,1,10) THEN substr(admin_settings.value,1,11)||CAST(CAST(substr(admin_settings.value,12) AS INTEGER)+1 AS TEXT) ELSE excluded.value END,updated_at=excluded.updated_at WHERE substr(admin_settings.value,1,10)!=substr(excluded.value,1,10) OR CAST(substr(admin_settings.value,12) AS INTEGER)<80 RETURNING value").bind(day+":1",stamp).first<any>();
+    if(row?.value)return true;
+    await recordRuntimeEventLimited(env,"news_ai_budget","daily_ai_budget_exhausted","UTC daily news AI call limit reached (80)");
+    return false;
+  }catch(error){
+    await recordRuntimeEventLimited(env,"news_ai_budget","budget_counter_unavailable","background AI generation blocked because budget accounting failed");
+    return false;
+  }
+};
 const independentSourceCount=(env:Env,evidence:SearchResult[])=>new Set(evidence.flatMap(item=>item.sources||[]).map(source=>{
   try{const host=new URL(String(source.url||"")).hostname.toLowerCase().replace(/^www\./,"");if(host)return host}catch(error){void recordRuntimeEventLimited(env,"ai_source_url","invalid_evidence_source_url",error)}
   return String(source.publisher||"").trim().toLowerCase();
 }).filter(Boolean)).size;
 
-export async function draftArticle(env:Env,question:string,locale:Locale,evidence:SearchResult[]){
+export async function draftArticle(env:Env,question:string,locale:Locale,evidence:SearchResult[],backgroundBudget=false){
   if(evidence.length<2)return{status:"insufficient" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[])};
   // Give the model bounded evidence excerpts only. URLs and unrelated result
   // metadata are deliberately excluded from the drafting prompt.
@@ -131,7 +144,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
   };
   const generate=async(extraInstruction:string)=>{
     const messages=[{role:"system",content:system},{role:"user",content:"Topic/question: "+question+"\nEvidence excerpts (only these snippets may be used): "+evidenceText+(extraInstruction?"\nCorrection required: "+extraInstruction:"")}];
-    if(env.OPENAI_API_KEY)try{
+    if(env.OPENAI_API_KEY&&(!backgroundBudget||await consumeDailyNewsAiCall(env)))try{
       const response=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(9000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",messages,temperature:0,max_tokens:2600,response_format:{type:"json_object"}})});
       if(response.ok){
         const data=await response.json<any>(),answer=String(data.choices?.[0]?.message?.content||"").trim();
@@ -139,7 +152,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
         await recordAiFailure(env,"OpenAI draft","empty_response");
       }else await recordAiFailure(env,"OpenAI draft","http_"+response.status);
     }catch(error){await recordAiFailure(env,"OpenAI draft",aiFailureDetail(error));}
-    if(env.AI)try{
+    if(env.AI&&(!backgroundBudget||await consumeDailyNewsAiCall(env)))try{
       const response=await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast",{messages,max_tokens:2200,temperature:0});
       const answer=String((response as any)?.response||"").trim();
       if(answer)return answer;
