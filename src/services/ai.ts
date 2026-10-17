@@ -12,23 +12,35 @@ const languageConsistent=(answer:string,locale:Locale)=>{
   return sentences.every(sentence=>/[\u0600-\u06ff]/.test(sentence)||!/[A-Za-z]{5,}/.test(sentence));
 };
 export const answerUnsupportedSpecificsDetail=(answer:string,evidence:SearchResult[],question="")=>{
-  // Topic matching is handled by provider relevance checks. Requiring every
-  // query token to occur in a source snippet caused false rejections for long
-  // news headlines even when the actual names and numbers in the draft were
-  // supported. Keep the factual-specific checks strict and report the exact
-  // unsupported tokens instead.
+  // Topic matching is handled by provider relevance checks. Each factual
+  // specific must still be supported by one evidence record that also matches
+  // the surrounding claim context; unrelated snippets cannot validate a name.
   void question;
-  const generic=new Set(["the","this","these","those","according","based","however","therefore","overall","summary","conclusion","answer","key","main","important","first","second","third","one","two","three","it","they","he","she","we","you","and","but","because","during","after","before","global","world","health","history","science","technology","economy","politics","sports","travel","art","bayan","من","هو","هي","ما","ماذا","كيف","متى","أين","اين","لماذا","هل","عن","حول","آخر","اخر","أخبار","اخبار","ماهو","ماهي","مع","في","إلى","الى","what","who","when","where","why","how","does","did","is","are","was","were","current","club","player","play","about","explain","tell","me","latest","news"]);
+  const generic=new Set(["the","this","these","those","according","based","however","therefore","overall","summary","conclusion","answer","key","main","important","first","second","third","one","two","three","it","they","he","she","we","you","and","but","because","during","after","before","global","world","health","history","science","technology","economy","politics","sports","travel","art","bayan","من","هو","هي","ما","ماذا","كيف","متى","أين","اين","لماذا","هل","عن","حول","آخر","اخر","أخبار","اخبار","ماهو","ماهي","مع","في","إلى","الى","what","who","when","where","why","how","does","did","is","are","was","were","current","club","player","play","about","explain","tell","me","latest","news","for","from","with","during","in","on","at","to","of","a","an","لنادي","نادي","فريق","الفريق","المنتخب","مع"]);
   const normalizeDigits=(value:string)=>value.replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[٬,]/g,"");
   const sentences=answer.replace(/^\s*\d+[.)]\s/gm,"").split(/[\n.!؟?]+/).map(sentence=>sentence.trim()).filter(Boolean);
-  const corpus=evidence.map(item=>[item.title,item.summary,...(item.sources||[]).flatMap(source=>[source.title,source.publisher])].filter(Boolean).join(" ")).join(" ").normalize("NFKC").toLowerCase();
-  const corpusTokens=new Set(corpus.match(/[\p{L}\p{N}&.-]+/gu)||[]);
-  const corpusNumbers=new Set(normalizeDigits(corpus).match(/[0-9]+/g)||[]);
+  const tokenize=(value:string)=>String(value||"").normalize("NFKC").toLowerCase().replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).match(/[\p{L}\p{N}&.-]+/gu)||[];
+  const evidenceItems=evidence.map(item=>{
+    const text=[item.title,item.summary,...(item.sources||[]).flatMap(source=>[source.title,source.publisher])].filter(Boolean).join(" ").normalize("NFKC").toLowerCase();
+    return {tokens:new Set(tokenize(text)),numbers:new Set(normalizeDigits(text).match(/[0-9]+/g)||[])};
+  });
   const arabicEntityPatterns=[
     /(?:نادي|فريق|الفريق|المنتخب|المدرب|المغني|المغنية|المطرب|المطربة|الممثل|الممثلة|الفنان|الفنانة|الكاتب|الكاتبة|المؤلف|المؤلفة|الروائي|الروائية)\s+([\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){0,1})/g,
     /(?:يلعب(?:\s+حاليًا)?\s+مع|انتقل(?:ت)?\s+إلى|انضم(?:ت)?\s+إلى|تعاقد\s+مع)\s+(?:نادي\s+|فريق\s+)?([\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){0,1})/g
   ];
+  const supportedWithContext=(specificTokens:string[],specificNumbers:string[],contextTokens:string[])=>{
+    const context=[...new Set(contextTokens.filter(token=>token.length>2&&!generic.has(token)&&!specificTokens.includes(token)))];
+    const requiredContextMatches=Math.min(2,context.length);
+    if(requiredContextMatches===0)return false;
+    return evidenceItems.some(item=>{
+      const specificPresent=specificTokens.every(token=>item.tokens.has(token))&&specificNumbers.every(number=>item.numbers.has(number));
+      if(!specificPresent)return false;
+      const overlap=context.filter(token=>item.tokens.has(token)).length;
+      return overlap>=requiredContextMatches;
+    });
+  };
   for(const sentence of sentences){
+    const tokens=tokenize(sentence);
     const names=(sentence.match(/\b[A-Z][A-Za-z0-9&.-]{2,}\b/g)||[]).filter(name=>!generic.has(name.toLowerCase()));
     const numbers=normalizeDigits(sentence).match(/[0-9]+/g)||[];
     const arabicEntities:{phrase:string;hasAlias:boolean}[]=[];
@@ -41,14 +53,20 @@ export const answerUnsupportedSpecificsDetail=(answer:string,evidence:SearchResu
         if(phrase&&!new Set(["كرة قدم","كرة القدم","كرة السلة","كرة اليد","الفريق الأول","المنتخب الوطني","فريق العمل","النادي المحلي"]).has(phrase))arabicEntities.push({phrase,hasAlias:Boolean(aliasMatch)});
       }
     }
-    const missingNames=names.filter(name=>!corpusTokens.has(name.toLowerCase()));
-    const missingNumbers=numbers.filter(number=>!corpusNumbers.has(number));
-    const missingArabic=arabicEntities.filter(entity=>!entity.hasAlias&&entity.phrase.split(/\s+/).some(token=>!corpusTokens.has(token.toLowerCase()))).map(entity=>entity.phrase);
+    const specificTokens=[...new Set([...names.map(name=>name.toLowerCase()),...arabicEntities.flatMap(entity=>entity.phrase.toLowerCase().split(/\s+/))])];
     const reasons:string[]=[];
-    if(missingNames.length)reasons.push("names="+[...new Set(missingNames)].slice(0,4).join(","));
-    if(missingNumbers.length)reasons.push("numbers="+[...new Set(missingNumbers)].slice(0,4).join(","));
-    if(missingArabic.length)reasons.push("arabic_entities="+[...new Set(missingArabic)].slice(0,3).join(","));
-    if(reasons.length)return ("unsupported_specifics:"+reasons.join(";")).slice(0,220);
+    for(const name of names){
+      if(!supportedWithContext([name.toLowerCase()],[],tokens))reasons.push("names="+name);
+    }
+    for(const number of numbers){
+      if(!supportedWithContext([], [number], tokens))reasons.push("numbers="+number);
+    }
+    for(const entity of arabicEntities){
+      if(entity.hasAlias)continue;
+      const phraseTokens=entity.phrase.toLowerCase().split(/\s+/);
+      if(!supportedWithContext(phraseTokens,[],tokens))reasons.push("arabic_entities="+entity.phrase);
+    }
+    if(reasons.length)return ("unsupported_specifics:"+[...new Set(reasons)].slice(0,4).join(";")).slice(0,220);
   }
   return undefined;
 };
