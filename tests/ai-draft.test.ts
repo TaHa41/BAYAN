@@ -42,9 +42,9 @@ describe.each(["ar", "en"] as const)("evidence-grounded article drafting (%s)", 
     const fetchMock = mockGeneration([draftJson(locale, { unsupported: true }), draftJson(locale, { unsupported: true })]);
     const result = await draftArticle({ OPENAI_API_KEY: "test-key" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(result.verification?.retried).toBe(true);
-    expect(result.verification?.removedSentences).toBe(1);
-    expect(result.verification?.remainingSentences).toBe(16);
+    expect((result as any).verification?.retried).toBe(true);
+    expect((result as any).verification?.removedSentences).toBe(1);
+    expect((result as any).verification?.remainingSentences).toBe(16);
     expect(result.answer).not.toContain(locale === "ar" ? "ريال مدريد" : "Acme Group");
     expect(result.answer).not.toContain(locale === "ar" ? "2031" : "2031");
   });
@@ -53,9 +53,9 @@ describe.each(["ar", "en"] as const)("evidence-grounded article drafting (%s)", 
     mockGeneration([draftJson(locale)]);
     const result = await draftArticle({ OPENAI_API_KEY: "test-key" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
     expect(result.status).toBe("verified");
-    expect(result.verification?.remainingSentences).toBe(16);
-    expect(result.verification?.removedSentences).toBe(0);
-    expect(result.verification?.retried).toBe(false);
+    expect((result as any).verification?.remainingSentences).toBe(16);
+    expect((result as any).verification?.removedSentences).toBe(0);
+    expect((result as any).verification?.retried).toBe(false);
   });
 
   it("rejects malformed JSON safely after one retry", async () => {
@@ -64,7 +64,7 @@ describe.each(["ar", "en"] as const)("evidence-grounded article drafting (%s)", 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result.status).toBe("mixed");
     expect(result.answer).toBe("");
-    expect(result.verification?.retried).toBe(true);
+    expect((result as any).verification?.retried).toBe(true);
   });
 
   it("rejects an unknown source ID safely after one retry", async () => {
@@ -73,6 +73,6 @@ describe.each(["ar", "en"] as const)("evidence-grounded article drafting (%s)", 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result.status).toBe("mixed");
     expect(result.answer).toBe("");
-    expect(result.verification?.retried).toBe(true);
+    expect((result as any).verification?.retried).toBe(true);
   });
 });
