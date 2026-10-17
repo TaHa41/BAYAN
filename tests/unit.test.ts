@@ -1,6 +1,6 @@
 import {describe,it,expect} from "vitest";
 import {SECTIONS} from "../src/config";
-import {answerHasUnsupportedSpecifics} from "../src/services/ai";
+import {answerHasUnsupportedSpecifics,normalizeDraftJson} from "../src/services/ai";
 import {isolateExactPerson,isolateArticleSubject,isSportsPersonProfile,personIdentityMatches} from "../src/services/search";
 
 describe("BAYAN product foundation",()=>{
@@ -107,6 +107,22 @@ describe("article subject isolation",()=>{
     expect(isolateArticleSubject("محمد صلاح",items)).toHaveLength(0);
   });
 });
+describe("strict article draft JSON normalization",()=>{
+  it("accepts a valid JSON object wrapped in a JSON markdown fence without changing its contents",()=>{
+    const raw='\`\`\`json\\n{"sections":[{"heading":"Evidence","sentences":[{"text":"The report was published in 2026.","sourceIds":["S1"]}]}]}\\n\`\`\`';
+    const normalized=normalizeDraftJson(raw);
+    expect(JSON.parse(normalized).sections[0].sentences[0].sourceIds).toEqual(["S1"]);
+  });
+  it("preserves malformed JSON so the strict parser rejects it",()=>{
+    const raw='\`\`\`json\\n{"sections":[}\\n\`\`\`';
+    expect(()=>JSON.parse(normalizeDraftJson(raw))).toThrow();
+  });
+  it("does not rewrite or remove invalid source IDs",()=>{
+    const raw='\`\`\`json\\n{"sections":[{"heading":"Evidence","sentences":[{"text":"Claim","sourceIds":["S999"]}]}]}\\n\`\`\`';
+    expect(JSON.parse(normalizeDraftJson(raw)).sections[0].sentences[0].sourceIds).toEqual(["S999"]);
+  });
+});
+
 describe("evidence-backed AI answer validation",()=>{
   const evidence=[{
     title:"Mohamed Salah scored 7 goals for Liverpool in 2025",
