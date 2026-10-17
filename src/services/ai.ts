@@ -111,7 +111,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
         const sentences:any[]=[];
         for(const sentence of section.sentences){
           if(!sentence||typeof sentence.text!=="string"||!Array.isArray(sentence.sourceIds)||!sentence.sourceIds.length)return undefined;
-          const sourceIds=[...new Set(sentence.sourceIds.map((id:any)=>String(id).trim()))];
+          const sourceIds:string[]=[...new Set<string>((sentence.sourceIds as unknown[]).map((id:unknown)=>String(id).trim()))];
           if(!sourceIds.length||sourceIds.some((id:string)=>!evidenceById.has(id)))return undefined;
           const text=sentence.text.replace(/\s+/g," ").trim().slice(0,900);
           if(!text)return undefined;
