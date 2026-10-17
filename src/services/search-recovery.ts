@@ -179,18 +179,33 @@ export async function externalSearchRecovery(query: string, language: Locale): P
     ["Bing News RSS", () => newsRss(q, language, "Bing News")],
     ["GDELT", () => gdelt(q, language)]
   ];
-  const settled = await Promise.allSettled(tasks.map(([, run]) => run()));
   const results: SearchResult[] = [];
   const providers: string[] = [];
   const providerAttempted: string[] = [];
 
-  settled.forEach((entry, index) => {
-    const name = tasks[index][0];
-    providerAttempted.push(name + (entry.status === "fulfilled" ? ":ok:" + entry.value.length : ":" + recoveryFailureKind(entry.reason)));
-    if (entry.status !== "fulfilled" || !entry.value.length) return;
-    providers.push(name);
-    results.push(...entry.value);
-  });
+  const runBatch = async (searchQuery: string) => {
+    const batchTasks: Array<[string, () => Promise<SearchResult[]>]> = searchQuery === q ? tasks : [
+      ["Wikipedia compact retry", () => wikipediaAction(searchQuery, language)],
+      ["Wikimedia REST compact retry", () => wikipediaRest(searchQuery, language)],
+      ["Google News RSS compact retry", () => newsRss(searchQuery, language, "Google News")],
+      ["Bing News RSS compact retry", () => newsRss(searchQuery, language, "Bing News")],
+      ["GDELT compact retry", () => gdelt(searchQuery, language)]
+    ];
+    const settled = await Promise.allSettled(batchTasks.map(([, run]) => run()));
+    settled.forEach((entry, index) => {
+      const name = batchTasks[index][0];
+      providerAttempted.push(name + (entry.status === "fulfilled" ? ":ok:" + entry.value.length : ":" + recoveryFailureKind(entry.reason)));
+      if (entry.status !== "fulfilled" || !entry.value.length) return;
+      providers.push(name);
+      results.push(...entry.value);
+    });
+  };
+
+  await runBatch(q);
+  if (!results.some(item => relevant(item.title, item.summary, q))) {
+    const compact = termsOf(q).slice(0, 6).join(" ");
+    if (compact && compact !== normalize(q)) await runBatch(compact);
+  }
 
   const filtered = results
     .filter(item => relevant(item.title, item.summary, q))
