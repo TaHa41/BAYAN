@@ -276,6 +276,7 @@ const checks = [
     "tests/api.test.ts","tests/editorial.test.ts","tests/publication-reason.test.ts","tests/search-patterns.test.ts","tests/search-recovery.test.ts","tests/unit.test.ts","tests/runtime-events.test.ts"
   ].every(path=>!(/catch\s*(?:\([^)]*\))?\s*\{\s*\}|\.catch\(\s*(?:\(\s*\w*\s*\)|\w+)\s*=>\s*(?:null|undefined|\{\s*\})\s*\)/.test(read(path))))],
 
+  ["news article drafting uses excerpt-only evidence, per-sentence source IDs, a single retry, and drops unsupported sentences", ai.includes('sourceId:"S"+(index+1)') && ai.includes("sourceIds") && ai.includes("answerHasUnsupportedSpecifics(sentence.text,cited,question)") && ai.includes("Regenerate the article JSON once") && ai.includes("checked.rejected.length") && !ai.slice(ai.indexOf("export async function draftArticle"),ai.indexOf("export async function ask")).includes("url:String(source.url")],
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
