@@ -37,6 +37,15 @@ describe("recent news archive queue ranking", () => {
     expect(result.candidates[0].independentPublisherCount).toBe(2);
   });
 
+  it("deduplicates Arabic titles after removing diacritics and punctuation", () => {
+    const first = row(1, "خبرٌ عاجل!", 1);
+    const second = row(2, "خبر عاجل", 1);
+    const result = rankNewsArchiveCandidates([first, second], now);
+    expect(result.candidates).toHaveLength(1);
+    expect(result.duplicateRows).toBe(1);
+    expect(result.candidates[0].independentPublisherCount).toBe(2);
+  });
+
   it("prefers an available image after timestamp and publisher-diversity ties", () => {
     const withoutImage = row(1, "No image", 1);
     const withImage = row(2, "Has image", 1, { image_url: "https://images.example/topic.jpg" });
