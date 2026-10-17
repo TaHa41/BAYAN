@@ -28,8 +28,8 @@ export const answerUnsupportedSpecificsDetail=(answer:string,evidence:SearchResu
     /(?:نادي|فريق|الفريق|المنتخب|المدرب|المغني|المغنية|المطرب|المطربة|الممثل|الممثلة|الفنان|الفنانة|الكاتب|الكاتبة|المؤلف|المؤلفة|الروائي|الروائية)\s+([\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){0,1})/g,
     /(?:يلعب(?:\s+حاليًا)?\s+مع|انتقل(?:ت)?\s+إلى|انضم(?:ت)?\s+إلى|تعاقد\s+مع)\s+(?:نادي\s+|فريق\s+)?([\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){0,1})/g
   ];
-  const supportedWithContext=(specificTokens:string[],specificNumbers:string[],contextTokens:string[])=>{
-    const context=[...new Set(contextTokens.filter(token=>token.length>2&&!generic.has(token)&&!specificTokens.includes(token)))];
+  const supportedWithContext=(specificTokens:string[],specificNumbers:string[],contextTokens:string[],excludedTokens:string[])=>{
+    const context=[...new Set(contextTokens.filter(token=>token.length>2&&!generic.has(token)&&!excludedTokens.includes(token)))];
     const requiredContextMatches=Math.min(2,context.length);
     if(requiredContextMatches===0)return false;
     return evidenceItems.some(item=>{
@@ -53,18 +53,18 @@ export const answerUnsupportedSpecificsDetail=(answer:string,evidence:SearchResu
         if(phrase&&!new Set(["كرة قدم","كرة القدم","كرة السلة","كرة اليد","الفريق الأول","المنتخب الوطني","فريق العمل","النادي المحلي"]).has(phrase))arabicEntities.push({phrase,hasAlias:Boolean(aliasMatch)});
       }
     }
-    const specificTokens=[...new Set([...names.map(name=>name.toLowerCase()),...arabicEntities.flatMap(entity=>entity.phrase.toLowerCase().split(/\s+/))])];
+    const allSpecificTokens=[...new Set([...names.map(name=>name.toLowerCase()),...arabicEntities.flatMap(entity=>entity.phrase.toLowerCase().split(/\s+/)),...numbers])];
     const reasons:string[]=[];
     for(const name of names){
-      if(!supportedWithContext([name.toLowerCase()],[],tokens))reasons.push("names="+name);
+      if(!supportedWithContext([name.toLowerCase()],[],tokens,allSpecificTokens))reasons.push("names="+name);
     }
     for(const number of numbers){
-      if(!supportedWithContext([], [number], tokens))reasons.push("numbers="+number);
+      if(!supportedWithContext([], [number], tokens,allSpecificTokens))reasons.push("numbers="+number);
     }
     for(const entity of arabicEntities){
       if(entity.hasAlias)continue;
       const phraseTokens=entity.phrase.toLowerCase().split(/\s+/);
-      if(!supportedWithContext(phraseTokens,[],tokens))reasons.push("arabic_entities="+entity.phrase);
+      if(!supportedWithContext(phraseTokens,[],tokens,allSpecificTokens))reasons.push("arabic_entities="+entity.phrase);
     }
     if(reasons.length)return ("unsupported_specifics:"+[...new Set(reasons)].slice(0,4).join(";")).slice(0,220);
   }
