@@ -83,7 +83,7 @@ const independentSourceCount=(env:Env,evidence:SearchResult[])=>new Set(evidence
   return String(source.publisher||"").trim().toLowerCase();
 }).filter(Boolean)).size;
 
-export const normalizeDraftJson=(raw:string)=>raw.trim().replace(/^\`\`\`(?:json)?\\s*/i,"").replace(/\\s*\`\`\`$/,"").trim();
+export const normalizeDraftJson=(raw:string)=>raw.trim().replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"").trim();
 
 export async function draftArticle(env:Env,question:string,locale:Locale,evidence:SearchResult[],backgroundBudget=false){
   if(evidence.length<2)return{status:"insufficient" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[])};
