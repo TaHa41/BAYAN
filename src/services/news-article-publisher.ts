@@ -11,7 +11,7 @@ export async function publishNextArchivedNewsArticle(env:Env){
   let setting:any=null;try{setting=await env.DB.prepare("SELECT value FROM admin_settings WHERE key=? LIMIT 1").bind("news_article_queue_language").first<any>()}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","settings_read_failed",error)}
   const preferred:Locale=String(setting?.value||"ar")==="en"?"en":"ar";
   const futureLimit=new Date(now+5*60*1000).toISOString();
-  const pick=async(language:Locale)=>env.DB.prepare("SELECT id,title,summary,language,article_attempts FROM news_archive WHERE language=? AND article_slug IS NULL AND article_attempts<2 AND length(summary)>=120 AND published_at>=? AND published_at<=? AND fetched_at>=? AND (article_last_attempt_at IS NULL OR article_last_attempt_at<=?) AND (article_last_reason IS NULL OR article_last_reason!='skipped_low_evidence' OR article_last_attempt_at<=?) ORDER BY CASE WHEN article_last_reason='publish_rejected' THEN 0 WHEN article_last_reason='draft_not_verified' THEN 1 ELSE 2 END,published_at DESC,fetched_at DESC,id DESC LIMIT 1").bind(language,cutoff,futureLimit,cutoff,retryBefore,lowEvidenceRetryBefore).first<any>();
+  const pick=async(language:Locale)=>env.DB.prepare("SELECT id,title,summary,language,article_attempts,publisher,image_url FROM news_archive WHERE language=? AND article_slug IS NULL AND article_attempts<2 AND length(summary)>=120 AND published_at>=? AND published_at<=? AND fetched_at>=? AND (article_last_attempt_at IS NULL OR article_last_attempt_at<=?) AND (article_last_reason IS NULL OR article_last_reason!='skipped_low_evidence' OR article_last_attempt_at<=?) ORDER BY published_at DESC,CASE WHEN publisher=(SELECT value FROM admin_settings WHERE key='news_article_queue_last_publisher' LIMIT 1) THEN 1 ELSE 0 END,CASE WHEN image_url IS NOT NULL AND trim(image_url)!='' THEN 0 ELSE 1 END,fetched_at DESC,id DESC LIMIT 1").bind(language,cutoff,futureLimit,cutoff,retryBefore,lowEvidenceRetryBefore).first<any>();
   let row=await pick(preferred);
   if(!row)row=await pick(preferred==="ar"?"en":"ar");
   if(!row)return{status:"idle" as const};
@@ -24,6 +24,8 @@ export async function publishNextArchivedNewsArticle(env:Env){
   // starve English news forever (and vice versa).
   const nextLanguage:Locale=language==="ar"?"en":"ar";
   try{await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind("news_article_queue_language",nextLanguage,stamp).run()}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","language_rotation_failed",error)}
+  const selectedPublisher=String(row.publisher||"").trim().slice(0,160);
+  if(selectedPublisher)try{await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.value,updated_at=excluded.updated_at").bind("news_article_queue_last_publisher",selectedPublisher,stamp).run()}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","publisher_rotation_failed",error)}
   try{
     const result=await search(env,title,language,{publish:true,draft:true,images:true,publicationContext:String(row.summary||"").slice(0,500)});
     const slug=String(result.articleSlug||"").trim();
