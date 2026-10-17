@@ -24,7 +24,7 @@ export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[
   // allowing unsupported names or numbers.
   const corpus=evidence.map(item=>[item.title,item.summary,...(item.sources||[]).flatMap(source=>[source.title,source.publisher])].filter(Boolean).join(" ")).join(" ").normalize("NFKC").toLowerCase();
   const itemCorpora=evidence.map(item=>[item.title,item.summary,...(item.sources||[]).flatMap(source=>[source.title,source.publisher])].filter(Boolean).join(" ").normalize("NFKC").toLowerCase());
-  const hasTokens=(text:string,tokens:string[])=>tokens.every(token=>new Set(text.match(/[\\p{L}\\p{N}&.-]+/gu)||[]).has(token));
+  const hasTokens=(text:string,tokens:string[])=>tokens.every(token=>new Set(text.match(/[\p{L}\p{N}&.-]+/gu)||[]).has(token));
 
   const corpusTokens=new Set(corpus.match(/[\p{L}\p{N}&.-]+/gu)||[]);
   const corpusNumbers=new Set(normalizeDigits(corpus).match(/[0-9]+/g)||[]);
