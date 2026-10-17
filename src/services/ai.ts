@@ -57,33 +57,95 @@ const independentSourceCount=(env:Env,evidence:SearchResult[])=>new Set(evidence
 
 export async function draftArticle(env:Env,question:string,locale:Locale,evidence:SearchResult[]){
   if(evidence.length<2)return{status:"insufficient" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[])};
+  // Give the model bounded evidence excerpts only. URLs and unrelated result
+  // metadata are deliberately excluded from the drafting prompt.
   const compactEvidence=evidence.slice(0,12).map((item,index)=>({
+    sourceId:"S"+(index+1),
     title:String(item.title||"").slice(0,240),
-    summary:String(item.summary||"").slice(0,1400),
-    section:String(item.section||""),
-    sources:(item.sources||[]).slice(0,4).map(source=>({title:String(source.title||"").slice(0,180),publisher:String(source.publisher||"").slice(0,120),url:String(source.url||"").slice(0,500)}))
+    excerpt:String(item.summary||"").slice(0,1400),
+    publishers:[...new Set((item.sources||[]).map(source=>String(source.publisher||"").trim()).filter(Boolean))].slice(0,4),
+    sourceTitles:(item.sources||[]).map(source=>String(source.title||"").slice(0,180)).filter(Boolean).slice(0,4)
   }));
-  const evidenceText=JSON.stringify(compactEvidence).slice(0,20000);
+  const evidenceById=new Map(compactEvidence.map((item,index)=>[item.sourceId,evidence[index]]));
+  const evidenceText=JSON.stringify(compactEvidence).slice(0,16000);
   const system=locale==="ar"
-    ?"أنت محرر معرفي في بيان. اكتب مقالًا عربيًا فصيحًا متكاملًا ومفيدًا، لا مجرد ملخص أو مقتطف. ابدأ بمقدمة تجيب عن الموضوع، ثم استخدم أربعة عناوين فرعية على الأقل وفقرات مترابطة تغطي الخلفية، والحقائق الأساسية، والسياق، والأثر أو الاستخدامات، والحدود أو ما لا يزال غير محسوم، وخلاصة واضحة. استهدف مقالًا تفصيليًا يقارب 700 إلى 1000 كلمة عندما تسمح الأدلة. استخدم الأدلة المرفقة فقط، ولا تضف اسمًا أو رقمًا أو تاريخًا أو ادعاءً محددًا غير مدعوم. لا تكرر الفكرة، ولا تخلط بين أشخاص أو أحداث متشابهة. إذا لم تكف الأدلة لتفصيل معين، فقل ذلك بوضوح بدل اختلاقه. لا تذكر أنك نموذج ذكاء اصطناعي ولا تضع روابط خارجية داخل متن المقال؛ تحفظ المصادر منفصلة في بيان."
-    :"You are a BAYAN knowledge editor. Write a genuinely useful, comprehensive English article, not a short answer or source excerpt. Begin with a direct introduction, then use at least four meaningful section headings and connected paragraphs covering background, established facts, context, impact or practical use, limitations or unresolved questions, and a clear conclusion. Aim for roughly 700–1000 words when the evidence supports it. Use only the supplied evidence; do not invent names, numbers, dates, quotations, or specific claims. Do not repeat ideas or conflate similar people/events. Clearly state when evidence does not establish a detail. Do not mention being an AI and do not put external URLs in the article body; BAYAN stores sources separately.";
-  const messages=[{role:"system",content:system},{role:"user",content:"Topic/question: "+question+"\nEvidence (source records are authoritative; summaries may be incomplete): "+evidenceText}];
-  if(env.OPENAI_API_KEY)try{
-    const response=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(9000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",messages,temperature:.1,max_tokens:2200})});
-    if(response.ok){
-      const data=await response.json<any>();
-      const answer=String(data.choices?.[0]?.message?.content||"").trim();
-      if(answer&&languageConsistent(answer,locale))return{status:independentSourceCount(env,evidence)>=2&&!answerHasUnsupportedSpecifics(answer,evidence,question)?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(item=>item.sources||[])};
-      await recordAiFailure(env,"OpenAI draft",answer?"language_mismatch":"empty_response");
-    }else await recordAiFailure(env,"OpenAI draft","http_"+response.status);
-  }catch(error){await recordAiFailure(env,"OpenAI draft",aiFailureDetail(error));}
-  if(env.AI)try{
-    const response=await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast",{messages,max_tokens:1800,temperature:.1});
-    const answer=String((response as any)?.response||"").trim();
-    if(answer&&languageConsistent(answer,locale))return{status:independentSourceCount(env,evidence)>=2&&!answerHasUnsupportedSpecifics(answer,evidence,question)?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(item=>item.sources||[])};
-    await recordAiFailure(env,"Workers AI draft",answer?"language_mismatch":"empty_response");
-  }catch(error){await recordAiFailure(env,"Workers AI draft",aiFailureDetail(error));}
-  return{status:"mixed" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[]),reason:"ai_unavailable" as const};
+    ?"أنت محرر أدلة في بيان. اكتب مقالًا عربيًا مفيدًا اعتمادًا على المقتطفات المرفقة فقط. أخرج JSON صالحًا فقط بالشكل {\\"sections\\":[{\\"heading\\":\\"عنوان\\",\\"sentences\\":[{\\"text\\":\\"جملة واحدة\\",\\"sourceIds\\":[\\"S1\\"]}]}]}. يجب أن تحمل كل جملة sourceIds لمعرف مقتطف واحد على الأقل يدعمها مباشرة. لا تضف أسماء أو أرقامًا أو تواريخ أو حقائق تفصيلية غير موجودة حرفيًا أو بوضوح في المقتطفات المشار إليها. لا تستنتج تفاصيل محددة. لا تضع أكثر من فكرة مستقلة في الجملة. استخدم أربعة عناوين ذات معنى على الأقل عندما تسمح الأدلة. إذا لم تدعم الأدلة جملة مفيدة، فلا تكتبها. لا تضف روابط أو نصًا خارج JSON."
+    :"You are BAYAN's evidence editor. Write a useful article using only the supplied excerpts. Output valid JSON only in this shape: {\\"sections\\":[{\\"heading\\":\\"Heading\\",\\"sentences\\":[{\\"text\\":\\"one sentence\\",\\"sourceIds\\":[\\"S1\\"]}]}]}. Every sentence must carry sourceIds for at least one excerpt that directly supports it. Do not add names, numbers, dates, or specific facts unless they are explicitly present in the cited excerpts. Do not infer specific details. Keep each sentence to one independently verifiable claim. Use at least four meaningful headings when evidence permits. Omit claims the evidence cannot support. No URLs and no text outside JSON.";
+  const parseDraft=(raw:string)=>{
+    try{
+      const value=JSON.parse(raw);
+      if(!value||!Array.isArray(value.sections))return undefined;
+      const sections=value.sections.map((section:any)=>({
+        heading:String(section?.heading||"").trim().slice(0,140),
+        sentences:(Array.isArray(section?.sentences)?section.sentences:[]).map((sentence:any)=>({
+          text:String(sentence?.text||"").replace(/\\s+/g," ").trim().slice(0,900),
+          sourceIds:[...new Set((Array.isArray(sentence?.sourceIds)?sentence.sourceIds:[]).map((id:any)=>String(id).trim()).filter((id:string)=>evidenceById.has(id)))].slice(0,4)
+        })).filter((sentence:any)=>sentence.text&&sentence.sourceIds.length>0)
+      })).filter((section:any)=>section.heading&&section.sentences.length);
+      return sections.length?sections:undefined;
+    }catch{return undefined;}
+  };
+  const verifySections=(sections:any[])=>{
+    const accepted:any[]=[],rejected:string[]=[];
+    for(const section of sections){
+      const sentences:any[]=[];
+      for(const sentence of section.sentences){
+        const cited=sentence.sourceIds.map((id:string)=>evidenceById.get(id)).filter(Boolean) as SearchResult[];
+        if(!cited.length||answerHasUnsupportedSpecifics(sentence.text,cited,question)){
+          rejected.push(sentence.text.slice(0,180));
+          continue;
+        }
+        sentences.push(sentence);
+      }
+      if(sentences.length)accepted.push({...section,sentences});
+    }
+    return{sections:accepted,rejected};
+  };
+  const generate=async(extraInstruction:string)=>{
+    const messages=[{role:"system",content:system},{role:"user",content:"Topic/question: "+question+"\\nEvidence excerpts (only these snippets may be used): "+evidenceText+(extraInstruction?"\\nCorrection required: "+extraInstruction:"")}];
+    if(env.OPENAI_API_KEY)try{
+      const response=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(9000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",messages,temperature:0,max_tokens:2600,response_format:{type:"json_object"}})});
+      if(response.ok){
+        const data=await response.json<any>(),answer=String(data.choices?.[0]?.message?.content||"").trim();
+        if(answer)return answer;
+        await recordAiFailure(env,"OpenAI draft","empty_response");
+      }else await recordAiFailure(env,"OpenAI draft","http_"+response.status);
+    }catch(error){await recordAiFailure(env,"OpenAI draft",aiFailureDetail(error));}
+    if(env.AI)try{
+      const response=await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast",{messages,max_tokens:2200,temperature:0});
+      const answer=String((response as any)?.response||"").trim();
+      if(answer)return answer;
+      await recordAiFailure(env,"Workers AI draft","empty_response");
+    }catch(error){await recordAiFailure(env,"Workers AI draft",aiFailureDetail(error));}
+    return "";
+  };
+  let raw=await generate("");
+  if(!raw)return{status:"mixed" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[]),reason:"ai_unavailable" as const};
+  let sections=parseDraft(raw);
+  if(!sections){
+    raw=await generate("The prior output was not valid JSON in the required schema. Return only valid JSON with sections, heading, sentences, text, and sourceIds.");
+    sections=parseDraft(raw);
+  }
+  if(!sections)return{status:"mixed" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[]),reason:"draft_not_verified" as const};
+  let checked=verifySections(sections);
+  // Retry once only when specific unsupported claims were found. Any remaining
+  // unsupported sentence is dropped, never allowed through the publication gate.
+  if(checked.rejected.length){
+    const rejected=checked.rejected.slice(0,8).join(" | ");
+    const retryRaw=await generate("Regenerate the article JSON once. The following sentences failed evidence verification and must be omitted or replaced with directly supported claims: "+rejected+". Each sentence must cite valid sourceIds.");
+    const retrySections=parseDraft(retryRaw);
+    if(retrySections){
+      const retryChecked=verifySections(retrySections);
+      if(retryChecked.sections.reduce((n,section)=>n+section.sentences.length,0)>checked.sections.reduce((n,section)=>n+section.sentences.length,0))checked=retryChecked;
+    }
+  }
+  const body=checked.sections.map(section=>"## "+section.heading+"\\n\\n"+section.sentences.map((sentence:any)=>sentence.text).join(" ")).join("\\n\\n");
+  const sentenceCount=checked.sections.reduce((n,section)=>n+section.sentences.length,0);
+  const headings=checked.sections.length;
+  const sufficientlyUseful=body.length>=1800&&sentenceCount>=12&&headings>=4;
+  const independentlySourced=independentSourceCount(env,evidence)>=2;
+  const verified=sufficientlyUseful&&independentlySourced&&languageConsistent(body,locale)&&!answerHasUnsupportedSpecifics(body,evidence,question);
+  return{status:verified?"verified" as const:"mixed" as const,answer:body,sources:evidence.flatMap(item=>item.sources||[]),reason:verified?undefined:"draft_not_verified" as const,verification:{sentenceCount,headings,rejectedSentences:checked.rejected.length}};
 }
 export async function ask(env:Env,question:string,locale:Locale,evidence:SearchResult[]){
   if(!evidence.length)return{status:"insufficient" as const,answer:locale==="ar"?"لا أملك أدلة موثقة كافية للإجابة بثقة.":"I do not have enough verified evidence to answer confidently.",sources:[]};
