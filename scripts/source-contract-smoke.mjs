@@ -277,7 +277,7 @@ const checks = [
   ].every(path=>!(/catch\s*(?:\([^)]*\))?\s*\{\s*\}|\.catch\(\s*(?:\(\s*\w*\s*\)|\w+)\s*=>\s*(?:null|undefined|\{\s*\})\s*\)/.test(read(path))))],
 
   ["news article drafting uses excerpt-only evidence, per-sentence source IDs, a single retry, and drops unsupported sentences", ai.includes('sourceId:"S"+(index+1)') && ai.includes("sourceIds") && ai.includes("answerHasUnsupportedSpecifics(sentence.text,cited,question)") && ai.includes("Regenerate the article JSON once") && ai.includes("checked.rejected.length") && !ai.slice(ai.indexOf("export async function draftArticle"),ai.indexOf("export async function ask")).includes("url:String(source.url")],
-  ["archive publisher runs in most 5-minute maintenance slots while refresh stays bounded and self-heal remains scheduled", index.includes("const scheduleSlot=Math.floor") && index.includes("task===1||(task===2&&scheduleSlot%12!==2)") && index.includes("news_archive_refresh_last") && index.includes("publishNextArchivedNewsArticle(env)")],
+  ["archive publisher runs in most 5-minute maintenance slots while refresh stays bounded and self-heal remains scheduled", index.includes("const scheduleSlot=Math.floor") && index.includes("task===1||(task===2&&scheduleSlot%12!==2&&scheduleSlot%12!==8)") && index.includes("news_archive_refresh_last") && index.includes("publishNextArchivedNewsArticle(env)")],
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
