@@ -89,14 +89,23 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
   const parseDraft=(raw:string)=>{
     try{
       const value=JSON.parse(raw);
-      if(!value||!Array.isArray(value.sections))return undefined;
-      const sections=value.sections.map((section:any)=>({
-        heading:String(section?.heading||"").trim().slice(0,140),
-        sentences:(Array.isArray(section?.sentences)?section.sentences:[]).map((sentence:any)=>({
-          text:String(sentence?.text||"").replace(/\s+/g," ").trim().slice(0,900),
-          sourceIds:[...new Set((Array.isArray(sentence?.sourceIds)?sentence.sourceIds:[]).map((id:any)=>String(id).trim()).filter((id:string)=>evidenceById.has(id)))].slice(0,4)
-        })).filter((sentence:any)=>sentence.text&&sentence.sourceIds.length>0)
-      })).filter((section:any)=>section.heading&&section.sentences.length);
+      if(!value||!Array.isArray(value.sections)||!value.sections.length)return undefined;
+      const sections:any[]=[];
+      for(const section of value.sections){
+        if(!section||typeof section.heading!=="string"||!Array.isArray(section.sentences))return undefined;
+        const heading=section.heading.trim().slice(0,140);
+        if(!heading)return undefined;
+        const sentences:any[]=[];
+        for(const sentence of section.sentences){
+          if(!sentence||typeof sentence.text!=="string"||!Array.isArray(sentence.sourceIds)||!sentence.sourceIds.length)return undefined;
+          const sourceIds=[...new Set(sentence.sourceIds.map((id:any)=>String(id).trim()))];
+          if(!sourceIds.length||sourceIds.some((id:string)=>!evidenceById.has(id)))return undefined;
+          const text=sentence.text.replace(/\s+/g," ").trim().slice(0,900);
+          if(!text)return undefined;
+          sentences.push({text,sourceIds:sourceIds.slice(0,4)});
+        }
+        if(sentences.length)sections.push({heading,sentences});
+      }
       return sections.length?sections:undefined;
     }catch{return undefined;}
   };
@@ -139,23 +148,28 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
     return "";
   };
   let raw=await generate("");
-  if(!raw)return{status:"mixed" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[]),reason:"ai_unavailable" as const};
+  if(!raw)return{status:"mixed" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[]),reason:"ai_unavailable" as const,verification:{removedSentences:0,remainingSentences:0,retried:false}};
+  let retried=false,totalRemoved=0;
   let sections=parseDraft(raw);
   if(!sections){
-    raw=await generate("The prior output was not valid JSON in the required schema. Return only valid JSON with sections, heading, sentences, text, and sourceIds.");
+    retried=true;
+    raw=await generate("The prior output was invalid JSON or contained an invalid source ID. Return only valid JSON in the required schema and cite only supplied sourceIds.");
     sections=parseDraft(raw);
   }
-  if(!sections)return{status:"mixed" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[]),reason:"draft_not_verified" as const};
+  if(!sections)return{status:"mixed" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[]),reason:"draft_not_verified" as const,verification:{removedSentences:0,remainingSentences:0,retried}};
   let checked=verifySections(sections);
-  // Retry once only when specific unsupported claims were found. Any remaining
-  // unsupported sentence is dropped, never allowed through the publication gate.
-  if(checked.rejected.length){
+  totalRemoved+=checked.rejected.length;
+  if(checked.rejected.length&&!retried){
+    retried=true;
     const rejected=checked.rejected.slice(0,8).join(" | ");
     const retryRaw=await generate("Regenerate the article JSON once. The following sentences failed evidence verification and must be omitted or replaced with directly supported claims: "+rejected+". Each sentence must cite valid sourceIds.");
     const retrySections=parseDraft(retryRaw);
     if(retrySections){
       const retryChecked=verifySections(retrySections);
-      if(retryChecked.sections.reduce((n,section)=>n+section.sentences.length,0)>checked.sections.reduce((n,section)=>n+section.sentences.length,0))checked=retryChecked;
+      if(retryChecked.sections.reduce((n,section)=>n+section.sentences.length,0)>checked.sections.reduce((n,section)=>n+section.sentences.length,0)){
+        checked=retryChecked;
+        totalRemoved+=retryChecked.rejected.length;
+      }
     }
   }
   const body=checked.sections.map(section=>"## "+section.heading+"\n\n"+section.sentences.map((sentence:any)=>sentence.text).join(" ")).join("\n\n");
@@ -164,7 +178,8 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
   const sufficientlyUseful=body.length>=1800&&sentenceCount>=12&&headings>=4;
   const independentlySourced=independentSourceCount(env,evidence)>=2;
   const verified=sufficientlyUseful&&independentlySourced&&languageConsistent(body,locale);
-  return{status:verified?"verified" as const:"mixed" as const,answer:body,sources:evidence.flatMap(item=>item.sources||[]),reason:verified?undefined:"draft_not_verified" as const,verification:{sentenceCount,headings,rejectedSentences:checked.rejected.length}};
+  return{status:verified?"verified" as const:"mixed" as const,answer:body,sources:evidence.flatMap(item=>item.sources||[]),reason:verified?undefined:"draft_not_verified" as const,verification:{sentenceCount,headings,rejectedSentences:totalRemoved,removedSentences:totalRemoved,remainingSentences:sentenceCount,retried}};
+
 }
 export async function ask(env:Env,question:string,locale:Locale,evidence:SearchResult[]){
   if(!evidence.length)return{status:"insufficient" as const,answer:locale==="ar"?"لا أملك أدلة موثقة كافية للإجابة بثقة.":"I do not have enough verified evidence to answer confidently.",sources:[]};
