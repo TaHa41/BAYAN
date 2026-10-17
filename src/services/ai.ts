@@ -69,8 +69,8 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
   const evidenceById=new Map(compactEvidence.map((item,index)=>[item.sourceId,evidence[index]]));
   const evidenceText=JSON.stringify(compactEvidence).slice(0,16000);
   const system=locale==="ar"
-    ?"أنت محرر أدلة في بيان. اكتب مقالًا عربيًا مفيدًا اعتمادًا على المقتطفات المرفقة فقط. أخرج JSON صالحًا فقط بالشكل {\\"sections\\":[{\\"heading\\":\\"عنوان\\",\\"sentences\\":[{\\"text\\":\\"جملة واحدة\\",\\"sourceIds\\":[\\"S1\\"]}]}]}. يجب أن تحمل كل جملة sourceIds لمعرف مقتطف واحد على الأقل يدعمها مباشرة. لا تضف أسماء أو أرقامًا أو تواريخ أو حقائق تفصيلية غير موجودة حرفيًا أو بوضوح في المقتطفات المشار إليها. لا تستنتج تفاصيل محددة. لا تضع أكثر من فكرة مستقلة في الجملة. استخدم أربعة عناوين ذات معنى على الأقل عندما تسمح الأدلة. إذا لم تدعم الأدلة جملة مفيدة، فلا تكتبها. لا تضف روابط أو نصًا خارج JSON."
-    :"You are BAYAN's evidence editor. Write a useful article using only the supplied excerpts. Output valid JSON only in this shape: {\\"sections\\":[{\\"heading\\":\\"Heading\\",\\"sentences\\":[{\\"text\\":\\"one sentence\\",\\"sourceIds\\":[\\"S1\\"]}]}]}. Every sentence must carry sourceIds for at least one excerpt that directly supports it. Do not add names, numbers, dates, or specific facts unless they are explicitly present in the cited excerpts. Do not infer specific details. Keep each sentence to one independently verifiable claim. Use at least four meaningful headings when evidence permits. Omit claims the evidence cannot support. No URLs and no text outside JSON.";
+    ?"أنت محرر أدلة في بيان. اكتب مقالًا عربيًا مفيدًا اعتمادًا على المقتطفات المرفقة فقط. أخرج JSON صالحًا فقط بالشكل {\"sections\":[{\"heading\":\"عنوان\",\"sentences\":[{\"text\":\"جملة واحدة\",\"sourceIds\":[\"S1\"]}]}]}. يجب أن تحمل كل جملة sourceIds لمعرف مقتطف واحد على الأقل يدعمها مباشرة. لا تضف أسماء أو أرقامًا أو تواريخ أو حقائق تفصيلية غير موجودة حرفيًا أو بوضوح في المقتطفات المشار إليها. لا تستنتج تفاصيل محددة. لا تضع أكثر من فكرة مستقلة في الجملة. استخدم أربعة عناوين ذات معنى على الأقل عندما تسمح الأدلة. إذا لم تدعم الأدلة جملة مفيدة، فلا تكتبها. لا تضف روابط أو نصًا خارج JSON."
+    :"You are BAYAN's evidence editor. Write a useful article using only the supplied excerpts. Output valid JSON only in this shape: {\"sections\":[{\"heading\":\"Heading\",\"sentences\":[{\"text\":\"one sentence\",\"sourceIds\":[\"S1\"]}]}]}. Every sentence must carry sourceIds for at least one excerpt that directly supports it. Do not add names, numbers, dates, or specific facts unless they are explicitly present in the cited excerpts. Do not infer specific details. Keep each sentence to one independently verifiable claim. Use at least four meaningful headings when evidence permits. Omit claims the evidence cannot support. No URLs and no text outside JSON.";
   const parseDraft=(raw:string)=>{
     try{
       const value=JSON.parse(raw);
@@ -78,7 +78,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
       const sections=value.sections.map((section:any)=>({
         heading:String(section?.heading||"").trim().slice(0,140),
         sentences:(Array.isArray(section?.sentences)?section.sentences:[]).map((sentence:any)=>({
-          text:String(sentence?.text||"").replace(/\\s+/g," ").trim().slice(0,900),
+          text:String(sentence?.text||"").replace(/\s+/g," ").trim().slice(0,900),
           sourceIds:[...new Set((Array.isArray(sentence?.sourceIds)?sentence.sourceIds:[]).map((id:any)=>String(id).trim()).filter((id:string)=>evidenceById.has(id)))].slice(0,4)
         })).filter((sentence:any)=>sentence.text&&sentence.sourceIds.length>0)
       })).filter((section:any)=>section.heading&&section.sentences.length);
@@ -102,7 +102,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
     return{sections:accepted,rejected};
   };
   const generate=async(extraInstruction:string)=>{
-    const messages=[{role:"system",content:system},{role:"user",content:"Topic/question: "+question+"\\nEvidence excerpts (only these snippets may be used): "+evidenceText+(extraInstruction?"\\nCorrection required: "+extraInstruction:"")}];
+    const messages=[{role:"system",content:system},{role:"user",content:"Topic/question: "+question+"\nEvidence excerpts (only these snippets may be used): "+evidenceText+(extraInstruction?"\nCorrection required: "+extraInstruction:"")}];
     if(env.OPENAI_API_KEY)try{
       const response=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(9000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",messages,temperature:0,max_tokens:2600,response_format:{type:"json_object"}})});
       if(response.ok){
@@ -139,7 +139,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
       if(retryChecked.sections.reduce((n,section)=>n+section.sentences.length,0)>checked.sections.reduce((n,section)=>n+section.sentences.length,0))checked=retryChecked;
     }
   }
-  const body=checked.sections.map(section=>"## "+section.heading+"\\n\\n"+section.sentences.map((sentence:any)=>sentence.text).join(" ")).join("\\n\\n");
+  const body=checked.sections.map(section=>"## "+section.heading+"\n\n"+section.sentences.map((sentence:any)=>sentence.text).join(" ")).join("\n\n");
   const sentenceCount=checked.sections.reduce((n,section)=>n+section.sentences.length,0);
   const headings=checked.sections.length;
   const sufficientlyUseful=body.length>=1800&&sentenceCount>=12&&headings>=4;
