@@ -54,7 +54,7 @@ export async function publishNextArchivedNewsArticle(env:Env){
       await recordRuntimeEventLimited(env,"news_archive_publication_gate",publishReason,gateEvent);
       return{status:"attempted_no_publish" as const,id,language,searchStatus:result.status,publishReason,queueStatus,publishReasonDetail:detail,resultCount:Array.isArray(result.results)?result.results.length:0,sourceCount,independentPublisherCount,independentHostCount,expandedSearchAttempted,providerFailures,providers:Array.isArray(result.providers)?result.providers.slice(0,4):[]};
     }
-    const detail=String(result.publishReasonDetail||"draft_verified_metrics_unavailable").replace(/https?:\\/\\/[^\\s]+/g,"[url]").replace(/\\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\\s+\\S+)\\b/gi,"[redacted]").replace(/\\s+/g," ").slice(0,300);
+    const detail=String(result.publishReasonDetail||"draft_verified_metrics_unavailable").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").replace(/\s+/g," ").slice(0,300);
     await env.DB.prepare("UPDATE news_archive SET article_slug=?,article_last_reason=NULL,article_last_detail=? WHERE id=?").bind(slug,detail,id).run();
     await recordRuntimeEventLimited(env,"news_archive_article_generation","article_published",("id="+id+";language="+language+";"+detail).slice(0,350));
     return{status:"published" as const,id,language,slug,publishReasonDetail:detail};
