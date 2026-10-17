@@ -26,6 +26,7 @@
 
 - **Changes committed on branch `fix/evidence-attributed-news-drafts`:** `src/services/ai.ts` now sends bounded title/summary/source-title/publisher excerpts rather than full provider records or URLs; requires JSON sentences with source IDs; validates each sentence against only its cited evidence; retries generation once after unsupported specifics and drops any remaining rejected sentences. Existing source-diversity, language, usefulness, image, and publication gates remain in place.
 - **Regression guard:** `scripts/source-contract-smoke.mjs` checks for excerpt-only drafting, sentence-level source IDs, unsupported-sentence validation, and the single correction path.
+- **Bounded queue cadence:** `src/index.ts` retains news refresh every 15 minutes and caps scheduled archive publication at six single-row attempts per hour, reserving two maintenance slots per hour for self-healing. Each attempt remains bounded to one archive row; visitor-facing search responses do not wait on scheduled drafting.
 - **Commits:** `f87c9eb9b70a930102963f612d6f4c078bf5db94` (drafting change); `4417daf0ca5a68cf440a86865a0d20a50965fa48` (prompt escaping correction); `f6fa9c30a3ab8a1b15deead28637b65c60e0efa7` (regression guard). Pull request: #347.
 - **Data/schema impact:** No D1 writes, no migrations changed, no retry counters reset, and no feature-ledger entries changed.
 - **Tests:** CI status not yet returned for the PR head; do not treat source-contract addition as a passing test run.
