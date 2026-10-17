@@ -20,16 +20,16 @@ export const answerUnsupportedSpecificsDetail=(answer:string,evidence:SearchResu
   void question;
   const generic=new Set(["the","this","these","those","according","based","however","therefore","overall","summary","conclusion","answer","key","main","important","first","second","third","one","two","three","it","they","he","she","we","you","and","but","because","during","after","before","global","world","health","history","science","technology","economy","politics","sports","travel","art","bayan","من","هو","هي","ما","ماذا","كيف","متى","أين","اين","لماذا","هل","عن","حول","آخر","اخر","أخبار","اخبار","ماهو","ماهي","مع","في","إلى","الى","what","who","when","where","why","how","does","did","is","are","was","were","current","club","player","play","about","explain","tell","me","latest","news"]);
   const normalizeDigits=(value:string)=>value.replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[٬,]/g,"");
-  const sentences=answer.replace(/^\\s*\\d+[.)]\\s/gm,"").split(/[\\n.!؟?]+/).map(sentence=>sentence.trim()).filter(Boolean);
+  const sentences=answer.replace(/^\s*\d+[.)]\s/gm,"").split(/[\n.!؟?]+/).map(sentence=>sentence.trim()).filter(Boolean);
   const corpus=evidence.map(item=>[item.title,item.summary,...(item.sources||[]).flatMap(source=>[source.title,source.publisher])].filter(Boolean).join(" ")).join(" ").normalize("NFKC").toLowerCase();
-  const corpusTokens=new Set(corpus.match(/[\\p{L}\\p{N}&.-]+/gu)||[]);
+  const corpusTokens=new Set(corpus.match(/[\p{L}\p{N}&.-]+/gu)||[]);
   const corpusNumbers=new Set(normalizeDigits(corpus).match(/[0-9]+/g)||[]);
   const arabicEntityPatterns=[
-    /(?:نادي|فريق|الفريق|المنتخب|المدرب|المغني|المغنية|المطرب|المطربة|الممثل|الممثلة|الفنان|الفنانة|الكاتب|الكاتبة|المؤلف|المؤلفة|الروائي|الروائية)\\s+([\\u0600-\\u06FF]+(?:\\s+[\\u0600-\\u06FF]+){0,1})/g,
-    /(?:يلعب(?:\\s+حاليًا)?\\s+مع|انتقل(?:ت)?\\s+إلى|انضم(?:ت)?\\s+إلى|تعاقد\\s+مع)\\s+(?:نادي\\s+|فريق\\s+)?([\\u0600-\\u06FF]+(?:\\s+[\\u0600-\\u06FF]+){0,1})/g
+    /(?:نادي|فريق|الفريق|المنتخب|المدرب|المغني|المغنية|المطرب|المطربة|الممثل|الممثلة|الفنان|الفنانة|الكاتب|الكاتبة|المؤلف|المؤلفة|الروائي|الروائية)\s+([\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){0,1})/g,
+    /(?:يلعب(?:\s+حاليًا)?\s+مع|انتقل(?:ت)?\s+إلى|انضم(?:ت)?\s+إلى|تعاقد\s+مع)\s+(?:نادي\s+|فريق\s+)?([\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){0,1})/g
   ];
   for(const sentence of sentences){
-    const names=(sentence.match(/\\b[A-Z][A-Za-z0-9&.-]{2,}\\b/g)||[]).filter(name=>!generic.has(name.toLowerCase()));
+    const names=(sentence.match(/\b[A-Z][A-Za-z0-9&.-]{2,}\b/g)||[]).filter(name=>!generic.has(name.toLowerCase()));
     const numbers=normalizeDigits(sentence).match(/[0-9]+/g)||[];
     const arabicEntities:{phrase:string;hasAlias:boolean}[]=[];
     for(const pattern of arabicEntityPatterns){
@@ -37,13 +37,13 @@ export const answerUnsupportedSpecificsDetail=(answer:string,evidence:SearchResu
       for(const match of sentence.matchAll(pattern)){
         const phrase=(match[1]||"").trim();
         const tail=sentence.slice((match.index||0)+match[0].length);
-        const aliasMatch=tail.match(/^\\s*\\(([A-Za-z][A-Za-z0-9&.-]*(?:\\s+[A-Za-z][A-Za-z0-9&.-]*)*)\\)/);
+        const aliasMatch=tail.match(/^\s*\(([A-Za-z][A-Za-z0-9&.-]*(?:\s+[A-Za-z][A-Za-z0-9&.-]*)*)\)/);
         if(phrase&&!new Set(["كرة قدم","كرة القدم","كرة السلة","كرة اليد","الفريق الأول","المنتخب الوطني","فريق العمل","النادي المحلي"]).has(phrase))arabicEntities.push({phrase,hasAlias:Boolean(aliasMatch)});
       }
     }
     const missingNames=names.filter(name=>!corpusTokens.has(name.toLowerCase()));
     const missingNumbers=numbers.filter(number=>!corpusNumbers.has(number));
-    const missingArabic=arabicEntities.filter(entity=>!entity.hasAlias&&entity.phrase.split(/\\s+/).some(token=>!corpusTokens.has(token.toLowerCase()))).map(entity=>entity.phrase);
+    const missingArabic=arabicEntities.filter(entity=>!entity.hasAlias&&entity.phrase.split(/\s+/).some(token=>!corpusTokens.has(token.toLowerCase()))).map(entity=>entity.phrase);
     const reasons:string[]=[];
     if(missingNames.length)reasons.push("names="+[...new Set(missingNames)].slice(0,4).join(","));
     if(missingNumbers.length)reasons.push("numbers="+[...new Set(missingNumbers)].slice(0,4).join(","));
