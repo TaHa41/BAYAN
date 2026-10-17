@@ -11,9 +11,14 @@ if(matches.length!==1){
   throw new Error("Expected exactly one static BUILD declaration in src/index.ts; found "+matches.length+".");
 }
 const buildId=sha.slice(0,12);
-const next=source.replace(matches[0],'const BUILD="'+buildId+'";');
-if(next===source){
-  throw new Error("Could not replace the BUILD declaration.");
+const commitMatches=source.match(/const COMMIT_SHA="[a-f0-9]{40}";/g)||[];
+if(commitMatches.length!==1){
+  throw new Error("Expected exactly one COMMIT_SHA declaration; found "+commitMatches.length+".");
+}
+const withBuild=source.replace(matches[0],'const BUILD="'+buildId+'";');
+const next=withBuild.replace(commitMatches[0],'const COMMIT_SHA="'+sha+'";');
+if(next===source||!next.includes('const COMMIT_SHA="'+sha+'";')){
+  throw new Error("Could not inject the full commit SHA.");
 }
 writeFileSync(path,next,"utf8");
-console.log("Injected commit-specific cache-busting build ID: "+buildId);
+console.log("Injected full commit SHA and cache-busting build ID: "+sha+" / "+buildId);
