@@ -50,7 +50,16 @@ export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[
     const numbersSupported=numbers.every(number=>evidenceItems.some(item=>item.numbers.has(number)&&(!anchorTokens.length||itemHasAnchor(item))));
     const subjectSupported=subjectTokens.every(token=>corpusTokens.has(token));
     const arabicEntitiesSupported=arabicEntities.every(entity=>entity.hasAlias||entity.phrase.split(/\s+/).every(token=>evidenceItems.some(item=>item.tokens.has(token.toLowerCase())&&(!anchorTokens.length||itemHasAnchor(item)))));
-    return !(namesSupported&&numbersSupported&&subjectSupported&&arabicEntitiesSupported);
+    const englishRelations=[...sentence.matchAll(/\\b(?:plays?\\s+(?:currently\\s+)?for|currently\\s+plays\\s+for|current\\s+club\\s+(?:is|:)|signed\\s+(?:for|with)|joined|transferred\\s+to|plays?\\s+with|signs?\\s+for|signs?\\s+with|contract\\s+with)\\s+(?:the\\s+)?([\\p{L}][\\p{L}0-9&.-]*(?:\\s+[\\p{L}][\\p{L}0-9&.-]*){0,2})/giu)].map(match=>({target:match[1],prefix:sentence.slice(0,match.index)}));
+    const arabicRelations=[...sentence.matchAll(/(?:يلعب(?:\\s*(?:حاليًا|حاليا))?\\s*(?:لنادي|مع\\s+نادي|مع\\s+فريق|مع)|ناديه\\s+الحالي(?:\\s+هو)?|انتقل(?:ت)?\\s+إلى|انضم(?:ت)?\\s+إلى|تعاقد(?:ت)?\\s+مع)\\s+(?:نادي\\s+|فريق\\s+)?([\\u0600-\\u06FF]+(?:\\s+[\\u0600-\\u06FF]+){0,2})/gu)].map(match=>({target:match[1],prefix:sentence.slice(0,match.index)}));
+    const relationships=[...englishRelations,...arabicRelations];
+    const relationshipsSupported=relationships.every(relation=>{
+      const subject=subjectTokens.length?subjectTokens:(relation.prefix.normalize("NFKC").toLowerCase().match(/[\\p{L}\\p{N}]+/gu)||[]).filter(token=>!generic.has(token)).slice(-4);
+      const targetTokens=(relation.target.normalize("NFKC").toLowerCase().match(/[\\p{L}\\p{N}]+/gu)||[]).filter(token=>!generic.has(token));
+      if(!subject.length||!targetTokens.length)return false;
+      return evidenceItems.some(item=>subject.every(token=>item.tokens.has(token))&&targetTokens.every(token=>item.tokens.has(token)));
+    });
+    return !(namesSupported&&numbersSupported&&subjectSupported&&arabicEntitiesSupported&&relationshipsSupported);
   });
 };
 const independentSourceCount=(env:Env,evidence:SearchResult[])=>new Set(evidence.flatMap(item=>item.sources||[]).map(source=>{
