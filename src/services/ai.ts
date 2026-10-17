@@ -23,6 +23,9 @@ export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[
   // in at least one supplied record. This removes false rejection without
   // allowing unsupported names or numbers.
   const corpus=evidence.map(item=>[item.title,item.summary,...(item.sources||[]).flatMap(source=>[source.title,source.publisher])].filter(Boolean).join(" ")).join(" ").normalize("NFKC").toLowerCase();
+  const itemCorpora=evidence.map(item=>[item.title,item.summary,...(item.sources||[]).flatMap(source=>[source.title,source.publisher])].filter(Boolean).join(" ").normalize("NFKC").toLowerCase());
+  const hasTokens=(text:string,tokens:string[])=>tokens.every(token=>new Set(text.match(/[\\p{L}\\p{N}&.-]+/gu)||[]).has(token));
+
   const corpusTokens=new Set(corpus.match(/[\p{L}\p{N}&.-]+/gu)||[]);
   const corpusNumbers=new Set(normalizeDigits(corpus).match(/[0-9]+/g)||[]);
   const arabicEntityPatterns=[
@@ -47,7 +50,19 @@ export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[
     const numbersSupported=numbers.every(number=>corpusNumbers.has(number));
     const subjectSupported=!subjectTokens.length||subjectTokens.every(token=>corpusTokens.has(token));
     const arabicEntitiesSupported=arabicEntities.every(entity=>entity.hasAlias||entity.phrase.split(/\s+/).every(token=>corpusTokens.has(token.toLowerCase())));
-    return !(namesSupported&&numbersSupported&&subjectSupported&&arabicEntitiesSupported);
+    // A club or destination may appear in an unrelated search result. For
+    // relationship claims, require the same evidence record to contain both
+    // the named subject and the relationship target.
+    const englishRelations=[...sentence.matchAll(/\b(?:plays?\s+(?:currently\s+)?for|currently\s+plays\s+for|current\s+club\s+(?:is|:)|signed\s+(?:for|with)|joined|transferred\s+to|plays?\s+with|signs?\s+for|signs?\s+with|contract\s+with)\s+(?:the\s+)?([\p{L}][\p{L}0-9&.-]*(?:\s+[\p{L}][\p{L}0-9&.-]*){0,2})/giu)].map(match=>({target:match[1],prefix:sentence.slice(0,match.index)}));
+    const arabicRelations=[...sentence.matchAll(/(?:يلعب(?:\s*(?:حاليًا|حاليا))?\s*(?:لنادي|مع\s+نادي|مع\s+فريق|مع)|ناديه\s+الحالي(?:\s+هو)?|انتقل(?:ت)?\s+إلى|انضم(?:ت)?\s+إلى|تعاقد(?:ت)?\s+مع)\s+(?:نادي\s+|فريق\s+)?([\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){0,2})/gu)].map(match=>({target:match[1],prefix:sentence.slice(0,match.index)}));
+    const relations=[...englishRelations,...arabicRelations];
+    const relationshipsSupported=relations.every(relation=>{
+      const subject=subjectTokens.length?subjectTokens:(relation.prefix.normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]+/gu)||[]).filter(token=>!generic.has(token)).slice(-4);
+      const targetTokens=(relation.target.normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]+/gu)||[]).filter(token=>!generic.has(token));
+      if(!subject.length||!targetTokens.length)return false;
+      return itemCorpora.some(itemCorpus=>hasTokens(itemCorpus,subject)&&hasTokens(itemCorpus,targetTokens));
+    });
+    return !(namesSupported&&numbersSupported&&subjectSupported&&arabicEntitiesSupported&&relationshipsSupported);
   });
 };
 const independentSourceCount=(env:Env,evidence:SearchResult[])=>new Set(evidence.flatMap(item=>item.sources||[]).map(source=>{
