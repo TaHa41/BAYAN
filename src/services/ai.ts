@@ -1,4 +1,4 @@
-import type{Env,Locale,SearchResult}from"../types";import{classifyOpenAIFailure,classifyWorkersAIFailure,getProviderBreaker,updateProviderBreaker,recordProviderDiagnostic,normalizeDraftJson}from"./ai-provider-resilience";import{notify}from"./telegram";export{normalizeDraftJson};
+import type{Env,Locale,SearchResult}from"../types";import{classifyOpenAIFailure,classifyWorkersAIFailure,getProviderBreaker,updateProviderBreaker,recordProviderDiagnostic,normalizeDraftJson,isOpenAIQuotaFailure}from"./ai-provider-resilience";import{notify}from"./telegram";export{normalizeDraftJson};
 import{recordRuntimeEventLimited}from"../runtime-events";
 const aiFailureDetail=(error:unknown)=>String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
 async function recordAiFailure(env:Env,provider:string,detail:string){await recordRuntimeEventLimited(env,"ai_generation","ai_provider_failure",provider+": "+detail);}
@@ -18,7 +18,7 @@ async function handleOpenAIResponseFailure(env:Env,provider:"OpenAI draft"|"Open
   await recordProviderDiagnostic(env,failure);
   await recordAiFailure(env,provider,failure.detail);
   await recordRuntimeEventLimited(env,"ai_circuit_breaker",breaker.open?"openai_breaker_open":"openai_breaker_closed",JSON.stringify({state:breaker.open?"open":"closed",code:breaker.code,openedUntil:breaker.openedUntil?new Date(breaker.openedUntil).toISOString():null}));
-  if(failure.code==="insufficient_quota"){
+  if(isOpenAIQuotaFailure(failure.code)){
     try{
       const existing=await env.DB.prepare("SELECT value FROM admin_settings WHERE key='openai_quota_telegram_notified' LIMIT 1").first<any>();
       if(!existing?.value){
