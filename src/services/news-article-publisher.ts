@@ -1,19 +1,11 @@
 import type {Env,Locale} from "../types";
 import {search} from "./search";
 import {recordRuntimeEventLimited} from "../runtime-events";
+import {NEWS_ARCHIVE_QUEUE_SQL} from "./news-article-publisher-query";
+export {RECENT_LOW_EVIDENCE_DUPLICATE_FILTER} from "./news-article-publisher-query";
 
 const DAILY_D1_READ_CALL_LIMIT=12000;
-export const RECENT_LOW_EVIDENCE_DUPLICATE_FILTER = `
-AND NOT EXISTS (
-  SELECT 1 FROM news_archive attempted
-  WHERE attempted.id <> na.id
-    AND attempted.language = na.language
-    AND lower(trim(attempted.title)) = lower(trim(na.title))
-    AND attempted.article_last_reason = 'skipped_low_evidence'
-    AND julianday(attempted.article_last_attempt_at) >= julianday('now','-6 hours')
-)`;
-
-const D1_READ_RESERVATION=120;
+export const D1_READ_RESERVATION=120;
 type ReadCounter={reads:number;limit:number};
 const wrapReadStatement=(statement:any,sql:string,counter:ReadCounter):any=>new Proxy(statement,{
   get(target,property){
@@ -65,7 +57,7 @@ async function publishNextArchivedNewsArticleInner(env:Env){
   let setting:any=null;try{setting=await env.DB.prepare("SELECT value FROM admin_settings WHERE key=? LIMIT 1").bind("news_article_queue_language").first<any>()}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","settings_read_failed",error)}
   const preferred:Locale=String(setting?.value||"ar")==="en"?"en":"ar";
   const futureLimit=new Date(now+5*60*1000).toISOString();
-  const pick=async(language:Locale)=>env.DB.prepare("SELECT id,title,summary,language,article_attempts,publisher,image_url FROM news_archive na WHERE language=? AND article_slug IS NULL AND article_attempts<2 AND length(summary)>=120 AND published_at>=? AND published_at<=? AND fetched_at>=? AND (article_last_attempt_at IS NULL OR article_last_attempt_at<=?) AND (article_last_reason IS NULL OR article_last_reason!='skipped_low_evidence' OR article_last_attempt_at<=?) ${RECENT_LOW_EVIDENCE_DUPLICATE_FILTER} ORDER BY published_at DESC,CASE WHEN publisher=(SELECT value FROM admin_settings WHERE key='news_article_queue_last_publisher' LIMIT 1) THEN 1 ELSE 0 END,CASE WHEN image_url IS NOT NULL AND trim(image_url)!='' THEN 0 ELSE 1 END,fetched_at DESC,id DESC LIMIT 1").bind(language,cutoff,futureLimit,cutoff,retryBefore,lowEvidenceRetryBefore).first<any>();
+  const pick=async(language:Locale)=>env.DB.prepare(NEWS_ARCHIVE_QUEUE_SQL).bind(language,cutoff,futureLimit,cutoff,retryBefore,lowEvidenceRetryBefore).first<any>();
   let row=await pick(preferred);
   if(!row)row=await pick(preferred==="ar"?"en":"ar");
   if(!row)return{status:"idle" as const};
