@@ -152,14 +152,11 @@ export async function gold(env:Env){
   }
   if(quote){
     try{
-      const [fxResponse,markets]=await Promise.all([
-        timeout("https://api.frankfurter.dev/v2/rates?base=USD&quotes=EGP",3500),
-        extraMarkets(env)
-      ]);
-      if(!fxResponse.ok)throw new Error("fx");
-      const fxData=await fxResponse.json<any>(),egp=parseUsdToEgpRate(fxData);
-      if(!egp)throw new Error("fx_data");
-      return{ok:true,provider:quote.name+" + Frankfurter",price:(quote.price/31.1034768)*egp,unit:"EGP/g (24K reference)",usdPerOunce:quote.price,fx:egp,markets,updatedAt:new Date().toISOString(),stale:false};
+      const [fxData,markets]=await Promise.all([fx(env),extraMarkets(env)]);
+      if(!fxData.ok)throw new Error("fx");
+      const egp=Number(fxData.rates?.EGP);
+      if(!Number.isFinite(egp)||egp<=0)throw new Error("fx_data");
+      return{ok:true,provider:quote.name+" + "+fxData.provider,price:(quote.price/31.1034768)*egp,unit:"EGP/g (24K reference)",usdPerOunce:quote.price,fx:egp,fxUpdatedAt:fxData.updatedAt,markets,updatedAt:new Date().toISOString(),stale:Boolean(fxData.stale)};
     }catch(error){await recordRuntimeEventLimited(env,"gold_fx_conversion","gold_fx_conversion_failed",error)}
   }
   try{
