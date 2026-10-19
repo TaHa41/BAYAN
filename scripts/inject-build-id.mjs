@@ -16,7 +16,8 @@ export function injectBuildId({sha,sourcePath="src/index.ts",configPath="wrangle
   if(commitMatches.length!==1){
     throw new Error("Expected exactly one COMMIT_SHA declaration; found "+commitMatches.length+".");
   }
-  // This is the normalized full-SHA equivalent of sha.slice(0,12), used for cache busting.\n  const buildId=commit.slice(0,12);
+  // Use the first 12 characters of the full commit for cache-busting asset URLs.
+  const buildId=commit.slice(0,12);
   const nextSource=source
     .replace(buildMatches[0],'const BUILD="'+buildId+'";')
     .replace(commitMatches[0],'const COMMIT_SHA="'+commit+'";');
