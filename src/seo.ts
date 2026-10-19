@@ -4,8 +4,9 @@ import type {Env,Locale} from "./types";
 import {text}from"./http";
 
 export function robots(){
-  // Keep robots.txt limited to directives recognized by crawlers.
-  return text("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nDisallow: /review\nDisallow: /saved\nSitemap: "+ORIGIN+"/sitemap.xml\nSitemap: "+ORIGIN+"/news-sitemap.xml\n");
+  // Advertise only the general sitemap. Google News sitemaps are useful only
+  // while eligible, recent, full news articles exist; never advertise an empty feed.
+  return text("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nDisallow: /review\nDisallow: /saved\nSitemap: "+ORIGIN+"/sitemap.xml\n");
 }
 const xml=(s:string)=>Array.from(String(s)).filter((character)=>{const code=character.codePointAt(0)!;return code===0x9||code===0xA||code===0xD||(code>=0x20&&code<=0xD7FF)||(code>=0xE000&&code<=0xFFFD)||(code>=0x10000&&code<=0x10FFFF)}).join("").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
 const retryableUnavailable=(message:string)=>{const response=text(message,"text/plain;charset=utf-8",503);response.headers.set("retry-after","300");return response;};
@@ -120,5 +121,15 @@ export async function newsSitemap(env:Env){
   response.headers.set("x-bayan-news-sitemap-archive-ready-for-drafting-count",String(archiveEligibleCount));
   response.headers.set("x-bayan-news-sitemap-rejection-reasons",JSON.stringify(rejectionReasons));
   console.info("news_sitemap_generation",JSON.stringify({articleCandidates:rows.length,archiveCandidates:archiveRows.length,eligible:items.length,archiveReadyForArticleDrafting:archiveEligibleCount,rejected:Math.max(0,rows.length-items.length),rejectionReasons,freshnessWindowHours:48}));
+  if(items.length===0){
+    // An empty HTTP-200 Google News sitemap is rejected by Search Console as
+    // missing its required URL element. Return a retryable unavailable status,
+    // while keeping the general sitemap healthy and exposing pipeline diagnostics.
+    const unavailable=retryableUnavailable("No eligible recent news articles are currently published; retry later.");
+    for(const [name,value] of response.headers){if(name.toLowerCase()!=="content-type")unavailable.headers.set(name,value);}
+    unavailable.headers.set("x-bayan-news-sitemap-eligible-count","0");
+    unavailable.headers.set("x-bayan-news-sitemap-archive-ready-for-drafting-count",String(archiveEligibleCount));
+    return unavailable;
+  }
   return response;
 }
