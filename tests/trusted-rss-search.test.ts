@@ -50,6 +50,18 @@ describe("trusted publisher RSS search fallback", () => {
     expect(diagnostics.some(value => value.includes("independent_publishers=0"))).toBe(true);
   });
 
+
+  it("uses current official Arabic RSS endpoints for Al Jazeera and Asharq Al-Awsat", async () => {
+    const seen: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      seen.push(String(input));
+      return new Response("<rss><channel></channel></rss>", { status: 200, headers: { "content-type": "application/rss+xml" } });
+    }));
+    await searchTrustedNewsFeeds("أخبار عربية", "ar", []);
+    expect(seen).toContain("https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdff8b8cab9");
+    expect(seen).toContain("https://aawsat.com/feed/news");
+  });
+
   it("returns no results rather than unrelated articles when query terms do not match feed content", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response('<rss><channel><item><title>Local sports final</title><description>A detailed report about a football final with no other topic references.</description><link>https://www.bbc.com/sport/final</link></item></channel></rss>', { status: 200, headers: { "content-type": "application/rss+xml" } })));
     const results = await searchTrustedNewsFeeds("central bank interest rates", "en");
