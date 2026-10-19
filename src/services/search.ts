@@ -561,9 +561,23 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
     const results=await Promise.all([
       wikipediaRestSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Wikipedia REST Search",error);return[]}),
       googleNewsSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Google News Search",error);return[]}),
-      bingWebRssSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing Web RSS Search",error);return[]})
+      bingWebRssSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing Web RSS Search",error);return[]}),
+      publicationResearch
+        ? searchPublisherNewsFeeds(variant,language,diagnostics).then(stories=>stories.map(story=>({
+            title:cleanText(story.title),
+            summary:cleanText(story.summary).slice(0,1400),
+            section:"news",
+            kind:"web" as const,
+            evidence:"mixed" as const,
+            sources:[source(story.title,story.publisher,story.url)],
+            url:story.url,
+            score:scoreSource(story.publisher,story.title,variant)+8,
+            provider:"Publisher RSS fallback"
+          }))).catch(error=>{reportProviderFailure(diagnostics,"Publisher RSS fallback",error);return[]})
+        : Promise.resolve([])
     ]);
-    diagnostics.push("Expanded variant "+(variantIndex+1)+" result counts: "+labels.map((label,index)=>label+"="+(results[index]?.length||0)).join(", "));
+    const labelsWithPublisher=[...labels,"Publisher RSS fallback"];
+    diagnostics.push("Expanded variant "+(variantIndex+1)+" result counts: "+labelsWithPublisher.map((label,index)=>label+"="+(results[index]?.length||0)).join(", "));
     return results.flat();
   };
   const batches:Candidate[][]=[];
