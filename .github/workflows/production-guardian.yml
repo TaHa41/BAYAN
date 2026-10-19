@@ -5,10 +5,12 @@ on:
     types: [completed]
 permissions:
   contents: read
+  actions: read
 jobs:
   production_guardian:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
         with:
@@ -16,6 +18,21 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+      - name: Wait until no production deployment is active
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in $(seq 1 60); do
+            active=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/deploy-worker.yml/runs?per_page=20" --jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress")] | length')
+            if [[ "$active" -eq 0 ]]; then
+              echo "No active deployment; safe to run post-deploy health check."
+              exit 0
+            fi
+            echo "A production deployment is active; waiting before health check."
+            sleep 10
+          done
+          echo "::error::Timed out waiting for the production deployment to finish."
+          exit 1
       - name: Lightweight post-deploy health check
         env:
           BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
