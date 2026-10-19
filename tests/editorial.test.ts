@@ -7,6 +7,12 @@ describe("topic-aware article editorial",()=>{
     expect(sectionForOpenedStory("نجيب محفوظ: من هو وما الذي ميّز تجربته؟","روائي مصري ولد في القاهرة وحصل على نوبل في الأدب.")).toBe("people");
   });
 
+  it("classifies public consultation and primary-source guides from their topic",()=>{
+    expect(sectionForOpenedStory("كيف تحسّن المشاورات العامة القرارات","دليل عملي لفهم المشاورات العامة والأدلة التي يقدمها الناس.")).toBe("politics");
+    expect(sectionForOpenedStory("كيف يستخدم المؤرخون المصادر الأولية؟","طريقة لفحص الوثائق والشهادات والصور بوصفها أدلة تاريخية.")).toBe("history");
+    expect(sectionForOpenedStory("How to read public opinion polls","A guide to interpreting survey findings and their limits.")).toBe("trends");
+  });
+
   it("classifies general scientific topics as Science",()=>{
     expect(sectionForOpenedStory("How do black holes form?","Astronomy research explains gravity, stars and the universe.")).toBe("science");
   });
