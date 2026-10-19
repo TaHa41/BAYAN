@@ -3,7 +3,7 @@ import type {Env,Locale,SearchResponse,SearchResult,Source} from "../types";
 import {searchArticles,saveSearch,publishVerifiedResearch,publicationRejectionReason} from "../db";
 import {boundedLikeKeywords,escapedLikePattern} from "../search-patterns";
 import {recordRuntimeEventLimited} from "../runtime-events";
-import {ask,draftArticle,answerHasUnsupportedSpecifics,answerUnsupportedSpecificsDetail,handleOpenAIResponseFailure,consumeDailyNewsAiCall} from "./ai";
+import {ask,draftArticle,ARTICLE_DRAFT_TIMEOUT_MS,answerHasUnsupportedSpecifics,answerUnsupportedSpecificsDetail,handleOpenAIResponseFailure,consumeDailyNewsAiCall} from "./ai";
 import {findRelatedImage,searchNewsFeed,searchTrustedNewsFeeds} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 import {sectionForOpenedStory,isContentForSection} from "./editorial";
@@ -1002,7 +1002,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
           const publishLongArticle=async()=>{
             let longDraft:any;
             try{
-              longDraft=await Promise.race([draftArticle(env,q,language,results,options.publish===true),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:"",reason:"ai_unavailable"}),18000))]);
+              longDraft=await Promise.race([draftArticle(env,q,language,results,options.publish===true),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:"",reason:"ai_unavailable"}),ARTICLE_DRAFT_TIMEOUT_MS))]);
             }catch(error){
               publishReason=publicationFailureReason(error);
               publishReasonDetail="article_draft_exception:"+publishReason;

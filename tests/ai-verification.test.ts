@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { answerHasUnsupportedSpecifics, answerUnsupportedSpecificsDetail } from "../src/services/ai";
+import { answerHasUnsupportedSpecifics, answerUnsupportedSpecificsDetail, ARTICLE_DRAFT_TIMEOUT_MS } from "../src/services/ai";
 import type { SearchResult } from "../src/types";
 
 const evidence: SearchResult[] = [{
@@ -15,6 +15,11 @@ const evidence: SearchResult[] = [{
 } as SearchResult];
 
 describe("article evidence verification diagnostics", () => {
+  it("allows the Workers AI long-form fallback enough time to finish a structured draft", () => {
+    expect(ARTICLE_DRAFT_TIMEOUT_MS).toBe(30000);
+    expect(ARTICLE_DRAFT_TIMEOUT_MS).toBeGreaterThan(18000);
+  });
+
   it("does not reject supported facts just because a long archive headline is absent from snippets", () => {
     const answer = "The report identified 12 sampling locations and compared shoreline measurements over time.";
     expect(answerHasUnsupportedSpecifics(answer, evidence, "Quantum Observatory Mission Results 2037")).toBe(false);
