@@ -115,3 +115,17 @@ export async function recordProviderDiagnostic(env: Pick<Env, "DB">, failure: Pr
       .bind("WARN", event, message, new Date().toISOString()).run();
   } catch { /* best effort; never include request prompts or credentials */ }
 }
+
+/** Normalize the supported Workers AI response shapes without stringifying an object as "[object Object]". */
+export function workersAIResponseText(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (!value || typeof value !== "object") return "";
+  const data = value as any;
+  if (typeof data.response === "string" && data.response.trim()) return data.response.trim();
+  const messageContent = data.choices?.[0]?.message?.content;
+  if (typeof messageContent === "string" && messageContent.trim()) return messageContent.trim();
+  if (data.response && typeof data.response === "object") {
+    try { return JSON.stringify(data.response); } catch { return ""; }
+  }
+  return "";
+}

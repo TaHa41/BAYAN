@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyOpenAIFailure, classifyWorkersAIFailure, exponentialBackoffMs, normalizeDraftJson, parseRetryAfter, isOpenAIQuotaFailure } from "./ai-provider-resilience";
+import { classifyOpenAIFailure, classifyWorkersAIFailure, exponentialBackoffMs, normalizeDraftJson, parseRetryAfter, isOpenAIQuotaFailure, workersAIResponseText } from "./ai-provider-resilience";
 
 describe("AI provider resilience", () => {
   it("distinguishes insufficient quota from rate limiting and records retry metadata", () => {
@@ -34,6 +34,14 @@ describe("AI provider resilience", () => {
     expect(classifyWorkersAIFailure(new Error("unsupported model")).code).toBe("unsupported_model");
     expect(classifyWorkersAIFailure(new Error("JSON parse error")).code).toBe("invalid_json");
   });
+  it("normalizes Workers AI string, chat-completion and parsed JSON response shapes", () => {
+    expect(workersAIResponseText({ response: "  {\"ok\":true}  " })).toBe('{"ok":true}');
+    expect(workersAIResponseText({ choices: [{ message: { content: '{"ok":true}' } }] })).toBe('{"ok":true}');
+    expect(workersAIResponseText({ response: { ok: true }, choices: [{ message: { content: '{"ok":true}' } }] })).toBe('{"ok":true}');
+    expect(workersAIResponseText({ response: { ok: true } })).toBe('{"ok":true}');
+    expect(workersAIResponseText({})).toBe("");
+  });
+
   it("repairs fenced JSON and extracts JSON surrounded by text", () => {
     expect(normalizeDraftJson('```json\n{"sections":[]}\n```')).toBe('{"sections":[]}');
     expect(normalizeDraftJson('Here is JSON: {"sections":[]} thanks')).toBe('{"sections":[]}');
