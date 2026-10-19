@@ -17,6 +17,8 @@ const evidenceDiversity = read("src/services/evidence-diversity.ts");
 const recovery = read("src/services/search-recovery.ts");
 const http = read("src/http.ts");
 const checks = [
+  ["trend fallback articles replace literal NULL image placeholders with the same topic-matched Wikimedia URLs used by the reviewed image migration", read("src/fallback-content.ts").includes("Social_media_icons_%28rubin-Social-media-icons-2x%29.jpg?width=1200") && read("src/fallback-content.ts").includes("Opinion_survey_exemple_1.jpg?width=1200") && !read("src/fallback-content.ts").includes('"imageUrl":"NULL","imageAlt":"اتجاهات مواقع التواصل الاجتماعي"') && !read("src/fallback-content.ts").includes('"imageUrl":"NULL","imageAlt":"استطلاعات الرأي العام"')],
+
   ["section archive candidate scan preserves cross-section reclassification but is bounded to 30 recent rows", read("src/routes/api.ts").includes("FROM news_archive WHERE language=? AND fetched_at>=? AND published_at>=? AND published_at<=?") && read("src/routes/api.ts").includes("bind(lang,newsCutoff,newsCutoff,newsFuture).all<any>()") && read("src/routes/api.ts").includes("ORDER BY published_at DESC LIMIT 30") && !read("src/routes/api.ts").includes("ORDER BY published_at DESC LIMIT 500")],
 
   ["health readiness probes a real news_archive row read and reports D1 read-limit outages honestly", read("src/routes/api.ts").includes('SELECT id FROM news_archive LIMIT 1') && read("src/routes/api.ts").includes('newsArchiveRead:false,articleRevisionHistory:true,error:"news_archive_read_unavailable"') && read("src/routes/api.ts").includes('newsArchiveRead:true,articleRevisionHistory:true')],
