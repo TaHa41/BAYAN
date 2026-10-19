@@ -86,8 +86,8 @@ export const classifySection=(q:string,items:SearchResult[],language:Locale)=>{
  const combined=title+" "+evidence;
  if(/(?:\bweather\b|\btemperature\b|\brainfall\b|\bexchange rate\b|\bcurrency price\b|\bgold price\b|\bmarket price\b|الطقس|درجات الحرارة|سعر الذهب|أسعار العملات|سعر الصرف|الأسعار المباشرة)/i.test(q+" "+title))return "prices";
  const inferred=sectionForOpenedStory(title,evidence);
- if(inferred!=="world")return inferred;
- // The editorial classifier uses "world" as its legacy unknown-topic fallback.
+ if(inferred!=="unclassified")return inferred;
+ // Unknown topics must stay unclassified rather than being routed into Global Shifts.
  // Preserve a concrete section attached to the strongest evidence instead of
  // silently routing every unrecognized topic into Global Shifts.
  const validSection=(value:unknown)=>sections.some(section=>section.slug===String(value||""));
@@ -97,7 +97,7 @@ export const classifySection=(q:string,items:SearchResult[],language:Locale)=>{
  if(/(?:\btrend\b|\bviral\b|\bpopular\b|ترند|متداول|رائج|اهتمام الناس)/i.test(combined))return "trends";
  if(/(?:\bcommunity\b|\bcommunities\b|\bsociety\b|\bsocial issue\b|\bpublic service\b|\bdaily life\b|\bhousing\b|\bfamilies\b|\bcost of living\b|مجتمع|مجتمعات|قضية اجتماعية|قضايا اجتماعية|خدمة عامة|خدمات عامة|الحياة اليومية|السكن|الأسرة|تكلفة المعيشة|المعيشة|السكان)/i.test(title+" "+String(lead?.summary||"")))return "egypt";
  if(/(?:\bidea\b|\bideas\b|\bdebate\b|\bphilosophy\b|\bphilosophical\b|\bargument\b|\bethics\b|\bcritical thinking\b|\bviewpoint\b|\bopinion\b|أفكار|فكرة|نقاش|نقاشات|فلسفة|فلسفي|جدل|حجة|أخلاقيات|تفكير نقدي|وجهة نظر|رأي|آراء|قضية فكرية|حوار فكري)/i.test(title+" "+String(lead?.summary||"")))return"arab";
- return "world";
+ return "unclassified";
 };
 
 const searchTerms=(q:string)=>{const stop=new Set(["the","and","for","with","from","about","what","when","where","who","how","why","are","was","is","of","to","in","on","at","by","as","an","a","or","into","over","under","after","before","than","can","does","do","did","be","been","being","من","في","عن","على","الى","إلى","ما","ماذا","كيف","لماذا","هل","هو","هي","هذا","هذه","التي","الذي","مع"]);return String(q||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter(x=>x.length>=2&&!stop.has(x)).slice(0,10)};
