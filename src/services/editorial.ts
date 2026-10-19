@@ -22,7 +22,7 @@ export function sectionForOpenedStory(title:string,summary:string){
  if(/(?:science|scientific|research|discovery|space|nasa|astronomy|physics|chemistry|biology|planet|universe|study finds|علم|بحث علمي|اكتشاف|فضاء|ناسا|فلك|فيزياء|كيمياء|أحياء|كوكب|الكون|دراسة علمية)/i.test(all))return "science";
  if(/(?:history|historical|heritage|archaeology|civilization|ancient|تاريخ|تاريخي|تراث|آثار|حضارة|قديم|العصور الوسطى)/i.test(all))return "history";
  if(/(?:film|movie|music|actor|actress|celebrity|artist|book review|novel|poetry|painting|theatre|cinema|الفن|فيلم|سينما|موسيقى|ممثل|ممثلة|فنان|كتاب|رواية|شعر|لوحة|مسرح|أدب)/i.test(all))return "art";
- if(/(?:travel|tourism|airport|flight|hotel|destination|visa|trip|transit|transport|transportation|commute|public transport|سفر|سياحة|مطار|رحلة|فندق|وجهة|تأشيرة|إقامة سياحية|تنقل|مواصلات|النقل|وسائل النقل)/i.test(all))return "travel";
+ if(/(?:travel|tourism|airport|flight|hotel|destination|visa|trip|سفر|سياحة|مطار|رحلة|فندق|وجهة|تأشيرة|إقامة سياحية)/i.test(all))return "travel";
  if(/(?:trend|viral|popular on social media|survey|poll|public opinion|ترند|متداول|رائج|استطلاع|رأي عام|انتشار على وسائل التواصل)/i.test(all))return "trends";
  
  if(/(?:idea|ideas|debate|philosophy|philosophical|argument|ethics|ethical dilemma|critical thinking|viewpoint|opinion piece|intellectual discussion|أفكار|فكرة|نقاش|نقاشات|فلسفة|فلسفي|جدل|حجة|أخلاقيات|معضلة أخلاقية|تفكير نقدي|وجهة نظر|رأي|آراء|قضية فكرية|حوار فكري)/i.test(all))return "arab";
@@ -40,7 +40,10 @@ export function isContentForSection(section:string,title:string,summary:string){
  const t=normalized(title),s=normalized(summary),all=t+" "+s;
  if(!section||!t||!s)return false;
  const inferred=sectionForOpenedStory(title,summary);
- if(inferred!==section)return false;
+ if(inferred!==section){
+  if(section==="travel"&&/(?:transit|transport|transportation|commute|public transport|تنقل|مواصلات|النقل|وسائل النقل)/i.test(all))return true;
+  return false;
+ }
  if(section==="world")return /(?:global|worldwide|cross border|cross-border|international system|systemic change|global shift|climate change|supply chain|عالمي|عالمية|عبر الحدود|تحولات كبرى|تغير المناخ|سلاسل الإمداد|النظام الدولي|تحول عالمي)/i.test(all);
  if(section==="news")return /(?:breaking|latest|today|reported|announced|statement|press release|عاجل|آخر التطورات|اليوم|أعلنت|أعلن|بيان رسمي|تطورات جديدة)/i.test(all);
  return true;
