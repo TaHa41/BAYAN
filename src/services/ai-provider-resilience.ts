@@ -81,7 +81,7 @@ export function normalizeDraftJson(raw: string): string {
     if (inString) {
       normalized += char;
       if (escaped) escaped = false;
-      else if (char === "\\\\") escaped = true;
+      else if (char === "\\") escaped = true;
       else if (char === '"') inString = false;
       continue;
     }
@@ -92,7 +92,7 @@ export function normalizeDraftJson(raw: string): string {
     }
     if (char === ",") {
       let next = index + 1;
-      while (next < value.length && /\\s/.test(value[next])) next += 1;
+      while (next < value.length && /\s/.test(value[next])) next += 1;
       if (value[next] === "}" || value[next] === "]") continue;
     }
     normalized += char;
