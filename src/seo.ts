@@ -121,15 +121,9 @@ export async function newsSitemap(env:Env){
   response.headers.set("x-bayan-news-sitemap-archive-ready-for-drafting-count",String(archiveEligibleCount));
   response.headers.set("x-bayan-news-sitemap-rejection-reasons",JSON.stringify(rejectionReasons));
   console.info("news_sitemap_generation",JSON.stringify({articleCandidates:rows.length,archiveCandidates:archiveRows.length,eligible:items.length,archiveReadyForArticleDrafting:archiveEligibleCount,rejected:Math.max(0,rows.length-items.length),rejectionReasons,freshnessWindowHours:48}));
-  if(items.length===0){
-    // An empty HTTP-200 Google News sitemap is rejected by Search Console as
-    // missing its required URL element. Return a retryable unavailable status,
-    // while keeping the general sitemap healthy and exposing pipeline diagnostics.
-    const unavailable=retryableUnavailable("No eligible recent news articles are currently published; retry later.");
-    for(const [name,value] of response.headers){if(name.toLowerCase()!=="content-type")unavailable.headers.set(name,value);}
-    unavailable.headers.set("x-bayan-news-sitemap-eligible-count","0");
-    unavailable.headers.set("x-bayan-news-sitemap-archive-ready-for-drafting-count",String(archiveEligibleCount));
-    return unavailable;
-  }
+  // An empty news sitemap is valid when no recent eligible articles exist. Google
+  // may show an empty-sitemap warning, but a 503 makes the sitemap unavailable and
+  // creates a fetch error. The separate production health check still flags an
+  // archive-to-publication gap, so returning valid XML does not hide pipeline failure.
   return response;
 }
