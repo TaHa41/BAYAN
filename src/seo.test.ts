@@ -40,7 +40,7 @@ describe("newsSitemap database failure handling", () => {
     const body = await response.text();
     expect(body).toContain("<urlset");
     expect(body).toContain("</urlset>");
-    expect(body).toContain("<url><loc>https://bayan.tahaomar411.workers.dev/</loc></url>");
+    expect(body).not.toContain("<loc>");
     expect(response.headers.get("x-bayan-news-sitemap-eligible-count")).toBe("0");
   });
 
@@ -58,11 +58,11 @@ describe("newsSitemap database failure handling", () => {
     const body = await response.text();
     expect(body).toContain("/article/recent-ar-news?lang=ar");
     expect(body).toContain("<news:language>ar</news:language>");
-    expect(body).toContain("/article/old-news?lang=en");
+    expect(body).not.toContain("/article/old-news?lang=en");
     expect(body).not.toContain("<news:title>Older news article</news:title>");
-    expect(body).toContain("/article/duplicate-hosts?lang=en");
+    expect(body).not.toContain("/article/duplicate-hosts?lang=en");
     expect(body).not.toContain("<news:title>Repeated source host</news:title>");
-    expect(body).toContain("/article/insecure-source?lang=en");
+    expect(body).not.toContain("/article/insecure-source?lang=en");
     expect(body).not.toContain("<news:title>Insecure source article</news:title>");
   });
 });
@@ -91,5 +91,16 @@ describe("sitemap database failure handling", () => {
     expect(body).toContain("/article/valid-ar?lang=ar");
     expect(body).not.toContain("invalid-lang");
     expect(body).not.toContain("?lang=fr");
+  });
+});
+
+describe("localized sitemap alternates", () => {
+  it("adds reciprocal xhtml language links to evergreen URLs", async () => {
+    const env = { DB: { prepare: () => ({ all: async () => ({ results: [] }) }) } } as any;
+    const response = await sitemap(env);
+    const body = await response.text();
+    expect(body).toContain('xmlns:xhtml="http://www.w3.org/1999/xhtml"');
+    expect(body).toContain('hreflang="ar" href="https://bayan.tahaomar411.workers.dev/news?lang=ar"');
+    expect(body).toContain('hreflang="en" href="https://bayan.tahaomar411.workers.dev/news?lang=en"');
   });
 });
