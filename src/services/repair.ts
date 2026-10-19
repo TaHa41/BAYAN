@@ -225,9 +225,9 @@ async function repairRuntime(env:Env,failures:string[]){
 }
 
 async function imageHealth(env:Env){
-  const articleRow=await env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN image_url IS NULL OR trim(image_url)='' THEN 1 ELSE 0 END) AS missing FROM (SELECT image_url FROM articles WHERE status='PUBLISHED' ORDER BY updated_at DESC LIMIT 12)").first<any>();
+  const articleRow=await env.DB.prepare("SELECT COUNT(*) AS total,SUM(CASE WHEN image_url IS NULL OR trim(image_url)='' THEN 1 ELSE 0 END) AS missing FROM articles WHERE status='PUBLISHED'").first<any>();
   const total=Number(articleRow?.total||0),missing=Number(articleRow?.missing||0);
-  if(total===0||missing>3)return false;
+  if(total===0||missing>0)return false;
   for(const language of ["ar","en"] as const){
     const row=await env.DB.prepare("SELECT payload FROM news_cache WHERE language=? LIMIT 1").bind(language).first<any>();
     if(!row?.payload)return false;
