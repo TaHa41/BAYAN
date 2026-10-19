@@ -4,7 +4,7 @@ import {searchArticles,saveSearch,publishVerifiedResearch,publicationRejectionRe
 import {boundedLikeKeywords,escapedLikePattern} from "../search-patterns";
 import {recordRuntimeEventLimited} from "../runtime-events";
 import {ask,draftArticle,answerHasUnsupportedSpecifics} from "./ai";
-import {findRelatedImage,searchNewsFeed} from "./news";
+import {findRelatedImage,searchNewsFeed,searchPublisherNewsFeeds} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 import {sectionForOpenedStory} from "./editorial";
 import {requiredEvidencePublisherCount} from "./evidence-diversity";
@@ -573,7 +573,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
             url:story.url,
             score:scoreSource(story.publisher,story.title,variant)+8,
             provider:"Publisher RSS fallback"
-          }))).catch(error=>{reportProviderFailure(diagnostics,"Publisher RSS fallback",error);return[]})
+          }))).catch((error:unknown)=>{reportProviderFailure(diagnostics,"Publisher RSS fallback",error);return[]})
         : Promise.resolve([])
     ]);
     const labelsWithPublisher=[...labels,"Publisher RSS fallback"];
