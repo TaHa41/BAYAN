@@ -37,4 +37,33 @@ describe("trusted publisher RSS search fallback", () => {
     const results = await searchTrustedNewsFeeds("central bank interest rates", "en");
     expect(results).toHaveLength(0);
   });
+
+  it("rejects relevant RSS stories that are stale or future-dated", async () => {
+    const hosts: Array<[string, string]> = [
+      ["feeds.bbci.co.uk", "www.bbc.com"],
+      ["reuters.com", "www.reuters.com"],
+      ["feeds.apnews.com", "apnews.com"],
+      ["aljazeera.com", "www.aljazeera.com"],
+      ["rss.dw.com", "www.dw.com"],
+      ["france24.com", "www.france24.com"],
+      ["theguardian.com", "www.theguardian.com"]
+    ];
+    const staleDate = new Date(Date.now() - 72 * 60 * 60 * 1000).toUTCString();
+    const futureDate = new Date(Date.now() + 10 * 60 * 1000).toUTCString();
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const feedUrl = String(input);
+      const match = hosts.find(([feedHost]) => feedUrl.includes(feedHost));
+      if (!match) return new Response("", { status: 404 });
+      const staleUrl = "https://" + match[1] + "/news/stale-central-bank-rates";
+      const futureUrl = "https://" + match[1] + "/news/future-central-bank-rates";
+      const description = "Central bank officials reviewed interest rates after new inflation data. Economists said the decision could affect borrowing costs and financial markets.";
+      const xml = '<rss><channel>' +
+        '<item><title>Central bank reviews interest rates after inflation report</title><description>' + description + '</description><link>' + staleUrl + '</link><pubDate>' + staleDate + '</pubDate></item>' +
+        '<item><title>Central bank announces interest rates tomorrow</title><description>' + description + '</description><link>' + futureUrl + '</link><pubDate>' + futureDate + '</pubDate></item>' +
+        '</channel></rss>';
+      return new Response(xml, { status: 200, headers: { "content-type": "application/rss+xml" } });
+    }));
+    const results = await searchTrustedNewsFeeds("central bank interest rates", "en");
+    expect(results).toHaveLength(0);
+  });
 });
