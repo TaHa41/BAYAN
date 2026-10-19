@@ -16,5 +16,5 @@ const sitemap=parseNewsSitemap(sitemapXml,origin);
 const archiveReady=Number(sitemapResponse.headers.get("x-bayan-news-sitemap-archive-ready-for-drafting-count")||0);
 const eligible=Number(sitemapResponse.headers.get("x-bayan-news-sitemap-eligible-count")||0);
 console.log("BAYAN news publication health "+JSON.stringify({urlCount:sitemap.urlCount,newsArticleCount:sitemap.newsArticleCount,articleUrlCount:sitemap.articleUrlCount,archiveReady,eligible}));
-if(sitemap.newsArticleCount===0&&archiveReady>0)throw new Error("news_publication_gap: archive has "+archiveReady+" candidates ready for article drafting but the news sitemap has zero recent verified news articles");
+if(sitemap.newsArticleCount===0&&archiveReady>0)throw new Error("news_publication_gap: archive has "+archiveReady+" candidates ready for article drafting but the news sitemap contains no published articles");
 console.log("BAYAN post-deploy health passed; database readiness, security headers and news publication coverage confirmed.");
