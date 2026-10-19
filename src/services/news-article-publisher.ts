@@ -91,8 +91,11 @@ async function publishNextArchivedNewsArticleInner(env:Env){
       const attempts=Array.isArray(result.providerAttempted)?result.providerAttempted.map((value:any)=>String(value)):[];
       const expandedSearchAttempted=attempts.some((value:string)=>value.includes("Expanded topic variants")||value.includes("Expanded variant "));
       const providerFailures=attempts.filter((value:string)=>/timeout|failed|unavailable|HTTP [45][0-9]{2}/i.test(value)).map((value:string)=>value.split(" ").slice(0,3).join(" ")).slice(0,3);
-      const providerDiagnostic=attempts.slice(-12).map((value:string)=>value.replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").replace(/\s+/g," ").slice(0,120)).join(" | ").slice(0,700);
-      if(providerDiagnostic)await recordRuntimeEventLimited(env,"news_archive_provider_diagnostics","provider_diagnostics",providerDiagnostic);
+      const providerDiagnosticParts=attempts.slice(-12).map((value:string)=>value.replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").replace(/\s+/g," ").slice(0,100)).filter(Boolean);
+      for(let offset=0;offset<providerDiagnosticParts.length;offset+=3){
+        const providerDiagnostic=providerDiagnosticParts.slice(offset,offset+3).join(" | ").slice(0,350);
+        if(providerDiagnostic)await recordRuntimeEventLimited(env,"news_archive_provider_diagnostics","provider_diagnostics_part_"+(Math.floor(offset/3)+1),providerDiagnostic);
+      }
       const publishReason=String(result.publishReason||"publish_rejected").slice(0,350);
       const detail=String(result.publishReasonDetail||"detail_not_provided").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").replace(/\s+/g," ").slice(0,300);
       const sourceCount=new Set(sourceRecords.map((source:any)=>String(source.url||"").trim()).filter(Boolean)).size;
