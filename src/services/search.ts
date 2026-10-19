@@ -575,7 +575,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
       wikipediaRestSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Wikipedia REST Search",error);return[]}),
       googleNewsSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Google News Search",error);return[]}),
       bingWebRssSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing Web RSS Search",error);return[]}),
-      variantIndex===0?trustedPublisherRssSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Trusted Publisher RSS Search",error);return[]}):Promise.resolve([])
+      trustedPublisherRssSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Trusted Publisher RSS Search",error);return[]})
     ]);
     diagnostics.push("Expanded variant "+(variantIndex+1)+" result counts: "+labels.map((label,index)=>label+"="+(results[index]?.length||0)).join(", "));
     return results.flat();
