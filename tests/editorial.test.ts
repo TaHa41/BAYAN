@@ -21,6 +21,18 @@ describe("topic-aware article editorial",()=>{
     expect(sectionForOpenedStory("Liverpool wins the match after two goals","The league match ended 2-1 and changed the standings.")).toBe("sports");
   });
 
+
+  it("classifies financial announcements by their actual subject rather than generic news wording",()=>{
+    expect(sectionForOpenedStory("DIP هولدينغ تعلن نيتها طرح أسهمها في سوق دبي المالي","الشركة تعلن طرحًا عامًا أوليًا وبيع أسهم قائمة في سوق دبي المالي.")).toBe("economy");
+    expect(sectionForOpenedStory("الأرز الإندونيسي والسكر الهندي يسجلان مستويات غير مسبوقة","اضطرابات الشحن تقلص إمدادات الحبوب وتزيد التضخم الغذائي.")).toBe("economy");
+    expect(sectionForOpenedStory("IMF chief discusses the UAE's 2029 meetings","The announcement focuses on economic infrastructure and financial institutions.")).toBe("economy");
+  });
+
+  it("does not classify a generic announcement as a biography or let a person keyword override a sports result",()=>{
+    expect(sectionForOpenedStory("City council announces new transport plan","The government statement describes a public policy decision.")).toBe("politics");
+    expect(sectionForOpenedStory("Liverpool wins the match after two goals","The player scored twice in a league match.")).toBe("sports");
+  });
+
   it("uses health-specific evidence and safety instructions",()=>{
     const prompt=articlePromptForTopic("ما الذي نعرفه عن ارتفاع ضغط الدم؟","ar",[
       {title:"Clinical review of hypertension",summary:"Medical evidence describes risk factors and treatment limitations."} as any
