@@ -314,10 +314,10 @@ const sectionRelevant=(x:any)=>{
  return terms.filter(term=>summaryWords.has(term)).length>=2;
 };
 const inferStoredArticleSection=(item:any)=>{
- const title=String(item?.title||""),context=title+" "+String(item?.summary||"")+" "+String(item?.body||"").slice(0,2200);
+ const title=String(item?.title||""),summary=String(item?.summary||""),context=title+" "+summary;
  const biography=/\b(?:biography|biographical|early life|life and career|career and legacy|born in|born on|education and career|biografia)\b|سيرة|النشأة|ولد في|ولدت في|مسيرته|مسيرتها|حياته|حياتها|تعليمه|تعليمها|إنجازاته|إنجازاتها/i.test(context);
  if(biography&&title.trim().split(/\s+/).length<=9&&!/(?:what is|how to|ما هو|ما هي|دليل|شرح|تاريخ|مقارنة)/i.test(title))return "people";
- const inferred=editorialSectionForOpenedStory(title,String(item?.summary||"")+" "+String(item?.body||""));
+ const inferred=editorialSectionForOpenedStory(title,summary);
  return inferred==="world"?String(item?.section||"world"):inferred;
 };
 items=items.map((item:any)=>({...item,section:inferStoredArticleSection(item)}));
