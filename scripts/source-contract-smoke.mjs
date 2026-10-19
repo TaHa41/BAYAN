@@ -8,7 +8,7 @@ const db = read("src/db.ts");
 const ai = read("src/services/ai.ts");
 const repair = read("src/services/repair.ts");
 const wisdom = read("src/wisdom.ts");
-const app = read("public/app-20261013-01.js");
+const app = read("public/app-20261019-01.js");
 const index = read("src/index.ts");
 const api = read("src/routes/api.ts");
 const recovery = read("src/services/search-recovery.ts");
@@ -229,6 +229,7 @@ const checks = [
   ["production health detects zero published news articles when the archive has drafting candidates", read("scripts/production-health.mjs").includes('fetch(origin+"/news-sitemap.xml"') && read("scripts/production-health.mjs").includes("x-bayan-news-sitemap-archive-ready-for-drafting-count") && read("scripts/production-health.mjs").includes("if(sitemap.newsArticleCount===0&&archiveReady>0)") && read("scripts/production-health.mjs").includes("parseNewsSitemap")],
   ["news sitemap rejection diagnostics run after deployment without blocking release", read("src/seo.ts").includes("x-bayan-news-sitemap-rejection-reasons") && read("scripts/news-sitemap-diagnostics.mjs").includes("NEWS_SITEMAP_DIAGNOSTICS") && read(".github/workflows/deploy-worker.yml").includes("node scripts/news-sitemap-diagnostics.mjs")],
   ["homepage SEO metadata keeps one H1 and caps descriptions at 160 characters", read("src/index.ts").includes('const homeTitle=lang==="en"?"Latest knowledge articles | BAYAN":"أحدث المقالات المعرفية والمصادر | بيان"') && read("src/index.ts").includes('seo-home-featured"><h2>') && read("src/index.ts").includes("metaDescriptionChars.slice(0,160)") && read("src/index.ts").includes("seoEscape(metaDescription)")],
+  ["search detail links preserve long evidence excerpts and show any available full article body", app.includes('String(item.summary||"").slice(0,1200)') && app.includes('String(item.summary || "").trim().slice(0,420)') && app.includes('String(item.body || "").trim().length > 500') && !app.includes('item.kind === "article" && String(item.body || "").trim().length > 500') && index.includes("app-20261019-01.js")],
   ["search provider fan-out and upstream body size are bounded to prevent Worker resource exhaustion", search.includes("const maxBytes=") && search.includes("Stage discovery:") && search.includes("diagnosticStart=providerDiagnostics.length") && search.includes("candidates.push(...expanded.slice(0,12))") && search.includes("slice(0,publicationResearch?2:1)") && !search.slice(search.indexOf("async function expandedSearch"),search.indexOf("async function settings")).includes("gdelt(variant") && !search.includes("const [expanded,web]=await Promise.all")],
   ["RSS and Atom provider bodies are size-capped while their timeout remains active during streaming", read("src/services/news.ts").includes("const maxFeedBytes = 384 * 1024") && read("src/services/news.ts").includes("const reader = response.body.getReader()") && read("src/services/news.ts").includes("total > maxFeedBytes") && read("src/services/news.ts").includes("clearTimeout(timer)")],
   ["production smoke runs general searches sequentially and limits section-query concurrency", read("scripts/production-smoke.mjs").includes("inBatches(generalQueries,1,async item=>{") && read("scripts/production-smoke.mjs").includes("inBatches(sectionChecks,2,async({section,language})=>{")],
