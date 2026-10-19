@@ -210,7 +210,7 @@ async function trustedPublisherRssSearch(q:string,language:Locale,diagnostics?:s
 }
 async function googleNewsSearch(q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
   try{
-    const stories=await searchNewsFeed(q,language);
+    const stories=await searchNewsFeed(q,language,diagnostics);
     const out=stories.slice(0,8).map(story=>{
       const title=cleanText(story.title),url=String(story.url||""),publisher=cleanText(story.publisher||"Google News");
       const summary=cleanText(story.summary||"").slice(0,1400);
