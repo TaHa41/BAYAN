@@ -801,8 +801,12 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
         try{const url=new URL(String(src.url||item.url||""));if(url.protocol==="https:"&&!/wikipedia.org|wikidata.org|news.google.com/i.test(url.hostname))hosts.add(url.hostname.toLowerCase().replace(/^www\./,""));}catch(error){void recordRuntimeEventLimited(env,"candidate_source_url","invalid_candidate_source_url",error)}
       }
     }
+    const minSources=Math.max(2,Number(s.min_sources||3));
+    // Publication requires five independent publishers/hosts. The old 2-host
+    // shortcut stopped recovery even when the publication gate still needed five.
+    const requiredPublishers=options.publish?Math.max(5,Number(s.min_sources||3)):2;
     const substantive=matching.filter(item=>String(item.summary||"").trim().length>=100).length;
-    return publishers.size>=2&&hosts.size>=2&&substantive>=Math.min(3,Math.max(2,Number(s.min_sources||3)));
+    return publishers.size>=requiredPublishers&&hosts.size>=requiredPublishers&&substantive>=Math.min(3,minSources);
   };
   // Expand when sparse OR when the first pass is dominated by duplicates, a
   // single publisher, encyclopedia-only results, or very thin snippets.
