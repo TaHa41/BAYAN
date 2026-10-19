@@ -55,4 +55,18 @@ describe("trusted publisher RSS search fallback", () => {
     const results = await searchTrustedNewsFeeds("central bank interest rates", "en");
     expect(results).toHaveLength(0);
   });
+
+  it("uses working Arabic publisher RSS endpoints instead of retired URLs", async () => {
+    const requested: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      requested.push(String(input));
+      return new Response("", { status: 404 });
+    }));
+    await searchTrustedNewsFeeds("أسعار الفائدة البنك المركزي", "ar");
+    expect(requested).toContain("https://www.aljazeera.net/rss");
+    expect(requested).toContain("https://www.france24.com/ar/top-stories/rss");
+    expect(requested).toContain("https://aawsat.com/feed/news");
+    expect(requested).not.toContain("https://www.aljazeera.net/aljazeera/rss");
+    expect(requested).not.toContain("https://aawsat.com/rss.xml");
+  });
 });
