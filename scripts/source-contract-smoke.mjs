@@ -17,6 +17,8 @@ const evidenceDiversity = read("src/services/evidence-diversity.ts");
 const recovery = read("src/services/search-recovery.ts");
 const http = read("src/http.ts");
 const checks = [
+  ["section archive lookup uses the section-language index and a bounded 30-row window", read("src/routes/api.ts").includes("WHERE language=? AND section=? AND fetched_at>=? AND published_at>=? AND published_at<=?") && read("src/routes/api.ts").includes("bind(lang,section,newsCutoff,newsCutoff,newsFuture).all<any>()") && read("src/routes/api.ts").includes("ORDER BY published_at DESC LIMIT 30") && !read("src/routes/api.ts").includes("ORDER BY published_at DESC LIMIT 500")],
+
   ["health readiness probes a real news_archive row read and reports D1 read-limit outages honestly", read("src/routes/api.ts").includes('SELECT id FROM news_archive LIMIT 1') && read("src/routes/api.ts").includes('newsArchiveRead:false,articleRevisionHistory:true,error:"news_archive_read_unavailable"') && read("src/routes/api.ts").includes('newsArchiveRead:true,articleRevisionHistory:true')],
 
   ["section API falls back to reviewed bundled articles by their curated section when fewer than two eligible results remain", read("src/routes/api.ts").includes('import{bundledArticlesForSection}from"../fallback-content"') && read("src/routes/api.ts").includes('if(items.length<2&&section!=="news"&&section!=="prices")') && read("src/routes/api.ts").includes("bundledArticlesForSection(section,lang,24)") && read("src/routes/api.ts").includes("articleEvidenceQuality(item.sources)") && read("src/routes/api.ts").includes("String(item.section||\"\")===section") && read("src/routes/api.ts").includes("fallbackMode:true")],
