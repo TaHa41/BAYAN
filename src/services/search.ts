@@ -7,7 +7,7 @@ import {ask,draftArticle,answerHasUnsupportedSpecifics,handleOpenAIResponseFailu
 import {findRelatedImage,searchNewsFeed,searchTrustedNewsFeeds} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 import {sectionForOpenedStory} from "./editorial";
-import {requiredEvidencePublisherCount} from "./evidence-diversity";
+import {requiredEvidencePublisherCount,independentEvidenceHost} from "./evidence-diversity";
 import {getProviderBreaker} from "./ai-provider-resilience";
 import {shouldAttemptOpenAIWebSearchFallback} from "./search-recovery";
 const publicationErrorMessage=(error:unknown)=>String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
@@ -812,13 +812,15 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     for(const item of matching){
       for(const src of item.sources||[]){
         const publisher=String(src.publisher||"").trim().toLowerCase();
-        if(publisher&&!/wikipedia|wikidata|ويكيبيديا|ويكي بيانات|google news|bing news|duckduckgo/i.test(publisher))publishers.add(publisher);
-        try{const url=new URL(String(src.url||item.url||""));if(url.protocol==="https:"&&!/wikipedia.org|wikidata.org|news.google.com/i.test(url.hostname))hosts.add(url.hostname.toLowerCase().replace(/^www\./,""));}catch(error){void recordRuntimeEventLimited(env,"candidate_source_url","invalid_candidate_source_url",error)}
+        const host=independentEvidenceHost(publisher,String(src.url||item.url||""));
+        if(!host)continue;
+        if(publisher)publishers.add(publisher);
+        hosts.add(host);
       }
     }
     const minSources=Math.max(2,Number(s.min_sources||3));
-    // Publication requires five independent publishers/hosts. The old 2-host
-    // shortcut stopped recovery even when the publication gate still needed five.
+    // Internal BAYAN indexes and aggregator URLs never satisfy this gate.
+    // Publication requires five genuinely independent HTTPS publishers/hosts.
     const requiredPublishers=requiredEvidencePublisherCount(options.publish===true,Number(s.min_sources||3));
     const substantive=matching.filter(item=>String(item.summary||"").trim().length>=100).length;
     return publishers.size>=requiredPublishers&&hosts.size>=requiredPublishers&&substantive>=Math.min(3,minSources);

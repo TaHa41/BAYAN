@@ -4,3 +4,26 @@ export function requiredEvidencePublisherCount(publishing: boolean, configuredMi
     : 3;
   return publishing ? Math.max(5, minimum) : 2;
 }
+
+/**
+ * Return a source host only when it can count as independent evidence.
+ * Internal BAYAN indexes, aggregators, and non-HTTPS URLs must not satisfy
+ * the publication recovery gate.
+ */
+export function independentEvidenceHost(publisher: string, rawUrl: string): string | undefined {
+  const label = String(publisher || "").trim().toLowerCase();
+  if (/(?:wikipedia|wikidata|google news|bing news|duckduckgo|bayan|knowledge base|recent news archive|internal archive)/i.test(label)) {
+    return undefined;
+  }
+  try {
+    const url = new URL(String(rawUrl || ""));
+    if (url.protocol !== "https:" || url.username || url.password) return undefined;
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    if (!host || /(?:^|\.)(?:wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com|workers\.dev)$/.test(host)) {
+      return undefined;
+    }
+    return host;
+  } catch {
+    return undefined;
+  }
+}
