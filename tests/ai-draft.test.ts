@@ -67,12 +67,32 @@ describe.each(["ar", "en"] as const)("evidence-grounded article drafting (%s)", 
     expect((result as any).verification?.retried).toBe(true);
   });
 
-  it("rejects an unknown source ID safely after one retry", async () => {
+  it("regenerates a sentence with an unknown source ID and preserves the verified article", async () => {
+    const fetchMock = mockGeneration([draftJson(locale, { invalidSource: true }), draftJson(locale)]);
+    const result = await draftArticle({ OPENAI_API_KEY: "test-key" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.status).toBe("verified");
+    expect((result as any).verification?.retried).toBe(true);
+    expect((result as any).verification?.remainingSentences).toBe(16);
+    expect((result as any).verification?.removedSentences).toBe(0);
+  });
+
+  it("drops sentences whose source IDs remain unknown after correction", async () => {
     const fetchMock = mockGeneration([draftJson(locale, { invalidSource: true }), draftJson(locale, { invalidSource: true })]);
     const result = await draftArticle({ OPENAI_API_KEY: "test-key" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(result.status).toBe("mixed");
-    expect(result.answer).toBe("");
+    expect(result.status).toBe("verified");
     expect((result as any).verification?.retried).toBe(true);
+    expect((result as any).verification?.remainingSentences).toBe(15);
+    expect((result as any).verification?.removedSentences).toBe(1);
+  });
+
+  it("normalizes trailing commas and source ID strings without accepting unknown IDs as evidence", async () => {
+    const normalizedVariant = draftJson(locale).replace(/"sourceIds":\["S1"\]/g, '"sourceIds":"S1, S99",');
+    const fetchMock = mockGeneration([normalizedVariant]);
+    const result = await draftArticle({ OPENAI_API_KEY: "test-key" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.status).toBe("verified");
+    expect((result as any).verification?.remainingSentences).toBe(16);
   });
 });
