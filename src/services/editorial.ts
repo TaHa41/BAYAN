@@ -15,7 +15,7 @@ export function sectionForOpenedStory(title:string,summary:string){
  if(/(?:football|soccer|basketball|tennis|league|championship|tournament|match|goal|athlete|coach|sports?|رياضة|مباراة|الدوري|بطولة|منتخب|لاعب|مدرب|هدف|نتيجة المباراة|إحصاءات رياضية)/i.test(all))return "sports";
  if(/(?:health|medical|medicine|hospital|disease|vaccine|doctor|symptom|treatment|clinical trial|hypertension|blood pressure|cardiology|ضغط الدم|ارتفاع ضغط الدم|صحة|طب|مستشفى|مرض|لقاح|طبيب|أعراض|علاج|تجربة سريرية|دواء|وقاية)/i.test(all))return "health";
  if(/(?:technology|artificial intelligence|software|cybersecurity|chip|robot|programming|algorithm|تقنية|تكنولوجيا|ذكاء اصطناعي|برمجيات|أمن سيبراني|رقائق|روبوت|برمجة|خوارزمية)/i.test(all))return "technology";
- if(/(?:economy|economic|market|stock|inflation|currency|bank|trade|gdp|finance|gold price|اقتصاد|اقتصادي|سوق|أسهم|تضخم|عملة|بنك|تجارة|ناتج محلي|تمويل|سعر الذهب|دولار)/i.test(all))return "economy";
+ if(/(?:economy|economic|market|stock|inflation|currency|bank|trade|gdp|finance|gold price|ipo|initial public offering|shares|share listing|food inflation|rice|sugar|imf|economics meeting|اقتصاد|اقتصادي|سوق|أسهم|تضخم|عملة|بنك|تجارة|ناتج محلي|تمويل|سعر الذهب|دولار|طرح أسهم|طرح عام أولي|إدراج أسهم|تضخم غذائي|الأرز|السكر|صندوق النقد)/i.test(all))return "economy";
  if(/(?:election|president|parliament|government|minister|policy|politics|diplomacy|legislation|sanction|انتخابات|رئيس|برلمان|حكومة|وزير|سياسة|دبلوماسية|تشريع|عقوبات|قانون جديد)/i.test(all))return "politics";
  if(/(?:science|scientific|research|discovery|space|nasa|astronomy|physics|chemistry|biology|planet|universe|study finds|علم|بحث علمي|اكتشاف|فضاء|ناسا|فلك|فيزياء|كيمياء|أحياء|كوكب|الكون|دراسة علمية)/i.test(all))return "science";
  if(/(?:history|historical|heritage|archaeology|civilization|ancient|تاريخ|تاريخي|تراث|آثار|حضارة|قديم|العصور الوسطى)/i.test(all))return "history";
@@ -26,6 +26,21 @@ export function sectionForOpenedStory(title:string,summary:string){
  if(/(?:arab world|arab society|arab league|العالم العربي|المجتمع العربي|جامعة الدول العربية|الدول العربية|المجتمعات العربية)/i.test(all))return "arab";
  if(/(?:breaking|latest|today|reported|announced|statement|press release|عاجل|آخر التطورات|اليوم|أعلنت|أعلن|بيان رسمي|تطورات جديدة)/i.test(all))return "news";
  return "world";
+}
+
+/**
+ * Strict display/persistence gate. Unknown or merely generic material must not
+ * be assigned to a specialist section; "world" is reserved for evidenced
+ * cross-border/systemic changes rather than acting as a catch-all.
+ */
+export function isContentForSection(section:string,title:string,summary:string){
+ const t=normalized(title),s=normalized(summary),all=t+" "+s;
+ if(!section||!t||!s)return false;
+ const inferred=sectionForOpenedStory(title,summary);
+ if(inferred!==section)return false;
+ if(section==="world")return /(?:global|worldwide|cross border|cross-border|international system|systemic change|global shift|climate change|supply chain|عالمي|عالمية|عبر الحدود|تحولات كبرى|تغير المناخ|سلاسل الإمداد|النظام الدولي|تحول عالمي)/i.test(all);
+ if(section==="news")return /(?:breaking|latest|today|reported|announced|statement|press release|عاجل|آخر التطورات|اليوم|أعلنت|أعلن|بيان رسمي|تطورات جديدة)/i.test(all);
+ return true;
 }
 
 const templates:Record<string,{ar:string;en:string}>={
