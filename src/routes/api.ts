@@ -371,7 +371,7 @@ try{
 if(items.length<2&&section!=="news"&&section!=="prices"){
  const existingSlugs=new Set(items.map((item:any)=>String(item.slug||"")).filter(Boolean));
  const existingTitles=new Set(items.map((item:any)=>String(item.title||"").normalize("NFKC").toLowerCase().trim()).filter(Boolean));
- const bundled=bundledArticlesForSection(section,lang,24).filter((item:any)=>item.slug&&!existingSlugs.has(String(item.slug))&&!existingTitles.has(String(item.title||"").normalize("NFKC").toLowerCase().trim())&&localeSafeItem(item)&&articleBodyQuality(String(item.body||"")).ok&&articleEvidenceQuality(item.sources)&&isContentForSection(section,String(item.title||""),String(item.summary||""))&&/^https:\/\//i.test(String(item.imageUrl||"")));
+ const bundled=bundledArticlesForSection(section,lang,24).filter((item:any)=>item.slug&&!existingSlugs.has(String(item.slug))&&!existingTitles.has(String(item.title||"").normalize("NFKC").toLowerCase().trim())&&localeSafeItem(item)&&articleBodyQuality(String(item.body||"")).ok&&articleEvidenceQuality(item.sources)&&String(item.section||"")===section&&/^https:\/\//i.test(String(item.imageUrl||"")));
  items=[...items,...bundled.map((item:any)=>({...item,kind:"article",fallbackMode:true,section,language:lang,imageUrl:safePublicImageUrl(item.imageUrl),imageAlt:String(item.imageAlt||item.title||"")}))];
 }
 items=items.filter((item:any)=>localeSafeItem(item)&&(()=>{const text=String(item?.body||item?.summary||"");return lang==="ar"?/[؀-ۿ]/.test(text):!/[؀-ۿ]/.test(text)})());
