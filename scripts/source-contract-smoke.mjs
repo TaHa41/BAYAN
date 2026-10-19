@@ -274,12 +274,14 @@ const checks = [
     "src/config.ts","src/db.ts","src/http.ts","src/image-url.ts","src/index.ts","src/routes/api.ts","src/schema.ts","src/search-patterns.ts","src/sections.ts","src/security.ts","src/runtime-events.ts","src/seo.ts","src/types.ts","src/wisdom.ts",
     "src/services/ai.ts","src/services/editorial.ts","src/services/live.ts","src/services/news-article-publisher.ts","src/services/news.ts","src/services/repair.ts","src/services/search-recovery.ts","src/services/search.ts","src/services/telegram.ts","src/services/wikimedia-enterprise.ts",
     "scripts/inject-build-id.mjs","scripts/news-sitemap-diagnostics.mjs","scripts/production-health.mjs","scripts/production-self-heal.mjs","scripts/production-smoke.mjs","scripts/seed-article-quality-smoke.mjs",
-    "tests/api.test.ts","tests/editorial.test.ts","tests/publication-reason.test.ts","tests/search-patterns.test.ts","tests/search-recovery.test.ts","tests/unit.test.ts","tests/runtime-events.test.ts"
+    "tests/api.test.ts","tests/editorial.test.ts","tests/publication-reason.test.ts","tests/search-patterns.test.ts","tests/search-recovery.test.ts","tests/unit.test.ts","tests/runtime-events.test.ts","tests/news-publisher-rss.test.ts"
   ].every(path=>!(/catch\s*(?:\([^)]*\))?\s*\{\s*\}|\.catch\(\s*(?:\(\s*\w*\s*\)|\w+)\s*=>\s*(?:null|undefined|\{\s*\})\s*\)/.test(read(path))))],
 
   ["news article drafting uses excerpt-only evidence, per-sentence source IDs, a single retry, and drops unsupported sentences", ai.includes('sourceId:"S"+(index+1)') && ai.includes("sourceIds") && ai.includes('answerHasUnsupportedSpecifics(sentence.text,cited,"")') && ai.includes("Regenerate the article JSON once") && ai.includes("checked.rejected.length") && !ai.slice(ai.indexOf("export async function draftArticle"),ai.indexOf("export async function ask")).includes("url:String(source.url")],
   ["archive publisher runs in most 5-minute maintenance slots while refresh stays bounded and self-heal remains scheduled", index.includes("const scheduleSlot=Math.floor") && index.includes("task===1||(task===2&&scheduleSlot%12!==2&&scheduleSlot%12!==8)") && index.includes("news_archive_refresh_last") && index.includes("publishNextArchivedNewsArticle(env)")],
   ["full commit identity is injected and exposed by a no-store endpoint", index.includes('const COMMIT_SHA="0000000000000000000000000000000000000000";') && index.includes('u.pathname==="/.well-known/build.json"') && index.includes('headers.set("X-BAYAN-Commit",COMMIT_SHA)') && read("scripts/inject-build-id.mjs").includes("^[a-f0-9]{40}$") && read("scripts/inject-build-id.mjs").includes("const COMMIT_SHA=") && read(".github/workflows/deploy-worker.yml").includes("Verify deployed commit identity")],
+  ["news publication search uses recent independent publisher RSS as a bounded fallback", news.includes("searchPublisherNewsFeeds") && search.includes("searchPublisherNewsFeeds") && search.includes("Publisher RSS fallback") && news.includes("independent_publishers=") && news.includes("published < cutoff")],
+
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
