@@ -160,7 +160,7 @@ if(staticPage){
 if(path.startsWith("/article/")){
   try{
     const slug=decodeURIComponent(path.slice(9));
-    let row:any=null;try{row=await env.DB.prepare("SELECT title,summary,section,body,updated_at,created_at,image_url,image_alt,sources_json FROM articles WHERE slug=? AND language=? AND status='PUBLISHED' LIMIT 1").bind(slug,lang).first<any>();}catch(error){const bundled=bundledArticleBySlug(slug,lang);if(bundled)row={...bundled,created_at:bundled.createdAt,updated_at:bundled.updatedAt,image_url:bundled.imageUrl,image_alt:bundled.imageAlt,sources_json:JSON.stringify(bundled.sources)};else await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}
+    let row:any=null;try{row=await env.DB.prepare("SELECT title,summary,section,body,updated_at,created_at,image_url,image_alt,sources_json FROM articles WHERE slug=? AND language=? AND status='PUBLISHED' LIMIT 1").bind(slug,lang).first<any>();}catch(error){try{await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}catch{}}if(!row){const bundled=bundledArticleBySlug(slug,lang);if(bundled)row={...bundled,created_at:bundled.createdAt,updated_at:bundled.updatedAt,image_url:bundled.imageUrl,image_alt:bundled.imageAlt,sources_json:JSON.stringify(bundled.sources)}}
     if(row?.title){
       const articleTitle=String(row.title),articleSummary=String(row.summary||""),articleImageRaw=String(row.image_url||""),articleImage=safePublicImageUrl(articleImageRaw)||"",articleImageAlt=String(row.image_alt||articleTitle),articlePublishedRaw=String(row.created_at||row.updated_at||""),articlePublished=articlePublishedRaw.includes("T")?articlePublishedRaw:articlePublishedRaw.replace(" ","T")+"Z";
       // Pair translations only when both are published and share at least two source URLs.
@@ -276,7 +276,7 @@ if(apiCacheTtl){
  if(cached)publicApiResponseCache.delete(apiCacheKey);
 }
 if(u.pathname.startsWith("/api/")){
- const schemaOptional=u.pathname==="/api/search";
+ const schemaOptional=["/api/search","/api/section","/api/article"].includes(u.pathname);
  try{await ensureSchema(env)}catch{if(!schemaOptional)return new Response(JSON.stringify({error:"database_unavailable"}),{status:503,headers:{"content-type":"application/json;charset=utf-8","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})}
  try{
   const response=await api(request,env,ctx);
