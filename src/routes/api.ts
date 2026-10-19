@@ -280,8 +280,8 @@ const sectionPatterns:Record<string,RegExp>={
  travel:/(travel|tourism|destination|airport|hotel|visa|trip|سفر|سياحة|وجهة|مطار|فندق|تأشيرة|رحلة|سياحي)/i,
  art:/(\barts?\b|book|books|novel|novels|author|writer|poetry|poet|painting|visual art|literature|literary|film|cinema|music|theatre|theater|song|museum|cultural|فن|سينما|موسيقى|مسرح|فيلم|أغنية|أدب|رواية|روايات|شعر|شاعر|كاتب|مؤلف|لوحة|لوحات|ثقافة|فنان)/i,
  trends:/(trend|viral|popular|social media|survey|poll|data|اتجاه|ترند|متداول|رائج|استطلاع|بيانات|شبكات اجتماعية)/i,
- egypt:/(egypt|egyptian|cairo|alexandria|nile|aswan|luxor|suez|sinai|red sea|مصر|المصري|القاهرة|الإسكندرية|النيل|أسوان|الأقصر|السويس|سيناء|البحر الأحمر)/i,
- arab:/(arab|arabic|arab league|العرب|عربي|العالم العربي|جامعة الدول العربية)/i,
+ egypt:/(community|communities|society|social issue|public service|daily life|housing|family|cost of living|مجتمع|مجتمعات|قضية اجتماعية|قضايا اجتماعية|خدمة عامة|خدمات عامة|الحياة اليومية|السكن|الأسرة|تكلفة المعيشة|المعيشة|السكان)/i,
+ arab:/(idea|ideas|debate|philosophy|philosophical|argument|ethics|critical thinking|viewpoint|opinion|أفكار|فكرة|نقاش|نقاشات|فلسفة|فلسفي|جدل|حجة|أخلاقيات|تفكير نقدي|وجهة نظر|رأي|آراء|قضية فكرية|حوار فكري)/i,
  world:/(world|global|international|united nations|international relations|global risk|عالمي|دولي|العالم|الأمم المتحدة|علاقات دولية|حرب|نزاع|داعش|تنظيم الدولة|سوريا|العراق|أوكرانيا|غزة|إيران|اليمن|الحوثيين|كييف|دولية)/i
 };
 const sectionTerms:Record<string,string[]>={
@@ -296,8 +296,8 @@ const sectionTerms:Record<string,string[]>={
  travel:["travel","tourism","destination","airport","hotel","visa","trip","سفر","السفر","سياحة","السياحة","سياحي","السياحي","سياحية","السياحية","وجهة","الوجهة","وجهات","الوجهات","مطار","المطار","فندق","الفندق","فنادق","الفنادق","تأشيرة","التأشيرة","تأشيرات","رحلة","رحلات"],
  art:["art","arts","artist","artists","book","books","novel","novels","author","writer","poetry","poet","painting","paintings","visual","literature","literary","film","cinema","music","theatre","theater","song","museum","cultural","فن","الفن","سينما","السينما","موسيقى","الموسيقى","مسرح","المسرح","فيلم","أغنية","أغاني","غناء","مغني","مغنية","مطرب","مطربة","ممثلة","فنان","الفنان","الفنانة","فنانين","أدب","الأدب","رواية","روايات","شعر","شاعر","كاتب","مؤلف","لوحة","لوحات","ثقافة","الثقافة"],
  trends:["trend","trends","viral","popular","social","media","survey","poll","data","اتجاه","اتجاهات","ترند","متداول","رائج","استطلاع","استطلاعات","بيانات","اجتماعي","اجتماعية","التواصل","رأي","آراء"],
- egypt:["egypt","egyptian","cairo","alexandria","nile","aswan","luxor","suez","sinai","مصر","المصري","المصرية","القاهرة","الإسكندرية","النيل","أسوان","الأقصر","السويس","سيناء","البحر","الأحمر"],
- arab:["arab","arabic","arabian","العرب","عربي","العربية","عربيّة","الجامعة","الدول"],
+ egypt:["community","communities","society","social issue","public service","daily life","housing","family","cost of living","مجتمع","مجتمعات","قضية اجتماعية","قضايا اجتماعية","خدمة عامة","خدمات عامة","الحياة اليومية","السكن","الأسرة","تكلفة المعيشة","المعيشة","السكان"],
+ arab:["idea","ideas","debate","philosophy","philosophical","argument","ethics","critical thinking","viewpoint","opinion","أفكار","فكرة","نقاش","نقاشات","فلسفة","فلسفي","جدل","حجة","أخلاقيات","تفكير نقدي","وجهة نظر","رأي","آراء","قضية فكرية","حوار فكري"],
  world:["world","global","international","united","nations","war","conflict","climate","supply","chain","globalization","worldwide","عالمي","عالمية","دولي","دولية","العالم","الأمم","المتحدة","علاقات","حرب","نزاع","سوريا","العراق","أوكرانيا","غزة","إيران","اليمن","داعش","تنظيم","الدولة","الإرهاب","الإرهابي","إقليمية","دول","المناخ","المناخي","المناخية","التغير","سلاسل","الإمداد","التوريد","الشحن","الموانئ"]
 };
 const sectionRelevant=(x:any)=>{
