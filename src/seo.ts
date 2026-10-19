@@ -126,7 +126,7 @@ export async function newsSitemap(env:Env){
     // missing its required URL element. Return a retryable unavailable status,
     // while keeping the general sitemap healthy and exposing pipeline diagnostics.
     const unavailable=retryableUnavailable("No eligible recent news articles are currently published; retry later.");
-    for(const [name,value] of response.headers)unavailable.headers.set(name,value);
+    for(const [name,value] of response.headers){if(name.toLowerCase()!=="content-type")unavailable.headers.set(name,value);}
     unavailable.headers.set("x-bayan-news-sitemap-eligible-count","0");
     unavailable.headers.set("x-bayan-news-sitemap-archive-ready-for-drafting-count",String(archiveEligibleCount));
     return unavailable;
