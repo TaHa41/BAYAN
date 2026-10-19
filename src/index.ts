@@ -280,7 +280,7 @@ if(u.pathname.startsWith("/api/")){
    const bodyText=await response.clone().text();
    if(bodyText.length<=512*1024){
     const headers:Array<[string,string]>=[];
-    response.headers.forEach((value,key)=>headers.push([key,value]));
+    response.headers.forEach((value:string,key:string)=>headers.push([key,value]));
     if(publicApiResponseCache.size>=160){const oldest=publicApiResponseCache.keys().next().value;if(oldest)publicApiResponseCache.delete(oldest);}
     publicApiResponseCache.set(apiCacheKey,{expiresAt:Date.now()+apiCacheTtl,body:bodyText,status:response.status,headers});
    }
