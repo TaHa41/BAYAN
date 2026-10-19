@@ -54,7 +54,6 @@ describe("topic-aware article editorial",()=>{
   });
 
   it("does not use the global-shifts section as a catch-all for unknown topics",()=>{
-    expect(isContentForSection("world","A local company announces a new product","The announcement describes a single company and product."));
     expect(isContentForSection("world","A local company announces a new product","The announcement describes a single company and product.")).toBe(false);
     expect(isContentForSection("world","Global supply chains face a systemic shift","International trade patterns are changing across several regions.")).toBe(true);
   });
