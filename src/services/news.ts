@@ -55,7 +55,7 @@ const feeds = (lang: Locale) =>
         ["بي بي سي عربي", "https://feeds.bbci.co.uk/arabic/rss.xml"],
         ["الجزيرة", "https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdff8b8cab9"],
         ["DW عربية", "https://rss.dw.com/rdf/rss-ar-all"],
-        ["فرانس 24 عربي", "https://www.france24.com/ar/rss"],
+        ["فرانس 24 عربي", "https://www.france24.com/ar/top-stories/rss"],
         ["سكاي نيوز عربية", "https://www.skynewsarabia.com/rss"],
         ["اندبندنت عربية", "https://www.independentarabia.com/rss.xml"],
         ["الشرق الأوسط", "https://aawsat.com/feed/news"],
