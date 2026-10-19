@@ -5,6 +5,14 @@ export function requiredEvidencePublisherCount(publishing: boolean, configuredMi
   return publishing ? Math.max(5, minimum) : 2;
 }
 
+export function requiredSearchExpansionPublisherCount(publishing: boolean, configuredMinimum: number): number {
+  const required = requiredEvidencePublisherCount(publishing, configuredMinimum);
+  // Ranking, language checks, title deduplication and source merging can reduce
+  // the final card set after retrieval. Publication searches need headroom so
+  // the final evidence gate can still receive its full independent-source minimum.
+  return publishing ? required + 2 : required;
+}
+
 /**
  * Return a source host only when it can count as independent evidence.
  * Internal BAYAN indexes, aggregators, and non-HTTPS URLs must not satisfy
