@@ -7,6 +7,7 @@ import {ask,draftArticle,answerHasUnsupportedSpecifics} from "./ai";
 import {findRelatedImage,searchNewsFeed} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 import {sectionForOpenedStory} from "./editorial";
+import {requiredEvidencePublisherCount} from "./evidence-diversity";
 const publicationErrorMessage=(error:unknown)=>String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
 const publicationFailureReason=(error:unknown)=>{const message=publicationErrorMessage(error);return /429|rate.?limit|timeout|timed out|abort|quota|neurons|overload|openai|workers ai|ai unavailable/i.test(message)?"ai_unavailable":"exception:"+message;};
 async function recordPublicationWarning(env:Env,message:string){await recordRuntimeEventLimited(env,"news_archive_article_generation","publication_warning",message);}
@@ -804,7 +805,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     const minSources=Math.max(2,Number(s.min_sources||3));
     // Publication requires five independent publishers/hosts. The old 2-host
     // shortcut stopped recovery even when the publication gate still needed five.
-    const requiredPublishers=options.publish?Math.max(5,Number(s.min_sources||3)):2;
+    const requiredPublishers=requiredEvidencePublisherCount(options.publish===true,Number(s.min_sources||3));
     const substantive=matching.filter(item=>String(item.summary||"").trim().length>=100).length;
     return publishers.size>=requiredPublishers&&hosts.size>=requiredPublishers&&substantive>=Math.min(3,minSources);
   };
