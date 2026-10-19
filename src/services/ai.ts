@@ -143,7 +143,8 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
       }
       if(typeof value!=="string")continue;
       const text=value.trim();
-      const matches=[...text.matchAll(/(?:\bsource\s*[-_ ]?\s*|\bS\s*[-_ ]?\s*)(\d+)\b/gi);
+      const matches=[...text.matchAll(/(?:\bsource\s*[-_ ]?\s*|\bS\s*[-_ ]?\s*)(\d+)\b/gi)];
+      if(matches.length)ids.push(...matches.map(match=>"S"+match[1]));
       else if(/^\d+$/.test(text))ids.push("S"+text);
     }
     return[...new Set(ids)].filter(id=>evidenceById.has(id));
