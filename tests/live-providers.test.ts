@@ -33,8 +33,8 @@ describe("live provider resilience", () => {
     expect(result.ok).toBe(true);
     expect(result.provider).toContain("ExchangeRate-API Open Access");
     expect(result.provider).toContain("exchangerate-api.com");
-    expect(result.base).toBe("USD");
-    expect(result.rates?.EGP).toBe(48.5);
+    expect((result as any).base).toBe("USD");
+    expect((result as any).rates?.EGP).toBe(48.5);
     expect(result.stale).toBe(false);
     expect(calls).toHaveLength(2);
   });
