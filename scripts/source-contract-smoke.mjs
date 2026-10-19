@@ -17,6 +17,8 @@ const evidenceDiversity = read("src/services/evidence-diversity.ts");
 const recovery = read("src/services/search-recovery.ts");
 const http = read("src/http.ts");
 const checks = [
+  ["bundled article fallback preserves bilingual hreflang links without D1 reads", read("src/index.ts").includes('const pairedSlug=slug.replace(lang==="ar"?/-ar$/:/-en$/,pairedLanguage==="ar"?"-ar":"-en")') && read("src/index.ts").includes('if(!row._bundled&&ownSources.size>=2)') && read("src/index.ts").includes('articleAlternateLinks=')],
+
   ["bundled article pages avoid D1 article reads and translation scans during quota pressure", read("src/index.ts").includes('if(!bundledArticleBySlug(slug,lang))try{const row=await env.DB.prepare("SELECT title,summary FROM articles') && read("src/index.ts").includes('const bundled=bundledArticleBySlug(slug,lang);let row:any=bundled?') && read("src/index.ts").includes('row._bundled?new Set<string>()') && read("src/index.ts").includes('AND slug<>? LIMIT 12')],
 
   ["news never invents dates or serves expired cached stories as current", !news.includes("publishedAt:new Date().toISOString()") && news.includes("const publishedAt = dateMatch") && news.includes("&& isFreshNews(story)")],
