@@ -32,6 +32,7 @@ describe("live provider resilience", () => {
     const result = await fx();
     expect(result.ok).toBe(true);
     expect(result.provider).toContain("ExchangeRate-API Open Access");
+    expect(result.provider).toContain("exchangerate-api.com");
     expect(result.base).toBe("USD");
     expect(result.rates?.EGP).toBe(48.5);
     expect(result.stale).toBe(false);
