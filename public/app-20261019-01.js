@@ -468,18 +468,28 @@
     output.innerHTML = '<div class="notice loading">' + t("جاري البحث في مصادر متعددة…","Searching multiple sources…") + "</div>";
     let data = null, fallbackUsed = false;
     try { data = await api("/api/search?q=" + encodeURIComponent(query) + "&lang=" + lang, {timeoutMs:30000}); } catch {}
-    if (!data?.results?.length && !((data?.providers||[]).includes("BAYAN content safety"))) {
+    const serverResults = Array.isArray(data?.results) ? data.results : [];
+    const shouldExpandWeakSearch = serverResults.length === 0 ||
+      (serverResults.length < 3 && data?.status !== "verified");
+    if (shouldExpandWeakSearch && !((data?.providers||[]).includes("BAYAN content safety"))) {
       fallbackUsed = true;
       const serverData = data || {};
       const serverTimedOut = !data;
       let fallbackResults = [];
       try { fallbackResults = await browserSearchFallback(query); } catch {}
+      const seenFallbackKeys = new Set();
+      const mergedResults = [...serverResults, ...fallbackResults].filter((item) => {
+        const key = String(item.url || item.sources?.[0]?.url || item.title || "").trim().toLowerCase();
+        if (!key || seenFallbackKeys.has(key)) return false;
+        seenFallbackKeys.add(key);
+        return true;
+      }).slice(0, 12);
       data = {
         ...serverData,
-        results: fallbackResults,
+        results: mergedResults,
         providers: [...new Set([...(serverData.providers || []), t("ويكيبيديا وويكي بيانات وGDELT وDuckDuckGo","Wikipedia, Wikidata, GDELT and DuckDuckGo")])],
-        status: fallbackResults.length ? "mixed" : (serverData.status || "insufficient"),
-        message: fallbackResults.length ? undefined : (serverTimedOut ? t("انتهت مهلة طلب البحث الأساسي، ولم تُرجع المصادر الاحتياطية نتائج كافية. أعد المحاولة بعد لحظات؛ لم تُعرض نتائج داخلية على أنها نتائج خارجية.","The main search request timed out and fallback sources did not return enough results. Please retry shortly; internal content was not presented as external results.") : (serverData.message || t("لم تُرجع المصادر الخارجية نتائج ذات صلة كافية. جرّب إضافة سياق إلى البحث؛ لن يعرض بيان نتائج غير مرتبطة لمجرد ملء الصفحة.","External sources did not return sufficiently relevant results. Add context to the query; BAYAN will not show unrelated results just to fill the page.")))
+        status: mergedResults.length ? (serverData.status === "verified" && serverResults.length ? "verified" : "mixed") : (serverData.status || "insufficient"),
+        message: mergedResults.length ? undefined : (serverTimedOut ? t("انتهت مهلة طلب البحث الأساسي، ولم تُرجع المصادر الاحتياطية نتائج كافية. أعد المحاولة بعد لحظات؛ لم تُعرض نتائج داخلية على أنها نتائج خارجية.","The main search request timed out and fallback sources did not return enough results. Please retry shortly; internal content was not presented as external results.") : (serverData.message || t("لم تُرجع المصادر الخارجية نتائج ذات صلة كافية. جرّب إضافة سياق إلى البحث؛ لن يعرض بيان نتائج غير مرتبطة لمجرد ملء الصفحة.","External sources did not return sufficiently relevant results. Add context to the query; BAYAN will not show unrelated results just to fill the page.")))
       };
     }
     const results = Array.isArray(data.results) ? data.results : [];
