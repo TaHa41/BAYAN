@@ -237,24 +237,30 @@ export async function searchTrustedNewsFeeds(query:string,lang:Locale,diagnostic
   const queryTerms=[...new Set(terms(query).filter(term=>!searchStopWords.has(term)))];
   if(!queryTerms.length)return[];
   const minimumMatches=queryTerms.length<=2?1:2;
+  const now=Date.now();
+  const freshnessCutoff=now-48*60*60*1000;
+  const futureLimit=now+5*60*1000;
   const directFeeds=feeds(lang).filter(([name])=>!/(?:google|أخبار google)/i.test(name)).slice(0,7);
   const batches=await Promise.all(directFeeds.map(async([name,url])=>{
     const stories=await readFeed(name,url);
-    const relevant=stories.map(story=>{
-      const text=(story.title+" "+story.summary).normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ");
+    const scored=stories.map(story=>{
+      const text=(story.title+" "+story.summary).normalize("NFKC").toLowerCase().replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/[^\\p{L}\\p{N}]+/gu," ");
       const matched=queryTerms.filter(term=>text.includes(term)).length;
-      return {story,matched};
-    }).filter(item=>item.matched>=minimumMatches&&item.story.title.trim()&&item.story.summary.trim().length>=80&&/^https:\/\//i.test(item.story.url));
-    diagnostics?.push("Trusted RSS "+name+" parsed="+stories.length+" relevant="+relevant.length);
-    return relevant;
+      const publishedAt=Date.parse(String(story.publishedAt||""));
+      const fresh=Number.isFinite(publishedAt)&&publishedAt>=freshnessCutoff&&publishedAt<=futureLimit;
+      return {story,matched,publishedAt,fresh};
+    }).filter(item=>item.matched>=minimumMatches&&item.story.title.trim()&&item.story.summary.trim().length>=80&&/^https:\\/\\//i.test(item.story.url));
+    const freshRelevant=scored.filter(item=>item.fresh);
+    diagnostics?.push("Trusted RSS "+name+" parsed="+stories.length+" relevant="+scored.length+" fresh_relevant="+freshRelevant.length);
+    return freshRelevant;
   }));
   const seen=new Set<string>();
-  return batches.flat().sort((a,b)=>b.matched-a.matched||Date.parse(b.story.publishedAt||"")-Date.parse(a.story.publishedAt||"")).filter(({story})=>{
+  return batches.flat().sort((a,b)=>b.matched-a.matched||b.publishedAt-a.publishedAt).filter(({story})=>{
     try{
       const url=new URL(story.url);
-      if(url.protocol!=="https:"||url.username||url.password||/(?:^|\.)news\.google\.com$|(?:^|\.)wikipedia\.org$|(?:^|\.)wikidata\.org$|(?:^|\.)workers\.dev$/i.test(url.hostname))return false;
+      if(url.protocol!=="https:"||url.username||url.password||/(?:^|\\.)news\\.google\\.com$|(?:^|\\.)wikipedia\\.org$|(?:^|\\.)wikidata\\.org$|(?:^|\\.)workers\\.dev$/i.test(url.hostname))return false;
       url.hash="";
-      const key=url.toString().replace(/\/$/,"");
+      const key=url.toString().replace(/\\/$/,"");
       if(seen.has(key))return false;
       seen.add(key);
       return true;
