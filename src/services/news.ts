@@ -264,7 +264,7 @@ export async function searchTrustedNewsFeeds(query:string,lang:Locale,diagnostic
       if(seenUrls.has(key)||seenPublishers.has(publisher)||seenHosts.has(host))continue;
       seenUrls.add(key);seenPublishers.add(publisher);seenHosts.add(host);output.push(item.story);
       if(output.length>=7)break;
-    }catch(error){void error;}
+    }catch{diagnostics?.push("Trusted RSS candidate rejected: invalid URL")}
   }
   diagnostics?.push("Trusted RSS query_terms="+queryTerms.length+" recent_matches="+ranked.length+" independent_publishers="+output.length);
   return output;
