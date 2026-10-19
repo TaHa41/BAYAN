@@ -6,6 +6,10 @@ const normalized=(value:string)=>String(value||"").normalize("NFKC").toLowerCase
 export function sectionForOpenedStory(title:string,summary:string){
  const t=normalized(title),s=normalized(summary),all=t+" "+s;
  const biographyIntent=/(?:biography|biographical|who is|who was|life and work|life of|career of|born in|born on|من هو|من هي|سيرة|حياته|حياتها|نشأته|نشأتها|ولد|ولدت|مسيرته|مسيرتها|إرثه|إرثها|حياتها وأبحاثها|حياته وأعماله)/i.test(t);
+ const focused= t+" "+s;
+ if(/(?:public consultation|public consultations|citizen participation|public affairs|public institutions|governance|public decision|المشاورات العامة|المشاركة العامة|المشاركة المدنية|المؤسسات العامة|القرار العام|القرارات العامة|الشأن العام)/i.test(focused))return "politics";
+ if(/(?:primary sources|historian|historians|historical source|المصادر الأولية|مصادر أولية|المؤرخون|المؤرخ|وثائق تاريخية)/i.test(focused))return "history";
+ if(/(?:public opinion polls?|opinion polls?|polling methodology|استطلاعات الرأي العام|استطلاع الرأي العام)/i.test(focused))return "trends";
  const biographicalEvidence=/(?:biography|biographical|physicist|chemist|novelist|writer|author|scientist|poet|inventor|actor|actress|politician|footballer|born in|born on|award winner|سيرة|فيزيائي|فيزيائية|كيميائي|كيميائية|روائي|روائية|كاتب|كاتبة|عالم|عالمة|شاعر|شاعرة|مخترع|مخترعة|ممثل|ممثلة|ولد في|ولدت في|حصل على جائزة|حصلت على جائزة|جائزة نوبل|مسيرته|مسيرتها)/i.test(s);
  if(biographyIntent||(biographicalEvidence&&/(?:^|[:—-])/.test(String(title))&&t.split(" ").length<=12))return "people";
  if(/(?:football|soccer|basketball|tennis|league|championship|tournament|match|goal|athlete|coach|sports?|رياضة|مباراة|الدوري|بطولة|منتخب|لاعب|مدرب|هدف|نتيجة المباراة|إحصاءات رياضية)/i.test(all))return "sports";
