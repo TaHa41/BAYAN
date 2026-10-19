@@ -52,9 +52,9 @@ export async function fx(env?:Env){
     if(d?.result!=="success"||!Number.isFinite(egp)||egp<=0)throw new Error("exchange_rate_api_invalid_data");
     const unix=Number(d?.time_last_update_unix);
     const stamp=Number.isFinite(unix)&&unix>0?unix*1000:Date.parse(String(d?.time_last_update_utc||""));
-    const validStamp=Number.isFinite(stamp)&&stamp>0;
-    const updatedAt=validStamp?new Date(stamp).toISOString():new Date().toISOString();
-    return{ok:true,provider:"ExchangeRate-API Open Access (exchangerate-api.com; daily reference)",base:"USD",rates,updatedAt,stale:!validStamp||Date.now()-stamp>36*60*60*1000};
+    if(!Number.isFinite(stamp)||stamp<=0||stamp>Date.now()+5*60*1000)throw new Error("exchange_rate_api_invalid_timestamp");
+    const updatedAt=new Date(stamp).toISOString();
+    return{ok:true,provider:"ExchangeRate-API Open Access (exchangerate-api.com; daily reference)",base:"USD",rates,updatedAt,stale:Date.now()-stamp>36*60*60*1000};
   }catch(error){
     if(env)await recordRuntimeEventLimited(env,"fx_provider","fx_fallback_failed",error);
     return{ok:false,provider:"Frankfurter / ExchangeRate-API",stale:true,message:"FX providers temporarily unavailable"};
