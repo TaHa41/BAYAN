@@ -17,6 +17,8 @@ const evidenceDiversity = read("src/services/evidence-diversity.ts");
 const recovery = read("src/services/search-recovery.ts");
 const http = read("src/http.ts");
 const checks = [
+  ["bundled article pages avoid D1 article reads and translation scans during quota pressure", read("src/index.ts").includes('if(!bundledArticleBySlug(slug,lang))try{const row=await env.DB.prepare("SELECT title,summary FROM articles') && read("src/index.ts").includes('const bundled=bundledArticleBySlug(slug,lang);let row:any=bundled?') && read("src/index.ts").includes('row._bundled?new Set<string>()') && read("src/index.ts").includes('AND slug<>? LIMIT 12')],
+
   ["news never invents dates or serves expired cached stories as current", !news.includes("publishedAt:new Date().toISOString()") && news.includes("const publishedAt = dateMatch") && news.includes("&& isFreshNews(story)")],
   ["news fallbacks use bounded non-GDELT providers and freshness is rechecked", news.includes("const [google, aiSearch, bing] = await Promise.all") && !news.includes("gdeltFallback(lang)") && news.lastIndexOf("all = all.filter(isFreshNews)") > news.indexOf("const [google, aiSearch, bing]")],
   ["wisdom endpoint rotates every 30 seconds", wisdom.includes("Date.now()/1000/30")],
