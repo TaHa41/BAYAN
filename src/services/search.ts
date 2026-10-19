@@ -3,7 +3,7 @@ import type {Env,Locale,SearchResponse,SearchResult,Source} from "../types";
 import {searchArticles,saveSearch,publishVerifiedResearch,publicationRejectionReason} from "../db";
 import {boundedLikeKeywords,escapedLikePattern} from "../search-patterns";
 import {recordRuntimeEventLimited} from "../runtime-events";
-import {ask,draftArticle,answerHasUnsupportedSpecifics} from "./ai";
+import {ask,draftArticle,answerHasUnsupportedSpecifics,openAIAllowed,handleOpenAIResponseFailure,consumeDailyNewsAiCall} from "./ai";
 import {findRelatedImage,searchNewsFeed,searchPublisherNewsFeeds} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 import {sectionForOpenedStory} from "./editorial";
@@ -251,9 +251,11 @@ async function pubmedSearch(q:string,language:Locale,diagnostics?:string[]):Prom
   }catch(error){reportProviderFailure(diagnostics,"PubMed / NCBI",error);return[]}
 }
 
-async function openAiWebSearch(env:Env,q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
+async function openAiWebSearch(env:Env,q:string,language:Locale,diagnostics?:string[],backgroundBudget=false):Promise<Candidate[]>{
   if(!env.OPENAI_API_KEY)return[];
   try{
+    if(!(await openAIAllowed(env))){diagnostics?.push("OpenAI Web Search skipped: circuit breaker open");return[];}
+    if(backgroundBudget&&!(await consumeDailyNewsAiCall(env))){diagnostics?.push("OpenAI Web Search skipped: background AI budget exhausted");return[];}
     const response=await fetch("https://api.openai.com/v1/responses",{
       method:"POST",
       headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},
@@ -267,7 +269,11 @@ async function openAiWebSearch(env:Env,q:string,language:Locale,diagnostics?:str
         input:"Search query: "+q+". Return up to six distinct useful sources with concise source-specific summaries."
       })
     });
-    if(!response.ok)return[];
+    if(!response.ok){
+      await handleOpenAIResponseFailure(env,"OpenAI web search",response);
+      diagnostics?.push("OpenAI Web Search HTTP "+response.status);
+      return[];
+    }
     const data=await response.json<any>();
     const output=String(data.output_text||"").trim();
     const cited=new Map<string,string>();
@@ -851,7 +857,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     // OpenAI web search is the final recovery path, not a parallel request on
     // every weak first pass. Skip it as soon as independent evidence is adequate.
     if(firstPassCount()===0||((personQuery||academicQuery)&&(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()))){
-      const web=await safe(openAiWebSearch(env,q,language,providerDiagnostics),[],"OpenAI Web Search");
+      const web=await safe(openAiWebSearch(env,q,language,providerDiagnostics,options.publish===true),[],"OpenAI Web Search");
       candidates.push(...web.slice(0,6).map(item=>identityAliases.length?({...item,identityAliases:[...identityAliases]}):item));
     }
   }
