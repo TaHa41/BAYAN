@@ -100,7 +100,7 @@ try{
       const articleUrl=new URL(parsedNewsSitemap.newsArticleUrls[0]);
       const articlePage=await get(articleUrl.pathname+articleUrl.search);
       if(!articlePage.text.includes("<h1>")||!articlePage.text.includes("<h2>"))throw new Error("news_sitemap_article_not_rendered_as_full_content");
-      const alternateTags=[...articlePage.text.matchAll(/<link\\s+rel="alternate"\\s+hreflang="(ar|en|x-default)"\\s+href="([^"]+)"/g)];
+      const alternateTags=[...articlePage.text.matchAll(/<link\s+rel="alternate"\s+hreflang="(ar|en|x-default)"\s+href="([^"]+)"/g)];
       if(alternateTags.length&&alternateTags.length!==3)throw new Error("article_hreflang_set_incomplete");
       if(alternateTags.length){const byLang=Object.fromEntries(alternateTags.map(match=>[match[1],match[2]]));if(!byLang.ar||!byLang.en||!byLang["x-default"]||byLang["x-default"]!==byLang.ar)throw new Error("article_hreflang_targets_inconsistent");for(const href of Object.values(byLang)){const target=new URL(href);if(target.origin!==origin||!target.pathname.startsWith("/article/"))throw new Error("article_hreflang_target_invalid");}const canonical=articlePage.text.match(/<link rel="canonical" href="([^"]+)">/);if(!canonical||canonical[1]!==articleUrl.href)throw new Error("article_canonical_mismatch");}
     }
