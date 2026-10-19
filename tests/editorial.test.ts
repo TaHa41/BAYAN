@@ -65,4 +65,14 @@ describe("topic-aware article editorial",()=>{
     expect(isContentForSection("science",title,summary)).toBe(false);
   });
 
+  it("routes ideas, community issues and live prices to their own sections",()=>{
+    expect(sectionForOpenedStory("A debate about ethical AI","Philosophers disagree about the moral limits of automated decisions.")).toBe("arab");
+    expect(isContentForSection("arab","A debate about ethical AI","Philosophers disagree about the moral limits of automated decisions.")).toBe(true);
+    expect(sectionForOpenedStory("How housing costs affect families","A report examines community services and cost of living.")).toBe("egypt");
+    expect(isContentForSection("egypt","How housing costs affect families","A report examines community services and cost of living.")).toBe(true);
+    expect(sectionForOpenedStory("سعر الدولار اليوم مقابل الجنيه","بيانات سعر الصرف الحالية في السوق.")).toBe("prices");
+    expect(isContentForSection("prices","سعر الدولار اليوم مقابل الجنيه","بيانات سعر الصرف الحالية في السوق.")).toBe(true);
+    expect(isContentForSection("arab","Latest news from the Arab League","A political statement was released today.")).toBe(false);
+  });
+
 });
