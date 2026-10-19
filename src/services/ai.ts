@@ -129,6 +129,8 @@ const independentSourceCount=(env:Env,evidence:SearchResult[])=>new Set(evidence
 
 
 
+export const ARTICLE_DRAFT_TIMEOUT_MS=30000;
+
 export async function draftArticle(env:Env,question:string,locale:Locale,evidence:SearchResult[],backgroundBudget=false){
   if(evidence.length<2)return{status:"insufficient" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[])};
   // Give the model bounded evidence excerpts only. URLs and unrelated result
