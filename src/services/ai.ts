@@ -109,13 +109,17 @@ export const answerUnsupportedSpecificsDetail=(answer:string,evidence:SearchResu
   return undefined;
 };
 export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[],question="")=>Boolean(answerUnsupportedSpecificsDetail(answer,evidence,question));
+// Daily cap for background news AI calls. Defaults to 80; override with the
+// NEWS_AI_DAILY_LIMIT variable (accepted range 10-500) without a code change.
+export const newsAiDailyLimit=(env:Env):number=>{const n=Number(env.NEWS_AI_DAILY_LIMIT);return Number.isFinite(n)&&n>=10?Math.min(Math.floor(n),500):80};
 export const consumeDailyNewsAiCall=async(env:Env)=>{
+  const limit=newsAiDailyLimit(env);
   const day=new Date().toISOString().slice(0,10);
   const stamp=new Date().toISOString();
   try{
-    const row=await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES('news_ai_budget_daily',?,?) ON CONFLICT(key) DO UPDATE SET value=CASE WHEN substr(admin_settings.value,1,10)=substr(excluded.value,1,10) THEN substr(admin_settings.value,1,11)||CAST(CAST(substr(admin_settings.value,12) AS INTEGER)+1 AS TEXT) ELSE excluded.value END,updated_at=excluded.updated_at WHERE substr(admin_settings.value,1,10)!=substr(excluded.value,1,10) OR CAST(substr(admin_settings.value,12) AS INTEGER)<80 RETURNING value").bind(day+":1",stamp).first<any>();
+    const row=await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES('news_ai_budget_daily',?,?) ON CONFLICT(key) DO UPDATE SET value=CASE WHEN substr(admin_settings.value,1,10)=substr(excluded.value,1,10) THEN substr(admin_settings.value,1,11)||CAST(CAST(substr(admin_settings.value,12) AS INTEGER)+1 AS TEXT) ELSE excluded.value END,updated_at=excluded.updated_at WHERE substr(admin_settings.value,1,10)!=substr(excluded.value,1,10) OR CAST(substr(admin_settings.value,12) AS INTEGER)<? RETURNING value").bind(day+":1",stamp,limit).first<any>();
     if(row?.value)return true;
-    await recordRuntimeEventLimited(env,"news_ai_budget","daily_ai_budget_exhausted","UTC daily news AI call limit reached (80)");
+    await recordRuntimeEventLimited(env,"news_ai_budget","daily_ai_budget_exhausted","UTC daily news AI call limit reached ("+limit+")");
     return false;
   }catch(error){
     await recordRuntimeEventLimited(env,"news_ai_budget","budget_counter_unavailable","background AI generation blocked because budget accounting failed");
