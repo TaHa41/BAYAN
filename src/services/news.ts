@@ -53,12 +53,12 @@ const feeds = (lang: Locale) =>
   lang === "ar"
     ? [
         ["بي بي سي عربي", "https://feeds.bbci.co.uk/arabic/rss.xml"],
-        ["الجزيرة", "https://www.aljazeera.net/aljazeera/rss"],
+        ["الجزيرة", "https://www.aljazeera.net/rss"],
         ["DW عربية", "https://rss.dw.com/rdf/rss-ar-all"],
-        ["فرانس 24 عربي", "https://www.france24.com/ar/rss"],
+        ["فرانس 24 عربي", "https://www.france24.com/ar/top-stories/rss"],
         ["سكاي نيوز عربية", "https://www.skynewsarabia.com/rss"],
         ["اندبندنت عربية", "https://www.independentarabia.com/rss.xml"],
-        ["الشرق الأوسط", "https://aawsat.com/rss.xml"],
+        ["الشرق الأوسط", "https://aawsat.com/feed/news"],
         ["أخبار Google عربية", "https://news.google.com/rss?hl=ar&gl=EG&ceid=EG:ar"],
         ["أخبار مصر", "https://news.google.com/rss/search?q=مصر&hl=ar&gl=EG&ceid=EG:ar"],
         ["أخبار عربية", "https://news.google.com/rss/search?q=العالم%20العربي&hl=ar&gl=EG&ceid=EG:ar"],
