@@ -71,6 +71,7 @@ export function normalizeDraftJson(raw: string): string {
   const first = value.indexOf("{");
   const last = value.lastIndexOf("}");
   if (first >= 0 && last > first) value = value.slice(first, last + 1);
+  value = value.replace(/"source_ids"\s*:/g, '"sourceIds":').replace(/,\s*([}\]])/g, "$1");
   return value;
 }
 
