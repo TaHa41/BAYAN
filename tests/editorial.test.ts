@@ -1,5 +1,5 @@
 import {describe,it,expect} from "vitest";
-import {articlePromptForTopic,sectionForOpenedStory} from "../src/services/editorial";
+import {articlePromptForTopic,sectionForOpenedStory,isContentForSection} from "../src/services/editorial";
 
 describe("topic-aware article editorial",()=>{
   it("classifies biography-led science profiles as People rather than Science",()=>{
@@ -39,4 +39,31 @@ describe("topic-aware article editorial",()=>{
     expect(prompt).toContain("Mandatory rules");
     expect(prompt).not.toMatch(/[\u0600-\u06ff]/);
   });
+  it("enforces strict section membership and rejects misfiled archived news",()=>{
+    const dipTitle="DIP Holding announces intention to list shares on Dubai Financial Market";
+    const dipSummary="The company plans an initial public offering representing 20% of issued capital.";
+    expect(sectionForOpenedStory(dipTitle,dipSummary)).toBe("economy");
+    expect(isContentForSection("economy",dipTitle,dipSummary)).toBe(true);
+    expect(isContentForSection("people",dipTitle,dipSummary)).toBe(false);
+
+    const riceTitle="الأرز الإندونيسي والسكر الهندي يسجلان مستويات غير مسبوقة";
+    const riceSummary="من المتوقع أن يتسارع التضخم الغذائي بسبب اضطرابات الشحن والجفاف.";
+    expect(sectionForOpenedStory(riceTitle,riceSummary)).toBe("economy");
+    expect(isContentForSection("people",riceTitle,riceSummary)).toBe(false);
+    expect(isContentForSection("economy",riceTitle,riceSummary)).toBe(true);
+  });
+
+  it("does not use the global-shifts section as a catch-all for unknown topics",()=>{
+    expect(isContentForSection("world","A local company announces a new product","The announcement describes a single company and product."));
+    expect(isContentForSection("world","A local company announces a new product","The announcement describes a single company and product.")).toBe(false);
+    expect(isContentForSection("world","Global supply chains face a systemic shift","International trade patterns are changing across several regions.")).toBe(true);
+  });
+
+  it("allows verified biographies only in People & Biographies",()=>{
+    const title="ماري كوري: حياتها وأبحاثها وإرثها العلمي";
+    const summary="سيرة موثقة لماري كوري، من دراستها في باريس إلى جائزتي نوبل وإسهامها في أبحاث النشاط الإشعاعي.";
+    expect(isContentForSection("people",title,summary)).toBe(true);
+    expect(isContentForSection("science",title,summary)).toBe(false);
+  });
+
 });
