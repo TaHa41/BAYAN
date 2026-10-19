@@ -85,7 +85,7 @@ describe.each(["ar", "en"] as const)("evidence-grounded article drafting (%s)", 
       }
     }
     const fence = String.fromCharCode(96).repeat(3);
-    const fetchMock = mockGeneration([fence + "json\\n" + JSON.stringify(value).replace(/,\\s*([}\\]])/g, "$1") + "\\n" + fence]);
+    const fetchMock = mockGeneration([fence + "json" + String.fromCharCode(10) + JSON.stringify(value).replace(/,\s*([}\]])/g, "$1") + String.fromCharCode(10) + fence]);
     const result = await draftArticle({ OPENAI_API_KEY: "test-key" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(result.status).toBe("verified");
