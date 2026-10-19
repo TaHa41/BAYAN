@@ -550,7 +550,10 @@ const classifyNewsSection = (story: Story): string => {
   // Share the same topic-aware classifier used for opened research articles.
   // This prevents broad words such as "research", "science", "Egypt" or "Arab"
   // from randomly overriding the actual subject of a news headline.
-  return sectionForOpenedStory(String(story.title || ""), String(story.summary || ""));
+  const section = sectionForOpenedStory(String(story.title || ""), String(story.summary || ""));
+  // Every item entering this pipeline is a news story. If evidence does not
+  // establish a specialist section, keep it in News rather than inventing one.
+  return section === "unclassified" ? "news" : section;
 };
 
 const archiveNewsStories = async (env: Env, lang: Locale, items: Story[]) => {
