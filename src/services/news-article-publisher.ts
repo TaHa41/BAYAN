@@ -3,7 +3,7 @@ import {search} from "./search";
 import {recordRuntimeEventLimited} from "../runtime-events";
 
 const DAILY_D1_READ_CALL_LIMIT=12000;
-export const RECENT_LOW_EVIDENCE_DUPLICATE_FILTER = \`
+export const RECENT_LOW_EVIDENCE_DUPLICATE_FILTER = `
 AND NOT EXISTS (
   SELECT 1 FROM news_archive attempted
   WHERE attempted.id <> na.id
@@ -11,7 +11,7 @@ AND NOT EXISTS (
     AND lower(trim(attempted.title)) = lower(trim(na.title))
     AND attempted.article_last_reason = 'skipped_low_evidence'
     AND julianday(attempted.article_last_attempt_at) >= julianday('now','-6 hours')
-)\`;
+)`;
 
 const D1_READ_RESERVATION=120;
 type ReadCounter={reads:number;limit:number};
