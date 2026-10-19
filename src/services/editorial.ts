@@ -22,8 +22,9 @@ export function sectionForOpenedStory(title:string,summary:string){
  if(/(?:film|movie|music|actor|actress|celebrity|artist|book review|novel|poetry|painting|theatre|cinema|الفن|فيلم|سينما|موسيقى|ممثل|ممثلة|فنان|كتاب|رواية|شعر|لوحة|مسرح|أدب)/i.test(all))return "art";
  if(/(?:travel|tourism|airport|flight|hotel|destination|visa|trip|سفر|سياحة|مطار|رحلة|فندق|وجهة|تأشيرة|إقامة سياحية)/i.test(all))return "travel";
  if(/(?:trend|viral|popular on social media|survey|poll|public opinion|ترند|متداول|رائج|استطلاع|رأي عام|انتشار على وسائل التواصل)/i.test(all))return "trends";
- if(/(?:egypt|egyptian society|cairo|alexandria|مصر|المجتمع المصري|القاهرة|الإسكندرية|محافظة مصرية|الحياة اليومية في مصر)/i.test(all))return "egypt";
- if(/(?:arab world|arab society|arab league|العالم العربي|المجتمع العربي|جامعة الدول العربية|الدول العربية|المجتمعات العربية)/i.test(all))return "arab";
+ if(/(?:live price|current price|exchange rate|currency rate|gold price today|stock quote|live market data|current temperature|weather now|أسعار مباشرة|سعر الصرف|سعر الذهب اليوم|أسعار الآن|الأسعار الآن|سعر الدولار اليوم|سعر السهم|بيانات السوق المباشرة|درجة الحرارة الآن|الطقس الآن)/i.test(all))return "prices";
+ if(/(?:idea|ideas|debate|philosophy|philosophical|argument|ethics|ethical dilemma|critical thinking|viewpoint|opinion piece|intellectual discussion|أفكار|فكرة|نقاش|نقاشات|فلسفة|فلسفي|جدل|حجة|أخلاقيات|معضلة أخلاقية|تفكير نقدي|وجهة نظر|رأي|آراء|قضية فكرية|حوار فكري)/i.test(all))return "arab";
+ if(/(?:community|communities|society|social issue|public service|daily life|housing|family policy|cost of living|مجتمع|مجتمعات|قضية اجتماعية|قضايا اجتماعية|خدمة عامة|خدمات عامة|الحياة اليومية|السكن|الأسرة|تكلفة المعيشة|المعيشة|السكان)/i.test(all))return "egypt";
  if(/(?:breaking|latest|today|reported|announced|statement|press release|عاجل|آخر التطورات|اليوم|أعلنت|أعلن|بيان رسمي|تطورات جديدة)/i.test(all))return "news";
  return "world";
 }
