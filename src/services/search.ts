@@ -13,6 +13,29 @@ async function recordPublicationWarning(env:Env,message:string){await recordRunt
 
 
 type Candidate = SearchResult & {score:number; provider:string; identityAliases?:string[]};
+
+export function hasDiverseIndependentEvidence(items:Array<{summary?:string;url?:string;sources?:Array<{publisher?:string;url?:string}>}>,requiredPublishers=2,minSubstantive=2):boolean{
+  const publishers=new Set<string>(),hosts=new Set<string>();
+  const excludedPublisher=/(?:wikipedia|wikidata|ويكيبيديا|ويكي بيانات|google news|bing news|bing web|duckduckgo|bayan knowledge base|bayan recent news archive)/i;
+  const excludedHost=/(?:^|\\.)wikipedia\\.org$|(?:^|\\.)wikidata\\.org$|(?:^|\\.)news\\.google\\.com$|(?:^|\\.)bing\\.com$|(?:^|\\.)duckduckgo\\.com$|(?:^|\\.)workers\\.dev$/i;
+  for(const item of items){
+    for(const source of Array.isArray(item.sources)?item.sources:[]){
+      let host="";
+      try{
+        const url=new URL(String(source.url||item.url||""));
+        if(url.protocol!=="https:"||url.username||url.password)continue;
+        host=url.hostname.toLowerCase().replace(/^www\\./,"");
+        if(!host||excludedHost.test(host))continue;
+        hosts.add(host);
+      }catch{continue}
+      const publisher=String(source.publisher||"").trim().toLowerCase();
+      if(publisher&&!excludedPublisher.test(publisher))publishers.add(publisher);
+      else if(!publisher)publishers.add(host);
+    }
+  }
+  const substantive=items.filter(item=>String(item.summary||"").trim().length>=100).length;
+  return publishers.size>=requiredPublishers&&hosts.size>=requiredPublishers&&substantive>=minSubstantive;
+}
 const providerFailureKind=(error:unknown):"timeout"|"connection_failure"|"invalid_response"|"request_failure"=>{const value=error as {name?:string;message?:string};const name=String(value?.name||"");const message=String(value?.message||error||"").toLowerCase();if(name==="AbortError"||name==="TimeoutError"||/timeout|timed out|aborted/.test(message))return"timeout";if(name==="SyntaxError"||/json|parse|unexpected token/.test(message))return"invalid_response";if(name==="TypeError"||/fetch failed|network|connection|dns|socket|econn/.test(message))return"connection_failure";return"request_failure";};
 const reportProviderFailure=(diagnostics:string[]|undefined,provider:string,error:unknown)=>{if(!diagnostics)return;const kind=providerFailureKind(error);const value=error as {message?:string};const detail=String(value?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").slice(0,140);diagnostics.push(provider+": "+kind+(detail?": "+detail:""));};
 const timeout = async (url:string, ms=2600, diagnostics?:string[], provider="external provider") => {
@@ -793,16 +816,8 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   // or one publisher must not suppress the broader search pass for any query type.
   const firstPassHasDiverseEvidence=()=>{
     const matching=personQuery?isolateExactPerson(q,firstPassMatches()):firstPassMatches();
-    const publishers=new Set<string>(),hosts=new Set<string>();
-    for(const item of matching){
-      for(const src of item.sources||[]){
-        const publisher=String(src.publisher||"").trim().toLowerCase();
-        if(publisher&&!/wikipedia|wikidata|ويكيبيديا|ويكي بيانات|google news|bing news|duckduckgo/i.test(publisher))publishers.add(publisher);
-        try{const url=new URL(String(src.url||item.url||""));if(url.protocol==="https:"&&!/wikipedia.org|wikidata.org|news.google.com/i.test(url.hostname))hosts.add(url.hostname.toLowerCase().replace(/^www\./,""));}catch(error){void recordRuntimeEventLimited(env,"candidate_source_url","invalid_candidate_source_url",error)}
-      }
-    }
-    const substantive=matching.filter(item=>String(item.summary||"").trim().length>=100).length;
-    return publishers.size>=2&&hosts.size>=2&&substantive>=Math.min(3,Math.max(2,Number(s.min_sources||3)));
+    const requiredPublishers=options.publish?5:3;
+    return hasDiverseIndependentEvidence(matching,requiredPublishers,Math.min(3,Math.max(2,Number(s.min_sources||3))));
   };
   // Expand when sparse OR when the first pass is dominated by duplicates, a
   // single publisher, encyclopedia-only results, or very thin snippets.
@@ -827,7 +842,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   }
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
     providerAttempted.push("Expanded topic variants: Wikipedia REST Search, Google News Search, Bing Web RSS Search","OpenAI Web Search (fallback)");
-    const expanded=await safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||""),providerAttempted,identityAliases,options.images===true,options.publicationContext||""),[]);
+    const expanded=await safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||""),providerAttempted,identityAliases,options.publish===true,options.publicationContext||""),[]);
     candidates.push(...expanded.slice(0,12));
     // OpenAI web search is the final recovery path, not a parallel request on
     // every weak first pass. Skip it as soon as independent evidence is adequate.
