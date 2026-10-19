@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { externalSearchRecovery } from "../src/services/search-recovery";
-import { normalizeBingNewsUrl } from "../src/services/search";
+import { normalizeBingNewsUrl, hasDiverseIndependentEvidence } from "../src/services/search";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -89,6 +89,37 @@ describe("external search recovery", () => {
   });
 });
 
+
+describe("independent evidence diversity for search expansion", () => {
+  const summary = "This source contains a substantial explanatory summary with enough context to be useful and independently assessed by readers.";
+
+  it("does not treat two sources as enough to skip expanded search for publication", () => {
+    const items = [
+      { summary, sources: [{ publisher: "Publisher One", url: "https://one.example/story" }] },
+      { summary, sources: [{ publisher: "Publisher Two", url: "https://two.example/story" }] }
+    ];
+    expect(hasDiverseIndependentEvidence(items, 5, 2)).toBe(false);
+    expect(hasDiverseIndependentEvidence(items, 2, 2)).toBe(true);
+  });
+
+  it("requires five independent publishers and hosts for a publication-ready first pass", () => {
+    const items = ["one","two","three","four","five"].map(name => ({
+      summary,
+      sources: [{ publisher: "Publisher " + name, url: "https://" + name + ".example/story" }]
+    }));
+    expect(hasDiverseIndependentEvidence(items, 5, 3)).toBe(true);
+  });
+
+  it("does not count encyclopedias, aggregators, or BAYAN's own index as independent publishers", () => {
+    const items = [
+      { summary, sources: [{ publisher: "Wikipedia", url: "https://en.wikipedia.org/wiki/Topic" }] },
+      { summary, sources: [{ publisher: "Wikidata", url: "https://www.wikidata.org/wiki/Q1" }] },
+      { summary, sources: [{ publisher: "BAYAN Knowledge Base", url: "https://bayan.tahaomar411.workers.dev/article/topic?lang=en" }] },
+      { summary, sources: [{ publisher: "Google News Search", url: "https://news.google.com/rss/articles/example" }] }
+    ];
+    expect(hasDiverseIndependentEvidence(items, 2, 2)).toBe(false);
+  });
+});
 
 describe("Bing News RSS URL safety", () => {
   it("upgrades only Bing redirect hosts to HTTPS and rejects insecure publisher URLs", () => {
