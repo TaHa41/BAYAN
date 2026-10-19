@@ -361,7 +361,7 @@ if(items.length<2&&section!=="prices"){
 try{
   const newsCutoff=new Date(Date.now()-72*60*60*1000).toISOString();
   const newsFuture=new Date(Date.now()+5*60*1000).toISOString();
-  const archived=await env.DB.prepare("SELECT id,title,summary,publisher,published_at,image_url,image_alt,section,fetched_at FROM news_archive WHERE language=? AND fetched_at>=? AND published_at>=? AND published_at<=? AND length(summary)>=120 AND image_url IS NOT NULL AND trim(image_url)<>'' ORDER BY published_at DESC LIMIT 500").bind(lang,newsCutoff,newsCutoff,newsFuture).all<any>();
+  const archived=await env.DB.prepare("SELECT id,title,summary,publisher,published_at,image_url,image_alt,section,fetched_at FROM news_archive WHERE language=? AND section=? AND fetched_at>=? AND published_at>=? AND published_at<=? AND length(summary)>=120 AND image_url IS NOT NULL AND trim(image_url)<>'' ORDER BY published_at DESC LIMIT 30").bind(lang,section,newsCutoff,newsCutoff,newsFuture).all<any>();
   for(const row of archived.results||[]){
     const title=String(row.title||""),summary=String(row.summary||""),imageUrl=safePublicImageUrl(row.image_url);
     if(!title||summary.length<120||!imageUrl||!localeSafeItem({title,summary})||!isContentForSection(section,title,summary)||items.some((item:any)=>String(item.title||"").trim().toLowerCase()===title.trim().toLowerCase()))continue;
