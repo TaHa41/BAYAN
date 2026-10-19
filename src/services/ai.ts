@@ -133,20 +133,32 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
   const parseDraft=(raw:string)=>{
     try{
       const value=JSON.parse(normalizeDraftJson(raw));
-      if(!value||!Array.isArray(value.sections)||!value.sections.length)return undefined;
+      const rawSections=Array.isArray(value?.sections)?value.sections:Array.isArray(value?.article?.sections)?value.article.sections:Array.isArray(value?.content?.sections)?value.content.sections:[];
+      if(!rawSections.length)return undefined;
+      const normalizeSourceId=(value:unknown):string|undefined=>{
+        const rawId=value&&typeof value==="object"&&"id" in (value as any)?String((value as any).id):String(value??"");
+        let id=rawId.trim().replace(/^source[\s_-]*/i,"S").replace(/^s[\s_-]*(\d+)$/i,"S$1");
+        if(/^\d+$/.test(id))id="S"+id;
+        id=id.toUpperCase();
+        return evidenceById.has(id)?id:undefined;
+      };
       const sections:any[]=[];
-      for(const section of value.sections){
-        if(!section||typeof section.heading!=="string"||!Array.isArray(section.sentences))return undefined;
+      for(const section of rawSections){
+        if(!section||typeof section.heading!=="string"||!Array.isArray(section.sentences))continue;
         const heading=section.heading.trim().slice(0,140);
-        if(!heading)return undefined;
+        if(!heading)continue;
         const sentences:any[]=[];
-        for(const sentence of section.sentences){
-          if(!sentence||typeof sentence.text!=="string"||!Array.isArray(sentence.sourceIds)||!sentence.sourceIds.length)return undefined;
-          const sourceIds:string[]=[...new Set<string>((sentence.sourceIds as unknown[]).map((id:unknown)=>String(id).trim()))];
-          if(!sourceIds.length||sourceIds.some((id:string)=>!evidenceById.has(id)))return undefined;
+        for(const rawSentence of section.sentences){
+          const sentence=typeof rawSentence==="string"?{text:rawSentence}:rawSentence;
+          if(!sentence||typeof sentence.text!=="string")continue;
+          const rawIds=sentence.sourceIds??sentence.source_ids??sentence.sourceId??sentence.source_id??sentence.sources??section.sourceIds??section.source_ids;
+          const ids=Array.isArray(rawIds)?rawIds:typeof rawIds==="string"?rawIds.split(/[,\s]+/):rawIds==null?[]:[rawIds];
+          const sourceIds=[...new Set<string>(ids.map(normalizeSourceId).filter((id:string|undefined):id is string=>Boolean(id)))];
           const text=sentence.text.replace(/\s+/g," ").trim().slice(0,900);
-          if(!text)return undefined;
-          sentences.push({text,sourceIds:sourceIds.slice(0,4)});
+          if(!text)continue;
+          // Keep a malformed/unknown citation attached to the sentence so the
+          // evidence verifier rejects that sentence, not the entire draft.
+          sentences.push({text,sourceIds:sourceIds.length?sourceIds:["__INVALID_SOURCE_ID__"]});
         }
         if(sentences.length)sections.push({heading,sentences});
       }
