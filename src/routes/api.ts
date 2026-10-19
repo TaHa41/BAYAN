@@ -317,7 +317,7 @@ const sectionRelevant=(x:any)=>{
 };
 items=items.filter((item:any)=>String(item.section||"")===section);
 
-items=items.filter((x:any)=>(x.slug?String(x.section||"")===section:sectionRelevant(x))&&(x.kind==="evidence"||(articleBodyQuality(String(x.body||"")).ok&&articleEvidenceQuality(x.sources)))).filter(localeSafeItem);
+items=items.filter((x:any)=>{const title=String(x.title||""),summary=String(x.summary||"");return (x.slug?String(x.section||"")===section&&isContentForSection(section,title,summary):sectionRelevant(x)&&isContentForSection(section,title,summary))&&(x.kind==="evidence"||(articleBodyQuality(String(x.body||"")).ok&&articleEvidenceQuality(x.sources)))&&localeSafeItem(x);});
 items=items.filter((x:any)=>x.kind==="evidence"||/^https:\/\//i.test(String(x.imageUrl||"")));
 if(items.length<2&&section!=="prices"){
  try{
@@ -342,7 +342,7 @@ if(items.length<2&&section!=="prices"){
   items=[...items,...cachedEvidence];
   const refreshed=await listArticles(env,section,lang,24);
   const existingSlugs=new Set(items.map((x:any)=>String(x.slug||"")).filter(Boolean));
-  const refreshedComplete=refreshed.filter((x:any)=>x.slug&&!existingSlugs.has(String(x.slug))&&articleBodyQuality(String(x.body||"")).ok&&localeSafeItem(x)&&String(x.section||"")===section&&/^https:\/\//i.test(String(x.imageUrl||"")));
+  const refreshedComplete=refreshed.filter((x:any)=>x.slug&&!existingSlugs.has(String(x.slug))&&articleBodyQuality(String(x.body||"")).ok&&localeSafeItem(x)&&String(x.section||"")===section&&isContentForSection(section,String(x.title||""),String(x.summary||""))&&/^https:\/\//i.test(String(x.imageUrl||"")));
   items=[...items,...refreshedComplete];
 
  }catch(error){await recordRuntimeEventLimited(env,"section_article_refresh","section_article_refresh_failed",error)}
