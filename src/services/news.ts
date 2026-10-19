@@ -248,7 +248,7 @@ export async function searchTrustedNewsFeeds(query:string,lang:Locale,diagnostic
       const text=normalize(story.title+" "+story.summary);
       const matched=queryTerms.filter(term=>text.includes(term)).length;
       return {story,matched,published};
-    }).filter(item=>item.matched>=minimumMatches&&item.story.title.trim()&&item.story.summary.trim().length>=80&&Number.isFinite(item.published)&&item.published>=cutoff&&item.published<=futureLimit&&/^https:\/\/\//i.test(item.story.url));
+    }).filter(item=>item.matched>=minimumMatches&&item.story.title.trim()&&item.story.summary.trim().length>=80&&Number.isFinite(item.published)&&item.published>=cutoff&&item.published<=futureLimit&&/^https:\/\//i.test(item.story.url));
     diagnostics?.push("Trusted RSS "+name+" parsed="+stories.length+" relevant_recent="+relevant.length);
     return relevant;
   }));
