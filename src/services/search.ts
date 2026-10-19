@@ -784,7 +784,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language,providerDiagnostics),[],"Wikipedia"),
     safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipediaRestSearch(q,language,providerDiagnostics),[],"Wikipedia REST Search"),
     safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language,providerDiagnostics),[],"Wikidata"),
-    safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q,providerDiagnostics),[],"Cloudflare AI Search"),
+    safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q,language,providerDiagnostics),[],"Cloudflare AI Search"),
     safe(duck(q,language,providerDiagnostics),[],"DuckDuckGo Instant Answers"),
     safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q,providerDiagnostics),[],"OpenAlex"),
     safe((academicQuery&&!personLookup(q))?crossrefSearch(q,providerDiagnostics):Promise.resolve([]),[],"Crossref"),
