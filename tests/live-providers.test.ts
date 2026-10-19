@@ -83,10 +83,17 @@ describe("live provider resilience", () => {
           headers: { "content-type": "application/json" }
         });
       } else if (url.includes("api.frankfurter.dev/v2/rates")) {
-        response = new Response(JSON.stringify([{ date: "2026-10-19", base: "USD", quote: "EGP", rate: 48.5 }]), {
+        response = new Response(JSON.stringify([{ date: "2026-10-19", base: "USD", quote: "EUR", rate: 0.9 }]), {
           status: 200,
           headers: { "content-type": "application/json" }
         });
+      } else if (url === "https://open.er-api.com/v6/latest/USD") {
+        response = new Response(JSON.stringify({
+          result: "success",
+          base_code: "USD",
+          time_last_update_unix: Math.floor(Date.now() / 1000),
+          rates: { USD: 1, EGP: 48.5, EUR: 0.9 }
+        }), { status: 200, headers: { "content-type": "application/json" } });
       } else if (isYahoo) {
         response = new Response(JSON.stringify({
           chart: { result: [{ meta: { regularMarketPrice: 100, currency: "USD", regularMarketTime: Math.floor(Date.now() / 1000) } }] }
@@ -102,6 +109,9 @@ describe("live provider resilience", () => {
     const result = await gold({} as any);
     expect(result.ok).toBe(true);
     expect(result.markets).toHaveLength(7);
+    expect(result.fx).toBe(48.5);
+    expect(result.provider).toContain("ExchangeRate-API Open Access");
+    expect(result.fxUpdatedAt).toBeTruthy();
     expect(maximumYahooActive).toBeLessThanOrEqual(4);
     expect(maximumActive).toBeLessThanOrEqual(5);
   });
