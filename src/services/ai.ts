@@ -184,7 +184,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
       }else await handleOpenAIResponseFailure(env,"OpenAI draft",response);
     }catch(error){await recordAiFailure(env,"OpenAI draft",aiFailureDetail(error));}
     if(env.AI&&(!backgroundBudget||await consumeDailyNewsAiCall(env)))try{
-      const response=await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast",{messages,max_tokens:3600,temperature:0,response_format:{type:"json_object"}};
+      const response=await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast",{messages,max_tokens:3600,temperature:0,response_format:{type:"json_object"}});
       const answer=workersAIResponseText(response);
       if(answer)return answer;
       await recordAiFailure(env,"Workers AI draft","empty_response");
