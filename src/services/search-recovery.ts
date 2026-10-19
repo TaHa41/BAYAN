@@ -1,6 +1,12 @@
 import { safePublicImageUrl } from "../image-url";
 import type { Locale, SearchResult } from "../types";
 
+export function shouldAttemptOpenAIWebSearchFallback(input:{publishing:boolean;firstPassCount:number;personOrAcademic:boolean;evidenceDiverse:boolean;belowExpansionThreshold:boolean}):boolean{
+  if(input.firstPassCount===0)return true;
+  if(input.publishing)return !input.evidenceDiverse;
+  return input.personOrAcademic&&(input.belowExpansionThreshold||!input.evidenceDiverse);
+}
+
 type RecoveryResult = {
   results: SearchResult[];
   providers: string[];
