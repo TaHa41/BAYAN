@@ -93,7 +93,7 @@ export const classifySection=(q:string,items:SearchResult[],language:Locale)=>{
  const validSection=(value:unknown)=>sections.some(section=>section.slug===String(value||""));
  const explicitSection=[lead?.section,...ordered.map(item=>item.section)].map(value=>String(value||"")).find(value=>validSection(value)&&value!=="world");
  if(explicitSection)return explicitSection;
- if(ordered.some(item=>item.kind==="news"||Boolean(item.publishedAt)))return "news";
+ if(ordered.some(item=>String((item as any).kind||"")==="news"||Boolean((item as any).publishedAt)))return "news";
  if(/(?:\btrend\b|\bviral\b|\bpopular\b|ترند|متداول|رائج|اهتمام الناس)/i.test(combined))return "trends";
  if(/(?:\begypt\b|\begyptian\b|\bcairo\b|\bcommunity\b|\bpublic service\b|مصر|المصري|القاهرة|مجتمع|خدمات عامة)/i.test(title+" "+String(lead?.summary||"")))return "egypt";
  if(/(?:\barab\b|\barabic\b|\barab league\b|العرب|عربي|العالم العربي|جامعة الدول العربية)/i.test(title+" "+String(lead?.summary||"")))return"arab";
