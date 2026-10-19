@@ -104,7 +104,7 @@ async function publishNextArchivedNewsArticleInner(env:Env){
       const providerDiagnosticParts=attempts.slice(-12).map((value:string)=>value.replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").replace(/\s+/g," ").slice(0,100)).filter(Boolean);
       for(let offset=0;offset<providerDiagnosticParts.length;offset+=3){
         const providerDiagnostic=providerDiagnosticParts.slice(offset,offset+3).join(" | ").slice(0,350);
-        if(providerDiagnostic)await recordRuntimeEventLimited(env,"news_archive_provider_diagnostics","provider_diagnostics_part_"+(Math.floor(offset/3)+1),providerDiagnostic);
+        if(providerDiagnostic)await recordRuntimeEventLimited(env,"news_archive_provider_diagnostics_part_"+(Math.floor(offset/3)+1),"provider_diagnostics",providerDiagnostic);
       }
       const publishReason=String(result.publishReason||"publish_rejected").slice(0,350);
       const detail=String(result.publishReasonDetail||"detail_not_provided").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").replace(/\s+/g," ").slice(0,300);
