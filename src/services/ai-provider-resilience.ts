@@ -55,6 +55,11 @@ export function classifyWorkersAIFailure(error: unknown): ProviderFailure {
   return { provider: "workers_ai", code, detail: safe("code=" + code + "; " + raw) };
 }
 
+export function isOpenAIQuotaFailure(code: string): boolean {
+  const normalized = String(code || "").toLowerCase().replace(/[- ]/g, "_");
+  return ["insufficient_quota", "quota_exceeded", "credit_balance_exhausted", "billing_hard_limit_reached", "billing_not_active"].some(value => normalized.includes(value));
+}
+
 export function exponentialBackoffMs(attempt: number, baseMs = 15 * 60_000, capMs = 2 * 60 * 60_000): number {
   const n = Math.max(0, Math.floor(attempt));
   return Math.min(capMs, baseMs * 2 ** Math.min(n, 16));
@@ -92,7 +97,7 @@ export async function updateProviderBreaker(env: Pick<Env, "DB">, provider: "ope
   if (failure?.provider === "openai" && failure.status === 429) {
     next.consecutive429 = previous.consecutive429 + 1;
     next.code = failure.code;
-    const quota = /insufficient_quota|quota_exceeded/i.test(failure.code);
+    const quota = isOpenAIQuotaFailure(failure.code);
     const open = quota || next.consecutive429 >= 3;
     if (open) next.openedUntil = now + (quota ? 6 * 60 * 60_000 : Math.max(15 * 60_000, failure.retryAfterMs || 0, failure.resetMs || 0));
   }
