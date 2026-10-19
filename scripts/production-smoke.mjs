@@ -10,7 +10,8 @@ async function get(path){
   const r=await fetch(origin+path,{redirect:"manual",headers:{accept:"application/json,text/plain,*/*","user-agent":"BAYAN-Production-Smoke/1.0"},signal:AbortSignal.timeout(25000)});
   const text=await r.text();
   console.log(path,r.status,text.slice(0,220));
-  if(!r.ok)throw new Error(path+" status "+r.status);
+  const emptyNewsSitemapUnavailable=pathname==="/news-sitemap.xml"&&r.status===503&&r.headers.get("x-bayan-news-sitemap-eligible-count")==="0";
+  if(!r.ok&&!emptyNewsSitemapUnavailable)throw new Error(path+" status "+r.status);
   const pathname=new URL(path,origin).pathname;
   const htmlRoutes=new Set(["/","/index.html","/saved","/tools","/about","/methodology","/privacy","/terms","/news","/prices","/art","/trends"]);
   const isHtmlRoute=htmlRoutes.has(pathname)||sections.includes(pathname.replace(/^\//,""))||pathname.startsWith("/article/");
@@ -87,17 +88,22 @@ try{
   const newsMap=await get("/news-sitemap.xml");
   const newsLanding=await get("/news?lang=ar");
   if(!newsLanding.text.includes('class="seo-content-image"'))throw new Error("news_landing_server_rendered_images_missing");
-  if(newsMap.text.includes("/news?story="))throw new Error("news_sitemap_contains_summary_only_pages");
-  const parsedNewsSitemap=parseNewsSitemap(newsMap.text,origin);
-  if(!parsedNewsSitemap.allUrlsSameOrigin)throw new Error("news_sitemap_contains_off_origin_url");
-  if(!parsedNewsSitemap.newsMetadataUrlsAreArticles)throw new Error("news_sitemap_news_metadata_not_full_article");
-  if(parsedNewsSitemap.newsArticleCount>0){
-    const articleUrl=new URL(parsedNewsSitemap.newsArticleUrls[0]);
-    const articlePage=await get(articleUrl.pathname+articleUrl.search);
-    if(!articlePage.text.includes("<h1>")||!articlePage.text.includes("<h2>"))throw new Error("news_sitemap_article_not_rendered_as_full_content");
-    const alternateTags=[...articlePage.text.matchAll(/<link\s+rel="alternate"\s+hreflang="(ar|en|x-default)"\s+href="([^"]+)"/g)];
-    if(alternateTags.length&&alternateTags.length!==3)throw new Error("article_hreflang_set_incomplete");
-    if(alternateTags.length){const byLang=Object.fromEntries(alternateTags.map(match=>[match[1],match[2]]));if(!byLang.ar||!byLang.en||!byLang["x-default"]||byLang["x-default"]!==byLang.ar)throw new Error("article_hreflang_targets_inconsistent");for(const href of Object.values(byLang)){const target=new URL(href);if(target.origin!==origin||!target.pathname.startsWith("/article/"))throw new Error("article_hreflang_target_invalid");}const canonical=articlePage.text.match(/<link rel="canonical" href="([^"]+)">/);if(!canonical||canonical[1]!==articleUrl.href)throw new Error("article_canonical_mismatch");}
+  if(newsMap.status===503){
+    if(newsMap.headers.get("x-bayan-news-sitemap-eligible-count")!=="0")throw new Error("news_sitemap_unavailable_without_zero_eligible_diagnostic");
+    console.log("News sitemap intentionally unavailable: no eligible recent full articles; general sitemap remains active.");
+  }else{
+    if(newsMap.text.includes("/news?story="))throw new Error("news_sitemap_contains_summary_only_pages");
+    const parsedNewsSitemap=parseNewsSitemap(newsMap.text,origin);
+    if(!parsedNewsSitemap.allUrlsSameOrigin)throw new Error("news_sitemap_contains_off_origin_url");
+    if(!parsedNewsSitemap.newsMetadataUrlsAreArticles)throw new Error("news_sitemap_news_metadata_not_full_article");
+    if(parsedNewsSitemap.newsArticleCount>0){
+      const articleUrl=new URL(parsedNewsSitemap.newsArticleUrls[0]);
+      const articlePage=await get(articleUrl.pathname+articleUrl.search);
+      if(!articlePage.text.includes("<h1>")||!articlePage.text.includes("<h2>"))throw new Error("news_sitemap_article_not_rendered_as_full_content");
+      const alternateTags=[...articlePage.text.matchAll(/<link\\s+rel="alternate"\\s+hreflang="(ar|en|x-default)"\\s+href="([^"]+)"/g)];
+      if(alternateTags.length&&alternateTags.length!==3)throw new Error("article_hreflang_set_incomplete");
+      if(alternateTags.length){const byLang=Object.fromEntries(alternateTags.map(match=>[match[1],match[2]]));if(!byLang.ar||!byLang.en||!byLang["x-default"]||byLang["x-default"]!==byLang.ar)throw new Error("article_hreflang_targets_inconsistent");for(const href of Object.values(byLang)){const target=new URL(href);if(target.origin!==origin||!target.pathname.startsWith("/article/"))throw new Error("article_hreflang_target_invalid");}const canonical=articlePage.text.match(/<link rel="canonical" href="([^"]+)">/);if(!canonical||canonical[1]!==articleUrl.href)throw new Error("article_canonical_mismatch");}
+    }
   }
   const homeAr=await get("/?lang=ar"); if(!homeAr.text.includes('<link rel="canonical" href="'+origin+'/">'))throw new Error("arabic_homepage_canonical_mismatch");
   const homeEn=await get("/?lang=en"); if(!homeEn.text.includes('<link rel="canonical" href="'+origin+'/?lang=en">'))throw new Error("english_homepage_canonical_mismatch");
