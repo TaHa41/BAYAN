@@ -40,28 +40,36 @@ const languageConsistent=(answer:string,locale:Locale)=>{
   const sentences=answer.split(/[\n.!؟?]+/).map(x=>x.trim()).filter(Boolean);
   return sentences.every(sentence=>/[\u0600-\u06ff]/.test(sentence)||!/[A-Za-z]{5,}/.test(sentence));
 };
-export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[],question="")=>{
-  const generic=new Set(["the","this","these","those","according","based","however","therefore","overall","summary","conclusion","answer","key","main","important","first","second","third","one","two","three","it","they","he","she","we","you","and","but","because","during","after","before","global","world","health","history","science","technology","economy","politics","sports","travel","art","bayan","من","هو","هي","ما","ماذا","كيف","متى","أين","اين","لماذا","هل","عن","حول","آخر","اخر","أخبار","اخبار","ماهو","ماهي","مع","في","إلى","الى","what","who","when","where","why","how","does","did","is","are","was","were","current","club","player","play","about","explain","tell","me","latest","news"]);
-  const normalizeDigits=(value:string)=>value.replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[٬,]/g,"");
-  const cleanAnswer=answer.replace(/^\s*\d+[.)]\s/gm,"");
-  const sentences=cleanAnswer.split(/[\n.!؟?]+/).map(sentence=>sentence.trim()).filter(Boolean);
-  const questionTokens=(question.normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]+/gu)||[]).filter(token=>!generic.has(token));
-  const subjectTokens=questionTokens.length>=2?questionTokens.slice(0,4):[];
-  // Build one corpus for support checks: a sentence may synthesize separate
-  // facts from different evidence records, but every specific must still occur
-  // in at least one supplied record. This removes false rejection without
-  // allowing unsupported names or numbers.
-  const corpus=evidence.map(item=>[item.title,item.summary,...(item.sources||[]).flatMap(source=>[source.title,source.publisher])].filter(Boolean).join(" ")).join(" ").normalize("NFKC").toLowerCase();
-  const itemCorpora=evidence.map(item=>[item.title,item.summary,...(item.sources||[]).flatMap(source=>[source.title,source.publisher])].filter(Boolean).join(" ").normalize("NFKC").toLowerCase());
-  const hasTokens=(text:string,tokens:string[])=>tokens.every(token=>new Set(text.match(/[\p{L}\p{N}&.-]+/gu)||[]).has(token));
+export const answerUnsupportedSpecificsDetail=(answer:string,evidence:SearchResult[],question="")=>{
+  // Topic matching is handled by provider relevance checks. Each factual
+  // specific must still be supported by one evidence record that also matches
+  // the surrounding claim context; unrelated snippets cannot validate a name.
 
-  const corpusTokens=new Set(corpus.match(/[\p{L}\p{N}&.-]+/gu)||[]);
-  const corpusNumbers=new Set(normalizeDigits(corpus).match(/[0-9]+/g)||[]);
+  const generic=new Set(["the","this","these","those","according","based","however","therefore","overall","summary","conclusion","answer","key","main","important","first","second","third","one","two","three","it","they","he","she","we","you","and","but","because","during","after","before","global","world","health","history","science","technology","economy","politics","sports","travel","art","bayan","من","هو","هي","ما","ماذا","كيف","متى","أين","اين","لماذا","هل","عن","حول","آخر","اخر","أخبار","اخبار","ماهو","ماهي","مع","في","إلى","الى","what","who","when","where","why","how","does","did","is","are","was","were","current","club","player","play","about","explain","tell","me","latest","news","for","from","with","during","in","on","at","to","of","a","an","لنادي","نادي","فريق","الفريق","المنتخب","مع"]);
+  const normalizeDigits=(value:string)=>value.replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[٬,]/g,"");
+  const sentences=answer.replace(/^\s*\d+[.)]\s/gm,"").split(/[\n.!؟?]+/).map(sentence=>sentence.trim()).filter(Boolean);
+  const tokenize=(value:string)=>String(value||"").normalize("NFKC").toLowerCase().replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).match(/[\p{L}\p{N}&.-]+/gu)||[];
+  const evidenceItems=evidence.map(item=>{
+    const text=[item.title,item.summary,...(item.sources||[]).flatMap(source=>[source.title,source.publisher])].filter(Boolean).join(" ").normalize("NFKC").toLowerCase();
+    return {tokens:new Set(tokenize(text)),numbers:new Set(normalizeDigits(text).match(/[0-9]+/g)||[])};
+  });
   const arabicEntityPatterns=[
     /(?:نادي|فريق|الفريق|المنتخب|المدرب|المغني|المغنية|المطرب|المطربة|الممثل|الممثلة|الفنان|الفنانة|الكاتب|الكاتبة|المؤلف|المؤلفة|الروائي|الروائية)\s+([\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){0,1})/g,
     /(?:يلعب(?:\s+حاليًا)?\s+مع|انتقل(?:ت)?\s+إلى|انضم(?:ت)?\s+إلى|تعاقد\s+مع)\s+(?:نادي\s+|فريق\s+)?([\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){0,1})/g
   ];
-  return sentences.some(sentence=>{
+  const supportedWithContext=(specificTokens:string[],specificNumbers:string[],contextTokens:string[],excludedTokens:string[])=>{
+    const context=[...new Set(contextTokens.filter(token=>token.length>2&&!generic.has(token)&&!excludedTokens.includes(token)))];
+    const requiredContextMatches=Math.min(2,context.length);
+    if(requiredContextMatches===0)return false;
+    return evidenceItems.some(item=>{
+      const specificPresent=specificTokens.every(token=>item.tokens.has(token))&&specificNumbers.every(number=>item.numbers.has(number));
+      if(!specificPresent)return false;
+      const overlap=context.filter(token=>item.tokens.has(token)).length;
+      return overlap>=requiredContextMatches;
+    });
+  };
+  for(const sentence of sentences){
+    const tokens=tokenize(sentence);
     const names=(sentence.match(/\b[A-Z][A-Za-z0-9&.-]{2,}\b/g)||[]).filter(name=>!generic.has(name.toLowerCase()));
     const numbers=normalizeDigits(sentence).match(/[0-9]+/g)||[];
     const arabicEntities:{phrase:string;hasAlias:boolean}[]=[];
@@ -74,26 +82,33 @@ export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[
         if(phrase&&!new Set(["كرة قدم","كرة القدم","كرة السلة","كرة اليد","الفريق الأول","المنتخب الوطني","فريق العمل","النادي المحلي"]).has(phrase))arabicEntities.push({phrase,hasAlias:Boolean(aliasMatch)});
       }
     }
-    if(!names.length&&!numbers.length&&!arabicEntities.length)return false;
-    const namesSupported=names.every(name=>corpusTokens.has(name.toLowerCase()));
-    const numbersSupported=numbers.every(number=>corpusNumbers.has(number));
-    const subjectSupported=!subjectTokens.length||subjectTokens.every(token=>corpusTokens.has(token));
-    const arabicEntitiesSupported=arabicEntities.every(entity=>entity.hasAlias||entity.phrase.split(/\s+/).every(token=>corpusTokens.has(token.toLowerCase())));
-    // A club or destination may appear in an unrelated search result. For
-    // relationship claims, require the same evidence record to contain both
-    // the named subject and the relationship target.
-    const englishRelations=[...sentence.matchAll(/\b(?:plays?\s+(?:currently\s+)?for|currently\s+plays\s+for|current\s+club\s+(?:is|:)|signed\s+(?:for|with)|joined|transferred\s+to|plays?\s+with|signs?\s+for|signs?\s+with|contract\s+with)\s+(?:the\s+)?([\p{L}][\p{L}0-9&.-]*(?:\s+[\p{L}][\p{L}0-9&.-]*){0,2})/giu)].map(match=>({target:match[1],prefix:sentence.slice(0,match.index)}));
-    const arabicRelations=[...sentence.matchAll(/(?:يلعب(?:\s*(?:حاليًا|حاليا))?\s*(?:لنادي|مع\s+نادي|مع\s+فريق|مع)|ناديه\s+الحالي(?:\s+هو)?|انتقل(?:ت)?\s+إلى|انضم(?:ت)?\s+إلى|تعاقد(?:ت)?\s+مع)\s+(?:نادي\s+|فريق\s+)?([\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){0,2})/gu)].map(match=>({target:match[1],prefix:sentence.slice(0,match.index)}));
-    const relations=[...englishRelations,...arabicRelations];
-    const relationshipsSupported=relations.every(relation=>{
-      const subject=subjectTokens.length?subjectTokens:(relation.prefix.normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]+/gu)||[]).filter(token=>!generic.has(token)).slice(-4);
-      const targetTokens=(relation.target.normalize("NFKC").toLowerCase().match(/[\p{L}\p{N}]+/gu)||[]).filter(token=>!generic.has(token));
-      if(!subject.length||!targetTokens.length)return false;
-      return itemCorpora.some(itemCorpus=>hasTokens(itemCorpus,subject)&&hasTokens(itemCorpus,targetTokens));
-    });
-    return !(namesSupported&&numbersSupported&&subjectSupported&&arabicEntitiesSupported&&relationshipsSupported);
-  });
+    const allSpecificTokens=[...new Set([...names.map(name=>name.toLowerCase()),...arabicEntities.flatMap(entity=>entity.phrase.toLowerCase().split(/\s+/)),...numbers])];
+    const reasons:string[]=[];
+    // A two-token subject name (e.g. Mohamed Salah) is acceptable when both
+    // tokens co-occur in one evidence record. Additional names in the claim
+    // (e.g. a club after "plays for") still require claim-context support.
+    const subjectPair=names.length>=2?names.slice(0,2).map(name=>name.toLowerCase()):[];
+    const subjectPairSupported=subjectPair.length===2&&evidenceItems.some(item=>subjectPair.every(token=>item.tokens.has(token)));
+    const queryTokens=new Set(tokenize(question));
+    for(const name of names){
+      const normalized=name.toLowerCase();
+      const querySubjectSupported=queryTokens.has(normalized)&&evidenceItems.some(item=>item.tokens.has(normalized));
+      const pairSubjectSupported=subjectPairSupported&&subjectPair.includes(normalized);
+      if(!querySubjectSupported&&!pairSubjectSupported&&!supportedWithContext([normalized],[],tokens,allSpecificTokens))reasons.push("names="+name);
+    }
+    for(const number of numbers){
+      if(!supportedWithContext([], [number], tokens,allSpecificTokens))reasons.push("numbers="+number);
+    }
+    for(const entity of arabicEntities){
+      if(entity.hasAlias)continue;
+      const phraseTokens=entity.phrase.toLowerCase().split(/\s+/);
+      if(!supportedWithContext(phraseTokens,[],tokens,allSpecificTokens))reasons.push("arabic_entities="+entity.phrase);
+    }
+    if(reasons.length)return ("unsupported_specifics:"+[...new Set(reasons)].slice(0,4).join(";")).slice(0,220);
+  }
+  return undefined;
 };
+export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[],question="")=>Boolean(answerUnsupportedSpecificsDetail(answer,evidence,question));
 export const consumeDailyNewsAiCall=async(env:Env)=>{
   const day=new Date().toISOString().slice(0,10);
   const stamp=new Date().toISOString();
