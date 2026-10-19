@@ -235,8 +235,8 @@ const searchStopWords = new Set([
 ]);
 
 export async function searchTrustedNewsFeeds(query:string,lang:Locale,diagnostics?:string[]):Promise<Story[]>{
-  const normalize=(value:string)=>String(value||"").normalize("NFKC").toLowerCase().replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/\\u0640/g,"").replace(/[^\\p{L}\\p{N}]+/gu," ").trim();
-  const queryTerms=[...new Set(normalize(query).split(/\\s+/).filter(term=>term.length>=3&&!searchStopWords.has(term)))].slice(0,8);
+  const normalize=(value:string)=>String(value||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/\u0640/g,"").replace(/[^\p{L}\p{N}]+/gu," ").trim();
+  const queryTerms=[...new Set(normalize(query).split(/\s+/).filter(term=>term.length>=3&&!searchStopWords.has(term)))].slice(0,8);
   if(!queryTerms.length){diagnostics?.push("Trusted RSS skipped: no meaningful query terms");return[];}
   const minimumMatches=Math.min(2,queryTerms.length);
   const now=Date.now(),cutoff=now-48*60*60*1000,futureLimit=now+5*60*1000;
@@ -248,7 +248,7 @@ export async function searchTrustedNewsFeeds(query:string,lang:Locale,diagnostic
       const text=normalize(story.title+" "+story.summary);
       const matched=queryTerms.filter(term=>text.includes(term)).length;
       return {story,matched,published};
-    }).filter(item=>item.matched>=minimumMatches&&item.story.title.trim()&&item.story.summary.trim().length>=80&&Number.isFinite(item.published)&&item.published>=cutoff&&item.published<=futureLimit&&/^https:\\/\\//i.test(item.story.url));
+    }).filter(item=>item.matched>=minimumMatches&&item.story.title.trim()&&item.story.summary.trim().length>=80&&Number.isFinite(item.published)&&item.published>=cutoff&&item.published<=futureLimit&&/^https:\/\/\//i.test(item.story.url));
     diagnostics?.push("Trusted RSS "+name+" parsed="+stories.length+" relevant_recent="+relevant.length);
     return relevant;
   }));
@@ -257,9 +257,9 @@ export async function searchTrustedNewsFeeds(query:string,lang:Locale,diagnostic
   for(const item of ranked){
     try{
       const url=new URL(item.story.url);
-      if(url.protocol!=="https:"||url.username||url.password||/(?:^|\\.)news\\.google\\.com$|(?:^|\\.)wikipedia\\.org$|(?:^|\\.)wikidata\\.org$|(?:^|\\.)workers\\.dev$/i.test(url.hostname))continue;
+      if(url.protocol!=="https:"||url.username||url.password||/(?:^|\.)news\.google\.com$|(?:^|\.)wikipedia\.org$|(?:^|\.)wikidata\.org$|(?:^|\.)workers\.dev$/i.test(url.hostname))continue;
       url.hash="";
-      const key=url.toString().replace(/\\/$/,""),host=url.hostname.toLowerCase().replace(/^www\\./,"");
+      const key=url.toString().replace(/\/$/,""),host=url.hostname.toLowerCase().replace(/^www\./,"");
       const publisher=normalize(item.story.publisher)||host;
       if(seenUrls.has(key)||seenPublishers.has(publisher)||seenHosts.has(host))continue;
       seenUrls.add(key);seenPublishers.add(publisher);seenHosts.add(host);output.push(item.story);
