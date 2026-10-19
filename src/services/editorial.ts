@@ -5,26 +5,26 @@ const normalized=(value:string)=>String(value||"").normalize("NFKC").toLowerCase
 /** Classify the article by the subject actually evidenced, not just the search query. */
 export function sectionForOpenedStory(title:string,summary:string){
  const t=normalized(title),s=normalized(summary),all=t+" "+s;
- const biographyIntent=/(?:biography|biographical|who is|who was|life and work|life of|career of|born in|born on|من هو|من هي|سيرة|حياته|حياتها|نشأته|نشأتها|ولد|ولدت|مسيرته|مسيرتها|إرثه|إرثها|حياتها وأبحاثها|حياته وأعماله)/i.test(t);
- const focused= t+" "+s;
- if(/(?:public consultation|public consultations|citizen participation|public affairs|public institutions|governance|public decision|المشاورات العامة|المشاركة العامة|المشاركة المدنية|المؤسسات العامة|القرار العام|القرارات العامة|الشأن العام)/i.test(focused))return "politics";
- if(/(?:primary sources|historian|historians|historical source|المصادر الأولية|مصادر أولية|المؤرخون|المؤرخ|وثائق تاريخية)/i.test(focused))return "history";
- if(/(?:public opinion polls?|opinion polls?|polling methodology|استطلاعات الرأي العام|استطلاع الرأي العام)/i.test(focused))return "trends";
- const biographicalEvidence=/(?:biography|biographical|physicist|chemist|novelist|writer|author|scientist|poet|inventor|actor|actress|politician|footballer|born in|born on|award winner|سيرة|فيزيائي|فيزيائية|كيميائي|كيميائية|روائي|روائية|كاتب|كاتبة|عالم|عالمة|شاعر|شاعرة|مخترع|مخترعة|ممثل|ممثلة|ولد في|ولدت في|حصل على جائزة|حصلت على جائزة|جائزة نوبل|مسيرته|مسيرتها)/i.test(s);
- if(biographyIntent||(biographicalEvidence&&/(?:^|[:—-])/.test(String(title))&&t.split(" ").length<=12))return "people";
- if(/(?:football|soccer|basketball|tennis|league|championship|tournament|match|goal|athlete|coach|sports?|رياضة|مباراة|الدوري|بطولة|منتخب|لاعب|مدرب|هدف|نتيجة المباراة|إحصاءات رياضية)/i.test(all))return "sports";
- if(/(?:health|medical|medicine|hospital|disease|vaccine|doctor|symptom|treatment|clinical trial|hypertension|blood pressure|cardiology|ضغط الدم|ارتفاع ضغط الدم|صحة|طب|مستشفى|مرض|لقاح|طبيب|أعراض|علاج|تجربة سريرية|دواء|وقاية)/i.test(all))return "health";
- if(/(?:technology|artificial intelligence|software|cybersecurity|chip|robot|programming|algorithm|تقنية|تكنولوجيا|ذكاء اصطناعي|برمجيات|أمن سيبراني|رقائق|روبوت|برمجة|خوارزمية)/i.test(all))return "technology";
- if(/(?:economy|economic|market|stock|inflation|currency|bank|trade|gdp|finance|gold price|اقتصاد|اقتصادي|سوق|أسهم|تضخم|عملة|بنك|تجارة|ناتج محلي|تمويل|سعر الذهب|دولار)/i.test(all))return "economy";
- if(/(?:election|president|parliament|government|minister|policy|politics|diplomacy|legislation|sanction|انتخابات|رئيس|برلمان|حكومة|وزير|سياسة|دبلوماسية|تشريع|عقوبات|قانون جديد)/i.test(all))return "politics";
- if(/(?:science|scientific|research|discovery|space|nasa|astronomy|physics|chemistry|biology|planet|universe|study finds|علم|بحث علمي|اكتشاف|فضاء|ناسا|فلك|فيزياء|كيمياء|أحياء|كوكب|الكون|دراسة علمية)/i.test(all))return "science";
- if(/(?:history|historical|heritage|archaeology|civilization|ancient|تاريخ|تاريخي|تراث|آثار|حضارة|قديم|العصور الوسطى)/i.test(all))return "history";
- if(/(?:film|movie|music|actor|actress|celebrity|artist|book review|novel|poetry|painting|theatre|cinema|الفن|فيلم|سينما|موسيقى|ممثل|ممثلة|فنان|كتاب|رواية|شعر|لوحة|مسرح|أدب)/i.test(all))return "art";
- if(/(?:travel|tourism|airport|flight|hotel|destination|visa|trip|سفر|سياحة|مطار|رحلة|فندق|وجهة|تأشيرة|إقامة سياحية)/i.test(all))return "travel";
- if(/(?:trend|viral|popular on social media|survey|poll|public opinion|ترند|متداول|رائج|استطلاع|رأي عام|انتشار على وسائل التواصل)/i.test(all))return "trends";
- if(/(?:egypt|egyptian society|cairo|alexandria|مصر|المجتمع المصري|القاهرة|الإسكندرية|محافظة مصرية|الحياة اليومية في مصر)/i.test(all))return "egypt";
- if(/(?:arab world|arab society|arab league|العالم العربي|المجتمع العربي|جامعة الدول العربية|الدول العربية|المجتمعات العربية)/i.test(all))return "arab";
- if(/(?:breaking|latest|today|reported|announced|statement|press release|عاجل|آخر التطورات|اليوم|أعلنت|أعلن|بيان رسمي|تطورات جديدة)/i.test(all))return "news";
+ // Classify the article's primary subject. Generic verbs such as "announced",
+ // "said" or "reported" must never override a specific subject.
+ const has=(pattern:RegExp)=>pattern.test(all);
+ const biographyIntent=/(?:biography|biographical|who is|who was|life and work|life of|career of|born in|born on|من هو|من هي|سيرة|حياته|حياتها|نشأته|نشأتها|ولد|ولدت|مسيرته|مسيرتها|إرثه|إرثها|حياتها وأبحاثها|حياته وأعماله|النشأة والتعليم)/i.test(t);
+ const biographyEvidence=/(?:biography|biographical|early life|personal life|life and career|career and legacy|born in|born on|education and career|physicist|chemist|novelist|writer|author|scientist|poet|inventor|footballer|actor|actress|biografia|سيرة ذاتية|سيرة شخصية|النشأة|ولد في|ولدت في|مسيرته|مسيرتها|حياته|حياتها|تعليمه|تعليمها|إنجازاته|إنجازاتها|جائزة نوبل|روائي|روائية|كاتب|كاتبة|عالم|عالمة|شاعر|شاعرة|مخترع|مخترعة|ممثل|ممثلة)/i.test(s);
+ if(biographyIntent||(biographyEvidence&&/(?:^|[:—-])/u.test(String(title))&&t.split(" ").length<=12))return "people";
+ if(has(/(?:football|soccer|basketball|tennis|league|championship|tournament|match report|match|goal|athlete|coach|sports?|رياضة|مباراة|الدوري|بطولة|منتخب|لاعب|مدرب|هدف|نتيجة المباراة|إحصاءات رياضية|كرة القدم)/i))return "sports";
+ if(has(/(?:health|medical|medicine|hospital|disease|vaccine|doctor|symptom|treatment|clinical trial|hypertension|blood pressure|cardiology|ضغط الدم|ارتفاع ضغط الدم|صحة|طب|مستشفى|مرض|لقاح|طبيب|أعراض|علاج|تجربة سريرية|دواء|وقاية|أبحاث طبية)/i))return "health";
+ if(has(/(?:technology|artificial intelligence|software|cybersecurity|chip|robot|programming|algorithm|cloud computing|تقنية|تكنولوجيا|ذكاء اصطناعي|برمجيات|أمن سيبراني|رقائق|روبوت|برمجة|خوارزمية|الحوسبة)/i))return "technology";
+ if(has(/(?:economy|economic|market|stock|stocks|share price|shares|initial public offering|\bipo\b|listing shares|inflation|currency|bank|trade|gdp|finance|investment|company earnings|food prices|rice prices|sugar prices|أسهم|سهم|طرح عام أولي|طرح أسهم|إدراج أسهم|سوق دبي المالي|تداول|البورصة|تضخم|عملة|بنك|تجارة|ناتج محلي|تمويل|استثمار|أرباح الشركة|أسعار الأرز|أسعار السكر|اقتصاد|اقتصادي|سوق المال|الأسواق المالية|شركة مساهمة)/i))return "economy";
+ if(has(/(?:election|parliament|government|minister|policy|politics|diplomacy|legislation|sanction|foreign ministry|public consultation|public affairs|governance|انتخابات|برلمان|حكومة|وزير|سياسة|دبلوماسية|تشريع|عقوبات|الخارجية|المشاورات العامة|الشأن العام|قرار حكومي|الانتخابات|مجلس الوزراء)/i))return "politics";
+ if(has(/(?:science|scientific|research|discovery|space|nasa|astronomy|physics|chemistry|biology|planet|universe|study finds|علم|بحث علمي|اكتشاف|فضاء|ناسا|فلك|فيزياء|كيمياء|أحياء|كوكب|الكون|دراسة علمية|تجربة علمية|نظرية علمية)/i))return "science";
+ if(has(/(?:history|historical|heritage|archaeology|civilization|ancient|primary sources|historian|تاريخ|تاريخي|تراث|آثار|حضارة|قديم|العصور الوسطى|مصادر أولية|المؤرخون|وثائق تاريخية)/i))return "history";
+ if(has(/(?:film|movie|music|celebrity|artist|book review|novel|poetry|painting|theatre|cinema|arts?|entertainment|الفن|فيلم|سينما|موسيقى|فنان|كتاب|رواية|شعر|لوحة|مسرح|أدب|ترفيه|أغنية)/i))return "art";
+ if(has(/(?:travel|tourism|airport|flight|hotel|destination|visa|trip|سفر|سياحة|مطار|رحلة|فندق|وجهة|تأشيرة|إقامة سياحية|معالم سياحية)/i))return "travel";
+ if(has(/(?:trend|viral|popular on social media|survey|poll|public opinion|ترند|متداول|رائج|استطلاع|رأي عام|انتشار على وسائل التواصل|اتجاهات الاهتمام)/i))return "trends";
+ if(has(/(?:egyptian society|community services|daily life|cairo|alexandria|مصر|المجتمع المصري|القاهرة|الإسكندرية|محافظة مصرية|الحياة اليومية|قضايا مجتمعية|خدمات المجتمع)/i))return "egypt";
+ if(has(/(?:arab world|arab society|arab league|العالم العربي|المجتمع العربي|جامعة الدول العربية|الدول العربية|المجتمعات العربية|نقاش فكري|فكرة فلسفية|حوار فكري)/i))return "arab";
+ if(has(/(?:breaking|latest news|news report|today's events|reported|announced|statement|press release|عاجل|آخر التطورات|خبر|أخبار|أعلنت|أعلن|بيان رسمي|تطورات جديدة)/i))return "news";
+ if(has(/(?:global shifts|global transformation|worldwide impact|cross-border|global crisis|تحول عالمي|تحولات كبرى|تغيرات عالمية|عابر للحدود|أزمة عالمية|سلاسل الإمداد العالمية)/i))return "world";
  return "world";
 }
 
