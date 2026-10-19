@@ -11,6 +11,7 @@ const wisdom = read("src/wisdom.ts");
 const app = read("public/app-20261019-01.js");
 const index = read("src/index.ts");
 const api = read("src/routes/api.ts");
+const schema = read("src/schema.ts");
 const recovery = read("src/services/search-recovery.ts");
 const http = read("src/http.ts");
 const checks = [
@@ -281,6 +282,7 @@ const checks = [
   ["news article drafting uses excerpt-only evidence, per-sentence source IDs, a single retry, and drops unsupported sentences", ai.includes('sourceId:"S"+(index+1)') && ai.includes("sourceIds") && ai.includes('answerHasUnsupportedSpecifics(sentence.text,cited,"")') && ai.includes("Regenerate the article JSON once") && ai.includes("checked.rejected.length") && !ai.slice(ai.indexOf("export async function draftArticle"),ai.indexOf("export async function ask")).includes("url:String(source.url")],
   ["archive publisher runs in most 5-minute maintenance slots while refresh stays bounded and self-heal remains scheduled", index.includes("const scheduleSlot=Math.floor") && index.includes("task===1||(task===2&&scheduleSlot%12!==2&&scheduleSlot%12!==8)") && index.includes("news_archive_refresh_last") && index.includes("publishNextArchivedNewsArticle(env)")],
   ["full commit identity is injected and exposed by a no-store endpoint", index.includes('const COMMIT_SHA="0000000000000000000000000000000000000000";') && index.includes('u.pathname==="/.well-known/build.json"') && index.includes('headers.set("X-BAYAN-Commit",COMMIT_SHA)') && read("scripts/inject-build-id.mjs").includes("^[a-f0-9]{40}$") && read("scripts/inject-build-id.mjs").includes("const COMMIT_SHA=") && read(".github/workflows/deploy-worker.yml").includes("Verify deployed commit identity")],
+  ["optional searches columns are inspected before ALTER and duplicate-column races are not logged as schema failures", schema.includes('PRAGMA table_info(searches)') && schema.includes('if(!searchesColumns.has("topic_section"))') && schema.includes('if(!searchesColumns.has("results_json"))') && schema.includes("/duplicate column name: topic_section/i") && schema.includes("/duplicate column name: results_json/i")],
 ];
 let failed = 0;
 for (const [name, ok] of checks) {
