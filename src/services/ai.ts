@@ -128,54 +128,41 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
   const evidenceById=new Map<string,SearchResult>(compactEvidence.map((item,index)=>[item.sourceId,evidence[index] as SearchResult] as const));
   const evidenceText=JSON.stringify(compactEvidence).slice(0,16000);
   const system=locale==="ar"
-    ?"أنت محرر أدلة في بيان. اكتب مقالًا عربيًا مفيدًا اعتمادًا على المقتطفات المرفقة فقط. أخرج JSON صالحًا فقط بالشكل {\"sections\":[{\"heading\":\"عنوان\",\"sentences\":[{\"text\":\"جملة واحدة\",\"sourceIds\":[\"S1\"]}]}]}. يجب أن تحمل كل جملة sourceIds لمعرف مقتطف واحد على الأقل يدعمها مباشرة. لا تضف أسماء أو أرقامًا أو تواريخ أو حقائق تفصيلية غير موجودة حرفيًا أو بوضوح في المقتطفات المشار إليها. لا تستنتج تفاصيل محددة. لا تضع أكثر من فكرة مستقلة في الجملة. استخدم أربعة عناوين ذات معنى على الأقل عندما تسمح الأدلة. إذا لم تدعم الأدلة جملة مفيدة، فلا تكتبها. لا تضف روابط أو نصًا خارج JSON."
-    :"You are BAYAN's evidence editor. Write a useful article using only the supplied excerpts. Output valid JSON only in this shape: {\"sections\":[{\"heading\":\"Heading\",\"sentences\":[{\"text\":\"one sentence\",\"sourceIds\":[\"S1\"]}]}]}. Every sentence must carry sourceIds for at least one excerpt that directly supports it. Do not add names, numbers, dates, or specific facts unless they are explicitly present in the cited excerpts. Do not infer specific details. Keep each sentence to one independently verifiable claim. Use at least four meaningful headings when evidence permits. Omit claims the evidence cannot support. No URLs and no text outside JSON.";
-  const normalizeSourceIds=(raw:unknown):string[]=>{
-    const candidates=Array.isArray(raw)?raw:[raw];
-    const ids:string[]=[];
-    for(const candidate of candidates){
-      const value=candidate&&typeof candidate==="object"
-        ?(candidate as any).sourceId??(candidate as any).source_id??(candidate as any).id
-        :candidate;
-      if(typeof value==="number"&&Number.isInteger(value)&&value>0){
-        ids.push("S"+value);
-        continue;
-      }
-      if(typeof value!=="string")continue;
-      const text=value.trim();
-      const matches=[...text.matchAll(/(?:\bsource\s*[-_ ]?\s*|\bS\s*[-_ ]?\s*)(\d+)\b/gi)];
-      if(matches.length)ids.push(...matches.map(match=>"S"+match[1]));
-      else if(/^\d+$/.test(text))ids.push("S"+text);
-    }
-    return[...new Set(ids)].filter(id=>evidenceById.has(id));
-  };
-  const parseDraft=(raw:string):{sections:any[];invalidSourceIdSentences:number}|undefined=>{
+    ?"أنت محرر أدلة في بيان. اكتب مقالًا عربيًا مفيدًا اعتمادًا على المقتطفات المرفقة فقط. أخرج JSON صالحًا فقط بالشكل {\"sections\":[{\"heading\":\"عنوان\",\"sentences\":[{\"text\":\"جملة واحدة\",\"sourceIds\":[\"S1\"]}]}]}. يجب أن تحمل كل جملة sourceIds لمعرف مقتطف واحد على الأقل يدعمها مباشرة. لا تضف أسماء أو أرقامًا أو تواريخ أو حقائق تفصيلية غير موجودة حرفيًا أو بوضوح في المقتطفات المشار إليها. لا تستنتج تفاصيل محددة. لا تضع أكثر من فكرة مستقلة في الجملة. استخدم من أربعة إلى ستة عناوين ذات معنى و12 إلى 16 جملة موجزة عندما تسمح الأدلة، ولا تتجاوز 16 جملة. اجعل المقال مفصلًا دون تكرار. إذا لم تدعم الأدلة جملة مفيدة، فلا تكتبها. لا تضف روابط أو نصًا خارج JSON."
+    :"You are BAYAN's evidence editor. Write a useful article using only the supplied excerpts. Output valid JSON only in this shape: {\"sections\":[{\"heading\":\"Heading\",\"sentences\":[{\"text\":\"one sentence\",\"sourceIds\":[\"S1\"]}]}]}. Every sentence must carry sourceIds for at least one excerpt that directly supports it. Do not add names, numbers, dates, or specific facts unless they are explicitly present in the cited excerpts. Do not infer specific details. Keep each sentence to one independently verifiable claim. Use four to six meaningful headings and 12–16 concise sentences when evidence permits; never exceed 16 sentences. Keep the article detailed but avoid repetition. Omit claims the evidence cannot support. No URLs and no text outside JSON.";
+  const parseDraft=(raw:string)=>{
     try{
       const value=JSON.parse(normalizeDraftJson(raw));
-      const inputSections=Array.isArray(value?.sections)?value.sections:Array.isArray(value?.article?.sections)?value.article.sections:undefined;
-      if(!inputSections?.length)return undefined;
+      const rawSections=Array.isArray(value?.sections)?value.sections:Array.isArray(value?.article?.sections)?value.article.sections:Array.isArray(value?.content?.sections)?value.content.sections:[];
+      if(!rawSections.length)return undefined;
+      const normalizeSourceId=(value:unknown):string|undefined=>{
+        const rawId=value&&typeof value==="object"&&"id" in (value as any)?String((value as any).id):String(value??"");
+        let id=rawId.trim().replace(/^source[\s_-]*/i,"S").replace(/^s[\s_-]*(\d+)$/i,"S$1");
+        if(/^\d+$/.test(id))id="S"+id;
+        id=id.toUpperCase();
+        return evidenceById.has(id)?id:undefined;
+      };
       const sections:any[]=[];
-      let invalidSourceIdSentences=0;
-      for(const section of inputSections){
-        if(!section||!Array.isArray(section.sentences))continue;
-        const heading=String(section.heading??section.title??"").trim().slice(0,140);
+      for(const section of rawSections){
+        if(!section||typeof section.heading!=="string"||!Array.isArray(section.sentences))continue;
+        const heading=section.heading.trim().slice(0,140);
         if(!heading)continue;
         const sentences:any[]=[];
-        for(const sentence of section.sentences){
-          const rawText=sentence?.text??sentence?.sentence;
-          if(typeof rawText!=="string")continue;
-          const sourceIds=normalizeSourceIds(sentence.sourceIds??sentence.source_ids??sentence.citations);
-          if(!sourceIds.length){
-            invalidSourceIdSentences+=1;
-            continue;
-          }
-          const text=rawText.replace(/\s+/g," ").trim().slice(0,900);
+        for(const rawSentence of section.sentences){
+          const sentence=typeof rawSentence==="string"?{text:rawSentence}:rawSentence;
+          if(!sentence||typeof sentence.text!=="string")continue;
+          const rawIds=sentence.sourceIds??sentence.source_ids??sentence.sourceId??sentence.source_id??sentence.sources??section.sourceIds??section.source_ids;
+          const ids=Array.isArray(rawIds)?rawIds:typeof rawIds==="string"?rawIds.split(/[,\s]+/):rawIds==null?[]:[rawIds];
+          const sourceIds=[...new Set<string>(ids.map(normalizeSourceId).filter((id:string|undefined):id is string=>Boolean(id)))];
+          const text=sentence.text.replace(/\s+/g," ").trim().slice(0,900);
           if(!text)continue;
-          sentences.push({text,sourceIds:sourceIds.slice(0,4)});
+          // Keep a malformed/unknown citation attached to the sentence so the
+          // evidence verifier rejects that sentence, not the entire draft.
+          sentences.push({text,sourceIds:sourceIds.length?sourceIds:["__INVALID_SOURCE_ID__"]});
         }
         if(sentences.length)sections.push({heading,sentences});
       }
-      return sections.length?{sections,invalidSourceIdSentences}:undefined;
+      return sections.length?sections:undefined;
     }catch{return undefined;}
   };
   const verifySections=(sections:any[])=>{
@@ -201,7 +188,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
   const generate=async(extraInstruction:string)=>{
     const messages=[{role:"system",content:system},{role:"user",content:"Topic/question: "+question+"\nEvidence excerpts (only these snippets may be used): "+evidenceText+(extraInstruction?"\nCorrection required: "+extraInstruction:"")}];
     if(env.OPENAI_API_KEY&&await openAIAllowed(env)&&(!backgroundBudget||await consumeDailyNewsAiCall(env)))try{
-      const response=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(9000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",messages,temperature:0,max_tokens:2600,response_format:{type:"json_object"}})});
+      const response=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(9000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",messages,temperature:0,max_tokens:3600,response_format:{type:"json_object"}})});
       if(response.ok){
         const data=await response.json<any>(),answer=String(data.choices?.[0]?.message?.content||"").trim();
         if(answer)return answer;
@@ -209,7 +196,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
       }else await handleOpenAIResponseFailure(env,"OpenAI draft",response);
     }catch(error){await recordAiFailure(env,"OpenAI draft",aiFailureDetail(error));}
     if(env.AI&&(!backgroundBudget||await consumeDailyNewsAiCall(env)))try{
-      const response=await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast",{messages,max_tokens:2200,temperature:0});
+      const response=await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast",{messages,max_tokens:3600,temperature:0,response_format:{type:"json_object"}});
       const answer=workersAIResponseText(response);
       if(answer)return answer;
       await recordAiFailure(env,"Workers AI draft","empty_response");
@@ -218,35 +205,26 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
   };
   let raw=await generate("");
   if(!raw)return{status:"mixed" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[]),reason:"ai_unavailable" as const,verification:{removedSentences:0,remainingSentences:0,retried:false,failureStage:"all_providers_unavailable"}};
-  let retried=false;
-  let parsed=parseDraft(raw);
-  if(!parsed){
+  let retried=false,totalRemoved=0;
+  let sections=parseDraft(raw);
+  if(!sections){
     retried=true;
-    raw=await generate("The prior output was invalid JSON or contained no usable supported sentences. Return only valid JSON in the required schema and cite only sourceIds from the supplied S1 through S"+compactEvidence.length+".");
-    parsed=parseDraft(raw);
+    raw=await generate("The prior output was invalid JSON or contained an invalid source ID. Return only valid JSON in the required schema and cite only supplied sourceIds.");
+    sections=parseDraft(raw);
   }
-  if(!parsed)return{status:"mixed" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[]),reason:"draft_not_verified" as const,verification:{removedSentences:0,remainingSentences:0,retried,failureStage:"invalid_json_or_source_id"}};
-  let checked=verifySections(parsed.sections);
-  let totalRemoved=parsed.invalidSourceIdSentences+checked.rejected.length;
-  let invalidSourceIdSentences=parsed.invalidSourceIdSentences;
-  const sentenceCountOf=(sections:any[])=>sections.reduce((count,section)=>count+section.sentences.length,0);
-  if((checked.rejected.length>0||parsed.invalidSourceIdSentences>0)&&!retried){
+  if(!sections)return{status:"mixed" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[]),reason:"draft_not_verified" as const,verification:{removedSentences:0,remainingSentences:0,retried,failureStage:"invalid_json_or_source_id"}};
+  let checked=verifySections(sections);
+  totalRemoved+=checked.rejected.length;
+  if(checked.rejected.length&&!retried){
     retried=true;
     const rejected=checked.rejected.slice(0,8).join(" | ");
-    const correction=[
-      parsed.invalidSourceIdSentences>0?"Some sentences had missing or invalid sourceIds. Omit them or cite only valid sourceIds from S1 through S"+compactEvidence.length+".":"",
-      checked.rejected.length>0?"Regenerate the article JSON once. The following sentences failed evidence verification and must be omitted or replaced with directly supported claims: "+rejected+". Each sentence must cite valid sourceIds.":""
-    ].filter(Boolean).join(" ");
-    const retryParsed=parseDraft(await generate(correction));
-    if(retryParsed){
-      const retryChecked=verifySections(retryParsed.sections);
-      const retryRemoved=retryParsed.invalidSourceIdSentences+retryChecked.rejected.length;
-      const retryCount=sentenceCountOf(retryChecked.sections);
-      const currentCount=sentenceCountOf(checked.sections);
-      if(retryCount>currentCount||(retryCount===currentCount&&retryRemoved<totalRemoved)){
+    const retryRaw=await generate("Regenerate the article JSON once. The following sentences failed evidence verification and must be omitted or replaced with directly supported claims: "+rejected+". Each sentence must cite valid sourceIds.");
+    const retrySections=parseDraft(retryRaw);
+    if(retrySections){
+      const retryChecked=verifySections(retrySections);
+      if(retryChecked.sections.reduce((n,section)=>n+section.sentences.length,0)>checked.sections.reduce((n,section)=>n+section.sentences.length,0)){
         checked=retryChecked;
-        totalRemoved=retryRemoved;
-        invalidSourceIdSentences=retryParsed.invalidSourceIdSentences;
+        totalRemoved+=retryChecked.rejected.length;
       }
     }
   }
