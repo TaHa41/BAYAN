@@ -1,6 +1,35 @@
-import type{Env,Locale,SearchResult}from"../types";import{recordRuntimeEventLimited}from"../runtime-events";
+import type{Env,Locale,SearchResult}from"../types";import{classifyOpenAIFailure,classifyWorkersAIFailure,getProviderBreaker,updateProviderBreaker,recordProviderDiagnostic,normalizeDraftJson}from"./ai-provider-resilience";import{notify}from"./telegram";export{normalizeDraftJson};
+import{recordRuntimeEventLimited}from"../runtime-events";
 const aiFailureDetail=(error:unknown)=>String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
 async function recordAiFailure(env:Env,provider:string,detail:string){await recordRuntimeEventLimited(env,"ai_generation","ai_provider_failure",provider+": "+detail);}
+async function openAIAllowed(env:Env){
+  const breaker=await getProviderBreaker(env,"openai");
+  if(breaker.open){
+    await recordRuntimeEventLimited(env,"ai_circuit_breaker","openai_breaker_open",JSON.stringify({state:"open",code:breaker.code,openedUntil:new Date(breaker.openedUntil).toISOString()}));
+    return false;
+  }
+  return true;
+}
+async function handleOpenAIResponseFailure(env:Env,provider:"OpenAI draft"|"OpenAI answer",response:Response){
+  let body:any={};
+  try{body=await response.clone().json()}catch(error){void error}
+  const failure=classifyOpenAIFailure(response.status,body,response.headers);
+  const breaker=await updateProviderBreaker(env,"openai",failure);
+  await recordProviderDiagnostic(env,failure);
+  await recordAiFailure(env,provider,failure.detail);
+  await recordRuntimeEventLimited(env,"ai_circuit_breaker",breaker.open?"openai_breaker_open":"openai_breaker_closed",JSON.stringify({state:breaker.open?"open":"closed",code:breaker.code,openedUntil:breaker.openedUntil?new Date(breaker.openedUntil).toISOString():null}));
+  if(failure.code==="insufficient_quota"){
+    try{
+      const existing=await env.DB.prepare("SELECT value FROM admin_settings WHERE key='openai_quota_telegram_notified' LIMIT 1").first<any>();
+      if(!existing?.value){
+        await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES('openai_quota_telegram_notified','sent',?) ON CONFLICT(key) DO NOTHING").bind(new Date().toISOString()).run();
+        const claimed=await env.DB.prepare("SELECT value FROM admin_settings WHERE key='openai_quota_telegram_notified' LIMIT 1").first<any>();
+        if(claimed?.value==="sent")await notify(env,"رصيد/حصة OpenAI منتهية، المطلوب مراجعة الفوترة");
+      }
+    }catch(error){await recordRuntimeEventLimited(env,"ai_quota_notification","notification_state_failed",error)}
+  }
+}
+
 
 const languageConsistent=(answer:string,locale:Locale)=>{
   if(!answer.trim())return false;
@@ -83,7 +112,7 @@ const independentSourceCount=(env:Env,evidence:SearchResult[])=>new Set(evidence
   return String(source.publisher||"").trim().toLowerCase();
 }).filter(Boolean)).size;
 
-export const normalizeDraftJson=(raw:string)=>raw.trim().replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"").trim();
+
 
 export async function draftArticle(env:Env,question:string,locale:Locale,evidence:SearchResult[],backgroundBudget=false){
   if(evidence.length<2)return{status:"insufficient" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[])};
@@ -146,20 +175,20 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
   };
   const generate=async(extraInstruction:string)=>{
     const messages=[{role:"system",content:system},{role:"user",content:"Topic/question: "+question+"\nEvidence excerpts (only these snippets may be used): "+evidenceText+(extraInstruction?"\nCorrection required: "+extraInstruction:"")}];
-    if(env.OPENAI_API_KEY&&(!backgroundBudget||await consumeDailyNewsAiCall(env)))try{
+    if(env.OPENAI_API_KEY&&(!backgroundBudget||await consumeDailyNewsAiCall(env))&&await openAIAllowed(env))try{
       const response=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(9000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",messages,temperature:0,max_tokens:2600,response_format:{type:"json_object"}})});
       if(response.ok){
         const data=await response.json<any>(),answer=String(data.choices?.[0]?.message?.content||"").trim();
         if(answer)return answer;
         await recordAiFailure(env,"OpenAI draft","empty_response");
-      }else await recordAiFailure(env,"OpenAI draft","http_"+response.status);
+      }else await handleOpenAIResponseFailure(env,"OpenAI draft",response);
     }catch(error){await recordAiFailure(env,"OpenAI draft",aiFailureDetail(error));}
     if(env.AI&&(!backgroundBudget||await consumeDailyNewsAiCall(env)))try{
       const response=await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fast",{messages,max_tokens:2200,temperature:0});
       const answer=String((response as any)?.response||"").trim();
       if(answer)return answer;
       await recordAiFailure(env,"Workers AI draft","empty_response");
-    }catch(error){await recordAiFailure(env,"Workers AI draft",aiFailureDetail(error));}
+    }catch(error){await recordAiFailure(env,"Workers AI draft",aiFailureDetail(error));const failure=classifyWorkersAIFailure(error);await recordProviderDiagnostic(env,failure);await recordAiFailure(env,"Workers AI draft",failure.detail);}
     return "";
   };
   let raw=await generate("");
@@ -199,10 +228,10 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
 export async function ask(env:Env,question:string,locale:Locale,evidence:SearchResult[]){
   if(!evidence.length)return{status:"insufficient" as const,answer:locale==="ar"?"لا أملك أدلة موثقة كافية للإجابة بثقة.":"I do not have enough verified evidence to answer confidently.",sources:[]};
   const evidenceText=JSON.stringify(evidence).slice(0,18000);
-  if(env.OPENAI_API_KEY)try{
+  if(env.OPENAI_API_KEY&&await openAIAllowed(env))try{
     const r=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(12000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",messages:[{role:"system",content:locale==="ar"?"أنت BAYAN. أجب بالعربية الفصحى فقط، ولا تضع جملًا إنجليزية أو فقرات بلغة أخرى. استخدم الأدلة المقدمة فقط، ولا تضف اسم شخص أو نادٍ أو مؤسسة أو رقمًا غير موجود في الأدلة. احتفظ بالتهجئة الأصلية للأسماء الخاصة بين قوسين إذا كانت موجودة في المصدر. ابدأ بإجابة مباشرة، ثم نظّم الأفكار في أقسام قصيرة مترابطة عند الحاجة. لا تكرر الفكرة أو الجملة بصياغة أخرى، ولا تخلط بين أشخاص أو أحداث متشابهة. ميّز بين الحقيقة والاستنتاج وعدم اليقين، ولا تخترع معلومة.":"You are BAYAN. Answer in English only. Do not include Arabic sentences or paragraphs. Use only the supplied evidence, and do not introduce any person, club, organization or number that does not appear in the evidence. Start with a direct answer, then organize related ideas into concise sections when useful. Never repeat the same claim in different wording or conflate similar people/events. Distinguish facts from inference and uncertainty, and never invent facts."},{role:"user",content:"Question: "+question+"\nEvidence: "+evidenceText}],temperature:.1})});
     if(r.ok){const d=await r.json<any>();const answer=String(d.choices?.[0]?.message?.content||"").trim();if(answer && languageConsistent(answer,locale) )return{status:independentSourceCount(env,evidence)>=2&&!answerHasUnsupportedSpecifics(answer,evidence,question)?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(x=>x.sources)};await recordAiFailure(env,"OpenAI answer",answer?"language_mismatch":"empty_response")}
-    else await recordAiFailure(env,"OpenAI answer","http_"+r.status);
+    else await handleOpenAIResponseFailure(env,"OpenAI answer",r);
   }catch(error){await recordAiFailure(env,"OpenAI answer",aiFailureDetail(error));}
   // AI_SEARCH is a retrieval binding, not the text-generation runtime.
   // Use the Workers AI binding for drafting when OpenAI is unavailable; keep
@@ -215,6 +244,6 @@ export async function ask(env:Env,question:string,locale:Locale,evidence:SearchR
     const answer=String((r as any)?.response||"").trim();
     if(answer && languageConsistent(answer,locale))return{status:independentSourceCount(env,evidence)>=2&&!answerHasUnsupportedSpecifics(answer,evidence,question)?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(x=>x.sources)};
     await recordAiFailure(env,"Workers AI answer",answer?"language_mismatch":"empty_response");
-  }catch(error){await recordAiFailure(env,"Workers AI answer",aiFailureDetail(error));}
+  }catch(error){await recordAiFailure(env,"Workers AI answer",aiFailureDetail(error));const failure=classifyWorkersAIFailure(error);await recordProviderDiagnostic(env,failure);await recordAiFailure(env,"Workers AI answer",failure.detail);}
   return{status:"mixed" as const,answer:locale==="ar"?"وجدت أدلة يمكن الرجوع إليها، لكن تعذر تشغيل صياغة BAYAN الذكية الآن. راجع الأدلة الظاهرة قبل اتخاذ قرار.":"Relevant evidence was found, but BAYAN's drafting model is temporarily unavailable. Review the evidence before acting.",sources:evidence.flatMap(x=>x.sources),reason:"ai_unavailable" as const}
 }
