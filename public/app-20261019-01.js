@@ -498,8 +498,8 @@
     const resultType = (item) => {
       const section = String(item?.section || "").toLowerCase();
       const kind = String(item?.kind || "").toLowerCase();
-      if (section === "people" || /biograph|person|profile|سيرة|شخصية/i.test(String(item?.title || "") + " " + String(item?.kind || ""))) return "people";
-      if (section === "news" || /news|article_news|خبر|أخبار/i.test(kind + " " + String(item?.title || ""))) return "news";
+      if (section === "people" || /biograph|biographical|person|profile|سيرة ذاتية|سيرة|الشخصية|شخصية/i.test(String(item?.title || "") + " " + String(item?.kind || "") + " " + String(item?.contentType || ""))) return "people";
+      if (section === "news" || /news|article_news|press release|breaking|خبر|أخبار|عاجل/i.test(kind + " " + String(item?.title || "") + " " + String(item?.contentType || ""))) return "news";
       if (["science","technology","economy","politics","health","history","sports","travel","art","trends","prices","egypt","arab","world"].includes(section)) return section;
       return "articles";
     };
@@ -512,7 +512,7 @@
       '<div class="search-tools-top"><strong>' + t("النتائج","Results") + ' (' + results.length + ')</strong>' +
       '<label class="search-sort-label">' + t("الترتيب","Sort") + ' <select id="search-sort"><option value="relevance">' + t("الأكثر صلة","Relevance") + '</option><option value="newest">' + t("الأحدث","Newest") + '</option><option value="title">' + t("العنوان","Title") + '</option></select></label></div>' +
       '<div class="search-filter-list" role="group" aria-label="' + t("نوع النتيجة","Result type") + '">' +
-      [['all',t("الكل","All")],['people',t("السير والأشخاص","People & biographies")],['news',t("الأخبار","News")],['articles',t("المقالات والمعرفة","Articles & knowledge")],['science',t("العلوم","Science")],['technology',t("التقنية","Technology")],['economy',t("الاقتصاد","Economy")],['sports',t("الرياضة","Sports")]].map(([key,label]) => '<button type="button" class="search-filter' + (key === "all" ? ' is-active' : '') + '" data-search-filter="' + key + '" aria-pressed="' + (key === "all" ? 'true' : 'false') + '">' + label + '</button>').join("") +
+      [['all',t("الكل","All")],['people',t("السير والأشخاص","People & biographies")],['news',t("الأخبار","News")],['articles',t("المقالات والمعرفة","Articles & knowledge")],['science',t("العلوم","Science")],['technology',t("التقنية","Technology")],['economy',t("الاقتصاد","Economy")],['politics',t("السياسة","Politics")],['health',t("الصحة والطب","Health & medicine")],['history',t("التاريخ والثقافة","History & culture")],['sports',t("الرياضة","Sports")],['travel',t("السفر والأماكن","Travel & places")],['art',t("الفن والترفيه","Arts & entertainment")],['trends',t("الاتجاهات","Trends")],['prices',t("الأسعار والبيانات","Prices & data")],['egypt',t("حياة ومجتمعات","Communities")],['arab',t("أفكار ونقاشات","Ideas & debate")],['world',t("تحولات كبرى","Global shifts")]].map(([key,label]) => '<button type="button" class="search-filter' + (key === "all" ? ' is-active' : '') + '" data-search-filter="' + key + '" aria-pressed="' + (key === "all" ? 'true' : 'false') + '">' + label + '</button>').join("") +
       '</div></div><div class="result-meta">' + escapeHtml((data.providers || []).join(" · ") || "BAYAN") + "</div>" +
       '<div id="search-result-list">' + results.map((item) => {
         const key = item.slug || item.url || item.title;
