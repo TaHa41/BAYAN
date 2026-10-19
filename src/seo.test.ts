@@ -40,6 +40,8 @@ describe("newsSitemap database failure handling", () => {
     const body = await response.text();
     expect(body).toContain("<urlset");
     expect(body).toContain("</urlset>");
+    expect(body).toContain("<url><loc>https://bayan.tahaomar411.workers.dev/</loc></url>");
+    expect(response.headers.get("x-bayan-news-sitemap-eligible-count")).toBe("0");
   });
 
   it("includes recent verified topical news with independent HTTPS sources even when publisher labels are absent", async () => {
@@ -56,9 +58,12 @@ describe("newsSitemap database failure handling", () => {
     const body = await response.text();
     expect(body).toContain("/article/recent-ar-news?lang=ar");
     expect(body).toContain("<news:language>ar</news:language>");
-    expect(body).not.toContain("old-news");
-    expect(body).not.toContain("duplicate-hosts");
-    expect(body).not.toContain("insecure-source");
+    expect(body).toContain("/article/old-news?lang=en");
+    expect(body).not.toContain("<news:title>Older archived report</news:title>");
+    expect(body).toContain("/article/duplicate-hosts?lang=en");
+    expect(body).not.toContain("<news:title>Repeated source host</news:title>");
+    expect(body).toContain("/article/insecure-source?lang=en");
+    expect(body).not.toContain("<news:title>Insecure source article</news:title>");
   });
 });
 
