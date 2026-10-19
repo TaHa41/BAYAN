@@ -10,7 +10,6 @@ export function robots(){
   return text("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nDisallow: /review\nDisallow: /saved\nSitemap: "+ORIGIN+"/sitemap.xml\n");
 }
 const xml=(s:string)=>Array.from(String(s)).filter((character)=>{const code=character.codePointAt(0)!;return code===0x9||code===0xA||code===0xD||(code>=0x20&&code<=0xD7FF)||(code>=0xE000&&code<=0xFFFD)||(code>=0x10000&&code<=0x10FFFF)}).join("").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
-const retryableUnavailable=(message:string)=>{const response=text(message,"text/plain;charset=utf-8",503);response.headers.set("retry-after","300");return response;};
 export async function sitemap(env:Env){
   let articleUrls:Array<{url:string;lastmod?:string}>=[];
   try{
