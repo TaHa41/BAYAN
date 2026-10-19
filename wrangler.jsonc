@@ -30,6 +30,9 @@
     }
   ],
   "keep_vars": true,
+  "vars": {
+    "NEWS_AI_DAILY_LIMIT": "150"
+  },
   "observability": {
     "enabled": true,
     "redact_query_string": true,
