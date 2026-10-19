@@ -1,5 +1,18 @@
 import type {Env} from "../types";import{recordRuntimeEventLimited}from"../runtime-events";
 const timeout=async(url:string,ms=5000)=>{const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);try{return await fetch(url,{signal:c.signal,headers:{accept:"application/json"}})}finally{clearTimeout(t)}};
+async function mapWithConcurrency<T,R>(items:T[],limit:number,worker:(item:T)=>Promise<R>):Promise<R[]>{
+  const results:R[]=new Array(items.length);
+  let cursor=0;
+  const workerCount=Math.min(items.length,Math.max(1,Math.floor(limit)||1));
+  await Promise.all(Array.from({length:workerCount},async()=>{
+    while(true){
+      const index=cursor++;
+      if(index>=items.length)return;
+      results[index]=await worker(items[index]);
+    }
+  }));
+  return results;
+}
 export async function weather(cityInput?:string,env?:Env){
   const city=String(cityInput||"Hurghada").trim().slice(0,100)||"Hurghada";
   try{
@@ -13,7 +26,32 @@ export async function weather(cityInput?:string,env?:Env){
     return{ok:true,provider:"Open-Meteo",city:place.name,region:place.admin1||"",country:place.country||"",latitude:place.latitude,longitude:place.longitude,current:d.current,timezone:d.timezone,stale:false,updatedAt:new Date().toISOString()};
   }catch(error){if(env)await recordRuntimeEventLimited(env,"weather_provider","weather_lookup_failed",error);return{ok:false,provider:"Open-Meteo",stale:true,city,message:"Weather provider temporarily unavailable"}}
 }
-export async function fx(env?:Env){try{const r=await timeout("https://api.frankfurter.dev/v2/rates?base=USD&quotes=EGP,EUR,GBP,SAR,AED,KWD,QAR,BHD,OMR,JOD,TRY,JPY,CNY,CAD,AUD,CHF,INR,ILS,LYD,TND,MAD,ZAR");if(!r.ok)throw 0;const d=await r.json<any>();const rates=Array.isArray(d)?Object.fromEntries(d.map((x:any)=>[String(x.quote).toUpperCase(),Number(x.rate)])):d.rates;if(!rates?.EGP)throw new Error("fx_data");return{ok:true,provider:"Frankfurter v2",base:"USD",rates,updatedAt:new Date().toISOString(),stale:false}}catch(error){if(env)await recordRuntimeEventLimited(env,"fx_provider","fx_lookup_failed",error);return{ok:false,provider:"Frankfurter",stale:true,message:"FX provider temporarily unavailable"}}}
+export async function fx(env?:Env){
+  try{
+    const r=await timeout("https://api.frankfurter.dev/v2/rates?base=USD&quotes=EGP,EUR,GBP,SAR,AED,KWD,QAR,BHD,OMR,JOD,TRY,JPY,CNY,CAD,AUD,CHF,INR,ILS,LYD,TND,MAD,ZAR");
+    if(!r.ok)throw new Error("frankfurter_http_"+r.status);
+    const d=await r.json<any>();
+    const rates=Array.isArray(d)?Object.fromEntries(d.map((x:any)=>[String(x.quote).toUpperCase(),Number(x.rate)])):d.rates;
+    if(!Number.isFinite(Number(rates?.EGP))||Number(rates.EGP)<=0)throw new Error("frankfurter_egp_unavailable");
+    return{ok:true,provider:"Frankfurter v2",base:"USD",rates,updatedAt:new Date().toISOString(),stale:false};
+  }catch(error){
+    if(env)await recordRuntimeEventLimited(env,"fx_provider","fx_primary_failed",error);
+  }
+  try{
+    const r=await timeout("https://open.er-api.com/v6/latest/USD",3500);
+    if(!r.ok)throw new Error("exchange_rate_api_http_"+r.status);
+    const d=await r.json<any>(),rates=d?.rates,egp=Number(rates?.EGP);
+    if(d?.result!=="success"||!Number.isFinite(egp)||egp<=0)throw new Error("exchange_rate_api_invalid_data");
+    const unix=Number(d?.time_last_update_unix);
+    const stamp=Number.isFinite(unix)&&unix>0?unix*1000:Date.parse(String(d?.time_last_update_utc||""));
+    const validStamp=Number.isFinite(stamp)&&stamp>0;
+    const updatedAt=validStamp?new Date(stamp).toISOString():new Date().toISOString();
+    return{ok:true,provider:"ExchangeRate-API Open Access (daily reference)",base:"USD",rates,updatedAt,stale:!validStamp||Date.now()-stamp>36*60*60*1000};
+  }catch(error){
+    if(env)await recordRuntimeEventLimited(env,"fx_provider","fx_fallback_failed",error);
+    return{ok:false,provider:"Frankfurter / ExchangeRate-API",stale:true,message:"FX providers temporarily unavailable"};
+  }
+}
 async function stooqQuote(symbol:string,stooqSymbol:string,env?:Env){
   try{
     const r=await timeout("https://stooq.com/q/l/?s="+encodeURIComponent(stooqSymbol)+"&i=d",3500);
@@ -77,7 +115,7 @@ async function marketQuote(symbol:string,env?:Env){
   return stooq[symbol]?stooqQuote(symbol,stooq[symbol],env):null;
 }
 async function extraMarkets(env?:Env){
-  const quotes=await Promise.all([marketQuote("SI=F",env),marketQuote("CL=F",env),marketQuote("GC=F",env),marketQuote("BTC-USD",env),marketQuote("ETH-USD",env),marketQuote("^GSPC",env),marketQuote("^IXIC",env)]);
+  const quotes=await mapWithConcurrency(["SI=F","CL=F","GC=F","BTC-USD","ETH-USD","^GSPC","^IXIC"],4,symbol=>marketQuote(symbol,env));
   const names:Record<string,{ar:string;en:string;unit:string;unitAr:string;unitEn:string}>={"SI=F":{ar:"الفضة",en:"Silver",unit:"USD / troy ounce",unitAr:"دولار أمريكي / أونصة تروي",unitEn:"USD / troy ounce"},"CL=F":{ar:"النفط الخام",en:"Crude oil",unit:"USD / barrel",unitAr:"دولار أمريكي / برميل",unitEn:"USD / barrel"},"GC=F":{ar:"العقود الآجلة للذهب",en:"Gold futures",unit:"USD / troy ounce",unitAr:"دولار أمريكي / أونصة تروي",unitEn:"USD / troy ounce"},"BTC-USD":{ar:"بيتكوين",en:"Bitcoin",unit:"USD",unitAr:"دولار أمريكي",unitEn:"USD"},"ETH-USD":{ar:"إيثيريوم",en:"Ethereum",unit:"USD",unitAr:"دولار أمريكي",unitEn:"USD"},"^GSPC":{ar:"مؤشر S&P 500",en:"S&P 500",unit:"index points",unitAr:"نقطة مؤشر",unitEn:"index points"},"^IXIC":{ar:"مؤشر ناسداك المركب",en:"Nasdaq Composite",unit:"index points",unitAr:"نقطة مؤشر",unitEn:"index points"}};
   return quotes.filter(Boolean).map((q:any)=>({...q,...names[q.symbol]}));
 }
