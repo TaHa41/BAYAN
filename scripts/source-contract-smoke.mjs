@@ -17,6 +17,8 @@ const evidenceDiversity = read("src/services/evidence-diversity.ts");
 const recovery = read("src/services/search-recovery.ts");
 const http = read("src/http.ts");
 const checks = [
+  ["bundled article fallback preserves bilingual hreflang links without D1 reads", read("src/index.ts").includes('const pairedSlug=slug.replace(lang==="ar"?/-ar$/:/-en$/,pairedLanguage==="ar"?"-ar":"-en")') && read("src/index.ts").includes('const ownSources=row._bundled?new Set<string>()') && read("src/index.ts").includes('articleAlternateLinks=')],
+
   ["admin dashboard normalizes unavailable API payloads and offers a safe retry instead of collapsing to a generic error", read("public/app-20261019-01.js").includes("const asItems=(value)=>Array.isArray(value)?value:[]") && read("public/app-20261019-01.js").includes("data.analytics?.topPages") && read("public/app-20261019-01.js").includes('id="adminRetry"') && read("public/app-20261019-01.js").includes("Some data services may be temporarily unavailable.")],
 
   ["bundled article pages avoid D1 article reads and translation scans during quota pressure", read("src/index.ts").includes('if(!bundledArticleBySlug(slug,lang))try{const row=await env.DB.prepare("SELECT title,summary FROM articles') && read("src/index.ts").includes('const bundled=bundledArticleBySlug(slug,lang);let row:any=bundled?') && read("src/index.ts").includes('row._bundled?new Set<string>()') && read("src/index.ts").includes('AND slug<>? LIMIT 12')],
