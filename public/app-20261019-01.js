@@ -504,11 +504,8 @@
       if (["science","technology","economy","politics","health","history","sports","travel","art","trends","prices","egypt","arab","world"].includes(section)) return section;
       return "articles";
     };
-    const answerText=String(data?.answer||"");
-    const answerUsable=Boolean(answerText)&&!/(تعذر تشغيل صياغة BAYAN الذكية الآن|drafting model is temporarily unavailable)/i.test(answerText);
     output.innerHTML = results.length
-      ? ((answerUsable ? '<article class="answer search-answer"><span class="eyebrow">' + t("إجابة بيان","BAYAN answer") + '</span><div class="article-body">' + renderArticleBody(answerText) + '</div>' + (data.articleSlug ? '<a class="read" href="/article/' + encodeURIComponent(data.articleSlug) + "?lang=" + lang + '">' + t("فتح الملف الكامل داخل بيان","Open the full BAYAN file") + " →</a>" : "") + "</article>" : "") +
-      (fallbackUsed ? '<div class="notice">' + t("هذه نتائج استكشافية من مسار احتياطي؛ لم تُعتبر تحققًا مستقلًا، ويعرض بيان حالة الأدلة بوضوح.","These are exploratory fallback results, not independently verified; BAYAN labels the evidence status explicitly.") + "</div>" : "") +
+      ? (      (fallbackUsed ? '<div class="notice">' + t("هذه نتائج استكشافية من مسار احتياطي؛ لم تُعتبر تحققًا مستقلًا، ويعرض بيان حالة الأدلة بوضوح.","These are exploratory fallback results, not independently verified; BAYAN labels the evidence status explicitly.") + "</div>" : "") +
       (bundledFallbackUsed ? '<div class="notice">' + t("نعرض مؤقتًا مواد من مكتبة بيان المحفوظة. افتح المادة لقراءة التفاصيل ومصادرها؛ وقد لا تظهر أحدث التحديثات الآن.","BAYAN is temporarily showing material from its saved knowledge library. Open an item for details and sources; the latest updates may not be available right now.") + "</div>" : "") +
       '<div class="search-tools" role="region" aria-label="' + t("أدوات تصفية البحث","Search filters") + '">' +
       '<div class="search-tools-top"><strong>' + t("النتائج","Results") + ' (' + results.length + ')</strong>' +
