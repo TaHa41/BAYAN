@@ -4,13 +4,12 @@ import { parseNewsSitemap } from "../scripts/news-sitemap-contract.mjs";
 const origin = "https://bayan.tahaomar411.workers.dev";
 
 describe("news sitemap contract", () => {
-  it("accepts public and published-article fallback URLs without pretending they are news articles", () => {
-    const xml = '<?xml version="1.0"?><urlset><url><loc>' + origin + '/</loc></url><url><loc>' + origin + '/about?lang=ar</loc></url><url><loc>' + origin + '/article/history-primary-sources-ar?lang=ar</loc></url></urlset>';
-    const result = parseNewsSitemap(xml, origin);
-    expect(result.urlCount).toBe(3);
-    expect(result.articleUrlCount).toBe(1);
+  it("accepts a valid empty Google News sitemap when no recent stories qualify", () => {
+    const result = parseNewsSitemap('<?xml version="1.0"?><urlset></urlset>', origin);
+    expect(result.urlCount).toBe(0);
     expect(result.newsArticleCount).toBe(0);
     expect(result.allUrlsSameOrigin).toBe(true);
+    expect(result.newsMetadataUrlsAreArticles).toBe(true);
   });
 
   it("counts only entries carrying Google News metadata as news articles", () => {
