@@ -12,7 +12,7 @@ async function openAIAllowed(env:Env){
 }
 async function handleOpenAIResponseFailure(env:Env,provider:"OpenAI draft"|"OpenAI answer",response:Response){
   let body:any={};
-  try{body=await response.clone().json()}catch{}
+  try{body=await response.clone().json()}catch(error){void error}
   const failure=classifyOpenAIFailure(response.status,body,response.headers);
   const breaker=await updateProviderBreaker(env,"openai",failure);
   await recordProviderDiagnostic(env,failure);
@@ -188,7 +188,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
       const answer=String((response as any)?.response||"").trim();
       if(answer)return answer;
       await recordAiFailure(env,"Workers AI draft","empty_response");
-    }catch(error){const failure=classifyWorkersAIFailure(error);await recordProviderDiagnostic(env,failure);await recordAiFailure(env,"Workers AI draft",failure.detail);}
+    }catch(error){const failure=classifyWorkersAIFailure(error);await recordProviderDiagnostic(env,failure);await recordAiFailure(env,"Workers AI draft",aiFailureDetail(error));await recordAiFailure(env,"Workers AI draft",failure.detail);}
     return "";
   };
   let raw=await generate("");
@@ -244,6 +244,6 @@ export async function ask(env:Env,question:string,locale:Locale,evidence:SearchR
     const answer=String((r as any)?.response||"").trim();
     if(answer && languageConsistent(answer,locale))return{status:independentSourceCount(env,evidence)>=2&&!answerHasUnsupportedSpecifics(answer,evidence,question)?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(x=>x.sources)};
     await recordAiFailure(env,"Workers AI answer",answer?"language_mismatch":"empty_response");
-  }catch(error){const failure=classifyWorkersAIFailure(error);await recordProviderDiagnostic(env,failure);await recordAiFailure(env,"Workers AI answer",failure.detail);}
+  }catch(error){const failure=classifyWorkersAIFailure(error);await recordProviderDiagnostic(env,failure);await recordAiFailure(env,"Workers AI answer",aiFailureDetail(error));await recordAiFailure(env,"Workers AI answer",failure.detail);}
   return{status:"mixed" as const,answer:locale==="ar"?"وجدت أدلة يمكن الرجوع إليها، لكن تعذر تشغيل صياغة BAYAN الذكية الآن. راجع الأدلة الظاهرة قبل اتخاذ قرار.":"Relevant evidence was found, but BAYAN's drafting model is temporarily unavailable. Review the evidence before acting.",sources:evidence.flatMap(x=>x.sources),reason:"ai_unavailable" as const}
 }
