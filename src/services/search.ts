@@ -7,6 +7,7 @@ import {ask,draftArticle,answerHasUnsupportedSpecifics,handleOpenAIResponseFailu
 import {findRelatedImage,searchNewsFeed,searchTrustedNewsFeeds} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 import {sectionForOpenedStory} from "./editorial";
+import {sections} from "../sections";
 import {requiredEvidencePublisherCount,independentEvidenceHost} from "./evidence-diversity";
 import {getProviderBreaker} from "./ai-provider-resilience";
 import {shouldAttemptOpenAIWebSearchFallback} from "./search-recovery";
@@ -74,7 +75,7 @@ const scoreSource=(publisher:string, title:string, q:string) => {
   return Math.min(100,score);
 };
 const source=(title:string,publisher:string,url:string):Source=>({title,publisher,url});
-const classifySection=(q:string,items:SearchResult[],language:Locale)=>{
+export const classifySection=(q:string,items:SearchResult[],language:Locale)=>{
  const personQuery=personLookup(q)||(nameOnlyArabicQuery(personQueryName(q))?personQueryName(q):undefined);
  if(personQuery&&items.some(x=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test((x.sources||[]).map(source=>source.publisher).join(" ")))&&items.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item)))return"people";
  if(/عالم مصري|عالمة|كيميائي/.test(String(items.slice(0,6).map(item=>String(item.title||"")+" "+String(item.summary||"")).join(" ")))&&personQuery)return"people";
@@ -86,6 +87,13 @@ const classifySection=(q:string,items:SearchResult[],language:Locale)=>{
  if(/(?:\bweather\b|\btemperature\b|\brainfall\b|\bexchange rate\b|\bcurrency price\b|\bgold price\b|\bmarket price\b|الطقس|درجات الحرارة|سعر الذهب|أسعار العملات|سعر الصرف|الأسعار المباشرة)/i.test(q+" "+title))return "prices";
  const inferred=sectionForOpenedStory(title,evidence);
  if(inferred!=="world")return inferred;
+ // The editorial classifier uses "world" as its legacy unknown-topic fallback.
+ // Preserve a concrete section attached to the strongest evidence instead of
+ // silently routing every unrecognized topic into Global Shifts.
+ const validSection=(value:unknown)=>sections.some(section=>section.slug===String(value||""));
+ const explicitSection=[lead?.section,...ordered.map(item=>item.section)].map(value=>String(value||"")).find(value=>validSection(value)&&value!=="world");
+ if(explicitSection)return explicitSection;
+ if(ordered.some(item=>item.kind==="news"||Boolean(item.publishedAt)))return "news";
  if(/(?:\btrend\b|\bviral\b|\bpopular\b|ترند|متداول|رائج|اهتمام الناس)/i.test(combined))return "trends";
  if(/(?:\begypt\b|\begyptian\b|\bcairo\b|\bcommunity\b|\bpublic service\b|مصر|المصري|القاهرة|مجتمع|خدمات عامة)/i.test(title+" "+String(lead?.summary||"")))return "egypt";
  if(/(?:\barab\b|\barabic\b|\barab league\b|العرب|عربي|العالم العربي|جامعة الدول العربية)/i.test(title+" "+String(lead?.summary||"")))return"arab";
