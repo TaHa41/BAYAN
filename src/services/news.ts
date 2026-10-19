@@ -84,7 +84,7 @@ const esc = (s: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-const readFeed = async (name: string, url: string): Promise<Story[]> => {
+const readFeed = async (name: string, url: string, diagnostics?: string[]): Promise<Story[]> => {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
@@ -95,7 +95,7 @@ const readFeed = async (name: string, url: string): Promise<Story[]> => {
         signal: controller.signal,
         headers: { accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, */*", "user-agent": "BAYAN/1.3 (+https://bayan.tahaomar411.workers.dev)" },
       });
-      if (!response.ok) return [];
+      if (!response.ok) { diagnostics?.push(name + " HTTP " + response.status); return []; }
       // RSS feeds are untrusted upstream payloads. Keep the abort timer active
       // while consuming the body, and cap decompressed bytes before regex parsing.
       const maxFeedBytes = 384 * 1024;
@@ -173,7 +173,8 @@ const readFeed = async (name: string, url: string): Promise<Story[]> => {
         imageAlt: title,
       };
     }).filter((story) => story.title && story.url);
-  } catch {
+  } catch (error) {
+    diagnostics?.push(name + " failed: " + String(error instanceof Error ? error.message : error).slice(0, 120));
     return [];
   }
 };
@@ -234,32 +235,39 @@ const searchStopWords = new Set([
 ]);
 
 export async function searchTrustedNewsFeeds(query:string,lang:Locale,diagnostics?:string[]):Promise<Story[]>{
-  const queryTerms=[...new Set(terms(query).filter(term=>!searchStopWords.has(term)))];
-  if(!queryTerms.length)return[];
-  const minimumMatches=queryTerms.length<=2?1:2;
+  const normalize=(value:string)=>String(value||"").normalize("NFKC").toLowerCase().replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/\\u0640/g,"").replace(/[^\\p{L}\\p{N}]+/gu," ").trim();
+  const queryTerms=[...new Set(normalize(query).split(/\\s+/).filter(term=>term.length>=3&&!searchStopWords.has(term)))].slice(0,8);
+  if(!queryTerms.length){diagnostics?.push("Trusted RSS skipped: no meaningful query terms");return[];}
+  const minimumMatches=Math.min(2,queryTerms.length);
+  const now=Date.now(),cutoff=now-48*60*60*1000,futureLimit=now+5*60*1000;
   const directFeeds=feeds(lang).filter(([name])=>!/(?:google|أخبار google)/i.test(name)).slice(0,7);
   const batches=await Promise.all(directFeeds.map(async([name,url])=>{
-    const stories=await readFeed(name,url);
+    const stories=await readFeed(name,url,diagnostics);
     const relevant=stories.map(story=>{
-      const text=(story.title+" "+story.summary).normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ");
+      const published=Date.parse(String(story.publishedAt||""));
+      const text=normalize(story.title+" "+story.summary);
       const matched=queryTerms.filter(term=>text.includes(term)).length;
-      return {story,matched};
-    }).filter(item=>item.matched>=minimumMatches&&item.story.title.trim()&&item.story.summary.trim().length>=80&&/^https:\/\//i.test(item.story.url));
-    diagnostics?.push("Trusted RSS "+name+" parsed="+stories.length+" relevant="+relevant.length);
+      return {story,matched,published};
+    }).filter(item=>item.matched>=minimumMatches&&item.story.title.trim()&&item.story.summary.trim().length>=80&&Number.isFinite(item.published)&&item.published>=cutoff&&item.published<=futureLimit&&/^https:\\/\\//i.test(item.story.url));
+    diagnostics?.push("Trusted RSS "+name+" parsed="+stories.length+" relevant_recent="+relevant.length);
     return relevant;
   }));
-  const seen=new Set<string>();
-  return batches.flat().sort((a,b)=>b.matched-a.matched||Date.parse(b.story.publishedAt||"")-Date.parse(a.story.publishedAt||"")).filter(({story})=>{
+  const ranked=batches.flat().sort((a,b)=>b.matched-a.matched||b.published-a.published);
+  const seenUrls=new Set<string>(),seenPublishers=new Set<string>(),seenHosts=new Set<string>(),output:Story[]=[];
+  for(const item of ranked){
     try{
-      const url=new URL(story.url);
-      if(url.protocol!=="https:"||url.username||url.password||/(?:^|\.)news\.google\.com$|(?:^|\.)wikipedia\.org$|(?:^|\.)wikidata\.org$|(?:^|\.)workers\.dev$/i.test(url.hostname))return false;
+      const url=new URL(item.story.url);
+      if(url.protocol!=="https:"||url.username||url.password||/(?:^|\\.)news\\.google\\.com$|(?:^|\\.)wikipedia\\.org$|(?:^|\\.)wikidata\\.org$|(?:^|\\.)workers\\.dev$/i.test(url.hostname))continue;
       url.hash="";
-      const key=url.toString().replace(/\/$/,"");
-      if(seen.has(key))return false;
-      seen.add(key);
-      return true;
-    }catch{return false}
-  }).slice(0,20).map(item=>item.story);
+      const key=url.toString().replace(/\\/$/,""),host=url.hostname.toLowerCase().replace(/^www\\./,"");
+      const publisher=normalize(item.story.publisher)||host;
+      if(seenUrls.has(key)||seenPublishers.has(publisher)||seenHosts.has(host))continue;
+      seenUrls.add(key);seenPublishers.add(publisher);seenHosts.add(host);output.push(item.story);
+      if(output.length>=7)break;
+    }catch{}
+  }
+  diagnostics?.push("Trusted RSS query_terms="+queryTerms.length+" recent_matches="+ranked.length+" independent_publishers="+output.length);
+  return output;
 }
 
 const wikidataImage = async (query: string, context = "", env?: Env): Promise<string | undefined> => {
