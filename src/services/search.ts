@@ -795,7 +795,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   let google:Candidate[]=[];
   const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers"];
   providerAttempted.push(...providerDiagnostics);
-  const bundledFallback:Candidate[]=bundledSearchArticles(q,language,Math.min(max,12)).map((item:any)=>({
+  const bundledFallback:Candidate[]=bundledSearchArticles(q,language,Math.min(max,12)).map((item:any):Candidate=>({
     title:String(item.title||""),summary:String(item.summary||""),section:String(item.section||"world"),slug:String(item.slug||""),kind:"article",
     evidence:item.fallbackEvidence==="verified"?"verified":"source_only",
     sources:(Array.isArray(item.sources)?item.sources:[]).slice(0,6).map((src:any)=>({title:String(src.title||item.title||""),publisher:String(src.publisher||""),url:String(src.url||"")})).filter((src:Source)=>/^https:\/\//i.test(src.url)),
