@@ -4,7 +4,7 @@ import {searchArticles,saveSearch,publishVerifiedResearch,publicationRejectionRe
 import {boundedLikeKeywords,escapedLikePattern} from "../search-patterns";
 import {recordRuntimeEventLimited} from "../runtime-events";
 import {ask,draftArticle,answerHasUnsupportedSpecifics,handleOpenAIResponseFailure} from "./ai";
-import {findRelatedImage,searchNewsFeed} from "./news";
+import {findRelatedImage,searchNewsFeed,searchTrustedNewsFeeds} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 import {sectionForOpenedStory} from "./editorial";
 import {requiredEvidencePublisherCount} from "./evidence-diversity";
@@ -192,6 +192,14 @@ async function wikidataEntityAliases(qid:string,diagnostics?:string[]):Promise<s
 }
 
 const decodeXml=(value:string)=>String(value||"").replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,"$1").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n)));
+async function trustedPublisherRssSearch(q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
+  const stories=await searchTrustedNewsFeeds(q,language,diagnostics);
+  return stories.slice(0,12).map(story=>{
+    const title=cleanText(story.title),url=String(story.url||""),publisher=cleanText(story.publisher||"Trusted publisher");
+    const summary=cleanText(story.summary||"").slice(0,1400);
+    return {title,summary,section:sectionForOpenedStory(title,summary),kind:"web" as const,evidence:"mixed" as const,sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+8,provider:"Trusted Publisher RSS Search"};
+  }).filter(item=>item.title&&item.summary.length>=80&&/^https:\/\//i.test(item.url));
+}
 async function googleNewsSearch(q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
   try{
     const stories=await searchNewsFeed(q,language);
@@ -557,7 +565,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   // when evidence is still sparse. This avoids unnecessary provider load while
   // keeping the worst-case recovery window short enough for the browser request.
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,publicationResearch?2:1);
-  const labels=["Wikipedia REST Search","Google News Search","Bing Web RSS Search"];
+  const labels=["Wikipedia REST Search","Google News Search","Bing Web RSS Search","Trusted Publisher RSS Search"];
   const runVariant=async(variant:string,variantIndex:number):Promise<Candidate[]>=>{
     // GDELT repeatedly timed out in production and amplified request fan-out.
     // Keep each recovery variant to three independent providers; try a second
@@ -565,7 +573,8 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
     const results=await Promise.all([
       wikipediaRestSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Wikipedia REST Search",error);return[]}),
       googleNewsSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Google News Search",error);return[]}),
-      bingWebRssSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing Web RSS Search",error);return[]})
+      bingWebRssSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing Web RSS Search",error);return[]}),
+      variantIndex===0?trustedPublisherRssSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Trusted Publisher RSS Search",error);return[]}):Promise.resolve([])
     ]);
     diagnostics.push("Expanded variant "+(variantIndex+1)+" result counts: "+labels.map((label,index)=>label+"="+(results[index]?.length||0)).join(", "));
     return results.flat();
