@@ -44,6 +44,12 @@ describe("live provider resilience", () => {
     let maximumActive = 0;
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (url.includes("api.frankfurter.dev")) {
+        return new Response(JSON.stringify([{ date: "2026-10-19", base: "USD", quote: "EGP", rate: 48.5 }]), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      }
       active += 1;
       maximumActive = Math.max(maximumActive, active);
       await new Promise(resolve => setTimeout(resolve, 12));
