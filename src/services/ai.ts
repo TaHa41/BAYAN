@@ -143,9 +143,8 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
       }
       if(typeof value!=="string")continue;
       const text=value.trim();
-      const matches=[...text.matchAll(/(?:\\bsource\\s*[-_ ]?\\s*|\\bS\\s*[-_ ]?\\s*)(\\d+)\\b/gi)];
-      if(matches.length)ids.push(...matches.map(match=>"S"+match[1]));
-      else if(/^\\d+$/.test(text))ids.push("S"+text);
+      const matches=[...text.matchAll(/(?:\bsource\s*[-_ ]?\s*|\bS\s*[-_ ]?\s*)(\d+)\b/gi);
+      else if(/^\d+$/.test(text))ids.push("S"+text);
     }
     return[...new Set(ids)].filter(id=>evidenceById.has(id));
   };
@@ -169,7 +168,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
             invalidSourceIdSentences+=1;
             continue;
           }
-          const text=rawText.replace(/\\s+/g," ").trim().slice(0,900);
+          const text=rawText.replace(/\s+/g," ").trim().slice(0,900);
           if(!text)continue;
           sentences.push({text,sourceIds:sourceIds.slice(0,4)});
         }
