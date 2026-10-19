@@ -320,17 +320,8 @@ const inferStoredArticleSection=(item:any)=>{
  const inferred=editorialSectionForOpenedStory(title,summary);
  return inferred==="world"?String(item?.section||"world"):inferred;
 };
-items=items.map((item:any)=>({...item,section:inferStoredArticleSection(item)}));
-try{
- const crossSection=await env.DB.prepare("SELECT * FROM articles WHERE language=? AND status='PUBLISHED' AND section!=? ORDER BY updated_at DESC LIMIT 100").bind(lang,section).all<any>();
- const seenSlugs=new Set(items.map((item:any)=>String(item.slug||"")).filter(Boolean));
- for(const row of crossSection.results||[]){
-  const slug=String(row.slug||"");if(!slug||seenSlugs.has(slug))continue;
-  let sources:any[]=[];try{const parsed=JSON.parse(String(row.sources_json||"[]"));if(Array.isArray(parsed))sources=parsed}catch(error){await recordRuntimeEventLimited(env,"section_source_parse","section_article_sources_invalid",error)}
-  const candidate={...row,sources,createdAt:row.created_at,updatedAt:row.updated_at,imageUrl:row.image_url,imageAlt:row.image_alt};
-  if(inferStoredArticleSection(candidate)===section){items.push({...candidate,section});seenSlugs.add(slug);}
- }
-}catch(error){await recordRuntimeEventLimited(env,"section_reclassification","cross_section_article_lookup_failed",error)}
+items=items.filter((item:any)=>String(item.section||"")===section);
+
 items=items.filter((x:any)=>(x.slug?String(x.section||"")===section:sectionRelevant(x))&&(x.kind==="evidence"||(articleBodyQuality(String(x.body||"")).ok&&articleEvidenceQuality(x.sources)))).filter(localeSafeItem);
 items=items.filter((x:any)=>x.kind==="evidence"||/^https:\/\//i.test(String(x.imageUrl||"")));
 if(items.length<2&&section!=="prices"){
@@ -346,7 +337,7 @@ if(items.length<2&&section!=="prices"){
      const title=String(item?.title||""),summary=String(item?.summary||"");
      const key=title.normalize("NFKC").toLowerCase().trim();
      if(!title||!summary||!key||seenCached.has(key))continue;
-     if(!localeSafeItem(item)||!sectionRelevant(item)||!safePublicImageUrl(item.imageUrl))continue;
+     if(!localeSafeItem(item)||!sectionRelevant(item)||editorialSectionForOpenedStory(title,summary)!==section||!safePublicImageUrl(item.imageUrl))continue;
      seenCached.add(key);cachedEvidence.push({...item,section,kind:"evidence"});
      if(cachedEvidence.length>=8)break;
     }
@@ -367,7 +358,7 @@ try{
   const archived=await env.DB.prepare("SELECT id,title,summary,publisher,published_at,image_url,image_alt,section,fetched_at FROM news_archive WHERE language=? AND section=? AND fetched_at>=? AND published_at>=? AND published_at<=? AND length(summary)>=120 AND image_url IS NOT NULL AND trim(image_url)<>'' ORDER BY published_at DESC LIMIT 12").bind(lang,section,newsCutoff,newsCutoff,newsFuture).all<any>();
   for(const row of archived.results||[]){
     const title=String(row.title||""),summary=String(row.summary||""),imageUrl=safePublicImageUrl(row.image_url);
-    if(!title||summary.length<120||!imageUrl||!localeSafeItem({title,summary})||items.some((item:any)=>String(item.title||"").trim().toLowerCase()===title.trim().toLowerCase()))continue;
+    if(!title||summary.length<120||!imageUrl||!localeSafeItem({title,summary})||editorialSectionForOpenedStory(title,summary)!==section||!sectionRelevant({title,summary})||items.some((item:any)=>String(item.title||"").trim().toLowerCase()===title.trim().toLowerCase()))continue;
     items.push({id:Number(row.id),title,summary,publisher:String(row.publisher||""),publishedAt:row.published_at||null,imageUrl,imageAlt:String(row.image_alt||title),section,kind:"news_archive",body:summary,slug:"",href:"/news?archive="+encodeURIComponent(String(row.id))+"&lang="+lang,sources:[],archivedAt:String(row.fetched_at||"")});
   }
 }catch(error){await recordRuntimeEventLimited(env,"section_news_archive","section_news_archive_query_failed",error)}
