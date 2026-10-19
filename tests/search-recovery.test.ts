@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { externalSearchRecovery, shouldAttemptOpenAIWebSearchFallback } from "../src/services/search-recovery";
 import { normalizeBingNewsUrl } from "../src/services/search";
+import { independentEvidenceHost, requiredEvidencePublisherCount } from "../src/services/evidence-diversity";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -109,5 +110,31 @@ describe("Bing News RSS URL safety", () => {
     expect(normalizeBingNewsUrl("http://news.example.com/article")).toBeUndefined();
     expect(normalizeBingNewsUrl("https://news.example.com/article")).toBe("https://news.example.com/article");
     expect(normalizeBingNewsUrl("https://user:secret@news.example.com/article")).toBeUndefined();
+  });
+});
+
+describe("independent evidence diversity", () => {
+  it("counts real HTTPS publisher hosts", () => {
+    expect(independentEvidenceHost("BBC News", "https://www.bbc.com/news/example")).toBe("bbc.com");
+    expect(independentEvidenceHost("Reuters", "https://www.reuters.com/world/example")).toBe("reuters.com");
+  });
+
+  it("does not let internal BAYAN sources satisfy external diversity", () => {
+    expect(independentEvidenceHost("BAYAN Knowledge Base", "https://example.org/article")).toBeUndefined();
+    expect(independentEvidenceHost("BAYAN Recent News Archive", "https://example.org/story")).toBeUndefined();
+    expect(independentEvidenceHost("BAYAN", "https://bayan.tahaomar411.workers.dev/article")).toBeUndefined();
+  });
+
+  it("excludes aggregators, insecure URLs, and credential-bearing URLs", () => {
+    expect(independentEvidenceHost("BBC News", "https://news.google.com/rss/articles/123")).toBeUndefined();
+    expect(independentEvidenceHost("Reuters", "https://www.bing.com/news/articles/123")).toBeUndefined();
+    expect(independentEvidenceHost("Reuters", "http://www.reuters.com/world/example")).toBeUndefined();
+    expect(independentEvidenceHost("Reuters", "https://user:pass@reuters.com/world/example")).toBeUndefined();
+  });
+
+  it("keeps the five-independent-publisher publication threshold", () => {
+    expect(requiredEvidencePublisherCount(true, 3)).toBe(5);
+    expect(requiredEvidencePublisherCount(true, 7)).toBe(7);
+    expect(requiredEvidencePublisherCount(false, 3)).toBe(2);
   });
 });
