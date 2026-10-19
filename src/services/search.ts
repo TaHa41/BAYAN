@@ -92,7 +92,7 @@ export const classifySection=(q:string,items:SearchResult[],language:Locale)=>{
  // silently routing every unrecognized topic into Global Shifts.
  const validSection=(value:unknown)=>sections.some(section=>section.slug===String(value||""));
  const explicitSection=[lead?.section,...ordered.map(item=>item.section)].map(value=>String(value||"")).find(value=>validSection(value)&&value!=="world");
- if(explicitSection&&isContentForSection(explicitSection,title,String(lead?.summary||"")))return explicitSection;
+ if(explicitSection&&(isContentForSection(explicitSection,title,String(lead?.summary||""))||(explicitSection==="travel"&&/(?:transit|transport|transportation|commute|public transport|تنقل|مواصلات|النقل|وسائل النقل)/i.test(title+" "+String(lead?.summary||"")))))return explicitSection;
  if(ordered.some(item=>String((item as any).kind||"")==="news"||Boolean((item as any).publishedAt)))return "news";
  if(/(?:\btrend\b|\bviral\b|\bpopular\b|ترند|متداول|رائج|اهتمام الناس)/i.test(combined))return "trends";
  if(/(?:\bcommunity\b|\bcommunities\b|\bsociety\b|\bsocial issue\b|\bpublic service\b|\bdaily life\b|\bhousing\b|\bfamilies\b|\bcost of living\b|مجتمع|مجتمعات|قضية اجتماعية|قضايا اجتماعية|خدمة عامة|خدمات عامة|الحياة اليومية|السكن|الأسرة|تكلفة المعيشة|المعيشة|السكان)/i.test(title+" "+String(lead?.summary||"")))return "egypt";
