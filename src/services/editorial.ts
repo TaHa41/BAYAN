@@ -28,7 +28,7 @@ export function sectionForOpenedStory(title:string,summary:string){
  if(/(?:idea|ideas|debate|philosophy|philosophical|argument|ethics|ethical dilemma|critical thinking|viewpoint|opinion piece|intellectual discussion|أفكار|فكرة|نقاش|نقاشات|فلسفة|فلسفي|جدل|حجة|أخلاقيات|معضلة أخلاقية|تفكير نقدي|وجهة نظر|رأي|آراء|قضية فكرية|حوار فكري)/i.test(all))return "arab";
  if(/(?:community|communities|society|social issue|public service|daily life|housing|family policy|cost of living|مجتمع|مجتمعات|قضية اجتماعية|قضايا اجتماعية|خدمة عامة|خدمات عامة|الحياة اليومية|السكن|الأسرة|تكلفة المعيشة|المعيشة|السكان)/i.test(all))return "egypt";
  if(/(?:breaking|latest|today|reported|announced|statement|press release|عاجل|آخر التطورات|اليوم|أعلنت|أعلن|بيان رسمي|تطورات جديدة)/i.test(all))return "news";
- return "world";
+ return "unclassified";
 }
 
 /**
