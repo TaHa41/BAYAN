@@ -17,6 +17,8 @@ const evidenceDiversity = read("src/services/evidence-diversity.ts");
 const recovery = read("src/services/search-recovery.ts");
 const http = read("src/http.ts");
 const checks = [
+  ["database-backed article pages use one full-row lookup, preserve honest 404/503 status, and bound hreflang pairing to one exact counterpart lookup", !read("src/index.ts").includes("SELECT 1 AS found FROM articles WHERE slug=? AND language=?") && !read("src/index.ts").includes("SELECT title,summary FROM articles WHERE slug=? AND language=?") && read("src/index.ts").includes("let articleDatabaseUnavailable=false") && read("src/index.ts").includes("return notFoundResponse(lang)") && read("src/index.ts").includes("SELECT slug,sources_json FROM articles WHERE slug=? AND language=?") && !read("src/index.ts").includes("AND slug<>? LIMIT 12")],
+
   ["news archive uses index-friendly filters and caches only successful unfiltered reads", read("src/routes/api.ts").includes('const cacheable=!q&&archiveId===0') && read("src/routes/api.ts").includes('caches.default.match(cacheKey)') && read("src/routes/api.ts").includes('caches.default.put(cacheKey,response.clone())') && read("src/routes/api.ts").includes('where.push("section=?")') && read("src/routes/api.ts").includes('ORDER BY published_at DESC,fetched_at DESC LIMIT ?') && !read("src/routes/api.ts").includes('ORDER BY COALESCE(published_at,fetched_at) DESC LIMIT ?')],
 
   ["bundled article fallback preserves bilingual hreflang links without D1 reads", read("src/index.ts").includes('const pairedSlug=slug.replace(lang==="ar"?/-ar$/:/-en$/,pairedLanguage==="ar"?"-ar":"-en")') && read("src/index.ts").includes('const ownSources=row._bundled?new Set<string>()') && read("src/index.ts").includes('articleAlternateLinks=')],
