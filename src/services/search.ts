@@ -308,11 +308,25 @@ async function openAiWebSearch(env:Env,q:string,language:Locale,diagnostics?:str
 async function openAlex(q:string,diagnostics?:string[]):Promise<Candidate[]>{
  try{const u="https://api.openalex.org/works?search="+encodeURIComponent(q)+"&per-page=5";const r=await timeout(u,4000,diagnostics,"OpenAlex");if(!r.ok)return[];const d=await r.json<any>();return(d.results||[]).map((x:any)=>({title:cleanText(x.title||""),summary:cleanText(x.abstract_inverted_index?Object.keys(x.abstract_inverted_index).slice(0,80).join(" "):x.primary_location?.source?.display_name||"Research work"),section:"science",kind:"web",evidence:"mixed",sources:[source(x.title||"Research work","OpenAlex",x.id)],url:x.id,score:64,provider:"OpenAlex"})).filter((x:any)=>x.title)}catch(error){reportProviderFailure(diagnostics,"OpenAlex",error);return[]}
 }
-async function aiSearch(env:Env,q:string,diagnostics?:string[]):Promise<Candidate[]>{
+async function aiSearch(env:Env,q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
   try{
-    const instanceName=String(env.BAYAN_AI_SEARCH_INSTANCE||"").trim();if(!env.AI_SEARCH||!instanceName||instanceName.toLowerCase()==="default")return[]; const r=await env.AI_SEARCH.get(instanceName).search({messages:[{role:"user",content:q}]});
-    const chunks=Array.isArray((r as any)?.chunks)?(r as any).chunks:[];
-    return chunks.slice(0,12).map((x:any)=>({title:cleanText(x.title||x.filename||"BAYAN evidence"),summary:cleanText(x.content||x.text||"").slice(0,1800),section:String(x.metadata?.section||"world"),kind:"web",evidence:"mixed",sources:[source(cleanText(x.title||"Evidence"),String(x.metadata?.publisher||"BAYAN AI Search"),String(x.url||"https://bayan.tahaomar411.workers.dev/"))],score:58,provider:"Cloudflare AI Search"}));
+    // The binding name is the namespace; the instance is bayan-search. Never
+    // default to "default", which is not an AI Search instance ID.
+    const instanceName=String(env.BAYAN_AI_SEARCH_INSTANCE||"bayan-search").trim();
+    if(!env.AI_SEARCH||!instanceName||instanceName.toLowerCase()==="default")return[];
+    const r=await env.AI_SEARCH.get(instanceName).search({messages:[{role:"user",content:q}]});
+    const response=r as any;
+    const chunks=Array.isArray(response?.chunks)?response.chunks:Array.isArray(response?.result?.chunks)?response.result.chunks:[];
+    return chunks.slice(0,12).map((x:any)=>{
+      const item=x?.item||{};
+      const metadata=item?.metadata||x?.metadata||{};
+      const url=String(x?.url||metadata?.url||item?.key||"").trim();
+      const title=cleanText(x?.title||metadata?.title||x?.filename||"BAYAN evidence");
+      const summary=cleanText(x?.summary||x?.content||x?.text||metadata?.description||"").slice(0,1800);
+      const indexedLanguage=String(metadata?.language||"").toLowerCase();
+      const isInternal=(()=>{try{return new URL(url).origin==="https://bayan.tahaomar411.workers.dev"}catch{return false}})();
+      return {title,summary,section:String(metadata?.section||"world"),kind:isInternal&&new URL(url).pathname.startsWith("/article/")?"article":"web",evidence:"source_only",sources:[source(title,isInternal?"BAYAN internal index":String(metadata?.publisher||"BAYAN AI Search"),url||"https://bayan.tahaomar411.workers.dev/")],url,score:58,provider:"Cloudflare AI Search",language:indexedLanguage};
+    }).filter((x:any)=>x.title&&x.summary&&(!x.language||x.language===language)&&(!x.url||/^https:\/\//i.test(x.url))).map(({language:_language,...candidate}:any)=>candidate);
   }catch(error){reportProviderFailure(diagnostics,"Cloudflare AI Search",error);return[]}
 }
 async function duck(q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
@@ -770,7 +784,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language,providerDiagnostics),[],"Wikipedia"),
     safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipediaRestSearch(q,language,providerDiagnostics),[],"Wikipedia REST Search"),
     safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language,providerDiagnostics),[],"Wikidata"),
-    safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q,providerDiagnostics),[],"Cloudflare AI Search"),
+    safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q,language,providerDiagnostics),[],"Cloudflare AI Search"),
     safe(duck(q,language,providerDiagnostics),[],"DuckDuckGo Instant Answers"),
     safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q,providerDiagnostics),[],"OpenAlex"),
     safe((academicQuery&&!personLookup(q))?crossrefSearch(q,providerDiagnostics):Promise.resolve([]),[],"Crossref"),
