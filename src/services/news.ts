@@ -241,10 +241,10 @@ export async function searchTrustedNewsFeeds(query:string,lang:Locale,diagnostic
   const batches=await Promise.all(directFeeds.map(async([name,url])=>{
     const stories=await readFeed(name,url);
     const relevant=stories.map(story=>{
-      const text=(story.title+" "+story.summary).normalize("NFKC").toLowerCase().replace(/[\\u064B-\\u065F\\u0670]/g,"").replace(/[^\\p{L}\\p{N}]+/gu," ");
+      const text=(story.title+" "+story.summary).normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ");
       const matched=queryTerms.filter(term=>text.includes(term)).length;
       return {story,matched};
-    }).filter(item=>item.matched>=minimumMatches&&item.story.title.trim()&&item.story.summary.trim().length>=80&&/^https:\\/\\//i.test(item.story.url));
+    }).filter(item=>item.matched>=minimumMatches&&item.story.title.trim()&&item.story.summary.trim().length>=80&&/^https:\/\//i.test(item.story.url));
     diagnostics?.push("Trusted RSS "+name+" parsed="+stories.length+" relevant="+relevant.length);
     return relevant;
   }));
@@ -252,9 +252,9 @@ export async function searchTrustedNewsFeeds(query:string,lang:Locale,diagnostic
   return batches.flat().sort((a,b)=>b.matched-a.matched||Date.parse(b.story.publishedAt||"")-Date.parse(a.story.publishedAt||"")).filter(({story})=>{
     try{
       const url=new URL(story.url);
-      if(url.protocol!=="https:"||url.username||url.password||/(?:^|\\.)news\\.google\\.com$|(?:^|\\.)wikipedia\\.org$|(?:^|\\.)wikidata\\.org$|(?:^|\\.)workers\\.dev$/i.test(url.hostname))return false;
+      if(url.protocol!=="https:"||url.username||url.password||/(?:^|\.)news\.google\.com$|(?:^|\.)wikipedia\.org$|(?:^|\.)wikidata\.org$|(?:^|\.)workers\.dev$/i.test(url.hostname))return false;
       url.hash="";
-      const key=url.toString().replace(/\\/$/,"");
+      const key=url.toString().replace(/\/$/,"");
       if(seen.has(key))return false;
       seen.add(key);
       return true;
