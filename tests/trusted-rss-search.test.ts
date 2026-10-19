@@ -25,8 +25,9 @@ describe("trusted publisher RSS search fallback", () => {
       const xml = '<rss><channel><item><title>Central bank reviews interest rates after inflation report</title><description>Central bank officials reviewed interest rates after new inflation data. Economists said the decision could affect borrowing costs and financial markets.</description><link>' + storyUrl + '</link><pubDate>' + new Date(Date.now() - 5 * 60 * 1000).toUTCString() + '</pubDate></item></channel></rss>';
       return new Response(xml, { status: 200, headers: { "content-type": "application/rss+xml" } });
     }));
-    const results = await searchTrustedNewsFeeds("central bank interest rates", "en");
-    expect(results.length).toBeGreaterThanOrEqual(5);
+    const diagnostics: string[] = [];
+    const results = await searchTrustedNewsFeeds("central bank interest rates", "en", diagnostics);
+    expect(results.length, diagnostics.join("; ")).toBeGreaterThanOrEqual(5);
     expect(new Set(results.map(result => result.publisher)).size).toBeGreaterThanOrEqual(5);
     expect(new Set(results.map(result => new URL(result.url).hostname)).size).toBeGreaterThanOrEqual(5);
     expect(results.every(result => !/news\.google\.com|wikipedia\.org|wikidata\.org/.test(result.url))).toBe(true);
