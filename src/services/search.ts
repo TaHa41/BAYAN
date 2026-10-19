@@ -17,14 +17,14 @@ type Candidate = SearchResult & {score:number; provider:string; identityAliases?
 export function hasDiverseIndependentEvidence(items:Array<{summary?:string;url?:string;sources?:Array<{publisher?:string;url?:string}>}>,requiredPublishers=2,minSubstantive=2):boolean{
   const publishers=new Set<string>(),hosts=new Set<string>();
   const excludedPublisher=/(?:wikipedia|wikidata|ويكيبيديا|ويكي بيانات|google news|bing news|bing web|duckduckgo|bayan knowledge base|bayan recent news archive)/i;
-  const excludedHost=/(?:^|\\.)wikipedia\\.org$|(?:^|\\.)wikidata\\.org$|(?:^|\\.)news\\.google\\.com$|(?:^|\\.)bing\\.com$|(?:^|\\.)duckduckgo\\.com$|(?:^|\\.)workers\\.dev$/i;
+  const excludedHost=/(?:^|\.)wikipedia\.org$|(?:^|\.)wikidata\.org$|(?:^|\.)news\.google\.com$|(?:^|\.)bing\.com$|(?:^|\.)duckduckgo\.com$|(?:^|\.)workers\.dev$/i;
   for(const item of items){
     for(const source of Array.isArray(item.sources)?item.sources:[]){
       let host="";
       try{
         const url=new URL(String(source.url||item.url||""));
         if(url.protocol!=="https:"||url.username||url.password)continue;
-        host=url.hostname.toLowerCase().replace(/^www\\./,"");
+        host=url.hostname.toLowerCase().replace(/^www\./,"");
         if(!host||excludedHost.test(host))continue;
         hosts.add(host);
       }catch{continue}
