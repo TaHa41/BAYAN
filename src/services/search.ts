@@ -735,7 +735,7 @@ export async function search(env:Env,q:string,language:Locale,options:{publish?:
   // Reuse a recent, previously verified answer when its evidence is still source-diverse.
   // This avoids re-running the full external-provider fan-out for repeat queries.
   // Person and explicit-news searches must run fresh discovery: a cached general answer can collapse a multi-result query into stale or wrongly typed cards. Keep cache reuse for broad research queries only.
-  if(!options.publish&&!options.images&&!options.background&&!options.healthCheck&&!["person","news"].includes(intent(q))){
+  if(!options.publish&&!options.images&&!options.background&&!options.healthCheck&&!personLookup(q)&&!nameOnlyArabicQuery(q)&&intent(q)!=="news"){
     try{
       const since=new Date(Date.now()-5*60*1000).toISOString();
       const cached=await env.DB.prepare("SELECT results_json,status,created_at FROM searches WHERE query=? AND language=? AND created_at>=? AND status IN ('verified','mixed') ORDER BY created_at DESC LIMIT 1").bind(q,language,since).first<any>();
