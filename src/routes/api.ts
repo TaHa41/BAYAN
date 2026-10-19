@@ -332,7 +332,7 @@ if(items.length<2&&section!=="prices"){
      const title=String(item?.title||""),summary=String(item?.summary||"");
      const key=title.normalize("NFKC").toLowerCase().trim();
      if(!title||!summary||!key||seenCached.has(key))continue;
-     if(!localeSafeItem(item)||!sectionRelevant(item)||!isContentForSection(section,title,summary)||!safePublicImageUrl(item.imageUrl))continue;
+     if(!localeSafeItem(item)||!isContentForSection(section,title,summary)||!safePublicImageUrl(item.imageUrl))continue;
      seenCached.add(key);cachedEvidence.push({...item,section,kind:"evidence"});
      if(cachedEvidence.length>=8)break;
     }
@@ -353,7 +353,7 @@ try{
   const archived=await env.DB.prepare("SELECT id,title,summary,publisher,published_at,image_url,image_alt,section,fetched_at FROM news_archive WHERE language=? AND section=? AND fetched_at>=? AND published_at>=? AND published_at<=? AND length(summary)>=120 AND image_url IS NOT NULL AND trim(image_url)<>'' ORDER BY published_at DESC LIMIT 12").bind(lang,section,newsCutoff,newsCutoff,newsFuture).all<any>();
   for(const row of archived.results||[]){
     const title=String(row.title||""),summary=String(row.summary||""),imageUrl=safePublicImageUrl(row.image_url);
-    if(!title||summary.length<120||!imageUrl||!localeSafeItem({title,summary})||!isContentForSection(section,title,summary)||!sectionRelevant({title,summary})||items.some((item:any)=>String(item.title||"").trim().toLowerCase()===title.trim().toLowerCase()))continue;
+    if(!title||summary.length<120||!imageUrl||!localeSafeItem({title,summary})||!isContentForSection(section,title,summary)||items.some((item:any)=>String(item.title||"").trim().toLowerCase()===title.trim().toLowerCase()))continue;
     items.push({id:Number(row.id),title,summary,publisher:String(row.publisher||""),publishedAt:row.published_at||null,imageUrl,imageAlt:String(row.image_alt||title),section,kind:"news_archive",body:summary,slug:"",href:"/news?archive="+encodeURIComponent(String(row.id))+"&lang="+lang,sources:[],archivedAt:String(row.fetched_at||"")});
   }
 }catch(error){await recordRuntimeEventLimited(env,"section_news_archive","section_news_archive_query_failed",error)}
