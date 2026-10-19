@@ -10,7 +10,7 @@ async function openAIAllowed(env:Env){
   }
   return true;
 }
-async function handleOpenAIResponseFailure(env:Env,provider:"OpenAI draft"|"OpenAI answer",response:Response){
+export async function handleOpenAIResponseFailure(env:Env,provider:"OpenAI draft"|"OpenAI answer"|"OpenAI Web Search",response:Response){
   let body:any={};
   try{body=await response.clone().json()}catch(error){void error}
   const failure=classifyOpenAIFailure(response.status,body,response.headers);

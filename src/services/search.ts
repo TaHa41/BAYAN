@@ -3,11 +3,13 @@ import type {Env,Locale,SearchResponse,SearchResult,Source} from "../types";
 import {searchArticles,saveSearch,publishVerifiedResearch,publicationRejectionReason} from "../db";
 import {boundedLikeKeywords,escapedLikePattern} from "../search-patterns";
 import {recordRuntimeEventLimited} from "../runtime-events";
-import {ask,draftArticle,answerHasUnsupportedSpecifics} from "./ai";
+import {ask,draftArticle,answerHasUnsupportedSpecifics,handleOpenAIResponseFailure} from "./ai";
 import {findRelatedImage,searchNewsFeed} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 import {sectionForOpenedStory} from "./editorial";
 import {requiredEvidencePublisherCount} from "./evidence-diversity";
+import {getProviderBreaker} from "./ai-provider-resilience";
+import {shouldAttemptOpenAIWebSearchFallback} from "./search-recovery";
 const publicationErrorMessage=(error:unknown)=>String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
 const publicationFailureReason=(error:unknown)=>{const message=publicationErrorMessage(error);return /429|rate.?limit|timeout|timed out|abort|quota|neurons|overload|openai|workers ai|ai unavailable/i.test(message)?"ai_unavailable":"exception:"+message;};
 async function recordPublicationWarning(env:Env,message:string){await recordRuntimeEventLimited(env,"news_archive_article_generation","publication_warning",message);}
@@ -253,6 +255,8 @@ async function pubmedSearch(q:string,language:Locale,diagnostics?:string[]):Prom
 
 async function openAiWebSearch(env:Env,q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
   if(!env.OPENAI_API_KEY)return[];
+  const breaker=await getProviderBreaker(env,"openai");
+  if(breaker.open){diagnostics?.push("OpenAI Web Search skipped: circuit_breaker_open code="+breaker.code);return[];}
   try{
     const response=await fetch("https://api.openai.com/v1/responses",{
       method:"POST",
@@ -267,7 +271,7 @@ async function openAiWebSearch(env:Env,q:string,language:Locale,diagnostics?:str
         input:"Search query: "+q+". Return up to six distinct useful sources with concise source-specific summaries."
       })
     });
-    if(!response.ok)return[];
+    if(!response.ok){await handleOpenAIResponseFailure(env,"OpenAI Web Search",response);diagnostics?.push("OpenAI Web Search HTTP "+response.status+" classified");return[];}
     const data=await response.json<any>();
     const output=String(data.output_text||"").trim();
     const cited=new Map<string,string>();
@@ -836,7 +840,8 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     candidates.push(...expanded.slice(0,12));
     // OpenAI web search is the final recovery path, not a parallel request on
     // every weak first pass. Skip it as soon as independent evidence is adequate.
-    if(firstPassCount()===0||((personQuery||academicQuery)&&(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()))){
+    const shouldUseOpenAIWebSearch=shouldAttemptOpenAIWebSearchFallback({publishing:options.publish===true,firstPassCount:firstPassCount(),personOrAcademic:personQuery||academicQuery,evidenceDiverse:firstPassHasDiverseEvidence(),belowExpansionThreshold:firstPassCount()<expansionThreshold});
+    if(shouldUseOpenAIWebSearch){
       const web=await safe(openAiWebSearch(env,q,language,providerDiagnostics),[],"OpenAI Web Search");
       candidates.push(...web.slice(0,6).map(item=>identityAliases.length?({...item,identityAliases:[...identityAliases]}):item));
     }

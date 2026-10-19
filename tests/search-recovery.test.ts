@@ -1,10 +1,23 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { externalSearchRecovery } from "../src/services/search-recovery";
+import { externalSearchRecovery, shouldAttemptOpenAIWebSearchFallback } from "../src/services/search-recovery";
 import { normalizeBingNewsUrl } from "../src/services/search";
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+describe("OpenAI web-search fallback decision", () => {
+  it("uses the final web fallback when publication evidence is still below threshold", () => {
+    expect(shouldAttemptOpenAIWebSearchFallback({publishing:true,firstPassCount:1,personOrAcademic:false,evidenceDiverse:false,belowExpansionThreshold:true})).toBe(true);
+    expect(shouldAttemptOpenAIWebSearchFallback({publishing:true,firstPassCount:6,personOrAcademic:false,evidenceDiverse:true,belowExpansionThreshold:false})).toBe(false);
+  });
+
+  it("preserves bounded visitor-search fallback behavior for ordinary topics", () => {
+    expect(shouldAttemptOpenAIWebSearchFallback({publishing:false,firstPassCount:1,personOrAcademic:false,evidenceDiverse:false,belowExpansionThreshold:true})).toBe(false);
+    expect(shouldAttemptOpenAIWebSearchFallback({publishing:false,firstPassCount:0,personOrAcademic:false,evidenceDiverse:false,belowExpansionThreshold:true})).toBe(true);
+    expect(shouldAttemptOpenAIWebSearchFallback({publishing:false,firstPassCount:2,personOrAcademic:true,evidenceDiverse:false,belowExpansionThreshold:true})).toBe(true);
+  });
 });
 
 describe("external search recovery", () => {
