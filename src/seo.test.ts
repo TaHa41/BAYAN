@@ -24,7 +24,7 @@ describe("newsSitemap database failure handling", () => {
     ]}):({results:[]})}) } } as any;
     const response = await newsSitemap(env);
     const body = await response.text();
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(503);
     expect(body).not.toContain("archive=42");
     expect(body).not.toContain("<news:title>A substantial current news report</news:title>");
     expect(body).not.toContain("archive=43");
