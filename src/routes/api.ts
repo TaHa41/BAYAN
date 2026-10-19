@@ -248,7 +248,7 @@ export async function api(request:Request,env:Env,ctx?:ExecutionContext){const u
   const cacheable=!q&&archiveId===0;
   const cacheUrl=new URL(u.toString());cacheUrl.searchParams.set("lang",lang);
   const cacheKey=new Request(cacheUrl.toString(),{method:"GET"});
-  if(cacheable){try{const cached=await caches.default.match(cacheKey);if(cached)return cached;}catch{}}
+  if(cacheable){try{const cached=await (caches as unknown as {default:Cache}).default.match(cacheKey);if(cached)return cached;}catch{}}
   try{
     const where=["language=?"];const params:any[]=[lang];
     if(section!=="all"){where.push("section=?");params.push(section);}
@@ -258,7 +258,7 @@ export async function api(request:Request,env:Env,ctx?:ExecutionContext){const u
     const rows=await env.DB.prepare("SELECT id,url,language,title,summary,publisher,published_at,image_url,image_alt,section,fetched_at FROM news_archive WHERE "+where.join(" AND ")+" ORDER BY published_at DESC,fetched_at DESC LIMIT ?").bind(...params).all<any>();
     const items=(rows.results||[]).map((row:any)=>({id:Number(row.id),title:String(row.title||""),summary:String(row.summary||""),url:String(row.url||""),publisher:String(row.publisher||""),publishedAt:row.published_at||null,imageUrl:safePublicImageUrl(row.image_url),imageAlt:String(row.image_alt||row.title||""),section:String(row.section||"news"),language:lang,archivedAt:String(row.fetched_at||""),sources:[{title:String(row.title||""),publisher:String(row.publisher||""),url:String(row.url||""),publishedAt:row.published_at||undefined,imageUrl:safePublicImageUrl(row.image_url)}]}));
     const response=json({ok:true,language:lang,section,items,count:items.length},200,cacheable?"public, max-age=60, stale-while-revalidate=300":"no-store");
-    if(cacheable){try{await caches.default.put(cacheKey,response.clone())}catch{}}
+    if(cacheable){try{await (caches as unknown as {default:Cache}).default.put(cacheKey,response.clone())}catch{}}
     return response;
   }catch(error){
     await recordRuntimeEventLimited(env,"news_archive_read","archive_read_failed",error)
