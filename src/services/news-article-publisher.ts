@@ -50,19 +50,19 @@ const settleDailyD1ReadCalls=async(env:Env,day:string,actualReads:number)=>{
 async function publishNextArchivedNewsArticleInner(env:Env){
   const now=Date.now();
   const cutoff=new Date(now-48*60*60*1000).toISOString();
-  const retryBefore=new Date(now-30*60*1000).toISOString();
+  const retryBefore=new Date(now-60*60*1000).toISOString();
   const lowEvidenceRetryBefore=new Date(now-6*60*60*1000).toISOString();
   let setting:any=null;try{setting=await env.DB.prepare("SELECT value FROM admin_settings WHERE key=? LIMIT 1").bind("news_article_queue_language").first<any>()}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","settings_read_failed",error)}
   const preferred:Locale=String(setting?.value||"ar")==="en"?"en":"ar";
   const futureLimit=new Date(now+5*60*1000).toISOString();
-  const pick=async(language:Locale)=>env.DB.prepare("SELECT id,title,summary,language,article_attempts,publisher,image_url FROM news_archive WHERE language=? AND article_slug IS NULL AND article_attempts<2 AND length(summary)>=120 AND published_at>=? AND published_at<=? AND fetched_at>=? AND (article_last_attempt_at IS NULL OR article_last_attempt_at<=?) AND (article_last_reason IS NULL OR article_last_reason!='skipped_low_evidence' OR article_last_attempt_at<=?) ORDER BY published_at DESC,CASE WHEN publisher=(SELECT value FROM admin_settings WHERE key='news_article_queue_last_publisher' LIMIT 1) THEN 1 ELSE 0 END,CASE WHEN image_url IS NOT NULL AND trim(image_url)!='' THEN 0 ELSE 1 END,fetched_at DESC,id DESC LIMIT 1").bind(language,cutoff,futureLimit,cutoff,retryBefore,lowEvidenceRetryBefore).first<any>();
+  const pick=async(language:Locale)=>env.DB.prepare("SELECT id,title,summary,language,article_attempts,publisher,image_url,article_last_reason,article_last_detail FROM news_archive WHERE language=? AND article_slug IS NULL AND article_attempts<2 AND length(summary)>=120 AND published_at>=? AND published_at<=? AND fetched_at>=? AND (article_last_attempt_at IS NULL OR article_last_attempt_at<=?) AND (article_last_reason IS NULL OR article_last_reason!='skipped_low_evidence' OR article_last_attempt_at<=?) ORDER BY published_at DESC,CASE WHEN publisher=(SELECT value FROM admin_settings WHERE key='news_article_queue_last_publisher' LIMIT 1) THEN 1 ELSE 0 END,CASE WHEN image_url IS NOT NULL AND trim(image_url)!='' THEN 0 ELSE 1 END,fetched_at DESC,id DESC LIMIT 1").bind(language,cutoff,futureLimit,cutoff,retryBefore,lowEvidenceRetryBefore).first<any>();
   let row=await pick(preferred);
   if(!row)row=await pick(preferred==="ar"?"en":"ar");
   if(!row)return{status:"idle" as const};
   const id=Number(row.id),language=row.language as Locale,title=String(row.title||"").trim();
   if(!Number.isInteger(id)||id<1||!title)return{status:"invalid_queue_item" as const};
   const stamp=new Date(now).toISOString();
-  const claim=await env.DB.prepare("UPDATE news_archive SET article_attempts=article_attempts+1,article_last_attempt_at=? WHERE id=? AND article_slug IS NULL AND article_attempts<2").bind(stamp,id).run();
+  const claim=await env.DB.prepare("UPDATE news_archive SET article_last_attempt_at=? WHERE id=? AND article_slug IS NULL AND article_attempts<2 AND (article_last_attempt_at IS NULL OR article_last_attempt_at<=?)").bind(stamp,id,retryBefore).run();
   if(Number((claim.meta as any)?.changes||0)!==1)return{status:"already_claimed" as const,id};
   // Persist the next language before drafting so a failed Arabic attempt cannot
   // starve English news forever (and vice versa).
@@ -73,6 +73,16 @@ async function publishNextArchivedNewsArticleInner(env:Env){
   try{
     const result=await search(env,title,language,{publish:true,draft:true,images:true,publicationContext:String(row.summary||"").slice(0,500)});
     const slug=String(result.articleSlug||"").trim();
+    const resultReason=String(result.publishReason||"");
+    if(resultReason!=="ai_unavailable"){
+      await env.DB.prepare("UPDATE news_archive SET article_attempts=article_attempts+1 WHERE id=? AND article_slug IS NULL AND article_attempts<2").bind(id).run();
+    }else{
+      const backoffAttempt=Math.max(0,Number(row.article_attempts||0));
+      const retryMinutes=Math.min(120,15*Math.pow(2,backoffAttempt));
+      await env.DB.prepare("UPDATE news_archive SET article_last_reason='ai_unavailable',article_last_detail=?,article_last_attempt_at=? WHERE id=?").bind(JSON.stringify({reason:"all_providers_unavailable",retryMinutes,backoffAttempt}),new Date(now).toISOString(),id).run();
+      await recordRuntimeEventLimited(env,"news_archive_article_generation","ai_unavailable_deferred",JSON.stringify({id,language,retryMinutes,attemptsPreserved:Number(row.article_attempts||0)}));
+      return{status:"attempted_failed" as const,id,language,publishReason:"ai_unavailable",publishReasonDetail:"all_providers_unavailable",retryMinutes,attemptsPreserved:Number(row.article_attempts||0)};
+    }
     if(!slug){
       const sourceRecords=(Array.isArray(result.results)?result.results:[]).flatMap((item:any)=>Array.isArray(item.sources)?item.sources:[]);
       const independentSources=sourceRecords.filter((source:any)=>{const publisher=String(source.publisher||"").trim().toLowerCase();const url=String(source.url||"");if(!url||["wikipedia","wikidata","google news","bing","duckduckgo","bayan recent news archive"].some(label=>publisher.includes(label)))return false;try{const parsed=new URL(url);const host=parsed.hostname.toLowerCase().replace(/^www[.]/,"");return parsed.protocol==="https:"&&!["wikipedia.org","wikidata.org","news.google.com","bing.com","duckduckgo.com"].some(domain=>host===domain||host.endsWith("."+domain))}catch{return false}});
@@ -104,9 +114,9 @@ async function publishNextArchivedNewsArticleInner(env:Env){
     return{status:"published" as const,id,language,slug,publishReasonDetail:detail};
   }catch(error){
     const detail=String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
-    const publishReason=/429|rate.?limit|timeout|timed out|abort|quota|neurons|overload|openai|workers ai|ai unavailable/i.test(detail)?"ai_unavailable":"exception:"+detail;
+    const publishReason=/429|rate.?limit|timeout|timed out|abort|quota|neurons|overload|openai|workers ai|ai unavailable|all_providers_unavailable/i.test(detail)?"ai_unavailable":"exception:"+detail;
     const detailReason=("publisher_exception:"+detail).slice(0,350);
-    try{await env.DB.prepare("UPDATE news_archive SET article_last_reason=?,article_last_detail=? WHERE id=?").bind(publishReason,detailReason,id).run()}catch(error){await recordRuntimeEventLimited(env,"news_archive_reason_persist","reason_persist_failed",error)}
+    try{if(publishReason==="ai_unavailable"){const backoffAttempt=Math.max(0,Number(row.article_attempts||0));const retryMinutes=Math.min(120,15*Math.pow(2,backoffAttempt));await env.DB.prepare("UPDATE news_archive SET article_last_reason=?,article_last_detail=?,article_last_attempt_at=? WHERE id=?").bind(publishReason,JSON.stringify({reason:detailReason,retryMinutes,backoffAttempt}),new Date().toISOString(),id).run()}else{await env.DB.prepare("UPDATE news_archive SET article_attempts=MIN(2,article_attempts+1),article_last_reason=?,article_last_detail=? WHERE id=?").bind(publishReason,detailReason,id).run()}}catch(error){await recordRuntimeEventLimited(env,"news_archive_reason_persist","reason_persist_failed",error)}
     await recordRuntimeEventLimited(env,"news_archive_article_generation",publishReason,detailReason);
     return{status:"attempted_failed" as const,id,language,publishReason,publishReasonDetail:detailReason};
   }
