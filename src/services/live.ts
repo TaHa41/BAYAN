@@ -13,6 +13,14 @@ export async function weather(cityInput?:string,env?:Env){
     return{ok:true,provider:"Open-Meteo",city:place.name,region:place.admin1||"",country:place.country||"",latitude:place.latitude,longitude:place.longitude,current:d.current,timezone:d.timezone,stale:false,updatedAt:new Date().toISOString()};
   }catch(error){if(env)await recordRuntimeEventLimited(env,"weather_provider","weather_lookup_failed",error);return{ok:false,provider:"Open-Meteo",stale:true,city,message:"Weather provider temporarily unavailable"}}
 }
+export function parseUsdToEgpRate(data:unknown):number|undefined{
+ const value=data as any;
+ const raw=Array.isArray(value)
+  ?value.find((row:any)=>String(row?.quote||"").toUpperCase()==="EGP"&&(!row?.base||String(row.base).toUpperCase()==="USD"))?.rate
+  :value?.rates?.EGP??value?.EGP;
+ const rate=Number(raw);
+ return Number.isFinite(rate)&&rate>0?rate:undefined;
+}
 export async function fx(env?:Env){try{const r=await timeout("https://api.frankfurter.dev/v2/rates?base=USD&quotes=EGP,EUR,GBP,SAR,AED,KWD,QAR,BHD,OMR,JOD,TRY,JPY,CNY,CAD,AUD,CHF,INR,ILS,LYD,TND,MAD,ZAR");if(!r.ok)throw 0;const d=await r.json<any>();const rates=Array.isArray(d)?Object.fromEntries(d.map((x:any)=>[String(x.quote).toUpperCase(),Number(x.rate)])):d.rates;if(!rates?.EGP)throw new Error("fx_data");return{ok:true,provider:"Frankfurter v2",base:"USD",rates,updatedAt:new Date().toISOString(),stale:false}}catch(error){if(env)await recordRuntimeEventLimited(env,"fx_provider","fx_lookup_failed",error);return{ok:false,provider:"Frankfurter",stale:true,message:"FX provider temporarily unavailable"}}}
 async function stooqQuote(symbol:string,stooqSymbol:string,env?:Env){
   try{
@@ -111,7 +119,7 @@ export async function gold(env:Env){
         extraMarkets(env)
       ]);
       if(!fxResponse.ok)throw new Error("fx");
-      const fxData=await fxResponse.json<any>(),egp=Number(fxData.rates?.EGP);
+      const fxData=await fxResponse.json<any>(),egp=parseUsdToEgpRate(fxData);
       if(!egp)throw new Error("fx_data");
       return{ok:true,provider:quote.name+" + Frankfurter",price:(quote.price/31.1034768)*egp,unit:"EGP/g (24K reference)",usdPerOunce:quote.price,fx:egp,markets,updatedAt:new Date().toISOString(),stale:false};
     }catch(error){await recordRuntimeEventLimited(env,"gold_fx_conversion","gold_fx_conversion_failed",error)}
