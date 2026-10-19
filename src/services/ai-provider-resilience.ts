@@ -71,7 +71,33 @@ export function normalizeDraftJson(raw: string): string {
   const first = value.indexOf("{");
   const last = value.lastIndexOf("}");
   if (first >= 0 && last > first) value = value.slice(first, last + 1);
-  return value;
+  // Repair trailing commas outside quoted strings. This accepts a common
+  // model-formatting error without changing sentence text or source IDs.
+  let normalized = "";
+  let inString = false;
+  let escaped = false;
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+    if (inString) {
+      normalized += char;
+      if (escaped) escaped = false;
+      else if (char === "\\\\") escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+      normalized += char;
+      continue;
+    }
+    if (char === ",") {
+      let next = index + 1;
+      while (next < value.length && /\\s/.test(value[next])) next += 1;
+      if (value[next] === "}" || value[next] === "]") continue;
+    }
+    normalized += char;
+  }
+  return normalized;
 }
 
 type BreakerState = { openedUntil: number; consecutive429: number; code: string };
