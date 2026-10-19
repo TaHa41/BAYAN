@@ -47,4 +47,8 @@ describe("AI provider resilience", () => {
     expect(normalizeDraftJson('Here is JSON: {"sections":[]} thanks')).toBe('{"sections":[]}');
     expect(normalizeDraftJson('{"sections":')).toBe('{"sections":');
   });
+
+  it("repairs trailing commas without changing quoted text", () => {
+    expect(normalizeDraftJson('{"note":"comma,} inside string","sections":[{"heading":"x","sentences":[],},],}')).toBe('{"note":"comma,} inside string","sections":[{"heading":"x","sentences":[]}]}');
+  });
 });
