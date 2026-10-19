@@ -167,8 +167,9 @@ if(path.startsWith("/article/")){
       try{
         const parseSources=(value:unknown)=>{try{const parsed=JSON.parse(String(value||"[]"));return Array.isArray(parsed)?parsed:[]}catch{return []}};
         const sourceKey=(value:unknown)=>{try{const url=new URL(String(value||""));if(url.protocol!=="https:"&&url.protocol!=="http:")return "";url.hash="";url.search="";url.hostname=url.hostname.toLowerCase().replace(/^www\./,"");return url.toString().replace(/\/$/,"")}catch{return ""}};
+        if(row._bundled){const pairedLanguage=lang==="ar"?"en":"ar";const pairedSlug=slug.replace(lang==="ar"?/-ar$/:/-en$/,pairedLanguage==="ar"?"-ar":"-en");if(pairedSlug!==slug&&bundledArticleBySlug(pairedSlug,pairedLanguage)){const arSlug=lang==="ar"?slug:pairedSlug;const enSlug=lang==="en"?slug:pairedSlug;const arUrl=ORIGIN+"/article/"+encodeURIComponent(arSlug)+"?lang=ar";const enUrl=ORIGIN+"/article/"+encodeURIComponent(enSlug)+"?lang=en";articleAlternateLinks='<link rel="alternate" hreflang="ar" href="'+arUrl+'"><link rel="alternate" hreflang="en" href="'+enUrl+'"><link rel="alternate" hreflang="x-default" href="'+arUrl+'">';}}
         const ownSources=row._bundled?new Set<string>():new Set(parseSources(row.sources_json).map((item:any)=>sourceKey(item?.url)).filter(Boolean));
-        if(ownSources.size>=2){
+        if(!row._bundled&&ownSources.size>=2){
           const candidates=await env.DB.prepare("SELECT slug,sources_json FROM articles WHERE section=? AND language=? AND status='PUBLISHED' AND slug<>? LIMIT 12").bind(String(row.section||""),lang==="ar"?"en":"ar",slug).all<any>();
           let best:{slug:string;matches:number}|null=null;
           for(const candidate of candidates.results||[]){const urls=new Set(parseSources(candidate.sources_json).map((item:any)=>sourceKey(item?.url)).filter(Boolean));let matches=0;for(const url of ownSources)if(urls.has(url))matches++;if(matches>=2&&(!best||matches>best.matches))best={slug:String(candidate.slug),matches};}
