@@ -2,7 +2,7 @@ import type{Env,Locale,SearchResult}from"../types";import{classifyOpenAIFailure,
 import{recordRuntimeEventLimited}from"../runtime-events";
 const aiFailureDetail=(error:unknown)=>String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
 async function recordAiFailure(env:Env,provider:string,detail:string){await recordRuntimeEventLimited(env,"ai_generation","ai_provider_failure",provider+": "+detail);}
-async function openAIAllowed(env:Env){
+export async function openAIAllowed(env:Env){
   const breaker=await getProviderBreaker(env,"openai");
   if(breaker.open){
     await recordRuntimeEventLimited(env,"ai_circuit_breaker","openai_breaker_open",JSON.stringify({state:"open",code:breaker.code,openedUntil:new Date(breaker.openedUntil).toISOString()}));
@@ -94,7 +94,7 @@ export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[
     return !(namesSupported&&numbersSupported&&subjectSupported&&arabicEntitiesSupported&&relationshipsSupported);
   });
 };
-const consumeDailyNewsAiCall=async(env:Env)=>{
+export const consumeDailyNewsAiCall=async(env:Env)=>{
   const day=new Date().toISOString().slice(0,10);
   const stamp=new Date().toISOString();
   try{
@@ -175,7 +175,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
   };
   const generate=async(extraInstruction:string)=>{
     const messages=[{role:"system",content:system},{role:"user",content:"Topic/question: "+question+"\nEvidence excerpts (only these snippets may be used): "+evidenceText+(extraInstruction?"\nCorrection required: "+extraInstruction:"")}];
-    if(env.OPENAI_API_KEY&&(!backgroundBudget||await consumeDailyNewsAiCall(env))&&await openAIAllowed(env))try{
+    if(env.OPENAI_API_KEY&&await openAIAllowed(env)&&(!backgroundBudget||await consumeDailyNewsAiCall(env)))try{
       const response=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(9000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",messages,temperature:0,max_tokens:2600,response_format:{type:"json_object"}})});
       if(response.ok){
         const data=await response.json<any>(),answer=String(data.choices?.[0]?.message?.content||"").trim();
