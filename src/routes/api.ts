@@ -313,6 +313,24 @@ const sectionRelevant=(x:any)=>{
  if(terms.some(term=>titleWords.has(term)))return true;
  return terms.filter(term=>summaryWords.has(term)).length>=2;
 };
+const inferStoredArticleSection=(item:any)=>{
+ const title=String(item?.title||""),context=title+" "+String(item?.summary||"")+" "+String(item?.body||"").slice(0,2200);
+ const biography=/\b(?:biography|biographical|early life|life and career|career and legacy|born in|born on|education and career|biografia)\b|سيرة|النشأة|ولد في|ولدت في|مسيرته|مسيرتها|حياته|حياتها|تعليمه|تعليمها|إنجازاته|إنجازاتها/i.test(context);
+ if(biography&&title.trim().split(/\s+/).length<=9&&!/(?:what is|how to|ما هو|ما هي|دليل|شرح|تاريخ|مقارنة)/i.test(title))return "people";
+ const inferred=editorialSectionForOpenedStory(title,String(item?.summary||"")+" "+String(item?.body||""));
+ return inferred==="world"?String(item?.section||"world"):inferred;
+};
+items=items.map((item:any)=>({...item,section:inferStoredArticleSection(item)}));
+try{
+ const crossSection=await env.DB.prepare("SELECT * FROM articles WHERE language=? AND status='PUBLISHED' AND section!=? ORDER BY updated_at DESC LIMIT 100").bind(lang,section).all<any>();
+ const seenSlugs=new Set(items.map((item:any)=>String(item.slug||"")).filter(Boolean));
+ for(const row of crossSection.results||[]){
+  const slug=String(row.slug||"");if(!slug||seenSlugs.has(slug))continue;
+  let sources:any[]=[];try{const parsed=JSON.parse(String(row.sources_json||"[]"));if(Array.isArray(parsed))sources=parsed}catch(error){await recordRuntimeEventLimited(env,"section_source_parse","section_article_sources_invalid",error)}
+  const candidate={...row,sources,createdAt:row.created_at,updatedAt:row.updated_at,imageUrl:row.image_url,imageAlt:row.image_alt};
+  if(inferStoredArticleSection(candidate)===section){items.push({...candidate,section});seenSlugs.add(slug);}
+ }
+}catch(error){await recordRuntimeEventLimited(env,"section_reclassification","cross_section_article_lookup_failed",error)}
 items=items.filter((x:any)=>(x.slug?String(x.section||"")===section:sectionRelevant(x))&&(x.kind==="evidence"||(articleBodyQuality(String(x.body||"")).ok&&articleEvidenceQuality(x.sources)))).filter(localeSafeItem);
 items=items.filter((x:any)=>x.kind==="evidence"||/^https:\/\//i.test(String(x.imageUrl||"")));
 if(items.length<2&&section!=="prices"){
