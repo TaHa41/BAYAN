@@ -3,7 +3,7 @@ import type {Env,Locale,SearchResponse,SearchResult,Source} from "../types";
 import {searchArticles,saveSearch,publishVerifiedResearch,publicationRejectionReason} from "../db";
 import {boundedLikeKeywords,escapedLikePattern} from "../search-patterns";
 import {recordRuntimeEventLimited} from "../runtime-events";
-import {ask,draftArticle,answerHasUnsupportedSpecifics,handleOpenAIResponseFailure} from "./ai";
+import {ask,draftArticle,answerHasUnsupportedSpecifics,handleOpenAIResponseFailure,consumeDailyNewsAiCall} from "./ai";
 import {findRelatedImage,searchNewsFeed,searchTrustedNewsFeeds} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 import {sectionForOpenedStory} from "./editorial";
@@ -261,10 +261,11 @@ async function pubmedSearch(q:string,language:Locale,diagnostics?:string[]):Prom
   }catch(error){reportProviderFailure(diagnostics,"PubMed / NCBI",error);return[]}
 }
 
-async function openAiWebSearch(env:Env,q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
+async function openAiWebSearch(env:Env,q:string,language:Locale,diagnostics?:string[],backgroundBudget=false):Promise<Candidate[]>{
   if(!env.OPENAI_API_KEY)return[];
   const breaker=await getProviderBreaker(env,"openai");
   if(breaker.open){diagnostics?.push("OpenAI Web Search skipped: circuit_breaker_open code="+breaker.code);return[];}
+  if(backgroundBudget&&!(await consumeDailyNewsAiCall(env))){diagnostics?.push("OpenAI Web Search skipped: background AI budget exhausted");return[];}
   try{
     const response=await fetch("https://api.openai.com/v1/responses",{
       method:"POST",
@@ -851,7 +852,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     // every weak first pass. Skip it as soon as independent evidence is adequate.
     const shouldUseOpenAIWebSearch=shouldAttemptOpenAIWebSearchFallback({publishing:options.publish===true,firstPassCount:firstPassCount(),personOrAcademic:personQuery||academicQuery,evidenceDiverse:firstPassHasDiverseEvidence(),belowExpansionThreshold:firstPassCount()<expansionThreshold});
     if(shouldUseOpenAIWebSearch){
-      const web=await safe(openAiWebSearch(env,q,language,providerDiagnostics),[],"OpenAI Web Search");
+      const web=await safe(openAiWebSearch(env,q,language,providerDiagnostics,options.publish===true),[],"OpenAI Web Search");
       candidates.push(...web.slice(0,6).map(item=>identityAliases.length?({...item,identityAliases:[...identityAliases]}):item));
     }
   }
