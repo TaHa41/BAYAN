@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyOpenAIFailure, classifyWorkersAIFailure, exponentialBackoffMs, normalizeDraftJson, parseRetryAfter } from "./ai-provider-resilience";
+import { classifyOpenAIFailure, classifyWorkersAIFailure, exponentialBackoffMs, normalizeDraftJson, parseRetryAfter, isOpenAIQuotaFailure } from "./ai-provider-resilience";
 
 describe("AI provider resilience", () => {
   it("distinguishes insufficient quota from rate limiting and records retry metadata", () => {
@@ -11,6 +11,12 @@ describe("AI provider resilience", () => {
     expect(failure.detail).toContain("x-ratelimit-remaining-requests=0");
     expect(failure.detail).not.toContain("private prompt");
   });
+  it("recognizes OpenAI credit balance exhaustion as a quota failure", () => {
+    expect(isOpenAIQuotaFailure("credit_balance_exhausted")).toBe(true);
+    expect(isOpenAIQuotaFailure("insufficient_quota")).toBe(true);
+    expect(isOpenAIQuotaFailure("rate_limit_exceeded")).toBe(false);
+  });
+
   it("parses Retry-After seconds and dates", () => {
     expect(parseRetryAfter("45", 0)).toBe(45000);
     expect(parseRetryAfter(new Date(60000).toUTCString(), 0)).toBe(60000);
