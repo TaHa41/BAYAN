@@ -17,6 +17,8 @@ const evidenceDiversity = read("src/services/evidence-diversity.ts");
 const recovery = read("src/services/search-recovery.ts");
 const http = read("src/http.ts");
 const checks = [
+  ["news archive uses index-friendly filters and caches only successful unfiltered reads", read("src/routes/api.ts").includes('const cacheable=!q&&archiveId===0') && read("src/routes/api.ts").includes('caches.default.match(cacheKey)') && read("src/routes/api.ts").includes('caches.default.put(cacheKey,response.clone())') && read("src/routes/api.ts").includes('where.push("section=?")') && read("src/routes/api.ts").includes('ORDER BY published_at DESC,fetched_at DESC LIMIT ?') && !read("src/routes/api.ts").includes('ORDER BY COALESCE(published_at,fetched_at) DESC LIMIT ?')],
+
   ["bundled article fallback preserves bilingual hreflang links without D1 reads", read("src/index.ts").includes('const pairedSlug=slug.replace(lang==="ar"?/-ar$/:/-en$/,pairedLanguage==="ar"?"-ar":"-en")') && read("src/index.ts").includes('const ownSources=row._bundled?new Set<string>()') && read("src/index.ts").includes('articleAlternateLinks=')],
 
   ["admin dashboard normalizes unavailable API payloads and offers a safe retry instead of collapsing to a generic error", read("public/app-20261019-01.js").includes("const asItems=(value)=>Array.isArray(value)?value:[]") && read("public/app-20261019-01.js").includes("data.analytics?.topPages") && read("public/app-20261019-01.js").includes('id="adminRetry"') && read("public/app-20261019-01.js").includes("Some data services may be temporarily unavailable.")],
