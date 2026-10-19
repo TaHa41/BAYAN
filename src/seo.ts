@@ -23,14 +23,18 @@ export async function sitemap(env:Env){
     return retryableUnavailable("Sitemap temporarily unavailable; retry later.");
   }
   const publicPaths=["/","/news","/about","/methodology","/privacy","/terms",...SECTIONS.map(x=>"/"+x[0])];
-  const localizedUrls=publicPaths.flatMap((path)=>["ar","en"].map((language)=>({url:path==="/"&&language==="ar"?ORIGIN+"/":ORIGIN+path+"?lang="+language})));
-  const urlMap=new Map<string,{url:string;lastmod?:string}>();
+  const localizedUrls=publicPaths.flatMap((path)=>["ar","en"].map((language)=>({
+    url:path==="/"&&language==="ar"?ORIGIN+"/":ORIGIN+path+"?lang="+language,
+    alternateUrl:path==="/"&&language==="ar"?ORIGIN+"/?lang=en":path==="/"&&language==="en"?ORIGIN+"/":ORIGIN+path+"?lang="+(language==="ar"?"en":"ar")
+  })));
+  const urlMap=new Map<string,{url:string;lastmod?:string;alternateUrl?:string}>();
   for(const item of [...localizedUrls,...articleUrls])urlMap.set(item.url,item);
-  const urls:Array<{url:string;lastmod?:string}>=[...urlMap.values()];
-  return text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+urls.map((item)=>{
+  const urls:Array<{url:string;lastmod?:string;alternateUrl?:string}>=[...urlMap.values()];
+  return text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">'+urls.map((item)=>{
     const date=Date.parse(String(item.lastmod||""));
     const lastmod=Number.isFinite(date)?'<lastmod>'+xml(new Date(date).toISOString())+'</lastmod>':"";
-    return '<url><loc>'+xml(item.url)+'</loc>'+lastmod+'</url>';
+    const alternates=item.alternateUrl?'<xhtml:link rel="alternate" hreflang="ar" href="'+xml(item.url.includes("lang=en")?item.alternateUrl:item.url)+'"/><xhtml:link rel="alternate" hreflang="en" href="'+xml(item.url.includes("lang=en")?item.url:item.alternateUrl)+'"/>':"";
+    return '<url><loc>'+xml(item.url)+'</loc>'+lastmod+alternates+'</url>';
   }).join("")+"</urlset>","application/xml;charset=utf-8");
 }
 const newsSitemapEligibility=async(row:any,now:number,env:Env)=>{
@@ -72,14 +76,11 @@ export async function newsSitemap(env:Env){
   const recentCutoff=new Date(now-48*60*60*1000).toISOString();
   const futureLimit=new Date(now+5*60*1000).toISOString();
   let rows:any[]=[];
-  let allPublishedRows:any[]=[];
   let archiveRows:any[]=[];
   try{
-    // Read actual published article URLs for a valid XML fallback when no
-    // recent article meets Google News metadata requirements. News metadata
-    // remains restricted to the existing 48-hour evidence-gated selection.
-    const allPublished=await env.DB.prepare("SELECT slug,title,language,created_at,body,sources_json FROM articles WHERE status='PUBLISHED' AND language IN ('ar','en') ORDER BY created_at DESC LIMIT 1000").all<any>();
-    allPublishedRows=allPublished.results||[];
+    // Google News sitemaps must contain only eligible news articles published
+    // within the recent 48-hour window. The general sitemap carries evergreen
+    // pages and all published articles; never pad this sitemap with unrelated URLs.
     const r=await env.DB.prepare("SELECT slug,title,language,created_at,body,sources_json FROM articles WHERE status='PUBLISHED' AND language IN ('ar','en') AND created_at>=? AND created_at<=? AND length(body)>=500 ORDER BY created_at DESC LIMIT 200").bind(recentCutoff,futureLimit).all<any>();
     rows=r.results||[];
   }catch(error){
@@ -108,24 +109,9 @@ export async function newsSitemap(env:Env){
   }
   const archiveEligibleCount=archiveRows.filter((row)=>archiveArticleCandidate(row,now)).length;
   const items=[...unique.values()];
-  const publicPaths=["/","/news","/about","/methodology","/privacy","/terms",...SECTIONS.map(x=>"/"+x[0])];
-  const sitemapUrls=new Map<string,{url:string}>();
-  for(const path of publicPaths){
-    for(const language of ["ar","en"]){
-      const url=path==="/"&&language==="ar"?ORIGIN+"/":ORIGIN+path+"?lang="+language;
-      sitemapUrls.set(url,{url});
-    }
-  }
-  for(const row of allPublishedRows){
-    if(!row?.slug||(row.language!=="ar"&&row.language!=="en"))continue;
-    const url=ORIGIN+"/article/"+encodeURIComponent(String(row.slug))+"?lang="+encodeURIComponent(String(row.language));
-    sitemapUrls.set(url,{url});
-  }
-  const newsByUrl=new Map(items.map(item=>[item.url,item]));
-  const response=text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">'+[...sitemapUrls.values()].map(entry=>{
-    const item=newsByUrl.get(entry.url);
-    const news=item?'<news:news><news:publication><news:name>BAYAN</news:name><news:language>'+xml(item.language)+'</news:language></news:publication><news:publication_date>'+xml(item.publishedAt)+'</news:publication_date><news:title>'+xml(item.title)+'</news:title></news:news>':"";
-    return '<url><loc>'+xml(entry.url)+'</loc>'+news+'</url>';
+  const response=text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">'+items.map(item=>{
+    const news='<news:news><news:publication><news:name>BAYAN</news:name><news:language>'+xml(item.language)+'</news:language></news:publication><news:publication_date>'+xml(item.publishedAt)+'</news:publication_date><news:title>'+xml(item.title)+'</news:title></news:news>';
+    return '<url><loc>'+xml(item.url)+'</loc>'+news+'</url>';
   }).join("")+"</urlset>","application/xml;charset=utf-8");
   response.headers.set("x-bayan-news-sitemap-candidate-count",String(rows.length));
   response.headers.set("x-bayan-news-sitemap-eligible-count",String(items.length));
