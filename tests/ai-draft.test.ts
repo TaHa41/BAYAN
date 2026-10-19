@@ -13,7 +13,7 @@ const evidenceFor = (locale: "ar" | "en") => {
   ] as any;
 };
 
-const draftJson = (locale: "ar" | "en", options: { unsupported?: boolean; invalidSource?: boolean } = {}) => {
+const draftJson = (locale: "ar" | "en", options: { unsupported?: boolean; invalidSource?: boolean | "all" } = {}) => {
   const sentence = supportedSentence(locale);
   const sections = Array.from({ length: 4 }, (_, index) => ({
     heading: locale === "ar" ? ["الخلفية", "الوقائع", "السياق", "الحدود"][index] : ["background", "documented facts", "context", "limitations"][index],
@@ -21,7 +21,7 @@ const draftJson = (locale: "ar" | "en", options: { unsupported?: boolean; invali
       text: options.unsupported && index === 0 && sentenceIndex === 0
         ? (locale === "ar" ? "أعلن نادي ريال مدريد في 17 مارس 2031 قرارًا جديدًا." : "Acme Group announced the result on 17 March 2031.")
         : sentence,
-      sourceIds: options.invalidSource && index === 0 && sentenceIndex === 0 ? ["S99"] : ["S1"],
+      sourceIds: options.invalidSource === "all" || (options.invalidSource && index === 0 && sentenceIndex === 0) ? ["S99"] : ["S1"],
     })),
   }));
   return JSON.stringify({ sections });
@@ -67,32 +67,37 @@ describe.each(["ar", "en"] as const)("evidence-grounded article drafting (%s)", 
     expect((result as any).verification?.retried).toBe(true);
   });
 
-  it("regenerates a sentence with an unknown source ID and preserves the verified article", async () => {
-    const fetchMock = mockGeneration([draftJson(locale, { invalidSource: true }), draftJson(locale)]);
-    const result = await draftArticle({ OPENAI_API_KEY: "test-key" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(result.status).toBe("verified");
-    expect((result as any).verification?.retried).toBe(true);
-    expect((result as any).verification?.remainingSentences).toBe(16);
-    expect((result as any).verification?.removedSentences).toBe(0);
-  });
-
-  it("drops sentences whose source IDs remain unknown after correction", async () => {
+  it("salvages supported sentences while rejecting an unknown source ID", async () => {
     const fetchMock = mockGeneration([draftJson(locale, { invalidSource: true }), draftJson(locale, { invalidSource: true })]);
     const result = await draftArticle({ OPENAI_API_KEY: "test-key" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result.status).toBe("verified");
-    expect((result as any).verification?.retried).toBe(true);
     expect((result as any).verification?.remainingSentences).toBe(15);
     expect((result as any).verification?.removedSentences).toBe(1);
   });
 
-  it("normalizes trailing commas and source ID strings without accepting unknown IDs as evidence", async () => {
-    const normalizedVariant = draftJson(locale).replace(/"sourceIds":\["S1"\]/g, '"sourceIds":"S1, S99",');
-    const fetchMock = mockGeneration([normalizedVariant]);
+  it("normalizes fenced JSON, source_ids aliases, and numeric source IDs", async () => {
+    const value = JSON.parse(draftJson(locale));
+    for (const section of value.sections) {
+      for (const sentence of section.sentences) {
+        sentence.source_ids = sentence.sourceIds.map((id: string) => Number(id.slice(1)));
+        delete sentence.sourceIds;
+      }
+    }
+    const fence = String.fromCharCode(96).repeat(3);
+    const fetchMock = mockGeneration([fence + "json" + String.fromCharCode(10) + JSON.stringify(value).replace(/,\s*([}\]])/g, "$1") + String.fromCharCode(10) + fence]);
     const result = await draftArticle({ OPENAI_API_KEY: "test-key" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(result.status).toBe("verified");
     expect((result as any).verification?.remainingSentences).toBe(16);
+  });
+
+  it("rejects a draft if every sentence has an unknown source ID", async () => {
+    const fetchMock = mockGeneration([draftJson(locale, { invalidSource: "all" }), draftJson(locale, { invalidSource: "all" })]);
+    const result = await draftArticle({ OPENAI_API_KEY: "test-key" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.status).toBe("mixed");
+    expect(result.answer).toBe("");
+    expect((result as any).verification?.retried).toBe(true);
   });
 });
