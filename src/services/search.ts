@@ -1,4 +1,5 @@
 import{resolvePublishedImageUrl,safePublicImageUrl}from"../image-url";
+import{bundledSearchArticles}from"../fallback-content";
 import type {Env,Locale,SearchResponse,SearchResult,Source} from "../types";
 import {searchArticles,saveSearch,publishVerifiedResearch,publicationRejectionReason} from "../db";
 import {boundedLikeKeywords,escapedLikePattern} from "../search-patterns";
@@ -794,8 +795,15 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   let google:Candidate[]=[];
   const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers"];
   providerAttempted.push(...providerDiagnostics);
+  const bundledFallback:Candidate[]=bundledSearchArticles(q,language,Math.min(max,12)).map((item:any)=>({
+    title:String(item.title||""),summary:String(item.summary||""),section:String(item.section||"world"),slug:String(item.slug||""),kind:"article",
+    evidence:item.fallbackEvidence==="verified"?"verified":"source_only",
+    sources:(Array.isArray(item.sources)?item.sources:[]).slice(0,6).map((src:any)=>({title:String(src.title||item.title||""),publisher:String(src.publisher||""),url:String(src.url||"")})).filter((src:Source)=>/^https:\/\//i.test(src.url)),
+    url:"https://bayan.tahaomar411.workers.dev/article/"+encodeURIComponent(String(item.slug||""))+"?lang="+language,
+    imageUrl:safePublicImageUrl(item.imageUrl),imageAlt:String(item.imageAlt||item.title||""),score:Math.min(72,42+Number(item.score||0)*4),provider:"BAYAN bundled fallback"
+  })).filter((item:Candidate)=>item.title&&item.summary&&item.slug&&item.url);
   const candidates:Candidate[]=[
-    ...local.map((x:Candidate)=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...wiki,...wikiRest,...wd,...oa,...crossref,...pubmed,...remote,...dd,...google
+    ...local.map((x:Candidate)=>({...x,score:92,provider:"BAYAN Knowledge Base"})),...bundledFallback,...wiki,...wikiRest,...wd,...oa,...crossref,...pubmed,...remote,...dd,...google
   ];
   // Use the authenticated Enterprise index as a recovery provider only when
   // primary discovery is empty or thin; avoid token/article requests on every search.
