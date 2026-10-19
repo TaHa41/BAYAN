@@ -72,8 +72,9 @@ const scoreSource=(publisher:string, title:string, q:string) => {
 };
 const source=(title:string,publisher:string,url:string):Source=>({title,publisher,url});
 const classifySection=(q:string,items:SearchResult[],language:Locale)=>{
- const personQuery=personLookup(q)||nameOnlyArabicQuery(q);
- if(personQuery&&items.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item)))return "people";
+ const personQuery=personLookup(q)||(nameOnlyArabicQuery(personQueryName(q))?personQueryName(q):undefined);
+ if(personQuery&&items.some(x=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test((x.sources||[]).map(source=>source.publisher).join(" ")))&&items.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item)))return"people";
+ if(/عالم مصري|عالمة|كيميائي/.test(String(items.slice(0,6).map(item=>String(item.title||"")+" "+String(item.summary||"")).join(" ")))&&personQuery)return"people";
  const ordered=[...items].sort((a,b)=>Number(Boolean((b as any).body))-Number(Boolean((a as any).body)));
  const lead=ordered.find(item=>String(item.title||"").trim()&&String(item.summary||"").trim());
  const title=String(lead?.title||q);
@@ -84,7 +85,7 @@ const classifySection=(q:string,items:SearchResult[],language:Locale)=>{
  if(inferred!=="world")return inferred;
  if(/(?:\btrend\b|\bviral\b|\bpopular\b|ترند|متداول|رائج|اهتمام الناس)/i.test(combined))return "trends";
  if(/(?:\begypt\b|\begyptian\b|\bcairo\b|\bcommunity\b|\bpublic service\b|مصر|المصري|القاهرة|مجتمع|خدمات عامة)/i.test(title+" "+String(lead?.summary||"")))return "egypt";
- if(/(?:\barab\b|\barabic\b|\barab league\b|العرب|عربي|العالم العربي|جامعة الدول العربية)/i.test(title+" "+String(lead?.summary||"")))return "arab";
+ if(/(?:\barab\b|\barabic\b|\barab league\b|العرب|عربي|العالم العربي|جامعة الدول العربية)/i.test(title+" "+String(lead?.summary||"")))return"arab";
  return "world";
 };
 
