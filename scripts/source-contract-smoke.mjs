@@ -17,7 +17,7 @@ const evidenceDiversity = read("src/services/evidence-diversity.ts");
 const recovery = read("src/services/search-recovery.ts");
 const http = read("src/http.ts");
 const checks = [
-  ["health readiness probes a real news_archive row read and reports D1 read-limit outages honestly", read("src/routes/api.ts").includes('SELECT id FROM news_archive LIMIT 1') && read("src/routes/api.ts").includes('newsArchiveRead:false,error:"news_archive_read_unavailable"') && read("src/routes/api.ts").includes('newsArchiveRead:true,articleRevisionHistory:true')],
+  ["health readiness probes a real news_archive row read and reports D1 read-limit outages honestly", read("src/routes/api.ts").includes('SELECT id FROM news_archive LIMIT 1') && read("src/routes/api.ts").includes('newsArchiveRead:false,articleRevisionHistory:true,error:"news_archive_read_unavailable"') && read("src/routes/api.ts").includes('newsArchiveRead:true,articleRevisionHistory:true')],
 
   ["section API falls back to reviewed bilingual bundle articles only when fewer than two eligible articles remain", read("src/routes/api.ts").includes('import{bundledArticlesForSection}from"../fallback-content"') && read("src/routes/api.ts").includes('if(items.length<2&&section!=="news"&&section!=="prices")') && read("src/routes/api.ts").includes("bundledArticlesForSection(section,lang,24)") && read("src/routes/api.ts").includes("articleEvidenceQuality(item.sources)") && read("src/routes/api.ts").includes("fallbackMode:true")],
 
