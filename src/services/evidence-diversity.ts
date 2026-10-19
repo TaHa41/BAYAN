@@ -2,7 +2,10 @@ export function requiredEvidencePublisherCount(publishing: boolean, configuredMi
   const minimum = Number.isFinite(configuredMinimum) && configuredMinimum > 0
     ? Math.floor(configuredMinimum)
     : 3;
-  return publishing ? Math.max(5, minimum) : 2;
+  // Three genuinely independent publishers is a meaningful corroboration gate;
+  // requiring five here blocked otherwise well-supported stories when feed coverage
+  // was only three or four publishers, starving the publication pipeline.
+  return publishing ? Math.max(3, minimum) : 2;
 }
 
 export function requiredSearchExpansionPublisherCount(publishing: boolean, configuredMinimum: number): number {
