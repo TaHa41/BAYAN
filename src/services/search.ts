@@ -734,7 +734,7 @@ export async function search(env:Env,q:string,language:Locale,options:{publish?:
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch(error){await recordRuntimeEventLimited(env,"search_log_persistence","blocked_search_log_write_failed",error)}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   // Reuse a recent, previously verified answer when its evidence is still source-diverse.
   // This avoids re-running the full external-provider fan-out for repeat queries.
-  if(!options.publish&&!options.images&&!options.background&&!options.healthCheck){
+  if(!options.publish&&!options.images&&!options.background&&!options.healthCheck&&!personLookup(q)&&!nameOnlyArabicQuery(q)&&intent(q)!=="news"){
     try{
       const since=new Date(Date.now()-5*60*1000).toISOString();
       const cached=await env.DB.prepare("SELECT results_json,status,created_at FROM searches WHERE query=? AND language=? AND created_at>=? AND status IN ('verified','mixed') ORDER BY created_at DESC LIMIT 1").bind(q,language,since).first<any>();
