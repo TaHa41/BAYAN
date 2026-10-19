@@ -3,7 +3,7 @@ import type {Env,Locale,SearchResponse,SearchResult,Source} from "../types";
 import {searchArticles,saveSearch,publishVerifiedResearch,publicationRejectionReason} from "../db";
 import {boundedLikeKeywords,escapedLikePattern} from "../search-patterns";
 import {recordRuntimeEventLimited} from "../runtime-events";
-import {ask,draftArticle,answerHasUnsupportedSpecifics,handleOpenAIResponseFailure,consumeDailyNewsAiCall} from "./ai";
+import {ask,draftArticle,answerHasUnsupportedSpecifics,answerUnsupportedSpecificsDetail,handleOpenAIResponseFailure,consumeDailyNewsAiCall} from "./ai";
 import {findRelatedImage,searchNewsFeed,searchTrustedNewsFeeds} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 import {sectionForOpenedStory,isContentForSection} from "./editorial";
@@ -1014,7 +1014,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
             if(longDraft?.reason==="ai_unavailable"){publishReason="ai_unavailable";publishReasonDetail=("article_draft_all_providers_unavailable;"+draftMetrics).slice(0,300);return;}
             if(longDraft?.status!=="verified"){
               publishReason="draft_not_verified";
-              publishReasonDetail=(!String(longDraft?.answer||"").trim()?"draft_empty_or_insufficient_evidence":answerHasUnsupportedSpecifics(String(longDraft.answer),results,q)?"unsupported_specifics":"verification_status_"+String(longDraft?.status||"missing"))+";"+draftMetrics;
+              publishReasonDetail=(!String(longDraft?.answer||"").trim()?"draft_empty_or_insufficient_evidence":answerHasUnsupportedSpecifics(String(longDraft.answer),results,q)?(answerUnsupportedSpecificsDetail(String(longDraft.answer),results,q)||"unsupported_specifics"):"verification_status_"+String(longDraft?.status||"missing"))+";"+draftMetrics;
               return;
             }
             if(!usefulDraft(longDraft.answer,language)){publishReason="draft_not_useful";publishReasonDetail=("article_draft_failed_usefulness_checks;"+draftMetrics).slice(0,300);return;}
