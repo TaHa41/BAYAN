@@ -12,20 +12,41 @@ export function sectionForOpenedStory(title:string,summary:string){
  if(/(?:public opinion polls?|opinion polls?|polling methodology|استطلاعات الرأي العام|استطلاع الرأي العام)/i.test(focused))return "trends";
  const biographicalEvidence=/(?:biography|biographical|physicist|chemist|novelist|writer|author|scientist|poet|inventor|actor|actress|politician|footballer|born in|born on|award winner|سيرة|فيزيائي|فيزيائية|كيميائي|كيميائية|روائي|روائية|كاتب|كاتبة|عالم|عالمة|شاعر|شاعرة|مخترع|مخترعة|ممثل|ممثلة|ولد في|ولدت في|حصل على جائزة|حصلت على جائزة|جائزة نوبل|مسيرته|مسيرتها)/i.test(s);
  if(biographyIntent||(biographicalEvidence&&/(?:^|[:—-])/.test(String(title))&&t.split(" ").length<=12))return "people";
+ if(/(?:global shift|systemic shift|cross border transformation|cross-border transformation|global supply chains|international system change|تحولات كبرى|تحول عالمي|تغيرات عابرة للحدود|تحول في النظام الدولي)/i.test(all))return "world";
  if(/(?:football|soccer|basketball|tennis|league|championship|tournament|match|goal|athlete|coach|sports?|رياضة|مباراة|الدوري|بطولة|منتخب|لاعب|مدرب|هدف|نتيجة المباراة|إحصاءات رياضية)/i.test(all))return "sports";
  if(/(?:health|medical|medicine|hospital|disease|vaccine|doctor|symptom|treatment|clinical trial|hypertension|blood pressure|cardiology|ضغط الدم|ارتفاع ضغط الدم|صحة|طب|مستشفى|مرض|لقاح|طبيب|أعراض|علاج|تجربة سريرية|دواء|وقاية)/i.test(all))return "health";
  if(/(?:technology|artificial intelligence|software|cybersecurity|chip|robot|programming|algorithm|تقنية|تكنولوجيا|ذكاء اصطناعي|برمجيات|أمن سيبراني|رقائق|روبوت|برمجة|خوارزمية)/i.test(all))return "technology";
- if(/(?:economy|economic|market|stock|inflation|currency|bank|trade|gdp|finance|gold price|اقتصاد|اقتصادي|سوق|أسهم|تضخم|عملة|بنك|تجارة|ناتج محلي|تمويل|سعر الذهب|دولار)/i.test(all))return "economy";
+ if(/(?:live price|current price|exchange rate|currency rate|gold price today|stock quote|live market data|current temperature|weather now|أسعار مباشرة|سعر الصرف|سعر الذهب اليوم|أسعار الآن|الأسعار الآن|سعر الدولار اليوم|سعر السهم|بيانات السوق المباشرة|درجة الحرارة الآن|الطقس الآن)/i.test(all))return "prices";
+ if(/(?:economy|economic|market|stock|inflation|currency|bank|trade|gdp|finance|gold price|ipo|initial public offering|shares|share listing|food inflation|rice|sugar|imf|economics meeting|اقتصاد|اقتصادي|سوق|أسهم|تضخم|عملة|بنك|تجارة|ناتج محلي|تمويل|سعر الذهب|دولار|طرح أسهم|طرح عام أولي|إدراج أسهم|تضخم غذائي|الأرز|السكر|صندوق النقد)/i.test(all))return "economy";
  if(/(?:election|president|parliament|government|minister|policy|politics|diplomacy|legislation|sanction|انتخابات|رئيس|برلمان|حكومة|وزير|سياسة|دبلوماسية|تشريع|عقوبات|قانون جديد)/i.test(all))return "politics";
  if(/(?:science|scientific|research|discovery|space|nasa|astronomy|physics|chemistry|biology|planet|universe|study finds|علم|بحث علمي|اكتشاف|فضاء|ناسا|فلك|فيزياء|كيمياء|أحياء|كوكب|الكون|دراسة علمية)/i.test(all))return "science";
  if(/(?:history|historical|heritage|archaeology|civilization|ancient|تاريخ|تاريخي|تراث|آثار|حضارة|قديم|العصور الوسطى)/i.test(all))return "history";
  if(/(?:film|movie|music|actor|actress|celebrity|artist|book review|novel|poetry|painting|theatre|cinema|الفن|فيلم|سينما|موسيقى|ممثل|ممثلة|فنان|كتاب|رواية|شعر|لوحة|مسرح|أدب)/i.test(all))return "art";
  if(/(?:travel|tourism|airport|flight|hotel|destination|visa|trip|سفر|سياحة|مطار|رحلة|فندق|وجهة|تأشيرة|إقامة سياحية)/i.test(all))return "travel";
  if(/(?:trend|viral|popular on social media|survey|poll|public opinion|ترند|متداول|رائج|استطلاع|رأي عام|انتشار على وسائل التواصل)/i.test(all))return "trends";
- if(/(?:egypt|egyptian society|cairo|alexandria|مصر|المجتمع المصري|القاهرة|الإسكندرية|محافظة مصرية|الحياة اليومية في مصر)/i.test(all))return "egypt";
- if(/(?:arab world|arab society|arab league|العالم العربي|المجتمع العربي|جامعة الدول العربية|الدول العربية|المجتمعات العربية)/i.test(all))return "arab";
+ 
+ if(/(?:idea|ideas|debate|philosophy|philosophical|argument|ethics|ethical dilemma|critical thinking|viewpoint|opinion piece|intellectual discussion|أفكار|فكرة|نقاش|نقاشات|فلسفة|فلسفي|جدل|حجة|أخلاقيات|معضلة أخلاقية|تفكير نقدي|وجهة نظر|رأي|آراء|قضية فكرية|حوار فكري)/i.test(all))return "arab";
+ if(/(?:community|communities|society|social issue|public service|daily life|housing|family policy|cost of living|مجتمع|مجتمعات|قضية اجتماعية|قضايا اجتماعية|خدمة عامة|خدمات عامة|الحياة اليومية|السكن|الأسرة|تكلفة المعيشة|المعيشة|السكان)/i.test(all))return "egypt";
  if(/(?:breaking|latest|today|reported|announced|statement|press release|عاجل|آخر التطورات|اليوم|أعلنت|أعلن|بيان رسمي|تطورات جديدة)/i.test(all))return "news";
  return "world";
+}
+
+/**
+ * Strict display/persistence gate. Unknown or merely generic material must not
+ * be assigned to a specialist section; "world" is reserved for evidenced
+ * cross-border/systemic changes rather than acting as a catch-all.
+ */
+export function isContentForSection(section:string,title:string,summary:string){
+ const t=normalized(title),s=normalized(summary),all=t+" "+s;
+ if(!section||!t||!s)return false;
+ const inferred=sectionForOpenedStory(title,summary);
+ if(inferred!==section){
+  if(section==="travel"&&/(?:transit|transport|transportation|commute|public transport|تنقل|مواصلات|النقل|وسائل النقل)/i.test(all))return true;
+  return false;
+ }
+ if(section==="world")return /(?:global|worldwide|cross border|cross-border|international system|systemic change|global shift|climate change|supply chain|عالمي|عالمية|عبر الحدود|تحولات كبرى|تغير المناخ|سلاسل الإمداد|النظام الدولي|تحول عالمي)/i.test(all);
+ if(section==="news")return /(?:breaking|latest|today|reported|announced|statement|press release|عاجل|آخر التطورات|اليوم|أعلنت|أعلن|بيان رسمي|تطورات جديدة)/i.test(all);
+ return true;
 }
 
 const templates:Record<string,{ar:string;en:string}>={

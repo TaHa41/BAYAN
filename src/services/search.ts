@@ -6,7 +6,7 @@ import {recordRuntimeEventLimited} from "../runtime-events";
 import {ask,draftArticle,answerHasUnsupportedSpecifics,handleOpenAIResponseFailure,consumeDailyNewsAiCall} from "./ai";
 import {findRelatedImage,searchNewsFeed,searchTrustedNewsFeeds} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
-import {sectionForOpenedStory} from "./editorial";
+import {sectionForOpenedStory,isContentForSection} from "./editorial";
 import {sections} from "../sections";
 import {requiredEvidencePublisherCount,independentEvidenceHost} from "./evidence-diversity";
 import {getProviderBreaker} from "./ai-provider-resilience";
@@ -92,11 +92,11 @@ export const classifySection=(q:string,items:SearchResult[],language:Locale)=>{
  // silently routing every unrecognized topic into Global Shifts.
  const validSection=(value:unknown)=>sections.some(section=>section.slug===String(value||""));
  const explicitSection=[lead?.section,...ordered.map(item=>item.section)].map(value=>String(value||"")).find(value=>validSection(value)&&value!=="world");
- if(explicitSection)return explicitSection;
+ if(explicitSection&&(isContentForSection(explicitSection,title,String(lead?.summary||""))||(explicitSection==="travel"&&/(?:transit|transport|transportation|commute|public transport|تنقل|مواصلات|النقل|وسائل النقل)/i.test(title+" "+String(lead?.summary||"")))))return explicitSection;
  if(ordered.some(item=>String((item as any).kind||"")==="news"||Boolean((item as any).publishedAt)))return "news";
  if(/(?:\btrend\b|\bviral\b|\bpopular\b|ترند|متداول|رائج|اهتمام الناس)/i.test(combined))return "trends";
- if(/(?:\begypt\b|\begyptian\b|\bcairo\b|\bcommunity\b|\bpublic service\b|مصر|المصري|القاهرة|مجتمع|خدمات عامة)/i.test(title+" "+String(lead?.summary||"")))return "egypt";
- if(/(?:\barab\b|\barabic\b|\barab league\b|العرب|عربي|العالم العربي|جامعة الدول العربية)/i.test(title+" "+String(lead?.summary||"")))return"arab";
+ if(/(?:\bcommunity\b|\bcommunities\b|\bsociety\b|\bsocial issue\b|\bpublic service\b|\bdaily life\b|\bhousing\b|\bfamilies\b|\bcost of living\b|مجتمع|مجتمعات|قضية اجتماعية|قضايا اجتماعية|خدمة عامة|خدمات عامة|الحياة اليومية|السكن|الأسرة|تكلفة المعيشة|المعيشة|السكان)/i.test(title+" "+String(lead?.summary||"")))return "egypt";
+ if(/(?:\bidea\b|\bideas\b|\bdebate\b|\bphilosophy\b|\bphilosophical\b|\bargument\b|\bethics\b|\bcritical thinking\b|\bviewpoint\b|\bopinion\b|أفكار|فكرة|نقاش|نقاشات|فلسفة|فلسفي|جدل|حجة|أخلاقيات|تفكير نقدي|وجهة نظر|رأي|آراء|قضية فكرية|حوار فكري)/i.test(title+" "+String(lead?.summary||"")))return"arab";
  return "world";
 };
 
@@ -734,7 +734,7 @@ export async function search(env:Env,q:string,language:Locale,options:{publish?:
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch(error){await recordRuntimeEventLimited(env,"search_log_persistence","blocked_search_log_write_failed",error)}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   // Reuse a recent, previously verified answer when its evidence is still source-diverse.
   // This avoids re-running the full external-provider fan-out for repeat queries.
-  if(!options.publish&&!options.images&&!options.background&&!options.healthCheck){
+  if(!options.publish&&!options.images&&!options.background&&!options.healthCheck&&!personLookup(q)&&!nameOnlyArabicQuery(q)&&intent(q)!=="news"){
     try{
       const since=new Date(Date.now()-5*60*1000).toISOString();
       const cached=await env.DB.prepare("SELECT results_json,status,created_at FROM searches WHERE query=? AND language=? AND created_at>=? AND status IN ('verified','mixed') ORDER BY created_at DESC LIMIT 1").bind(q,language,since).first<any>();
