@@ -8,7 +8,7 @@ import {findRelatedImage,searchNewsFeed,searchTrustedNewsFeeds} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 import {sectionForOpenedStory,isContentForSection} from "./editorial";
 import {sections} from "../sections";
-import {requiredEvidencePublisherCount,independentEvidenceHost} from "./evidence-diversity";
+import {requiredEvidencePublisherCount,requiredSearchExpansionPublisherCount,independentEvidenceHost} from "./evidence-diversity";
 import {getProviderBreaker} from "./ai-provider-resilience";
 import {shouldAttemptOpenAIWebSearchFallback} from "./search-recovery";
 const publicationErrorMessage=(error:unknown)=>String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
@@ -829,7 +829,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     const minSources=Math.max(2,Number(s.min_sources||3));
     // Internal BAYAN indexes and aggregator URLs never satisfy this gate.
     // Publication requires five genuinely independent HTTPS publishers/hosts.
-    const requiredPublishers=requiredEvidencePublisherCount(options.publish===true,Number(s.min_sources||3));
+    const requiredPublishers=requiredSearchExpansionPublisherCount(options.publish===true,Number(s.min_sources||3));
     const substantive=matching.filter(item=>String(item.summary||"").trim().length>=100).length;
     return publishers.size>=requiredPublishers&&hosts.size>=requiredPublishers&&substantive>=Math.min(3,minSources);
   };
