@@ -6,6 +6,7 @@ import {recordRuntimeEventLimited} from "../runtime-events";
 import {ask,draftArticle,answerHasUnsupportedSpecifics} from "./ai";
 import {findRelatedImage,searchNewsFeed} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
+import {sectionForOpenedStory} from "./editorial";
 const publicationErrorMessage=(error:unknown)=>String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
 const publicationFailureReason=(error:unknown)=>{const message=publicationErrorMessage(error);return /429|rate.?limit|timeout|timed out|abort|quota|neurons|overload|openai|workers ai|ai unavailable/i.test(message)?"ai_unavailable":"exception:"+message;};
 async function recordPublicationWarning(env:Env,message:string){await recordRuntimeEventLimited(env,"news_archive_article_generation","publication_warning",message);}
@@ -70,7 +71,23 @@ const scoreSource=(publisher:string, title:string, q:string) => {
   return Math.min(100,score);
 };
 const source=(title:string,publisher:string,url:string):Source=>({title,publisher,url});
-const classifySection=(q:string,items:SearchResult[],language:Locale)=>{const qTerms=searchTerms(q);if((personLookup(q)||(nameOnlyArabicQuery(personQueryName(q))&&items.some(x=>normalizedEntityTitle(x.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(x))))&&items.some(x=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test((x.sources||[]).map(source=>source.publisher).join(" "))&&qTerms.some(term=>String(x.title||"").normalize("NFKC").toLowerCase().includes(term))))return"people";const s=(q+" "+items.slice(0,4).map(x=>x.title+" "+x.summary).join(" ")).toLowerCase();if(/\bscientist\b|\bchemist\b|\bwriter\b|\bauthor\b|\bpolitician\b|\bactor\b|\bathlete\b|\bbiography\b|\bnobel prize winner\b|\bphilosopher\b|\bphysicist\b|\bmathematician\b|عالم مصري|عالمة|كيميائي|سيرة ذاتية|شخصية عامة|كاتب|مؤلف|سياسي|ممثل|لاعب|باحث|رئيس سابق|من هو|من هي/.test(s))return"people";if(/gold|dollar|currency|price|inflation|سعر|ذهب|دولار|عملة|تضخم/.test(s))return"economy";if(/weather|طقس|حرارة|rain|temperature/.test(s))return"travel";if(/ai|artificial intelligence|technology|software|programming|ذكاء اصطناعي|تقنية|برمجة/.test(s))return"technology";if(/health|medicine|medical|nutrition|صحة|طب|دواء|تغذية/.test(s))return"health";if(/science|space|nasa|physics|biology|علم|فضاء|اكتشاف/.test(s))return"science";if(/history|historical|ancient|تاريخ|حضارة|قديم|culture|ثقافة/.test(s))return"history";if(/art|film|book|music|فن|سينما|كتاب|موسيقى|ترفيه/.test(s))return"art";if(/sports|football|soccer|basketball|رياضة|مباراة|لاعب/.test(s))return"sports";if(/travel|tourism|destination|سفر|سياحة|وجهة/.test(s))return"travel";if(/economy|business|market|اقتصاد|أعمال|سوق/.test(s))return"economy";if(/politic|government|election|president|سياسة|حكومة|انتخابات|رئيس/.test(s))return"politics";if(/biography|who is|من هو|من هي|سيرة|شخصية/.test(s))return"people";if(/trend|viral|popular|ترند|متداول|رائج/.test(s))return"trends";if(/egypt|مصر|القاهرة|الإسكندرية/.test(s))return"egypt";if(/arab|العالم العربي|جامعة الدول العربية|العرب|عربي/.test(s))return"arab";return"world"};
+const classifySection=(q:string,items:SearchResult[],language:Locale)=>{
+ const personQuery=personLookup(q)||(nameOnlyArabicQuery(personQueryName(q))?personQueryName(q):undefined);
+ if(personQuery&&items.some(x=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test((x.sources||[]).map(source=>source.publisher).join(" ")))&&items.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item)))return"people";
+ if(/عالم مصري|عالمة|كيميائي/.test(String(items.slice(0,6).map(item=>String(item.title||"")+" "+String(item.summary||"")).join(" ")))&&personQuery)return"people";
+ const ordered=[...items].sort((a,b)=>Number(Boolean((b as any).body))-Number(Boolean((a as any).body)));
+ const lead=ordered.find(item=>String(item.title||"").trim()&&String(item.summary||"").trim());
+ const title=String(lead?.title||q);
+ const evidence=ordered.slice(0,6).map(item=>String(item.title||"")+" "+String(item.summary||"")+" "+String((item as any).body||"")).join(" ");
+ const combined=title+" "+evidence;
+ if(/(?:\bweather\b|\btemperature\b|\brainfall\b|\bexchange rate\b|\bcurrency price\b|\bgold price\b|\bmarket price\b|الطقس|درجات الحرارة|سعر الذهب|أسعار العملات|سعر الصرف|الأسعار المباشرة)/i.test(q+" "+title))return "prices";
+ const inferred=sectionForOpenedStory(title,evidence);
+ if(inferred!=="world")return inferred;
+ if(/(?:\btrend\b|\bviral\b|\bpopular\b|ترند|متداول|رائج|اهتمام الناس)/i.test(combined))return "trends";
+ if(/(?:\begypt\b|\begyptian\b|\bcairo\b|\bcommunity\b|\bpublic service\b|مصر|المصري|القاهرة|مجتمع|خدمات عامة)/i.test(title+" "+String(lead?.summary||"")))return "egypt";
+ if(/(?:\barab\b|\barabic\b|\barab league\b|العرب|عربي|العالم العربي|جامعة الدول العربية)/i.test(title+" "+String(lead?.summary||"")))return"arab";
+ return "world";
+};
 
 const searchTerms=(q:string)=>{const stop=new Set(["the","and","for","with","from","about","what","when","where","who","how","why","are","was","is","of","to","in","on","at","by","as","an","a","or","into","over","under","after","before","than","can","does","do","did","be","been","being","من","في","عن","على","الى","إلى","ما","ماذا","كيف","لماذا","هل","هو","هي","هذا","هذه","التي","الذي","مع"]);return String(q||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter(x=>x.length>=2&&!stop.has(x)).slice(0,10)};
 const searchTermVariants=(value:string)=>{
