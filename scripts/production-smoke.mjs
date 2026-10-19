@@ -10,9 +10,9 @@ async function get(path){
   const r=await fetch(origin+path,{redirect:"manual",headers:{accept:"application/json,text/plain,*/*","user-agent":"BAYAN-Production-Smoke/1.0"},signal:AbortSignal.timeout(25000)});
   const text=await r.text();
   console.log(path,r.status,text.slice(0,220));
+  const pathname=new URL(path,origin).pathname;
   const emptyNewsSitemapUnavailable=pathname==="/news-sitemap.xml"&&r.status===503&&r.headers.get("x-bayan-news-sitemap-eligible-count")==="0";
   if(!r.ok&&!emptyNewsSitemapUnavailable)throw new Error(path+" status "+r.status);
-  const pathname=new URL(path,origin).pathname;
   const htmlRoutes=new Set(["/","/index.html","/saved","/tools","/about","/methodology","/privacy","/terms","/news","/prices","/art","/trends"]);
   const isHtmlRoute=htmlRoutes.has(pathname)||sections.includes(pathname.replace(/^\//,""))||pathname.startsWith("/article/");
   if(isHtmlRoute&&!/text\/html/i.test(r.headers.get("content-type")||""))throw new Error(path+" expected text/html but received "+(r.headers.get("content-type")||"missing content-type"));
