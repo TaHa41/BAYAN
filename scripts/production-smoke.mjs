@@ -1,3 +1,4 @@
+import {parseNewsSitemap} from "./news-sitemap-contract.mjs";
 const origin=process.env.BAYAN_ORIGIN||"https://bayan.tahaomar411.workers.dev";
 const checks=["/","/saved?lang=ar","/tools?lang=ar","/about?lang=ar","/methodology?lang=ar","/privacy?lang=ar","/terms?lang=ar","/api/health","/api/features","/api/news/archive?lang=ar","/api/news/archive?lang=en","/api/live/weather","/api/live/fx","/api/live/gold","/news?lang=ar","/news?lang=en","/prices?lang=ar","/art?lang=ar","/trends?lang=ar","/robots.txt","/sitemap.xml","/news-sitemap.xml","/llms.txt","/.well-known/ai-catalog.json","/ai-catalog.json"];
 const sections=["science","technology","economy","politics","health","history","people","sports","travel","art","news","trends","prices","egypt","arab","world"];
@@ -87,11 +88,11 @@ try{
   const newsLanding=await get("/news?lang=ar");
   if(!newsLanding.text.includes('class="seo-content-image"'))throw new Error("news_landing_server_rendered_images_missing");
   if(newsMap.text.includes("/news?story="))throw new Error("news_sitemap_contains_summary_only_pages");
-  const newsLocs=[...newsMap.text.matchAll(/<loc>(.*?)<\/loc>/g)].map(match=>match[1]);
-  if(newsLocs.some(url=>!url.includes("/article/")))throw new Error("news_sitemap_url_is_not_full_article");
-  if(newsLocs.length>0&&!newsMap.text.includes("<news:news>"))throw new Error("news_sitemap_news_metadata_missing");
-  if(newsLocs.length>0){
-    const articleUrl=new URL(newsLocs[0]);
+  const parsedNewsSitemap=parseNewsSitemap(newsMap.text,origin);
+  if(!parsedNewsSitemap.allUrlsSameOrigin)throw new Error("news_sitemap_contains_off_origin_url");
+  if(!parsedNewsSitemap.newsMetadataUrlsAreArticles)throw new Error("news_sitemap_news_metadata_not_full_article");
+  if(parsedNewsSitemap.newsArticleCount>0){
+    const articleUrl=new URL(parsedNewsSitemap.newsArticleUrls[0]);
     const articlePage=await get(articleUrl.pathname+articleUrl.search);
     if(!articlePage.text.includes("<h1>")||!articlePage.text.includes("<h2>"))throw new Error("news_sitemap_article_not_rendered_as_full_content");
     const alternateTags=[...articlePage.text.matchAll(/<link\s+rel="alternate"\s+hreflang="(ar|en|x-default)"\s+href="([^"]+)"/g)];
