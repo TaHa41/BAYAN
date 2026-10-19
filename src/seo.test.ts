@@ -2,15 +2,20 @@ import { describe, expect, it, vi } from "vitest";
 import { newsSitemap, sitemap } from "./seo";
 
 describe("newsSitemap database failure handling", () => {
-  it("returns a retryable 503 instead of disguising a database error as empty XML", async () => {
+  it("returns valid empty news XML during D1 read exhaustion without fabricating news", async () => {
     const env = { DB: { prepare: () => ({ bind(){return this;}, all: async () => { throw new Error("database unavailable"); } }) } } as any;
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       const response = await newsSitemap(env);
-      expect(response.status).toBe(503);
-      expect(response.headers.get("content-type")).toContain("text/plain");
-      expect(response.headers.get("retry-after")).toBe("300");
-      expect(await response.text()).toContain("temporarily unavailable");
+      const body = await response.text();
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toContain("application/xml");
+      expect(response.headers.get("x-bayan-news-sitemap-degraded")).toBe("d1-unavailable");
+      expect(response.headers.get("x-bayan-news-sitemap-candidate-count")).toBe("0");
+      expect(response.headers.get("x-bayan-news-sitemap-eligible-count")).toBe("0");
+      expect(body).toContain("<urlset");
+      expect(body).toContain("</urlset>");
+      expect(body).not.toContain("<url>");
       expect(errorSpy).toHaveBeenCalledWith("news_sitemap_database_query_failed", "database unavailable");
     } finally { errorSpy.mockRestore(); }
   });
@@ -72,14 +77,18 @@ describe("newsSitemap database failure handling", () => {
 });
 
 describe("sitemap database failure handling", () => {
-  it("returns 503 rather than silently omitting published article URLs when the database fails", async () => {
+  it("keeps a valid sitemap with reviewed bundled article URLs when D1 reads fail", async () => {
     const env = { DB: { prepare: () => ({ bind(){return this;}, all: async () => { throw new Error("database unavailable"); } }) } } as any;
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       const response = await sitemap(env);
-      expect(response.status).toBe(503);
-      expect(response.headers.get("retry-after")).toBe("300");
-      expect(await response.text()).toContain("temporarily unavailable");
+      const body = await response.text();
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toContain("application/xml");
+      expect(body).toContain("<urlset");
+      expect(body).toContain("</urlset>");
+      expect(body).toContain("/article/who-is-naguib-mahfouz-ar?lang=ar");
+      expect(body).toContain("/article/who-is-naguib-mahfouz-en?lang=en");
       expect(errorSpy).toHaveBeenCalledWith("sitemap_database_query_failed", "database unavailable");
     } finally { errorSpy.mockRestore(); }
   });

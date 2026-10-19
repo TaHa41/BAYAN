@@ -2,6 +2,7 @@ import {ORIGIN,SECTIONS} from "./config";
 import {recordRuntimeEventLimited} from "./runtime-events";
 import type {Env,Locale} from "./types";
 import {text}from"./http";
+import {BUNDLED_ARTICLES} from "./fallback-content";
 
 export function robots(){
   // Advertise only the general sitemap. Google News sitemaps are useful only
@@ -9,7 +10,6 @@ export function robots(){
   return text("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nDisallow: /review\nDisallow: /saved\nSitemap: "+ORIGIN+"/sitemap.xml\n");
 }
 const xml=(s:string)=>Array.from(String(s)).filter((character)=>{const code=character.codePointAt(0)!;return code===0x9||code===0xA||code===0xD||(code>=0x20&&code<=0xD7FF)||(code>=0xE000&&code<=0xFFFD)||(code>=0x10000&&code<=0x10FFFF)}).join("").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
-const retryableUnavailable=(message:string)=>{const response=text(message,"text/plain;charset=utf-8",503);response.headers.set("retry-after","300");return response;};
 export async function sitemap(env:Env){
   let articleUrls:Array<{url:string;lastmod?:string}>=[];
   try{
@@ -19,9 +19,9 @@ export async function sitemap(env:Env){
       lastmod:String(x.updated_at||"")
     }));
   }catch(error){
-    // Avoid publishing a misleading partial sitemap when article discovery fails.
+    // Preserve a valid sitemap from reviewed bundled articles when D1 reads are unavailable.
     console.error("sitemap_database_query_failed", error instanceof Error ? error.message : String(error));
-    return retryableUnavailable("Sitemap temporarily unavailable; retry later.");
+    articleUrls=BUNDLED_ARTICLES.filter((x)=>x.status==="PUBLISHED"&&x.fallbackEvidence==="verified"&&x.imageUrl&& (x.language==="ar"||x.language==="en")).map((x)=>({url:ORIGIN+"/article/"+encodeURIComponent(x.slug)+"?lang="+encodeURIComponent(x.language),lastmod:String(x.updatedAt||"")}));
   }
   const publicPaths=["/","/news","/about","/methodology","/privacy","/terms",...SECTIONS.map(x=>"/"+x[0])];
   const localizedUrls=publicPaths.flatMap((path)=>["ar","en"].map((language)=>({
@@ -86,7 +86,12 @@ export async function newsSitemap(env:Env){
     rows=r.results||[];
   }catch(error){
     console.error("news_sitemap_database_query_failed",error instanceof Error?error.message:String(error));
-    return retryableUnavailable("News sitemap temporarily unavailable; retry later.");
+    // Never fabricate news. Return valid empty XML while D1 row reads are unavailable.
+    const response=text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"></urlset>',"application/xml;charset=utf-8");
+    response.headers.set("x-bayan-news-sitemap-degraded","d1-unavailable");
+    response.headers.set("x-bayan-news-sitemap-candidate-count","0");
+    response.headers.set("x-bayan-news-sitemap-eligible-count","0");
+    return response;
   }
   try{
     const archive=await env.DB.prepare("SELECT id,url,language,title,summary,publisher,published_at,fetched_at FROM news_archive WHERE language IN ('ar','en') AND fetched_at>=? AND fetched_at<=? AND length(summary)>=120 ORDER BY fetched_at DESC LIMIT 200").bind(recentCutoff,futureLimit).all<any>();

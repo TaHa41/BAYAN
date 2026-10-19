@@ -493,6 +493,7 @@
       };
     }
     const results = Array.isArray(data.results) ? data.results : [];
+    const bundledFallbackUsed = results.some((item) => Boolean(item?.fallbackMode));
     // Universal search presentation: classify each result by its editorial type,
     // while preserving the canonical section assigned by the backend.
     const resultType = (item) => {
@@ -503,12 +504,11 @@
       if (["science","technology","economy","politics","health","history","sports","travel","art","trends","prices","egypt","arab","world"].includes(section)) return section;
       return "articles";
     };
-    const answerText=String(data?.answer||"");
-    const answerUsable=Boolean(answerText)&&!/(تعذر تشغيل صياغة BAYAN الذكية الآن|drafting model is temporarily unavailable)/i.test(answerText);
     output.innerHTML = results.length
-      ? ((answerUsable ? '<article class="answer search-answer"><span class="eyebrow">' + t("إجابة بيان","BAYAN answer") + '</span><div class="article-body">' + renderArticleBody(answerText) + '</div>' + (data.articleSlug ? '<a class="read" href="/article/' + encodeURIComponent(data.articleSlug) + "?lang=" + lang + '">' + t("فتح الملف الكامل داخل بيان","Open the full BAYAN file") + " →</a>" : "") + "</article>" : "") +
-      (fallbackUsed ? '<div class="notice">' + t("هذه نتائج استكشافية من مسار احتياطي؛ لم تُعتبر تحققًا مستقلًا، ويعرض بيان حالة الأدلة بوضوح.","These are exploratory fallback results, not independently verified; BAYAN labels the evidence status explicitly.") + "</div>" : "") +
-      '<div class="search-tools" role="region" aria-label="' + t("أدوات تصفية البحث","Search filters") + '">' +
+      ? (      (fallbackUsed ? '<div class="notice">' + t("هذه نتائج استكشافية من مسار احتياطي؛ لم تُعتبر تحققًا مستقلًا، ويعرض بيان حالة الأدلة بوضوح.","These are exploratory fallback results, not independently verified; BAYAN labels the evidence status explicitly.") + "</div>" : "") +
+      (bundledFallbackUsed ? '<div class="notice">' + t("نعرض مؤقتًا مواد من مكتبة بيان المحفوظة. افتح المادة لقراءة التفاصيل ومصادرها؛ وقد لا تظهر أحدث التحديثات الآن.","BAYAN is temporarily showing material from its saved knowledge library. Open an item for details and sources; the latest updates may not be available right now.") + "</div>" : "") +
+      (String(data?.answer||"").trim() && !/(تعذر تشغيل صياغة BAYAN الذكية الآن|drafting model is temporarily unavailable)/i.test(String(data.answer)) ? '<article class="answer search-answer"><span class="eyebrow">' + t("إجابة مختصرة","Short answer") + '</span><p>' + escapeHtml(String(data.answer).trim().slice(0,180)) + (String(data.answer).trim().length>180 ? "…" : "") + '</p>' + (data.articleSlug ? '<a class="read" href="/article/' + encodeURIComponent(data.articleSlug) + "?lang=" + lang + '">' + t("افتح المقال لقراءة التفاصيل","Open article for full details") + " →</a>" : "") + "</article>" : "") +
+            '<div class="search-tools" role="region" aria-label="' + t("أدوات تصفية البحث","Search filters") + '">' +
       '<div class="search-tools-top"><strong>' + t("النتائج","Results") + ' (' + results.length + ')</strong>' +
       '<label class="search-sort-label">' + t("الترتيب","Sort") + ' <select id="search-sort"><option value="relevance">' + t("الأكثر صلة","Relevance") + '</option><option value="newest">' + t("الأحدث","Newest") + '</option><option value="title">' + t("العنوان","Title") + '</option></select></label></div>' +
       '<div class="search-filter-list" role="group" aria-label="' + t("نوع النتيجة","Result type") + '">' +
@@ -1152,7 +1152,7 @@
         return ar ? hasArabicText(title) && (!summary || hasArabicText(summary)) && (!body || hasArabicText(body)) : !hasArabicText(title) && !hasArabicText(summary) && !hasArabicText(body);
       });
       content.innerHTML = items.length
-        ? items.map(articleCard).join("")
+        ? (data.degraded ? '<div class="notice">' + t("نعرض مؤقتًا مواد معرفية محفوظة داخل بيان بينما تتعافى خدمة البيانات. قد لا تظهر أحدث التحديثات في هذه النسخة.","BAYAN is temporarily showing its bundled knowledge material while the data service recovers. The latest updates may not appear in this fallback.") + '</div>' : '') + items.map(articleCard).join("")
         : '<div class="notice"><h2>' + t("لا توجد مواد منشورة في هذا القسم بعد.","No published material in this section yet.") +
           '</h2><p>' + t("لن نعرض مقالات ناقصة أو غير متحققة. يمكنك البحث عن مصادر موثوقة حول موضوع القسم الآن.","We will not display incomplete or unverified articles. You can search reliable sources for this topic now.") +
           '</p><a class="primary" href="/search?q=' + encodeURIComponent(ar ? section[1] : section[2]) + '&lang=' + lang + '">' + t("ابحث عن مواد موثقة","Search sourced material") + '</a></div>';
