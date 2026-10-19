@@ -74,7 +74,7 @@ const source=(title:string,publisher:string,url:string):Source=>({title,publishe
 const classifySection=(q:string,items:SearchResult[],language:Locale)=>{
  const personQuery=personLookup(q)||nameOnlyArabicQuery(q);
  if(personQuery&&items.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item)))return "people";
- const ordered=[...items].sort((a,b)=>Number(Boolean(b.body))-Number(Boolean(a.body)));
+ const ordered=[...items].sort((a,b)=>Number(Boolean((b as any).body))-Number(Boolean((a as any).body)));
  const lead=ordered.find(item=>String(item.title||"").trim()&&String(item.summary||"").trim());
  const title=String(lead?.title||q);
  const evidence=ordered.slice(0,6).map(item=>String(item.title||"")+" "+String(item.summary||"")+" "+String((item as any).body||"")).join(" ");
