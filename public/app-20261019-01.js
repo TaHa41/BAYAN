@@ -493,13 +493,28 @@
       };
     }
     const results = Array.isArray(data.results) ? data.results : [];
+    // Universal search presentation: classify each result by its editorial type,
+    // while preserving the canonical section assigned by the backend.
+    const resultType = (item) => {
+      const section = String(item?.section || "").toLowerCase();
+      const kind = String(item?.kind || "").toLowerCase();
+      if (section === "people" || /biograph|person|profile|سيرة|شخصية/i.test(String(item?.title || "") + " " + String(item?.kind || ""))) return "people";
+      if (section === "news" || /news|article_news|خبر|أخبار/i.test(kind + " " + String(item?.title || ""))) return "news";
+      if (["science","technology","economy","politics","health","history","sports","travel","art","trends","prices","egypt","arab","world"].includes(section)) return section;
+      return "articles";
+    };
     const answerText=String(data?.answer||"");
     const answerUsable=Boolean(answerText)&&!/(تعذر تشغيل صياغة BAYAN الذكية الآن|drafting model is temporarily unavailable)/i.test(answerText);
     output.innerHTML = results.length
       ? ((answerUsable ? '<article class="answer search-answer"><span class="eyebrow">' + t("إجابة بيان","BAYAN answer") + '</span><div class="article-body">' + renderArticleBody(answerText) + '</div>' + (data.articleSlug ? '<a class="read" href="/article/' + encodeURIComponent(data.articleSlug) + "?lang=" + lang + '">' + t("فتح الملف الكامل داخل بيان","Open the full BAYAN file") + " →</a>" : "") + "</article>" : "") +
       (fallbackUsed ? '<div class="notice">' + t("هذه نتائج استكشافية من مسار احتياطي؛ لم تُعتبر تحققًا مستقلًا، ويعرض بيان حالة الأدلة بوضوح.","These are exploratory fallback results, not independently verified; BAYAN labels the evidence status explicitly.") + "</div>" : "") +
-      '<div class="result-meta">' + escapeHtml((data.providers || []).join(" · ") || "BAYAN") + "</div>" +
-      results.map((item) => {
+      '<div class="search-tools" role="region" aria-label="' + t("أدوات تصفية البحث","Search filters") + '">' +
+      '<div class="search-tools-top"><strong>' + t("النتائج","Results") + ' (' + results.length + ')</strong>' +
+      '<label class="search-sort-label">' + t("الترتيب","Sort") + ' <select id="search-sort"><option value="relevance">' + t("الأكثر صلة","Relevance") + '</option><option value="newest">' + t("الأحدث","Newest") + '</option><option value="title">' + t("العنوان","Title") + '</option></select></label></div>' +
+      '<div class="search-filter-list" role="group" aria-label="' + t("نوع النتيجة","Result type") + '">' +
+      [['all',t("الكل","All")],['people',t("السير والأشخاص","People & biographies")],['news',t("الأخبار","News")],['articles',t("المقالات والمعرفة","Articles & knowledge")],['science',t("العلوم","Science")],['technology',t("التقنية","Technology")],['economy',t("الاقتصاد","Economy")],['sports',t("الرياضة","Sports")]].map(([key,label]) => '<button type="button" class="search-filter' + (key === "all" ? ' is-active' : '') + '" data-search-filter="' + key + '" aria-pressed="' + (key === "all" ? 'true' : 'false') + '">' + label + '</button>').join("") +
+      '</div></div><div class="result-meta">' + escapeHtml((data.providers || []).join(" · ") || "BAYAN") + "</div>" +
+      '<div id="search-result-list">' + results.map((item) => {
         const key = item.slug || item.url || item.title;
         const sectionMeta=sections.find(section=>section[0]===item.section); const sectionLabel=sectionMeta?(ar?sectionMeta[1]:sectionMeta[2]):t("نتيجة بحث","Search result"); const sourceUrl=String(item.url||(item.sources||[])[0]?.url||""); const videoUrl=/^https:\/\/(www\.)?(youtube\.com|youtu\.be|vimeo\.com)\//i.test(sourceUrl); const videoId=(sourceUrl.match(/[?&]v=([A-Za-z0-9_-]{6,})/)||sourceUrl.match(/youtu\.be\/([A-Za-z0-9_-]{6,})/)||sourceUrl.match(/\/(?:shorts|embed|video)\/([A-Za-z0-9_-]{6,})/))?.[1]; const cardImage=item.imageUrl||(videoId?"https://i.ytimg.com/vi/"+videoId+"/hqdefault.jpg":""); const destination=item.slug?("/article/"+encodeURIComponent(item.slug)+"?lang="+lang):("/research?title="+encodeURIComponent(item.title||query)+"&summary="+encodeURIComponent(String(item.summary||"").slice(0,1200))+"&url="+encodeURIComponent(sourceUrl)+"&publisher="+encodeURIComponent((item.sources||[])[0]?.publisher||"")+"&image="+encodeURIComponent(item.imageUrl||"")+"&lang="+lang); return '<article class="search-result search-article-card">' + imageHtml({...item,imageUrl:cardImage}) + '<span class="kicker">' + escapeHtml(videoUrl?t("فيديو — مصدر بحث","Video source"):sectionLabel) + " · " +
           escapeHtml(({verified:t("موثق","Verified"),mixed:t("بحاجة إلى تحقق إضافي","Needs more verification"),insufficient:t("أدلة غير كافية","Insufficient evidence"),source_only:t("مرجع تعريفي","Reference only")})[item.evidence]||t("بحاجة إلى تحقق إضافي","Needs more verification")) + "</span><h2>" +
@@ -507,12 +522,42 @@
           "</h2><p>" + escapeHtml(String(item.summary || "").trim().slice(0,420)) + (String(item.summary || "").trim().length>420?"…":"") + '</p>' + (String(item.body || "").trim().length > 500 ? '<details class="search-full-article"><summary>' + t("قراءة المقال بالتفصيل","Read the full article") + '</summary><div class="article-body">' + renderArticleBody(String(item.body)) + '</div></details>' : "") + '<div class="source-line">' +
           (item.sources || []).slice(0, 3).map((source) => escapeHtml(source.publisher)).join(" · ") +
           '</div><a class="read" href="' + destination + '"' + '>' + t("عرض التفاصيل والأدلة","View details and evidence") + " →</a>" + socialActions({...item, _key:key}) + "</article>";
-      }).join(""))
+      }).join("") + '</div>')
       : '<div class="notice"><h2>' + escapeHtml(data?.message || t("لم نعثر على نتيجة مناسبة في المسارات المتاحة الآن.","No suitable result was found in the available search paths.")) +
         '</h2><p>' + t("يمكنك تجربة صياغة أخرى؛ يوسّع بيان البحث عبر المصادر المتاحة دون اختلاق معلومات.","Try another phrasing; BAYAN searches available sources without fabricating information.") + "</p>" +
         '<button class="primary" id="search-retry">' + t("إعادة البحث","Search again") + "</button></div>";
     document.querySelector("#search-retry")?.addEventListener("click", () => renderSearch());
-    if(results.length)hydrateSectionImages(results);
+    if (results.length) {
+      const resultList = document.querySelector("#search-result-list");
+      const cards = Array.from(resultList?.querySelectorAll(".search-result") || []);
+      const entries = results.map((item, index) => ({ item, card: cards[index], index, type: resultType(item) }));
+      const applySearchControls = () => {
+        const active = document.querySelector(".search-filter.is-active")?.dataset.searchFilter || "all";
+        const sort = document.querySelector("#search-sort")?.value || "relevance";
+        const visible = entries.filter(entry => active === "all" || entry.type === active);
+        visible.sort((a,b) => {
+          if (sort === "title") return String(a.item.title || "").localeCompare(String(b.item.title || ""), lang === "ar" ? "ar" : "en");
+          if (sort === "newest") return String(b.item.publishedAt || b.item.published_at || b.item.date || "").localeCompare(String(a.item.publishedAt || a.item.published_at || a.item.date || ""));
+          return (Number(b.item.score || 0) - Number(a.item.score || 0)) || (a.index - b.index);
+        });
+        entries.forEach(entry => { if (entry.card) entry.card.hidden = !visible.includes(entry); });
+        visible.forEach(entry => { if (entry.card && resultList) resultList.appendChild(entry.card); });
+        const count = document.querySelector(".search-tools-top strong");
+        if (count) count.textContent = t("النتائج","Results") + " (" + visible.length + "/" + results.length + ")";
+        let empty = document.querySelector("#search-filter-empty");
+        if (!visible.length && resultList) {
+          if (!empty) { empty = document.createElement("div"); empty.id = "search-filter-empty"; empty.className = "notice"; resultList.appendChild(empty); }
+          empty.textContent = t("لا توجد نتائج من هذا النوع في البحث الحالي. جرّب نوعًا آخر أو اعرض الكل.","No results of this type in this search. Try another type or show all.");
+        } else if (empty) empty.remove();
+      };
+      document.querySelectorAll("[data-search-filter]").forEach(button => button.addEventListener("click", () => {
+        document.querySelectorAll("[data-search-filter]").forEach(other => { other.classList.toggle("is-active", other === button); other.setAttribute("aria-pressed", other === button ? "true" : "false"); });
+        applySearchControls();
+      }));
+      document.querySelector("#search-sort")?.addEventListener("change", applySearchControls);
+      applySearchControls();
+      hydrateSectionImages(results);
+    }
   }
 
   async function renderResearchArticle() {
