@@ -39,6 +39,28 @@ describe("live provider resilience", () => {
     expect(calls).toHaveLength(2);
   });
 
+  it("does not claim fallback FX data is fresh when its update timestamp is missing", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("api.frankfurter.dev")) {
+        return new Response(JSON.stringify([{ base: "USD", quote: "EUR", rate: 0.9 }]), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      }
+      if (url === "https://open.er-api.com/v6/latest/USD") {
+        return new Response(JSON.stringify({ result: "success", base_code: "USD", rates: { USD: 1, EGP: 48.5 } }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      }
+      return new Response("", { status: 404 });
+    }));
+    const result = await fx();
+    expect(result.ok).toBe(false);
+    expect(result.stale).toBe(true);
+  });
+
   it("limits simultaneous Yahoo quote chains while retaining all seven supplemental markets", async () => {
     let active = 0;
     let activeYahoo = 0;
