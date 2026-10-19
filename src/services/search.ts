@@ -996,6 +996,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
       const articleSummary=results.find(x=>x.title&&x.summary)?.summary||q;
       if(options.publish!==false){
         if(!independentlyVerified){publishReason="no_independent_sources";publishReasonDetail="independent_evidence_below_threshold:publishers="+corroboration.publishers.size+";hosts="+corroboration.hosts.size+";required="+configuredMin;}
+        else if(classifySection(q,results,language)==="unclassified"){publishReason="draft_not_useful";publishReasonDetail="topic_section_unclassified";}
         else if(!articleTitle||disallowedContent(articleTitle+" "+articleSummary)){publishReason="draft_not_useful";publishReasonDetail="article_title_or_summary_missing_or_disallowed";}
         else{
           const publishLongArticle=async()=>{
