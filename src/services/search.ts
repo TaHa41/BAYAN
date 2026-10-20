@@ -9,7 +9,7 @@ import {findRelatedImage,searchNewsFeed,searchTrustedNewsFeeds,resolvePublisherA
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 import {sectionForOpenedStory,isContentForSection} from "./editorial";
 import {sections} from "../sections";
-import {requiredEvidencePublisherCount,requiredSearchExpansionPublisherCount,independentEvidenceHost,hasIndependentEvidenceDiversity,areNearDuplicateEvidenceTitles} from "./evidence-diversity";
+import {requiredEvidencePublisherCount,requiredSearchExpansionPublisherCount,independentEvidenceHost,hasIndependentEvidenceDiversity,areNearDuplicateEvidenceTitles,areNearDuplicateEvidenceTexts} from "./evidence-diversity";
 import {getProviderBreaker} from "./ai-provider-resilience";
 import {shouldAttemptOpenAIWebSearchFallback,shouldSkipGoogleNewsRetry} from "./search-recovery";
 import {selectExpandedSearchCandidates} from "./search-expansion";
@@ -1034,6 +1034,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   const independentEvidence=(items:SearchResult[])=>{
     const publishers=new Set<string>(),hosts=new Set<string>();
     const seenTitles:string[]=[];
+    const seenStoryEvidence:{title:string;summary:string}[]=[];
     const syndicatedTitle=(title:string)=>{
       if(seenTitles.some(previous=>areNearDuplicateEvidenceTitles(previous,title)))return true;
       const tokens=String(title||"").toLowerCase().normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu," ").split(/\s+/).filter(token=>token.length>=3);
@@ -1041,8 +1042,12 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
       return false;
     };
     for(const item of items){
-      const substantive=String(item.summary||"").trim().length>=100;
+      const itemTitle=String(item.title||"").trim();
+      const itemSummary=String(item.summary||"").trim();
+      const substantive=itemSummary.length>=100;
       if(!substantive)continue;
+      if(seenStoryEvidence.some(previous=>areNearDuplicateEvidenceTitles(previous.title,itemTitle)||areNearDuplicateEvidenceTexts(previous.summary,itemSummary)))continue;
+      seenStoryEvidence.push({title:itemTitle,summary:itemSummary});
       for(const src of item.sources||[]){
         const publisher=String(src.publisher||"").trim().toLowerCase();
         const url=String(src.url||item.url||"");
