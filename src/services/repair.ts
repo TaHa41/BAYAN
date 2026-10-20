@@ -1,4 +1,4 @@
-import type{Env}from"../types";import{recordRuntimeEventLimited}from"../runtime-events";import{now}from"../config";import{notify}from"./telegram";import{findRelatedImage,news}from"./news";import{search}from"./search";
+import type{Env}from"../types";import{recordRuntimeEventLimited}from"../runtime-events";import{now}from"../config";import{notify}from"./telegram";import{findRelatedImage,news}from"./news";import{search}from"./search";import{workersAiModel}from"./ai";
 async function newsCacheHealthy(env:Env){
   const rows=await env.DB.prepare("SELECT language,payload FROM news_cache WHERE language IN ('ar','en')").all<any>();
   const cache=rows.results||[];
@@ -84,7 +84,7 @@ async function diagnose(env:Env,failures:string[]){
     const r=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(12000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",instructions:"You are a conservative reliability engineer. Separate evidence from hypothesis.",input:prompt,store:false})});
     if(r.ok){const d=await r.json<any>();return String(d.output_text||"").slice(0,3000)}
   }catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
-  if(env.AI)try{const d=await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fp8",{prompt});return String((d as any)?.response||"").slice(0,3000)}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
+  if(env.AI)try{const d=await env.AI.run(workersAiModel(env),{prompt});return String((d as any)?.response||"").slice(0,3000)}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
   return"AI diagnostic unavailable; deterministic health evidence recorded.";
 }
 

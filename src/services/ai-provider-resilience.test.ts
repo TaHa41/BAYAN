@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { classifyOpenAIFailure, classifyWorkersAIFailure, exponentialBackoffMs, normalizeDraftJson, parseRetryAfter, isOpenAIQuotaFailure, workersAIResponseText } from "./ai-provider-resilience";
+import { DEFAULT_WORKERS_AI_MODEL, workersAiModel } from "./ai";
 
 describe("AI provider resilience", () => {
   it("distinguishes insufficient quota from rate limiting and records retry metadata", () => {
@@ -28,6 +29,13 @@ describe("AI provider resilience", () => {
     expect(exponentialBackoffMs(3)).toBe(7200000);
     expect(exponentialBackoffMs(10)).toBe(7200000);
   });
+  it("keeps the current Workers AI model by default and allows a valid environment override", () => {
+    expect(DEFAULT_WORKERS_AI_MODEL).toBe("@cf/meta/llama-3.1-8b-instruct-fp8");
+    expect(workersAiModel({} as any)).toBe(DEFAULT_WORKERS_AI_MODEL);
+    expect(workersAiModel({ NEWS_AI_MODEL: "@cf/mistral/mistral-7b-instruct-v0.1" } as any)).toBe("@cf/mistral/mistral-7b-instruct-v0.1");
+    expect(workersAiModel({ NEWS_AI_MODEL: "https://example.com/model" } as any)).toBe(DEFAULT_WORKERS_AI_MODEL);
+  });
+
   it("classifies Workers AI quota, timeout, unsupported model and invalid JSON failures", () => {
     expect(classifyWorkersAIFailure(new Error("error 4006: quota exceeded")).code).toBe("quota_exceeded");
     expect(classifyWorkersAIFailure(new Error("request timed out")).code).toBe("timeout");

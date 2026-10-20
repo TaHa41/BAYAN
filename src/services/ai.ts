@@ -1,5 +1,11 @@
 import type{Env,Locale,SearchResult}from"../types";import{classifyOpenAIFailure,classifyWorkersAIFailure,getProviderBreaker,updateProviderBreaker,recordProviderDiagnostic,normalizeDraftJson,isOpenAIQuotaFailure,workersAIResponseText}from"./ai-provider-resilience";import{notify}from"./telegram";export{normalizeDraftJson};
 import{recordRuntimeEventLimited}from"../runtime-events";
+export const DEFAULT_WORKERS_AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8";
+export function workersAiModel(env: Pick<Env, "NEWS_AI_MODEL">): string {
+  const configured = String(env.NEWS_AI_MODEL || "").trim();
+  return /^@[a-z0-9_-]+\/[a-z0-9._/-]+$/i.test(configured) ? configured : DEFAULT_WORKERS_AI_MODEL;
+}
+
 const aiFailureDetail=(error:unknown)=>String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
 async function recordAiFailure(env:Env,provider:string,detail:string){await recordRuntimeEventLimited(env,"ai_generation","ai_provider_failure",provider+": "+detail);}
 export async function openAIAllowed(env:Env){
@@ -217,7 +223,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
       }else await handleOpenAIResponseFailure(env,"OpenAI draft",response);
     }catch(error){await recordAiFailure(env,"OpenAI draft",aiFailureDetail(error));}
     if(env.AI&&(!backgroundBudget||await consumeDailyNewsAiCall(env)))try{
-      const response=await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fp8",{messages,max_tokens:3600,temperature:0,response_format:{type:"json_object"}});
+      const response=await env.AI.run(workersAiModel(env),{messages,max_tokens:3600,temperature:0,response_format:{type:"json_object"}});
       const answer=workersAIResponseText(response);
       if(answer)return answer;
       await recordAiFailure(env,"Workers AI draft","empty_response");
@@ -273,7 +279,7 @@ export async function ask(env:Env,question:string,locale:Locale,evidence:SearchR
     const system=locale==="ar"
       ?"أنت بيان. أجب بالعربية الفصحى فقط وبالاعتماد على الأدلة المرفقة وحدها. لا تخترع أسماء أو أرقامًا أو مصادر. ميّز الحقائق من الاستنتاجات، واذكر بوضوح ما لا تثبته الأدلة."
       :"You are BAYAN. Answer in English only using only the supplied evidence. Do not invent names, numbers, or sources. Distinguish facts from inference and state clearly what the evidence does not establish.";
-    const r=await env.AI.run("@cf/meta/llama-3.1-8b-instruct-fp8",{messages:[{role:"system",content:system},{role:"user",content:"Question: "+question+"\nEvidence: "+evidenceText}],max_tokens:1200,temperature:0.1});
+    const r=await env.AI.run(workersAiModel(env),{messages:[{role:"system",content:system},{role:"user",content:"Question: "+question+"\nEvidence: "+evidenceText}],max_tokens:1200,temperature:0.1});
     const answer=workersAIResponseText(r);
     if(answer && languageConsistent(answer,locale))return{status:independentSourceCount(env,evidence)>=2&&!answerHasUnsupportedSpecifics(answer,evidence,question)?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(x=>x.sources)};
     await recordAiFailure(env,"Workers AI answer",answer?"language_mismatch":"empty_response");
