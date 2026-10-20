@@ -1,4 +1,4 @@
-import type{Env}from"../types";import{recordRuntimeEventLimited}from"../runtime-events";import{now}from"../config";import{notify}from"./telegram";import{findRelatedImage,news}from"./news";import{search}from"./search";import{workersAiModel}from"./ai";
+import type{Env}from"../types";import{recordRuntimeEventLimited}from"../runtime-events";import{now}from"../config";import{notify}from"./telegram";import{findRelatedImage,news}from"./news";import{search,searchAvailabilityProbe}from"./search";import{workersAiModel}from"./ai";
 async function newsCacheHealthy(env:Env){
   const rows=await env.DB.prepare("SELECT language,payload FROM news_cache WHERE language IN ('ar','en')").all<any>();
   const cache=rows.results||[];
@@ -203,8 +203,8 @@ async function repairRuntime(env:Env,failures:string[]){
   if(failures.includes("images")&&sectionOnlyPass){actions.push("image repair deferred until the next run after section content repair pass")}else if(failures.includes("images")&&failures.includes("news_cache")&&!imageOnlyPass){actions.push("image repair deferred until the next run to preserve Worker subrequest budget after news refresh")}else if(failures.includes("images"))try{
     let imageCursor=0;
     try{const cursorRow=await env.DB.prepare("SELECT value FROM admin_settings WHERE key='image_repair_cursor' LIMIT 1").first<any>();imageCursor=Math.max(0,Number(cursorRow?.value||0)||0)}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","image_repair_cursor_read_failed",error)}
-    let rows=await env.DB.prepare("SELECT id,title,summary,sources_json FROM articles WHERE status='PUBLISHED' AND (image_url IS NULL OR trim(image_url)='') AND id>? ORDER BY id ASC LIMIT 4").bind(imageCursor).all<any>();
-    if(!(rows.results||[]).length)rows=await env.DB.prepare("SELECT id,title,summary,sources_json FROM articles WHERE status='PUBLISHED' AND (image_url IS NULL OR trim(image_url)='') AND id<=? ORDER BY id ASC LIMIT 4").bind(imageCursor).all<any>();
+    let rows=await env.DB.prepare("SELECT id,title,summary,sources_json FROM articles WHERE status='PUBLISHED' AND (image_url IS NULL OR trim(image_url)='') AND id>? ORDER BY id ASC LIMIT 1").bind(imageCursor).all<any>();
+    if(!(rows.results||[]).length)rows=await env.DB.prepare("SELECT id,title,summary,sources_json FROM articles WHERE status='PUBLISHED' AND (image_url IS NULL OR trim(image_url)='') AND id<=? ORDER BY id ASC LIMIT 1").bind(imageCursor).all<any>();
     if((rows.results||[]).length){const nextCursor=Number(rows.results[rows.results.length-1].id);try{await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES('image_repair_cursor',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(String(nextCursor),now()).run()}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","image_repair_cursor_write_failed",error)}}
     let filledArticles=0;
     for(const row of rows.results||[])try{let sourceUrl="";try{const sources=JSON.parse(String(row.sources_json||"[]"));sourceUrl=String(sources.find((item:any)=>String(item.url||"").startsWith("https://"))?.url||"")}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}const url=await findRelatedImage(String(row.title||""),sourceUrl||undefined);if(url){await env.DB.prepare("UPDATE articles SET image_url=?,updated_at=? WHERE id=? AND (image_url IS NULL OR trim(image_url)='')").bind(url,now(),row.id).run();filledArticles++}else await record(env,"warn","image_repair_no_match","No topic-matched image found for article "+String(row.id)+" ("+String(row.title||"").slice(0,180)+")")}catch(error){await record(env,"warn","image_repair_article_error","Article "+String(row.id)+": "+String(error).slice(0,300))}
@@ -215,7 +215,7 @@ async function repairRuntime(env:Env,failures:string[]){
       const parsed=JSON.parse(String(row.payload));
       const items:any[]=Array.isArray(parsed)?parsed:(Array.isArray(parsed?.items)?parsed.items:[]);
       let changed=false;
-      for(const item of items.filter((entry:any)=>!String(entry.imageUrl||"").trim()&&String(entry.title||"").trim()).slice(0,3)){
+      for(const item of items.filter((entry:any)=>!String(entry.imageUrl||"").trim()&&String(entry.title||"").trim()).slice(0,1)){
         const url=await findRelatedImage(String(item.title||""),String(item.url||""),"",env);
         if(url){item.imageUrl=url;item.imageAlt=String(item.title||"");filledNews++;changed=true}else await record(env,"warn","image_repair_news_no_match","No topic-matched image found for cached "+language+" story: "+String(item.title||"").slice(0,180))
       }
@@ -347,7 +347,7 @@ export async function selfHeal(env:Env){
     ["sections",async()=>{return (await sectionHealth(env)).length===0}],
     ["news_cache",async()=>await newsCacheHealthy(env)],
     ["news_publication_rate",async()=>{const eligible=await env.DB.prepare("SELECT COUNT(*) count FROM news_archive WHERE article_slug IS NULL AND length(summary)>=120 AND published_at>=datetime('now','-48 hours') AND published_at<=datetime('now','+5 minutes') AND fetched_at>=datetime('now','-48 hours')").first<any>();if(Number(eligible?.count||0)===0)return true;const published=await env.DB.prepare("SELECT COUNT(*) count FROM news_archive n JOIN articles a ON a.slug=n.article_slug WHERE n.article_slug IS NOT NULL AND a.status='PUBLISHED' AND a.created_at>=?").bind(new Date(Date.now()-24*60*60*1000).toISOString()).first<any>();return Number(published?.count||0)>0;}],
-    ["search_availability",async()=>{const result=await search(env,"photosynthesis","en",{publish:false,draft:false,healthCheck:true});return Array.isArray(result.results)&&result.results.length>0;}],
+    ["search_availability",async()=>await searchAvailabilityProbe()],
     ["images",async()=>await imageHealth(env)],
     ["contributions",async()=>{await env.DB.prepare("SELECT 1 FROM contributions LIMIT 1").first();return true}],
     ["repair_state",async()=>{await env.DB.prepare("SELECT 1 FROM repair_jobs LIMIT 1").first();return true}],

@@ -783,6 +783,14 @@ const languageSafe=(x:Candidate,language:Locale)=>{
     return output;
   }catch(error){throw error;}
 }
+export async function searchAvailabilityProbe():Promise<boolean>{
+  const diagnostics:string[]=[];
+  const bing=await bingWebRssSearch("photosynthesis","en",diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing RSS health probe",error);return[]});
+  if(bing.length)return true;
+  const wikipedia=await wikipediaRestSearch("photosynthesis","en",diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Wikipedia health probe",error);return[]});
+  return wikipedia.length>0;
+}
+
 export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean;draft?:boolean;images?:boolean;healthCheck?:boolean;publicationContext?:string;background?:(task:Promise<unknown>)=>void}={}):Promise<SearchResponse>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch(error){await recordRuntimeEventLimited(env,"search_log_persistence","blocked_search_log_write_failed",error)}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   // Reuse a recent, previously verified answer when its evidence is still source-diverse.
