@@ -67,7 +67,7 @@ export function requiredSearchExpansionPublisherCount(publishing: boolean, confi
  */
 export function independentEvidenceHost(publisher: string, rawUrl: string): string | undefined {
   const label = String(publisher || "").trim().toLowerCase();
-  if (/(?:wikipedia|wikidata|google news|bing news|duckduckgo|bayan|knowledge base|recent news archive|internal archive)/i.test(label)) {
+  if (/(?:wikipedia|wikidata|google news|bing news|duckduckgo|yahoo news|msn news|newsbreak|flipboard|bayan|knowledge base|recent news archive|internal archive)/i.test(label)) {
     return undefined;
   }
   try {
