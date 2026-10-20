@@ -21,6 +21,10 @@ These are initial browser smoke tests, not a complete accessibility, visual regr
 
 The project-root `.mcp.json` configures the Context7 MCP server for developer tooling. Set `CONTEXT7_API_KEY` in the local MCP host environment if required by your Context7 account/rate limits. Never commit API keys. Context7 is a development-time documentation helper and does not add a public BAYAN endpoint.
 
+## ScrapeGraphAI, Scrapling MCP, and Agent Reach
+
+See [WEB_RESEARCH_TOOLS.md](WEB_RESEARCH_TOOLS.md) for the exact setup, credentials boundary, usage guidance, and verification status. `.mcp.json` now includes ScrapeGraphAI MCP and Scrapling MCP entries; Agent Reach is documented as a separate local CLI/skill because it is not itself an MCP server. The ScrapeGraph API key entry is a placeholder and must be configured locally. These integrations have not been run from this GitHub repository or verified in a developer MCP host.
+
 ## Strix security testing
 
 Strix is an agentic security testing tool, not a visitor-facing feature. It is not run automatically against production because active security testing can affect live services and requires explicit scope and model/API credentials. Install it using the official instructions at https://github.com/usestrix/strix and first run it against a local/staging copy with synthetic data. Do not put API keys in repository files or send D1 production credentials to the scanner. Add a dedicated CI job only after its CLI invocation, authentication, scope and output format have been verified.
