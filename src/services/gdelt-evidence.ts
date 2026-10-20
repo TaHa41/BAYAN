@@ -181,19 +181,24 @@ async function fetchPublisherExcerpt(article: GdeltArticle, lang: Locale, fetchI
     let title = "";
     let description = "";
     let paragraphText = "";
+    let publishedRaw = "";
     const html = new Response(bytes, { headers: response.headers });
     const transformed = new HTMLRewriter()
       .on("title", { text(chunk) { if (title.length < 240) title += chunk.text; } })
-      .on("meta[name]", { element(element) { if ((element.getAttribute("name") || "").toLowerCase() === "description") description = element.getAttribute("content") || description; } })
+      .on("meta[name]", { element(element) { const name=(element.getAttribute("name") || "").toLowerCase(); if (name === "description") description = element.getAttribute("content") || description; if (["date","pubdate","datepublished","article:published_time"].includes(name) && !publishedRaw) publishedRaw = element.getAttribute("content") || ""; } })
+      .on("meta[property]", { element(element) { const property=(element.getAttribute("property") || "").toLowerCase(); if (["article:published_time","article:modified_time","og:updated_time"].includes(property) && !publishedRaw) publishedRaw = element.getAttribute("content") || ""; } })
+      .on("time[datetime]", { element(element) { if (!publishedRaw) publishedRaw = element.getAttribute("datetime") || ""; } })
       .on("p", { text(chunk) { if (paragraphText.length < 1600) paragraphText += chunk.text + " "; } })
       .transform(html);
     await transformed.text();
     const summary = cleanText(description.length >= 100 ? description : paragraphText, 900);
-    const articleTitle = cleanText(title, 240) || cleanText(article.title, 240);
+    const articleTitle = cleanText(article.title, 240) || cleanText(title, 240);
     if (!articleTitle || summary.length < 120) { diagnostics.push("GDELT page text insufficient: " + url.hostname); return undefined; }
     if (lang === "ar" ? !/[\u0600-\u06ff]/.test(articleTitle + " " + summary) : /[\u0600-\u06ff]/.test(articleTitle)) return undefined;
-    const publishedAt = parseDate(article.seendate);
-    if (publishedAt && (Date.parse(publishedAt) > Date.now() + 5 * 60_000 || Date.now() - Date.parse(publishedAt) > 72 * 60 * 60_000)) return undefined;
+    // GDELT seendate is an observation time, not the publisher's publication time.
+    // Only use a date explicitly present on the publisher page; otherwise skip it.
+    const publishedAt = parseDate(publishedRaw);
+    if (!publishedAt || Date.parse(publishedAt) > Date.now() + 5 * 60_000 || Date.now() - Date.parse(publishedAt) > 72 * 60 * 60_000) return undefined;
     return { title: articleTitle, summary, url: url.toString(), publisher: url.hostname.toLowerCase().replace(/^www\./, ""), publishedAt, imageUrl: typeof article.socialimage === "string" && article.socialimage.startsWith("https://") ? article.socialimage : undefined };
   } catch (error) {
     diagnostics.push("GDELT publisher fetch failed: " + url.hostname + " (" + String((error as any)?.name || "error") + ")");
