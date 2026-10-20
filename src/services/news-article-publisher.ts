@@ -48,6 +48,10 @@ const settleDailyD1ReadCalls=async(env:Env,day:string,actualReads:number)=>{
   }catch(error){await recordRuntimeEventLimited(env,"news_d1_budget","usage_persist_failed","could not persist background D1 read usage");}
 };
 
+export function shouldCountArticleDraftAttempt(publishReason: string): boolean {
+  return publishReason !== "ai_unavailable" && publishReason !== "no_independent_sources";
+}
+
 // One bounded, evidence-gated article attempt per cron tick keeps the Worker responsive.
 async function publishNextArchivedNewsArticleInner(env:Env){
   const now=Date.now();
@@ -76,14 +80,15 @@ async function publishNextArchivedNewsArticleInner(env:Env){
     const result=await search(env,title,language,{publish:true,draft:true,images:true,publicationContext:String(row.summary||"").slice(0,500)});
     const slug=String(result.articleSlug||"").trim();
     const resultReason=String(result.publishReason||"");
-    if(resultReason!=="ai_unavailable"){
-      await env.DB.prepare("UPDATE news_archive SET article_attempts=article_attempts+1 WHERE id=? AND article_slug IS NULL AND article_attempts<2").bind(id).run();
-    }else{
+    if(resultReason==="ai_unavailable"){
       const backoffAttempt=Math.max(0,Number(row.article_attempts||0));
       const retryMinutes=Math.min(120,15*Math.pow(2,backoffAttempt));
       await env.DB.prepare("UPDATE news_archive SET article_last_reason='ai_unavailable',article_last_detail=?,article_last_attempt_at=? WHERE id=?").bind(JSON.stringify({reason:"all_providers_unavailable",retryMinutes,backoffAttempt}),new Date(now).toISOString(),id).run();
       await recordRuntimeEventLimited(env,"news_archive_article_generation","ai_unavailable_deferred",JSON.stringify({id,language,retryMinutes,attemptsPreserved:Number(row.article_attempts||0)}));
       return{status:"attempted_failed" as const,id,language,publishReason:"ai_unavailable",publishReasonDetail:"all_providers_unavailable",retryMinutes,attemptsPreserved:Number(row.article_attempts||0)};
+    }
+    if(shouldCountArticleDraftAttempt(resultReason)){
+      await env.DB.prepare("UPDATE news_archive SET article_attempts=article_attempts+1 WHERE id=? AND article_slug IS NULL AND article_attempts<2").bind(id).run();
     }
     if(!slug){
       const sourceRecords=(Array.isArray(result.results)?result.results:[]).flatMap((item:any)=>Array.isArray(item.sources)?item.sources:[]);
@@ -103,9 +108,9 @@ async function publishNextArchivedNewsArticleInner(env:Env){
       const sourceCount=new Set(sourceRecords.map((source:any)=>String(source.url||"").trim()).filter(Boolean)).size;
       const queueStatus=publishReason==="no_independent_sources"?"skipped_low_evidence":publishReason;
       if(queueStatus==="skipped_low_evidence"){
-        // A low-evidence item is deferred, not burned: preserve its history,
-        // release one claim attempt, and retry only after six hours.
-        await env.DB.prepare("UPDATE news_archive SET article_attempts=MAX(0,article_attempts-1),article_last_reason='skipped_low_evidence',article_last_detail=? WHERE id=?").bind(("no_independent_sources; "+detail).slice(0,350),id).run();
+        // Low evidence is deferred before drafting: preserve article_attempts
+        // unchanged and retry only after six hours.
+        await env.DB.prepare("UPDATE news_archive SET article_last_reason='skipped_low_evidence',article_last_detail=? WHERE id=?").bind(("no_independent_sources; "+detail).slice(0,350),id).run();
       }else{
         await env.DB.prepare("UPDATE news_archive SET article_last_reason=?,article_last_detail=? WHERE id=?").bind(publishReason,detail,id).run();
       }
