@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { requiredEvidencePublisherCount, requiredSearchExpansionPublisherCount } from "../src/services/evidence-diversity";
+import { hasIndependentEvidenceDiversity, requiredEvidencePublisherCount, requiredSearchExpansionPublisherCount } from "../src/services/evidence-diversity";
 
 describe("publication evidence diversity threshold", () => {
   it("keeps normal visitor search at the existing two-independent-source threshold", () => {
@@ -20,6 +20,13 @@ describe("publication evidence diversity threshold", () => {
     expect(requiredSearchExpansionPublisherCount(true, 5)).toBe(7);
     expect(requiredSearchExpansionPublisherCount(true, 7)).toBe(9);
     expect(requiredSearchExpansionPublisherCount(false, 5)).toBe(2);
+  });
+
+  it("requires five distinct publisher hosts as well as five publisher labels for a five-source publication gate", () => {
+    expect(hasIndependentEvidenceDiversity(5, 2, 5)).toBe(false);
+    expect(hasIndependentEvidenceDiversity(5, 4, 5)).toBe(false);
+    expect(hasIndependentEvidenceDiversity(5, 5, 5)).toBe(true);
+    expect(hasIndependentEvidenceDiversity(4, 5, 5)).toBe(false);
   });
 
   it("uses a safe default for invalid configuration", () => {
