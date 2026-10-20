@@ -7,6 +7,11 @@ const D1_INDEPENDENT_API_PATHS = new Set([
   "/api/features",
   "/api/image",
   "/api/wisdom",
+  // Live data is fetched from external providers; these routes do not need D1 reads.
+  "/api/live/weather",
+  "/api/live/prayer",
+  "/api/live/fx",
+  "/api/live/gold",
 ]);
 
 export function isD1IndependentApiPath(pathname: string): boolean {
