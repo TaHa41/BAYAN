@@ -76,19 +76,21 @@ async function releaseSelfHealLease(env:Env,lease:string){
   try{await env.DB.prepare("UPDATE admin_settings SET value='',updated_at=? WHERE key='self_heal_lock' AND value=?").bind(now(),lease).run()}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
 }
 
-async function diagnose(env:Env,failures:string[]){
+async function diagnose(env:Env,failures:string[],preferWorkersAI=false){
   let history="No recorded repair history for this failure signature.";
   try{const rows=await env.DB.prepare("SELECT attempt_no,diagnosis,action,verification,created_at FROM repair_attempts WHERE signature=? ORDER BY attempt_no DESC LIMIT 5").bind(failures.join(",")).all<any>();if((rows.results||[]).length)history=(rows.results||[]).map((row:any)=>"Attempt "+row.attempt_no+"; verification="+row.verification+"; action="+String(row.action||"").slice(0,700)+"; diagnosis="+String(row.diagnosis||"").slice(0,500)).join("\n")}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
   const prompt="BAYAN reliability diagnostic. Evidence items to assess (a report is not independently verified): "+failures.join(", ")+".\nPrevious attempts (do not repeat a failed action unchanged):\n"+history+"\nReturn evidence, likely cause, and one safest reversible action that improves on prior attempts. Never propose destructive SQL, authentication changes, secret exposure, or unverified code mutation.";
-  // Cost-aware routing: use the already-bound Workers AI service first; paid OpenAI is fallback only.
-  if(env.AI)try{const d=await env.AI.run(workersAiModel(env),{prompt});const answer=String((d as any)?.response||"").trim();if(answer)return answer.slice(0,3000)}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
+  const workersAiDiagnosis=async()=>{if(!env.AI)return"";try{const d=await env.AI.run(workersAiModel(env),{prompt});return String((d as any)?.response||"").trim().slice(0,3000)}catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error);return""}};
+  // Only the read-only admin assistant prefers the already-bound lower-cost provider.
+  // Preserve the existing self-heal provider order for the separate repair workflow.
+  if(preferWorkersAI){const answer=await workersAiDiagnosis();if(answer)return answer}
   if(env.OPENAI_API_KEY)try{
-    const r=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(12000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-6-luna",instructions:"You are a conservative reliability engineer. Separate evidence from hypothesis.",input:prompt,store:false})});
+    const r=await fetch("https://api.openai.com/v1/responses",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(12000),body:JSON.stringify({model:env.OPENAI_MODEL||(preferWorkersAI?"gpt-6-luna":"gpt-5-mini"),instructions:"You are a conservative reliability engineer. Separate evidence from hypothesis.",input:prompt,store:false})});
     if(r.ok){const d=await r.json<any>();const answer=String(d.output_text||"").trim();if(answer)return answer.slice(0,3000)}
   }catch(error){await recordRuntimeEventLimited(env,"self_heal_operation","operation_failed",error)}
-  return"AI diagnostic unavailable; no repair action was performed.";
+  if(!preferWorkersAI){const answer=await workersAiDiagnosis();if(answer)return answer}
+  return preferWorkersAI?"AI diagnostic unavailable; no repair action was performed.":"AI diagnostic unavailable; deterministic health evidence recorded.";
 }
-
 async function repairTaxonomy(env:Env){
   const actions:string[]=[];
   const canonical=[
@@ -391,7 +393,7 @@ export async function aiRepairRequest(env:Env,problem:string){
   // The AI assistant is strictly diagnostic: never invoke selfHeal or write repair actions.
   // Avoid persisting the raw report because it may contain personal data or credentials.
   await record(env,"info","ai_repair_request","Read-only admin diagnosis requested");
-  const diagnosis=await diagnose(env,[issue]);
+  const diagnosis=await diagnose(env,[issue],true);
   return {
     ok:true,
     mode:"read_only",
