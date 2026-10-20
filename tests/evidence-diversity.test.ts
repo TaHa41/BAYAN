@@ -58,7 +58,7 @@ describe("publication evidence diversity threshold", () => {
     expect(isSafeGdeltPublisherUrl("http://publisher.example/story")).toBe(false);
     expect(isSafeGdeltPublisherUrl("https://127.0.0.1/private")).toBe(false);
     expect(isSafeGdeltPublisherUrl("https://news.google.com/rss")).toBe(false);
-    const robots = "User-agent: *\\nDisallow: /private\\nAllow: /private/public";
+    const robots = "User-agent: *\nDisallow: /private\nAllow: /private/public";
     expect(robotsAllowsPath(robots, "/private/story")).toBe(false);
     expect(robotsAllowsPath(robots, "/private/public/story")).toBe(true);
     expect(robotsAllowsPath(robots, "/news/story")).toBe(true);
