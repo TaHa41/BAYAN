@@ -596,20 +596,24 @@
       const data = await api("/api/article?slug=" + encodeURIComponent(slug) + "&lang=" + lang);
       const output = document.querySelector("#article");
       output.innerHTML =
-        '<article class="article-full">' + (data.imageUrl ? heroImageHtml(data.imageUrl, data.imageAlt || data.title, data.summary || "") : "") +
-        '<span class="eyebrow">' + escapeHtml(data.section || "BAYAN") + "</span><h1>" +
-        escapeHtml(data.title) + '</h1>' + articleLeadHtml(data.summary || "", data.body || "") +
-        '<div class="article-body">' + renderArticleBody(data.body || "") +
-        '</div><div class="sources-box"><h2>' + t("الأدلة والمصادر","Evidence & sources") + "</h2>" +
-        (data.sources || []).map((source) =>
+        '<article class="article-full article-template-v1">' +
+        '<header class="article-heading">' +
+        '<span class="eyebrow">' + escapeHtml(data.section || "BAYAN") + "</span>" +
+        "<h1>" + escapeHtml(data.title) + "</h1>" +
+        articleLeadHtml(data.summary || "", data.body || "") +
+        '</header><div class="article-hero-slot">' +
+        (data.imageUrl ? heroImageHtml(data.imageUrl, data.imageAlt || data.title, data.title + ": " + (data.summary || "")) :
+          '<div class="article-hero-placeholder" role="img" aria-label="' + escapeHtml(t("صورة المقال غير متاحة بعد","Article image not available yet")) + '">' +
+          escapeHtml(t("جاري تجهيز صورة مناسبة للمقال…","Finding a relevant article image…")) + "</div>") +
+        '</div><div class="article-body">' + renderArticleBody(data.body || "") +
+        '</div><section class="sources-box"><h2>' + t("الأدلة والمصادر","Evidence & sources") + "</h2>" +
+        ((data.sources || []).length ? (data.sources || []).map((source) =>
           '<div class="source-line">' + escapeHtml(source.publisher || "") + " · " + escapeHtml(source.title || "") +
-          "</div>").join("") + "</div>" + socialActions({...data, _key:data.slug || slug, slug}) + "</article>";
+          "</div>").join("") : '<p class="sources-empty">' + escapeHtml(t("لم تُرفق مصادر قابلة للعرض مع هذا الملف.","No displayable sources were attached to this file.")) + "</p>") +
+        "</section>" + socialActions({...data, _key:data.slug || slug, slug}) + "</article>";
       if (!data.imageUrl) {
-        try {
-          const image = await api("/api/image?q=" + encodeURIComponent(data.title));
-          if (image.imageUrl) document.querySelector(".article-full")?.insertAdjacentHTML(
-            "afterbegin", heroImageHtml(image.imageUrl, data.title, data.summary || ""));
-        } catch {}
+        const slot = document.querySelector(".article-hero-slot");
+        if (slot) await ensureHeroImage(slot, data.title, data.summary || "");
       }
     } catch (error) {
       const output = document.querySelector("#article");
