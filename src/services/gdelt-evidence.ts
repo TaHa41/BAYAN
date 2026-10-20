@@ -1,6 +1,13 @@
 import type { Env, Locale } from "../types";
 import { recordRuntimeEventLimited } from "../runtime-events";
 
+/** GDELT's sourcelang operator belongs inside QUERY, not as a URL parameter. */
+export function gdeltQueryForLanguage(lang: Locale): string {
+  return lang === "ar"
+    ? "(news OR breaking OR update) sourcelang:arabic"
+    : "(news OR breaking OR update) sourcelang:english";
+}
+
 export type GdeltEvidenceStory = {
   title: string;
   summary: string;
@@ -98,7 +105,7 @@ async function loadGdeltMetadata(fetchImpl: typeof fetch, diagnostics: string[])
   }
   if (metadataFlight) return metadataFlight;
   metadataFlight = (async () => {
-    const query = encodeURIComponent('(news OR أخبار)');
+    const query = encodeURIComponent(gdeltQueryForLanguage(lang));
     const url = "https://api.gdeltproject.org/api/v2/doc/doc?query=" + query + "&mode=artlist&format=json&maxrecords=20&timespan=3d&sort=DateDesc";
     try {
       const response = await fetchImpl(url, { signal: AbortSignal.timeout(5000), headers: { accept: "application/json", "user-agent": "BAYAN/1.3 (+https://bayan.tahaomar411.workers.dev)" } });
