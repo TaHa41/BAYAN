@@ -13,6 +13,20 @@ describe("topic-aware article editorial",()=>{
     expect(sectionForOpenedStory("How to read public opinion polls","A guide to interpreting survey findings and their limits.")).toBe("trends");
   });
 
+  it("distinguishes a person biography from a sports report in Arabic and English",()=>{
+    expect(sectionForOpenedStory("محمد صلاح: السيرة والمسيرة الكروية","لاعب كرة قدم مصري وُلد في نجريج وبدأ مسيرته الاحترافية قبل انتقاله إلى ليفربول.")).toBe("people");
+    expect(sectionForOpenedStory("محمد صلاح يسجل هدفًا في مباراة ليفربول","انتهت المباراة بفوز الفريق بعد هدفين وتغير ترتيب الدوري.")).toBe("sports");
+    expect(sectionForOpenedStory("Mohamed Salah: biography and career","The Egyptian footballer was born in Nagrig and became an international player.")).toBe("people");
+    expect(sectionForOpenedStory("Mohamed Salah scores in Liverpool match","The league match ended after a late goal and changed the standings.")).toBe("sports");
+  });
+
+  it("keeps the classification matrix topic-led across economy, politics, science and biography",()=>{
+    expect(sectionForOpenedStory("How do black holes form?","Astronomy research explains gravity, stars and the universe.")).toBe("science");
+    expect(sectionForOpenedStory("Egypt announces new trade policy","The government published an economic policy statement.")).toBe("economy");
+    expect(sectionForOpenedStory("البرلمان يناقش قانونًا جديدًا","ناقش النواب مشروع القانون والسياسة العامة.")).toBe("politics");
+    expect(sectionForOpenedStory("نجيب محفوظ: حياته وأعماله","روائي مصري حصل على جائزة نوبل في الأدب.")).toBe("people");
+  });
+
   it("classifies general scientific topics as Science",()=>{
     expect(sectionForOpenedStory("How do black holes form?","Astronomy research explains gravity, stars and the universe.")).toBe("science");
   });
