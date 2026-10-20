@@ -1,7 +1,7 @@
 import {parseNewsSitemap} from "./news-sitemap-contract.mjs";
 const origin=process.env.BAYAN_ORIGIN||"https://bayan.tahaomar411.workers.dev";
 const checks=["/","/saved?lang=ar","/tools?lang=ar","/about?lang=ar","/methodology?lang=ar","/privacy?lang=ar","/terms?lang=ar","/api/health","/api/features","/api/news/archive?lang=ar","/api/news/archive?lang=en","/api/live/weather","/api/live/fx","/api/live/gold","/news?lang=ar","/news?lang=en","/prices?lang=ar","/art?lang=ar","/trends?lang=ar","/robots.txt","/sitemap.xml","/news-sitemap.xml","/llms.txt","/.well-known/ai-catalog.json","/ai-catalog.json"];
-const sections=["science","technology","economy","politics","health","history","people","sports","travel","art","news","trends","prices","egypt","arab","world"];
+const sections=["arab","art","economy","egypt","health","history","people","politics","science","sports","technology","travel","trends","world"];
 let bad=0;
 let bundleText="";
 let bundlePath="";
@@ -293,7 +293,7 @@ try{
   if(!/[\u0600-\u06ff]/.test(String(ad.title)))throw new Error("arabic_article_missing");
   if(!/[\u0600-\u06ff]/.test(String(ad.body)))throw new Error("arabic_article_body_missing");
 }catch(e){console.error("ARTICLE",e);bad++}
-if(process.env.BAYAN_SMOKE_AI_PROBES==="1"){
+if(process.env.BAYAN_SMOKE_SEARCH_PROBES==="1"){
   try{
     const s=await get("/api/search?q=%D9%86%D8%AC%D9%8A%D8%A8%20%D9%85%D8%AD%D9%81%D9%88%D8%B8&lang=ar"); const d=JSON.parse(s.text);
     if(!Array.isArray(d.results)||d.results.length<1)throw new Error("person_search_empty");
@@ -321,9 +321,9 @@ if(process.env.BAYAN_SMOKE_AI_PROBES==="1"){
     if(ed.results.some(x=>/[\u0600-\u06ff]/.test(String(x.title||""))))throw new Error("english_topic_result_language_mismatch");
   }catch(e){console.error("SEARCH",e);bad++}
 }else{
-  console.log("LIVE SEARCH regression probes skipped: internal bounded search health check remains enabled; set BAYAN_SMOKE_AI_PROBES=1 for explicit provider testing.");
+  console.log("LIVE SEARCH regression probes skipped; set BAYAN_SMOKE_SEARCH_PROBES=1 to test search without AI drafting probes.");
 }
-if(process.env.BAYAN_SMOKE_AI_PROBES==="1"){
+if(process.env.BAYAN_SMOKE_SEARCH_PROBES==="1"){
   try{
     // General-search regression matrix: coverage must not be special-cased to one name or one subject.
     const generalQueries=[
@@ -362,15 +362,25 @@ if(process.env.BAYAN_SMOKE_AI_PROBES==="1"){
     if(hostCoverage.size<4)throw new Error("general_search_source_diversity_too_low");
   }catch(e){console.error("GENERAL_SEARCH_MATRIX",e);bad++}
 }else{
-  console.log("GENERAL_SEARCH_MATRIX skipped in routine smoke to avoid repeated AI-provider calls.");
+  console.log("GENERAL_SEARCH_MATRIX skipped; set BAYAN_SMOKE_SEARCH_PROBES=1 for bounded provider retrieval checks.");
 }
-const sectionChecks=sections.filter(section=>section!=="prices").flatMap(section=>["ar","en"].map(language=>({section,language})));
+const sectionChecks=sections.flatMap(section=>["ar","en"].map(language=>({section,language})));
 await inBatches(sectionChecks,2,async({section,language})=>{
   try{
     const x=await get("/api/section?section="+section+"&lang="+language); const d=JSON.parse(x.text);
     if(!Array.isArray(d.items)||d.items.length<2)throw new Error(section+"_"+language+"_needs_at_least_two_articles");
     const languageMismatch=language==="ar"?d.items.filter(x=>!/[؀-ۿ]/.test(String(x.title))).length:d.items.filter(x=>/[؀-ۿ]/.test(String(x.title))).length; if(languageMismatch>d.items.length/2)throw new Error(section+"_"+language+"_content_language_mismatch"); const bodies=d.items.map(x=>String(x.body||x.summary||"")); if(language==="ar" && bodies.length && bodies.filter(x=>x && /[؀-ۿ]/.test(x)).length < Math.ceil(bodies.length/2)) throw new Error(section+"_"+language+"_body_language_mismatch"); if(language==="en" && bodies.length && bodies.filter(x=>x && !/[؀-ۿ]/.test(x)).length < Math.ceil(bodies.length/2)) throw new Error(section+"_"+language+"_body_language_mismatch");
   }catch(e){console.error("SECTION",section,language,e);bad++}
+});
+const sectionPageChecks=sections.flatMap(section=>["ar","en"].map(language=>({section,language})));
+await inBatches(sectionPageChecks,3,async({section,language})=>{
+  try{
+    const page=await get("/"+section+"?lang="+language);
+    const htmlOpen=(page.text.match(/<html\b[^>]*>/i)||[])[0]||"";
+    const expectedDir=language==="ar"?"rtl":"ltr";
+    if(!new RegExp('\\blang=["\\x27]'+language+'["\\x27]','i').test(htmlOpen))throw new Error(section+"_"+language+"_html_lang_mismatch");
+    if(!new RegExp('\\bdir=["\\x27]'+expectedDir+'["\\x27]','i').test(htmlOpen))throw new Error(section+"_"+language+"_html_direction_mismatch");
+  }catch(error){console.error("SECTION_PAGE",section,language,String(error));bad++}
 });
 try{
   for(const live of ["/api/live/weather","/api/live/fx","/api/live/gold"]){
@@ -380,6 +390,9 @@ try{
     if(live.endsWith("/gold")&&payload.ok&&(!Number(payload.price)||!Date.parse(String(payload.updatedAt||""))))throw new Error("gold_payload_missing_price_or_update_time");
     if(live.endsWith("/gold")&&Array.isArray(payload.markets)&&payload.markets.some(item=>!Number(item.price)||!item.provider||!Date.parse(String(item.updatedAt||""))))throw new Error("market_quote_missing_price_provider_or_timestamp");
   }
+  const prayer=await get("/api/live/prayer?city=Hurghada&country=Egypt");
+  const prayerData=JSON.parse(prayer.text);
+  if(!prayerData.ok||prayerData.provider!=="AlAdhan"||!prayerData.timings?.Fajr||!prayerData.hijri?.month||!Date.parse(String(prayerData.updatedAt||"")))throw new Error("prayer_payload_missing_verified_times_or_hijri_date");
   const page=await get("/prices?lang=ar");
   if(!bundleText.includes('id="pricesRefresh"')||!bundleVersion)throw new Error("prices_page_assets_not_updated");
   const css=await get("/styles.css?v="+encodeURIComponent(bundleVersion));
