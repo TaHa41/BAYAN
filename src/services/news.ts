@@ -904,21 +904,19 @@ export async function news(env: Env, lang: Locale, options: {forceRefresh?:boole
     console.warn("BAYAN_NEWS_FEED_DIAGNOSTICS " + JSON.stringify({ language: lang, providers: feedDiagnostics }));
   }
   const seen = new Set<string>();
-  const limit = Math.max(
-    6,
-    Math.min(
-      40,
-      Number(
-        (
-          await env.DB.prepare(
-            "SELECT value FROM admin_settings WHERE key=?",
-          )
-            .bind("news_items")
-            .first<any>()
-        )?.value || 24,
-      ),
-    ),
-  );
+  // The daily D1 row-read quota can be exhausted independently of upstream RSS.
+  // A missing optional display-limit setting must not turn the public news page into HTTP 503.
+  let configuredNewsLimit = 24;
+  try {
+    const setting = await env.DB.prepare(
+      "SELECT value FROM admin_settings WHERE key=?",
+    ).bind("news_items").first<any>();
+    const parsedLimit = Number(setting?.value || 24);
+    if (Number.isFinite(parsedLimit)) configuredNewsLimit = parsedLimit;
+  } catch {
+    // Use the safe built-in limit and continue rendering verified live RSS results.
+  }
+  const limit = Math.max(6, Math.min(40, configuredNewsLimit));
 
   const deduplicated = all.filter((story) => {
     const key = story.title
