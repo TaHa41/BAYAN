@@ -43,7 +43,7 @@ describe("free market rate-limit fallback", () => {
     vi.restoreAllMocks();
   });
 
-  it("uses a free daily reference and opens a Yahoo cooldown after HTTP 429", async () => {
+  it("opens a Yahoo cooldown after HTTP 429 and stops retrying unavailable market data", async () => {
     const calls: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -51,19 +51,15 @@ describe("free market rate-limit fallback", () => {
       if (url.includes("query1.finance.yahoo.com")) {
         return new Response("rate limited", { status: 429 });
       }
-      if (url.includes("fred.stlouisfed.org/graph/fredgraph.csv?id=DCOILWTICO")) {
-        return new Response("observation_date,DCOILWTICO\n2026-10-19,71.23\n", {
-          status: 200, headers: { "content-type": "text/csv" }
-        });
-      }
       return new Response("unexpected request", { status: 404 });
     }));
 
     const quote = await marketQuote("CL=F", {} as any);
-    expect(quote?.price).toBe(71.23);
-    expect(quote?.provider).toBe("FRED (daily reference)");
-    expect(quote?.stale).toBe(true);
+    expect(quote).toBeNull();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain("query1.finance.yahoo.com");
     expect(calls.some(url => url.includes("query2.finance.yahoo.com"))).toBe(false);
+    expect(calls.some(url => url.includes("fred.stlouisfed.org"))).toBe(false);
     expect(calls.some(url => url.includes("stooq.com"))).toBe(false);
   });
 });
