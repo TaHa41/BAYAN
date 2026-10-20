@@ -8,7 +8,10 @@ export function workersAiModel(env: Pick<Env, "NEWS_AI_MODEL">): string {
 
 const aiFailureDetail=(error:unknown)=>String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
 async function recordAiFailure(env:Env,provider:string,detail:string){await recordRuntimeEventLimited(env,"ai_generation","ai_provider_failure",provider+": "+detail);}
+export function paidAiEnabled(env:Pick<Env,"BAYAN_ALLOW_PAID_AI">){return String(env.BAYAN_ALLOW_PAID_AI||"").trim().toLowerCase()==="true";}
 export async function openAIAllowed(env:Env){
+  // OpenAI API usage can incur charges independent of a ChatGPT subscription. Disabled unless explicitly opted in.
+  if(!paidAiEnabled(env))return false;
   const breaker=await getProviderBreaker(env,"openai");
   if(breaker.open){
     await recordRuntimeEventLimited(env,"ai_circuit_breaker","openai_breaker_open",JSON.stringify({state:"open",code:breaker.code,openedUntil:new Date(breaker.openedUntil).toISOString()}));
