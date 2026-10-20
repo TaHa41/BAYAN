@@ -1,7 +1,7 @@
 import type { Env } from "../types";
 
 export type ProviderFailure = {
-  provider: "openai" | "workers_ai";
+  provider: "openai" | "workers_ai" | "gemini";
   code: string;
   status?: number;
   retryAfterMs?: number;
@@ -55,6 +55,20 @@ export function classifyWorkersAIFailure(error: unknown): ProviderFailure {
   return { provider: "workers_ai", code, detail: safe("code=" + code + "; " + raw) };
 }
 
+export function classifyGeminiFailure(kind: string, status?: number, detail = ""): ProviderFailure {
+  const normalized = String(kind || "provider_error").toLowerCase();
+  const code = normalized === "quota" ? "quota_exceeded"
+    : normalized === "rate_limited" ? "rate_limited"
+    : normalized === "auth" ? "authentication_failed"
+    : normalized === "timeout" ? "timeout"
+    : normalized === "blocked" ? "blocked"
+    : normalized === "bad_response" ? "invalid_response"
+    : normalized === "http" ? "http_error"
+    : normalized === "no_key" ? "not_configured"
+    : "provider_error";
+  return { provider: "gemini", code, status, detail: safe(detail || code) };
+}
+
 export function isOpenAIQuotaFailure(code: string): boolean {
   const normalized = String(code || "").toLowerCase().replace(/[- ]/g, "_");
   return ["insufficient_quota", "quota_exceeded", "credit_balance_exhausted", "billing_hard_limit_reached", "billing_not_active"].some(value => normalized.includes(value));
@@ -78,7 +92,7 @@ export function normalizeDraftJson(raw: string): string {
 type BreakerState = { openedUntil: number; consecutive429: number; code: string };
 const breakerKey = (provider: string) => "ai_breaker_" + provider;
 
-export async function getProviderBreaker(env: Pick<Env, "DB">, provider: "openai" | "workers_ai", now = Date.now()): Promise<{ open: boolean; openedUntil: number; code: string }> {
+export async function getProviderBreaker(env: Pick<Env, "DB">, provider: "openai" | "workers_ai" | "gemini", now = Date.now()): Promise<{ open: boolean; openedUntil: number; code: string }> {
   try {
     const row = await env.DB.prepare("SELECT value FROM admin_settings WHERE key=? LIMIT 1").bind(breakerKey(provider)).first<{value:string}>();
     const state = row?.value ? JSON.parse(row.value) as BreakerState : { openedUntil: 0, consecutive429: 0, code: "closed" };
@@ -88,19 +102,24 @@ export async function getProviderBreaker(env: Pick<Env, "DB">, provider: "openai
   }
 }
 
-export async function updateProviderBreaker(env: Pick<Env, "DB">, provider: "openai" | "workers_ai", failure?: ProviderFailure, now = Date.now()): Promise<{ open: boolean; openedUntil: number; code: string }> {
+export async function updateProviderBreaker(env: Pick<Env, "DB">, provider: "openai" | "workers_ai" | "gemini", failure?: ProviderFailure, now = Date.now()): Promise<{ open: boolean; openedUntil: number; code: string }> {
   let previous: BreakerState = { openedUntil: 0, consecutive429: 0, code: "closed" };
   try {
     const row = await env.DB.prepare("SELECT value FROM admin_settings WHERE key=? LIMIT 1").bind(breakerKey(provider)).first<{value:string}>();
     if (row?.value) previous = { ...previous, ...JSON.parse(row.value) };
   } catch { /* fail closed for breaker state; provider failure is still recorded */ }
   let next: BreakerState = { openedUntil: 0, consecutive429: 0, code: "closed" };
-  if (failure?.provider === "openai" && failure.status === 429) {
-    next.consecutive429 = previous.consecutive429 + 1;
-    next.code = failure.code;
-    const quota = isOpenAIQuotaFailure(failure.code);
-    const open = quota || next.consecutive429 >= 3;
-    if (open) next.openedUntil = now + (quota ? 6 * 60 * 60_000 : Math.max(15 * 60_000, failure.retryAfterMs || 0, failure.resetMs || 0));
+  if (failure) {
+    const quota = provider === "openai"
+      ? isOpenAIQuotaFailure(failure.code)
+      : /quota|quota_exceeded|neurons/.test(failure.code.toLowerCase());
+    const rateLimited = failure.status === 429 || /rate_limited|rate_limit/.test(failure.code.toLowerCase());
+    if (quota || rateLimited) {
+      next.consecutive429 = previous.consecutive429 + 1;
+      next.code = failure.code;
+      const open = quota || next.consecutive429 >= 3;
+      if (open) next.openedUntil = now + (quota ? 6 * 60 * 60_000 : Math.max(15 * 60_000, failure.retryAfterMs || 0, failure.resetMs || 0));
+    }
   }
   try {
     await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at")
