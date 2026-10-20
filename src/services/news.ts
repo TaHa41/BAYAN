@@ -256,11 +256,18 @@ const readFeed = async (name: string, url: string, diagnostics?: string[]): Prom
     });
     const acceptedStories = parsedStories.filter((story) => story.title && story.url);
     diagnostics?.push(name + " parsed=" + entries.length + " accepted=" + acceptedStories.length + (acceptedStories.length ? "" : " reason=no_valid_title_or_url"));
-    return await Promise.all(acceptedStories.map(async (story, index) => ({
-      ...story,
+    return await Promise.all(acceptedStories.map(async (story, index) => {
       // Resolve only a bounded prefix; direct publisher URLs incur no extra request.
-      url: index < 8 ? await resolvePublisherArticleUrl(story.url, diagnostics) : story.url,
-    })));
+      const resolvedUrl = index < 8 ? await resolvePublisherArticleUrl(story.url, diagnostics) : story.url;
+      let publisher = story.publisher;
+      if (/^(?:Google News.*|Bing News.*|Bing World News|أخبار Google.*|أخبار مصر|أخبار عربية)$/i.test(publisher)) {
+        try {
+          const resolvedHost = new URL(resolvedUrl).hostname.toLowerCase().replace(/^www\\./, "");
+          if (!isNewsAggregatorHost(resolvedHost)) publisher = resolvedHost;
+        } catch { /* Keep the source label when the resolved URL is not a valid URL. */ }
+      }
+      return { ...story, url: resolvedUrl, publisher };
+    }));
   } catch (error) {
     const detail = String(error instanceof Error ? error.message : error).replace(/https?:\/\/[^\s]+/g, "[url]").slice(0, 120);
     diagnostics?.push(name + " parsed=0 accepted=0 reason=fetch_or_parse_exception detail=" + detail);
