@@ -1,6 +1,6 @@
 /**
  * Index-friendly candidate query for the scheduled article publisher.
- * The old correlated NOT EXISTS performed a title-normalisation scan of news_archive
+ * The old correlated duplicate check performed a title-normalisation scan of news_archive
  * for each candidate. Recent low-evidence titles are fetched separately and filtered in memory.
  */
 export const NEWS_ARCHIVE_CANDIDATES_SQL = `SELECT id,title,summary,language,article_attempts,publisher,image_url,published_at,fetched_at
