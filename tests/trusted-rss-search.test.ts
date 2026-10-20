@@ -63,6 +63,18 @@ describe("trusted publisher RSS search fallback", () => {
     expect(seen).toContain("https://aawsat.com/feed/news");
   });
 
+  it("records a concrete reason when a feed responds with HTML but no RSS/Atom entries", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<html><title>temporarily unavailable</title></html>", {
+      status: 200,
+      headers: { "content-type": "text/html; charset=utf-8" }
+    })));
+    const diagnostics: string[] = [];
+    const results = await searchTrustedNewsFeeds("central bank interest rates", "en", diagnostics);
+    expect(results).toHaveLength(0);
+    expect(diagnostics.some(value => value.includes("parsed=0 accepted=0 reason=no_item_or_entry_markup"))).toBe(true);
+    expect(diagnostics.some(value => value.includes("content_type=text/html"))).toBe(true);
+  });
+
   it("returns no results rather than unrelated articles when query terms do not match feed content", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response('<rss><channel><item><title>Local sports final</title><description>A detailed report about a football final with no other topic references.</description><link>https://www.bbc.com/sport/final</link></item></channel></rss>', { status: 200, headers: { "content-type": "application/rss+xml" } })));
     const results = await searchTrustedNewsFeeds("central bank interest rates", "en");
