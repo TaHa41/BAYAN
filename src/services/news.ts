@@ -787,7 +787,7 @@ export async function news(env: Env, lang: Locale, options: {forceRefresh?:boole
   if (!options.forceRefresh && cachedItems.length >= 3) {
     return {
       ok: true,
-      stale: !Number.isFinite(cacheAge) || cacheAge > 15 * 60 * 1000,
+      stale: !Number.isFinite(cacheAge) || cacheAge > 35 * 60 * 1000,
       cachedAt: cachedAtStart?.updatedAt,
       providers: ["BAYAN verified cache"],
       items: cachedItems.map((story) => ({
