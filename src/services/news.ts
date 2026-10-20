@@ -262,7 +262,7 @@ const readFeed = async (name: string, url: string, diagnostics?: string[]): Prom
       let publisher = story.publisher;
       if (/^(?:Google News.*|Bing News.*|Bing World News|أخبار Google.*|أخبار مصر|أخبار عربية)$/i.test(publisher)) {
         try {
-          const resolvedHost = new URL(resolvedUrl).hostname.toLowerCase().replace(/^www\\./, "");
+          const resolvedHost = new URL(resolvedUrl).hostname.toLowerCase().replace(/^www\./, "");
           if (!isNewsAggregatorHost(resolvedHost)) publisher = resolvedHost;
         } catch { /* Keep the source label when the resolved URL is not a valid URL. */ }
       }
