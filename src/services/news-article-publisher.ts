@@ -1,6 +1,7 @@
 import type {Env,Locale} from "../types";
 import {search} from "./search";
 import {recordRuntimeEventLimited} from "../runtime-events";
+import {isD1QuotaError,logD1QuotaOncePerHour,persistD1Block} from "./d1-guard";
 import {independentEvidenceHost} from "./evidence-diversity";
 import {NEWS_ARCHIVE_CANDIDATES_SQL,RECENT_LOW_EVIDENCE_SQL,pickCandidate} from "./news-article-publisher-query";
 
@@ -37,6 +38,7 @@ const reserveDailyD1ReadCalls=async(env:Env)=>{
     const row=await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES('news_d1_read_calls_daily',?,?) ON CONFLICT(key) DO UPDATE SET value=CASE WHEN substr(admin_settings.value,1,10)=substr(excluded.value,1,10) THEN substr(admin_settings.value,1,11)||CAST(CAST(substr(admin_settings.value,12) AS INTEGER)+120 AS TEXT) ELSE excluded.value END,updated_at=excluded.updated_at WHERE substr(admin_settings.value,1,10)!=substr(excluded.value,1,10) OR CAST(substr(admin_settings.value,12) AS INTEGER)+120<=12000 RETURNING value").bind(day+":"+D1_READ_RESERVATION,stamp).first<any>();
     return row?{day,stamp}:null;
   }catch(error){
+    if(isD1QuotaError(error)){await persistD1Block();logD1QuotaOncePerHour(error);return null;}
     await recordRuntimeEventLimited(env,"news_d1_budget","budget_counter_unavailable","background publication blocked because D1 read budget accounting failed");
     return null;
   }
