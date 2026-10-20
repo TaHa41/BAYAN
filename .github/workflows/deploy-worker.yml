@@ -115,6 +115,11 @@ jobs:
           BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
           BAYAN_AI_MANAGER_TOKEN: ${{ secrets.BAYAN_AI_MANAGER_TOKEN }}
         run: node scripts/production-self-heal.mjs
+      - name: Enforce post-deploy production health
+        if: always()
+        env:
+          BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
+        run: node scripts/production-health.mjs
       - name: Report news sitemap eligibility (non-blocking)
         if: always()
         env:
