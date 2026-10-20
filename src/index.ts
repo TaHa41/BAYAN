@@ -292,6 +292,15 @@ const publicApiCacheTtl=(request:Request,url:URL):number=>{
  if(url.pathname==="/api/wisdom")return 60_000;
  return 0;
 };
+const d1QuotaFallback=(url:URL)=>{
+ const lang=url.searchParams.get("lang")==="en"?"en":"ar";
+ const headers={"content-type":"application/json;charset=utf-8","cache-control":"no-store","x-bayan-degraded":"d1_quota","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"};
+ if(url.pathname==="/api/health")return new Response(JSON.stringify({ok:false,service:"BAYAN",version:"1.2.0",database:false,newsArchiveRead:false,articleRevisionHistory:false,error:"d1_quota",checkedAt:new Date().toISOString()}),{status:503,headers});
+ if(url.pathname==="/api/news/archive")return new Response(JSON.stringify({ok:true,language:lang,section:"news",items:[],count:0,degraded:true,archiveAvailable:false,reason:"d1_quota",message:lang==="ar"?"الأرشيف المحفوظ غير متاح مؤقتًا بسبب بلوغ حد القراءة اليومي؛ لم تُعرض أخبار غير متحققة.":"The saved archive is temporarily unavailable because the daily read limit was reached; no unverified stories were shown."}),{status:200,headers});
+ if(url.pathname==="/api/news")return new Response(JSON.stringify({items:[],degraded:true,reason:"d1_quota",message:lang==="ar"?"الأخبار المحفوظة غير متاحة مؤقتًا بسبب حد قاعدة البيانات.":"Saved news is temporarily unavailable because of the database quota."}),{status:200,headers});
+ if(url.pathname==="/api/section")return new Response(JSON.stringify({section:url.searchParams.get("section")||"",items:[],degraded:true,reason:"d1_quota"}),{status:200,headers});
+ return new Response(JSON.stringify({degraded:true,reason:"d1_quota",error:"database_temporarily_unavailable"}),{status:200,headers});
+};
 export default{async fetch(request:Request,env:Env,ctx?:ExecutionContext){const u=new URL(request.url);
 if(u.pathname==="/.well-known/build.json"){return new Response(JSON.stringify({service:"BAYAN",commit:COMMIT_SHA,build:BUILD}),{status:200,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store, max-age=0","cdn-cache-control":"no-store","x-bayan-commit":COMMIT_SHA,"x-bayan-build":BUILD,"x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY"}})}
 const apiCacheTtl=publicApiCacheTtl(request,u),apiCacheKey=u.pathname+u.search;
@@ -304,8 +313,8 @@ if(u.pathname.startsWith("/api/")){
  const schemaOptional=["/api/search","/api/section","/api/article"].includes(u.pathname);
  const d1Independent=isD1IndependentApiPath(u.pathname);
  if(!d1Independent){
-  if(d1Blocked())return new Response(JSON.stringify({degraded:true,reason:"d1_quota",error:"database_temporarily_unavailable"}),{status:200,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store","x-bayan-degraded":"d1_quota","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}});
-  try{await ensureSchema(env)}catch(error){if(isD1QuotaError(error)){markD1Blocked();logD1QuotaOncePerHour(error);return new Response(JSON.stringify({degraded:true,reason:"d1_quota",error:"database_temporarily_unavailable"}),{status:200,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store","x-bayan-degraded":"d1_quota","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})}if(!schemaOptional)return new Response(JSON.stringify({error:"database_unavailable"}),{status:503,headers:{"content-type":"application/json;charset=utf-8","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})}
+  if(d1Blocked())return d1QuotaFallback(u);
+  try{await ensureSchema(env)}catch(error){if(isD1QuotaError(error)){markD1Blocked();logD1QuotaOncePerHour(error);return d1QuotaFallback(u)}if(!schemaOptional)return new Response(JSON.stringify({error:"database_unavailable"}),{status:503,headers:{"content-type":"application/json;charset=utf-8","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})}
  }
  try{
   const response=await api(request,env,ctx);
@@ -320,7 +329,7 @@ if(u.pathname.startsWith("/api/")){
   }
   return response;
  }catch(error){
-  if(isD1QuotaError(error)){markD1Blocked();logD1QuotaOncePerHour(error);return new Response(JSON.stringify({degraded:true,reason:"d1_quota"}),{status:200,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store","x-bayan-degraded":"d1_quota","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})}
+  if(isD1QuotaError(error)){markD1Blocked();logD1QuotaOncePerHour(error);return d1QuotaFallback(u)}
   const message=String(error).slice(0,800);
   try{await notify(env,"BAYAN API ERROR\\nPath: "+u.pathname+"\\nError: "+message)}catch(error){await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}
   return new Response(JSON.stringify({error:"internal_error"}),{status:500,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})
