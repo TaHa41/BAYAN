@@ -1033,16 +1033,30 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   // Wikipedia + Wikidata, or several aggregators pointing to one publisher, are not independent corroboration.
   const independentEvidence=(items:SearchResult[])=>{
     const publishers=new Set<string>(),hosts=new Set<string>();
+    const seenTitleTokens:Set<string>[]=[];
+    const titleTokens=(value:string)=>new Set(value.toLowerCase().normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu," ").split(/\s+/).filter(token=>token.length>=3));
+    const syndicatedTitle=(tokens:Set<string>)=>{
+      if(tokens.size<5)return false;
+      for(const previous of seenTitleTokens){
+        const smaller=Math.min(tokens.size,previous.size);
+        if(!smaller)continue;
+        let overlap=0;
+        for(const token of tokens)if(previous.has(token))overlap++;
+        if(overlap/smaller>=0.88)return true;
+      }
+      seenTitleTokens.push(tokens);
+      return false;
+    };
     for(const item of items){
       const substantive=String(item.summary||"").trim().length>=100;
       if(!substantive)continue;
       for(const src of item.sources||[]){
         const publisher=String(src.publisher||"").trim().toLowerCase();
         const url=String(src.url||item.url||"");
-        let host="";
-        try{const parsed=new URL(url);if(parsed.protocol==="https:")host=parsed.hostname.toLowerCase().replace(/^www\./,"");}catch(error){void recordRuntimeEventLimited(env,"candidate_source_url","invalid_candidate_source_url",error)}
-        if(!host||/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com|news\.yahoo\.com/.test(host))continue;
-        if(/wikipedia|wikidata|google news|bing news|duckduckgo|news aggregator|ويكيبيديا|ويكي بيانات/i.test(publisher))continue;
+        const host=independentEvidenceHost(publisher,url);
+        if(!host)continue;
+        const title=String(src.title||item.title||"").trim();
+        if(syndicatedTitle(titleTokens(title)))continue;
         publishers.add(publisher||host);
         hosts.add(host);
       }
