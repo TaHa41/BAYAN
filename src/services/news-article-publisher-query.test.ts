@@ -41,6 +41,14 @@ describe("bounded news archive queue", () => {
     expect(selected?.id).toBe(2);
   });
 
+  it("uses fetch time and then id only after publication, publisher, and image ties", () => {
+    const selected = pickCandidate([
+      { id: 8, title: "Older fetch", publisher: "other", image_url: "img", published_at: "2026-10-20T11:00:00Z", fetched_at: "2026-10-20T10:00:00Z" },
+      { id: 9, title: "Newer fetch", publisher: "other", image_url: "img", published_at: "2026-10-20T11:00:00Z", fetched_at: "2026-10-20T10:30:00Z" },
+    ], [], "last");
+    expect(selected?.id).toBe(9);
+  });
+
   it("returns null when every candidate is deferred as a duplicate", () => {
     expect(pickCandidate([{ id: 1, title: "Repeat", published_at: "2026-10-20T11:00:00Z" }], [{ id: 2, title: "repeat" }], null)).toBeNull();
   });
