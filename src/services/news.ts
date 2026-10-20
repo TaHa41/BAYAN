@@ -84,6 +84,12 @@ const esc = (s: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
+export function normalizeFeedPublisher(sourceName: string, fallback: string): string {
+  const normalized = String(sourceName || "").trim();
+  // Some RSS feeds put a taxonomy path or URL in <source>; that is not a publisher name.
+  return normalized && !/(?:^|\\/)taxonomy\\/term\\/\\d+|^https?:\\/\\//i.test(normalized) ? normalized : fallback;
+}
+
 const isNewsAggregatorHost = (hostname: string) => {
   const host = String(hostname || "").toLowerCase().replace(/^www\./, "");
   return host === "news.google.com" || host.endsWith(".news.google.com") ||
@@ -246,9 +252,8 @@ const readFeed = async (name: string, url: string, diagnostics?: string[]): Prom
       const imageUrl = isUsableNewsImage(rawImageUrl) ? rawImageUrl : undefined;
       const title = tag("title");
       const summary = tag("content:encoded", "description", "summary", "content").slice(0, 1800);
-      const sourceName = tag("source").trim();
-      // Some RSS feeds put a taxonomy path or URL in <source>; that is not a publisher name.
-      const publisher = sourceName && !/(?:^|\/)taxonomy\/term\/\d+|^https?:\/\//i.test(sourceName) ? sourceName : name;
+      const sourceName = tag("source");
+      const publisher = normalizeFeedPublisher(sourceName, name);
       const absoluteUrl = link ? (link.startsWith("http") ? link : new URL(link, url).toString()) : "";
       return {
         title,
