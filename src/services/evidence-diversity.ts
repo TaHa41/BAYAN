@@ -74,7 +74,7 @@ export function independentEvidenceHost(publisher: string, rawUrl: string): stri
     const url = new URL(String(rawUrl || ""));
     if (url.protocol !== "https:" || url.username || url.password) return undefined;
     const host = url.hostname.toLowerCase().replace(/^www\./, "");
-    if (!host || /(?:^|\.)(?:wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com|workers\.dev)$/.test(host)) {
+    if (!host || /(?:^|\.)(?:wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com|yahoo\.com|msn\.com|newsbreak\.com|flipboard\.com|workers\.dev)$/.test(host)) {
       return undefined;
     }
     return registrableEvidenceDomain(host);
