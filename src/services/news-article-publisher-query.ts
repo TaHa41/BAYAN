@@ -9,7 +9,7 @@ export const NEWS_ARCHIVE_CANDIDATES_SQL = `SELECT id,title,summary,language,art
    AND published_at>=? AND published_at<=? AND fetched_at>=?
    AND (article_last_attempt_at IS NULL OR article_last_attempt_at<=?)
    AND (article_last_reason IS NULL OR article_last_reason!='skipped_low_evidence' OR article_last_attempt_at<=?)
- ORDER BY published_at DESC, id DESC LIMIT 60`;
+ ORDER BY published_at DESC, id DESC LIMIT 40`;
 
 export const RECENT_LOW_EVIDENCE_SQL = `SELECT id,title FROM news_archive
  WHERE language=? AND article_last_reason='skipped_low_evidence' AND article_last_attempt_at>=? LIMIT 300`;

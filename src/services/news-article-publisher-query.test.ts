@@ -10,7 +10,7 @@ describe("bounded news archive queue", () => {
   it("does not use a correlated title scan against news_archive", () => {
     expect(NEWS_ARCHIVE_CANDIDATES_SQL).not.toMatch(/NOT\s+EXISTS/i);
     expect(NEWS_ARCHIVE_CANDIDATES_SQL).not.toContain("lower(trim(");
-    expect(NEWS_ARCHIVE_CANDIDATES_SQL).toContain("LIMIT 60");
+    expect(NEWS_ARCHIVE_CANDIDATES_SQL).toContain("LIMIT 40");
     expect(NEWS_ARCHIVE_CANDIDATES_SQL).toContain("published_at DESC");
     expect(RECENT_LOW_EVIDENCE_SQL).toContain("LIMIT 300");
   });
