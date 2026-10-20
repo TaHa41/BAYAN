@@ -9,7 +9,7 @@ import {findRelatedImage,searchNewsFeed,searchTrustedNewsFeeds} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 import {sectionForOpenedStory,isContentForSection} from "./editorial";
 import {sections} from "../sections";
-import {requiredEvidencePublisherCount,requiredSearchExpansionPublisherCount,independentEvidenceHost} from "./evidence-diversity";
+import {requiredEvidencePublisherCount,requiredSearchExpansionPublisherCount,independentEvidenceHost,hasIndependentEvidenceDiversity} from "./evidence-diversity";
 import {getProviderBreaker} from "./ai-provider-resilience";
 import {shouldAttemptOpenAIWebSearchFallback} from "./search-recovery";
 const publicationErrorMessage=(error:unknown)=>String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
@@ -998,7 +998,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   };
   const configuredMin=Math.max(2,Math.min(5,Number(s.min_sources||3)));
   const corroboration=independentEvidence(results);
-  const independentlyVerified=corroboration.publishers.size>=configuredMin&&corroboration.hosts.size>=2;
+  const independentlyVerified=hasIndependentEvidenceDiversity(corroboration.publishers.size,corroboration.hosts.size,configuredMin);
   const status=results.length===0?"insufficient":independentlyVerified?"verified":"mixed";
   let publishedSlug:string|undefined;
   let publishReason:string|undefined=options.publish!==false&&!independentlyVerified?"no_independent_sources":undefined;
