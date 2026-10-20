@@ -105,6 +105,12 @@ describe("external search recovery", () => {
 
 
 describe("Bing News RSS URL safety", () => {
+  it("unwraps a Bing redirect's encoded HTTPS publisher URL", () => {
+    const target = "https://www.reuters.com/world/example-story";
+    const redirect = "https://www.bing.com/news/apiclick.aspx?url=" + encodeURIComponent(target);
+    expect(normalizeBingNewsUrl(redirect)).toBe(target);
+  });
+
   it("upgrades only Bing redirect hosts to HTTPS and rejects insecure publisher URLs", () => {
     expect(normalizeBingNewsUrl("http://www.bing.com/news/apiclick.aspx?ref=1")).toBe("https://www.bing.com/news/apiclick.aspx?ref=1");
     expect(normalizeBingNewsUrl("http://news.example.com/article")).toBeUndefined();
