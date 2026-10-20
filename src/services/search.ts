@@ -9,7 +9,7 @@ import {findRelatedImage,searchNewsFeed,searchTrustedNewsFeeds,resolvePublisherA
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 import {sectionForOpenedStory,isContentForSection} from "./editorial";
 import {sections} from "../sections";
-import {requiredEvidencePublisherCount,requiredSearchExpansionPublisherCount,independentEvidenceHost,hasIndependentEvidenceDiversity} from "./evidence-diversity";
+import {requiredEvidencePublisherCount,requiredSearchExpansionPublisherCount,independentEvidenceHost,hasIndependentEvidenceDiversity,areNearDuplicateEvidenceTitles} from "./evidence-diversity";
 import {getProviderBreaker} from "./ai-provider-resilience";
 import {shouldAttemptOpenAIWebSearchFallback,shouldSkipGoogleNewsRetry} from "./search-recovery";
 import {selectExpandedSearchCandidates} from "./search-expansion";
@@ -1033,18 +1033,11 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   // Wikipedia + Wikidata, or several aggregators pointing to one publisher, are not independent corroboration.
   const independentEvidence=(items:SearchResult[])=>{
     const publishers=new Set<string>(),hosts=new Set<string>();
-    const seenTitleTokens:Set<string>[]=[];
-    const titleTokens=(value:string)=>new Set(value.toLowerCase().normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu," ").split(/\s+/).filter(token=>token.length>=3));
-    const syndicatedTitle=(tokens:Set<string>)=>{
-      if(tokens.size<5)return false;
-      for(const previous of seenTitleTokens){
-        const smaller=Math.min(tokens.size,previous.size);
-        if(!smaller)continue;
-        let overlap=0;
-        for(const token of tokens)if(previous.has(token))overlap++;
-        if(overlap/smaller>=0.88)return true;
-      }
-      seenTitleTokens.push(tokens);
+    const seenTitles:string[]=[];
+    const syndicatedTitle=(title:string)=>{
+      if(seenTitles.some(previous=>areNearDuplicateEvidenceTitles(previous,title)))return true;
+      const tokens=String(title||"").toLowerCase().normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu," ").split(/\s+/).filter(token=>token.length>=3);
+      if(tokens.length>=5)seenTitles.push(title);
       return false;
     };
     for(const item of items){
@@ -1056,7 +1049,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
         const host=independentEvidenceHost(publisher,url);
         if(!host)continue;
         const title=String(src.title||item.title||"").trim();
-        if(syndicatedTitle(titleTokens(title)))continue;
+        if(syndicatedTitle(title))continue;
         publishers.add(publisher||host);
         hosts.add(host);
       }
