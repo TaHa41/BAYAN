@@ -188,7 +188,7 @@ async function fetchPublisherExcerpt(article: GdeltArticle, lang: Locale, fetchI
     let description = "";
     let paragraphText = "";
     let publishedRaw = "";
-    const html = new Response(bytes, { headers: response.headers });
+    const html = new Response(new TextDecoder().decode(bytes), { headers: response.headers });
     const transformed = new HTMLRewriter()
       .on("title", { text(chunk) { if (title.length < 240) title += chunk.text; } })
       .on("meta[name]", { element(element) { const name=(element.getAttribute("name") || "").toLowerCase(); if (name === "description") description = element.getAttribute("content") || description; if (["date","pubdate","datepublished","article:published_time"].includes(name) && !publishedRaw) publishedRaw = element.getAttribute("content") || ""; } })
