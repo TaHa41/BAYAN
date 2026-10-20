@@ -899,13 +899,13 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     const minSources=Math.max(2,Number(s.min_sources||3));
     // Internal BAYAN indexes and aggregator URLs never satisfy this gate.
     // Publication requires five genuinely independent HTTPS publishers/hosts.
-    const requiredPublishers=requiredSearchExpansionPublisherCount(options.publish===true,Number(s.min_sources||3));
+    const requiredPublishers=requiredSearchExpansionPublisherCount(options.publish===true,Number(s.min_sources||5));
     const substantive=matching.filter(item=>String(item.summary||"").trim().length>=100).length;
     return publishers.size>=requiredPublishers&&hosts.size>=requiredPublishers&&substantive>=Math.min(3,minSources);
   };
   // Expand when sparse OR when the first pass is dominated by duplicates, a
   // single publisher, encyclopedia-only results, or very thin snippets.
-  const expansionThreshold=personQuery?Math.min(6,Math.max(3,Number(s.min_sources||3))):Math.max(3,Number(s.min_sources||3));
+  const expansionThreshold=personQuery?Math.min(7,Math.max(5,Number(s.min_sources||5))):Math.max(5,Number(s.min_sources||5));
   // The local news archive is a cheap, bounded recovery source; query it only
   // when primary retrieval lacks independent publishers, reducing work on healthy searches.
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
@@ -1049,7 +1049,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     }
     return {publishers,hosts};
   };
-  const configuredMin=Math.max(2,Math.min(5,Number(s.min_sources||3)));
+  const configuredMin=Math.max(5,Math.min(10,Number(s.min_sources||5)));
   const corroboration=independentEvidence(results);
   const independentlyVerified=hasIndependentEvidenceDiversity(corroboration.publishers.size,corroboration.hosts.size,configuredMin);
   const status=results.length===0?"insufficient":independentlyVerified?"verified":"mixed";
