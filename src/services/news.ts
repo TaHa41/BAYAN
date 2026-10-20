@@ -826,9 +826,9 @@ export async function news(env: Env, lang: Locale, options: {forceRefresh?:boole
   const distinctPublisherCount = (stories: Story[]) =>
     new Set(stories.map((story) => String(story.publisher || "").trim().toLowerCase()).filter(Boolean)).size;
 
-  // If the feed batch has too few items OR too few independent publishers, broaden
+  // If the feed batch has too few items OR fewer than five publisher labels, broaden
   // discovery. A large batch from one or two feeds is not source diversity.
-  if (all.length < 3 || distinctPublisherCount(all) < 3) {
+  if (all.length < 5 || distinctPublisherCount(all) < 5) {
     const [google, aiSearch, bing, gdelt] = await Promise.all([
       lang === "ar" ? googleArabicFallback(feedDiagnostics) : googleEnglishFallback(feedDiagnostics),
       aiSearchNews(env, lang),
@@ -845,7 +845,7 @@ export async function news(env: Env, lang: Locale, options: {forceRefresh?:boole
     // recent, dated, image-backed stories already archived from independent feeds.
     // Resolve the publisher from the article URL rather than trusting photo-credit
     // strings that some RSS feeds place in their publisher field.
-    if (distinctPublisherCount(all) < 3) {
+    if (distinctPublisherCount(all) < 5) {
       try {
         const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
         const futureLimit = new Date(Date.now() + 5 * 60 * 1000).toISOString();
