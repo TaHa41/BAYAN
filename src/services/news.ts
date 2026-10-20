@@ -1,6 +1,7 @@
 import type { Env, Locale, Source } from "../types";
 import { recordRuntimeEventLimited } from "../runtime-events";
 import { sectionForOpenedStory } from "./editorial";
+import { fetchGdeltEvidenceStories } from "./gdelt-evidence";
 
 type Story = {
   title: string;
@@ -701,21 +702,12 @@ const googleEnglishFallback = async (diagnostics?: string[]): Promise<Story[]> =
   return batches.flat().filter(x => !hasArabic(x.title));
 };
 
-const gdeltFallback = async (lang: Locale): Promise<Story[]> => {
-  try {
-    const query = lang === "ar" ? "أخبار" : "news";
-    const url = "https://api.gdeltproject.org/api/v2/doc/doc?query=" + encodeURIComponent(query) + "&mode=artlist&maxrecords=12&format=json&sort=HybridRel";
-    const response = await fetch(url, { signal: AbortSignal.timeout(5000), headers: { accept: "application/json" } });
-    if (!response.ok) return [];
-    const data = await response.json<any>();
-    return (data.articles || []).map((x:any) => ({
-      title: esc(String(x.title || "")),
-      summary: esc(String(x.seendate || "") + " " + String(x.domain || "")),
-      url: String(x.url || ""),
-      publisher: String(x.domain || "GDELT"),
-      publishedAt: (() => { const raw=String(x.seendate||""); const m=raw.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z?$/); return m ? new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6])).toISOString() : raw; })()
-    })).filter((x:Story) => x.title && x.url);
-  } catch { return []; }
+const gdeltFallback = async (lang: Locale, env: Env, diagnostics: string[]): Promise<Story[]> => {
+  const stories = await fetchGdeltEvidenceStories(lang, env, diagnostics);
+  return stories.map((story) => ({
+    ...story,
+    summary: languageSafeText(story.summary, lang) ? story.summary : "",
+  })).filter((story) => story.summary.length >= 120);
 };
 
 const directNewsPageFallback = async (lang: Locale, env?: Env): Promise<Story[]> => {
@@ -837,12 +829,13 @@ export async function news(env: Env, lang: Locale, options: {forceRefresh?:boole
   // If the feed batch has too few items OR too few independent publishers, broaden
   // discovery. A large batch from one or two feeds is not source diversity.
   if (all.length < 3 || distinctPublisherCount(all) < 3) {
-    const [google, aiSearch, bing] = await Promise.all([
+    const [google, aiSearch, bing, gdelt] = await Promise.all([
       lang === "ar" ? googleArabicFallback(feedDiagnostics) : googleEnglishFallback(feedDiagnostics),
       aiSearchNews(env, lang),
       bingNewsFallback(lang, feedDiagnostics),
+      gdeltFallback(lang, env, feedDiagnostics),
     ]);
-    const fallback = [...google, ...aiSearch, ...bing]
+    const fallback = [...google, ...aiSearch, ...bing, ...gdelt]
       .filter((story) => lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title))
       .map((story) => ({ ...story, summary: languageSafeText(story.summary, lang) ? story.summary : "" }))
       .filter(isFreshNews);
