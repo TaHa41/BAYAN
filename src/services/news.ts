@@ -84,6 +84,76 @@ const esc = (s: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
+const isNewsAggregatorHost = (hostname: string) => {
+  const host = String(hostname || "").toLowerCase().replace(/^www\./, "");
+  return host === "news.google.com" || host.endsWith(".news.google.com") ||
+    host === "bing.com" || host.endsWith(".bing.com");
+};
+
+/**
+ * Resolve aggregator article links to their actual HTTPS publisher URL before
+ * they are considered as independent evidence. If resolution fails, retain the
+ * original URL so the evidence gate can reject the aggregator rather than guess.
+ */
+export async function resolvePublisherArticleUrl(rawUrl: string, diagnostics?: string[]): Promise<string> {
+  let original: URL;
+  try { original = new URL(String(rawUrl || "")); } catch { return String(rawUrl || ""); }
+  if (original.protocol !== "https:" || !isNewsAggregatorHost(original.hostname)) return original.href;
+
+  if (original.hostname.toLowerCase().endsWith("bing.com")) {
+    for (const key of ["url", "URL", "u"]) {
+      const value = original.searchParams.get(key);
+      if (!value) continue;
+      let candidate = value;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const decoded = new URL(candidate);
+          if (decoded.protocol === "https:" && !isNewsAggregatorHost(decoded.hostname)) {
+            diagnostics?.push("Bing aggregator URL unwrapped host=" + decoded.hostname.toLowerCase());
+            return decoded.href;
+          }
+        } catch { /* Try one additional URL decode for nested redirect parameters. */ }
+        try {
+          const decoded = decodeURIComponent(candidate);
+          if (decoded === candidate) break;
+          candidate = decoded;
+        } catch { break; }
+      }
+    }
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 2200);
+  try {
+    const response = await fetch(original.href, {
+      method: "GET",
+      redirect: "follow",
+      signal: controller.signal,
+      headers: {
+        accept: "text/html,application/xhtml+xml,*/*",
+        range: "bytes=0-0",
+        "user-agent": "BAYAN/1.3 (+https://bayan.tahaomar411.workers.dev)"
+      }
+    });
+    const finalUrl = String(response.url || "");
+    await response.body?.cancel().catch(error => { void error; });
+    if (finalUrl) {
+      const resolved = new URL(finalUrl);
+      if (resolved.protocol === "https:" && !isNewsAggregatorHost(resolved.hostname)) {
+        diagnostics?.push("Google/Bing aggregator URL resolved host=" + resolved.hostname.toLowerCase());
+        return resolved.href;
+      }
+    }
+    diagnostics?.push("Aggregator URL unresolved host=" + original.hostname.toLowerCase() + " reason=redirect_target_not_publisher");
+  } catch (error) {
+    const kind = error instanceof Error && /abort|timeout/i.test(error.name + " " + error.message) ? "timeout" : "fetch_failure";
+    diagnostics?.push("Aggregator URL unresolved host=" + original.hostname.toLowerCase() + " reason=" + kind);
+  } finally {
+    clearTimeout(timer);
+  }
+  return original.href;
+}
+
 const readFeed = async (name: string, url: string, diagnostics?: string[]): Promise<Story[]> => {
   try {
     const controller = new AbortController();
@@ -186,7 +256,11 @@ const readFeed = async (name: string, url: string, diagnostics?: string[]): Prom
     });
     const acceptedStories = parsedStories.filter((story) => story.title && story.url);
     diagnostics?.push(name + " parsed=" + entries.length + " accepted=" + acceptedStories.length + (acceptedStories.length ? "" : " reason=no_valid_title_or_url"));
-    return acceptedStories;
+    return await Promise.all(acceptedStories.map(async (story, index) => ({
+      ...story,
+      // Resolve only a bounded prefix; direct publisher URLs incur no extra request.
+      url: index < 8 ? await resolvePublisherArticleUrl(story.url, diagnostics) : story.url,
+    })));
   } catch (error) {
     const detail = String(error instanceof Error ? error.message : error).replace(/https?:\/\/[^\s]+/g, "[url]").slice(0, 120);
     diagnostics?.push(name + " parsed=0 accepted=0 reason=fetch_or_parse_exception detail=" + detail);
