@@ -25,7 +25,7 @@ type RobotGroup = { agents: string[]; rules: RobotRule[] };
 const CACHE_ORIGIN = "https://bayan.tahaomar411.workers.dev";
 const MAX_PAGE_BYTES = 512 * 1024;
 const CACHE_TTL_SECONDS = 15 * 60;
-let metadataFlight: Promise<GdeltArticle[]> | undefined;
+const metadataFlights = new Map<Locale, Promise<GdeltArticle[]>>();
 
 const getCache = (): CacheLike | undefined => {
   try { return (globalThis as any).caches?.default as CacheLike | undefined; } catch { return undefined; }
@@ -96,15 +96,16 @@ const parseDate = (raw: unknown): string | undefined => {
   return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : undefined;
 };
 
-async function loadGdeltMetadata(fetchImpl: typeof fetch, diagnostics: string[]): Promise<GdeltArticle[]> {
-  const key = cacheKey("/__bayan_internal_cache/gdelt-metadata-v1");
+async function loadGdeltMetadata(lang: Locale, fetchImpl: typeof fetch, diagnostics: string[]): Promise<GdeltArticle[]> {
+  const key = cacheKey("/__bayan_internal_cache/gdelt-metadata-v1?lang=" + lang);
   const cached = await cacheJson(key);
   if (Array.isArray(cached)) {
     diagnostics.push("GDELT metadata cache hit count=" + cached.length);
     return cached as GdeltArticle[];
   }
-  if (metadataFlight) return metadataFlight;
-  metadataFlight = (async () => {
+  const inFlight = metadataFlights.get(lang);
+  if (inFlight) return inFlight;
+  const flight = (async () => {
     const query = encodeURIComponent(gdeltQueryForLanguage(lang));
     const url = "https://api.gdeltproject.org/api/v2/doc/doc?query=" + query + "&mode=artlist&format=json&maxrecords=20&timespan=3d&sort=DateDesc";
     try {
@@ -131,7 +132,8 @@ async function loadGdeltMetadata(fetchImpl: typeof fetch, diagnostics: string[])
       return [];
     }
   })();
-  try { return await metadataFlight; } finally { metadataFlight = undefined; }
+  metadataFlights.set(lang, flight);
+  try { return await flight; } finally { metadataFlights.delete(lang); }
 }
 
 async function fetchRobotsAllowed(url: URL, fetchImpl: typeof fetch): Promise<boolean> {
@@ -223,7 +225,7 @@ export async function fetchGdeltEvidenceStories(lang: Locale, env: Env, diagnost
   const outputKey = cacheKey("/__bayan_internal_cache/gdelt-evidence-v1?lang=" + lang);
   const cached = await cacheJson(outputKey);
   if (Array.isArray(cached)) { diagnostics.push("GDELT evidence cache hit lang=" + lang + " count=" + cached.length); return cached as GdeltEvidenceStory[]; }
-  const metadata = await loadGdeltMetadata(fetchImpl, diagnostics);
+  const metadata = await loadGdeltMetadata(lang, fetchImpl, diagnostics);
   const recent = metadata.filter(article => {
     const title = String(article.title || "");
     const language = String(article.language || "").toLowerCase();
