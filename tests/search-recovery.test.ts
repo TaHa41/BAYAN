@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { externalSearchRecovery, shouldAttemptOpenAIWebSearchFallback } from "../src/services/search-recovery";
+import { externalSearchRecovery, shouldAttemptOpenAIWebSearchFallback, shouldSkipGoogleNewsRetry } from "../src/services/search-recovery";
 import { normalizeBingNewsUrl } from "../src/services/search";
 import { independentEvidenceHost, requiredEvidencePublisherCount } from "../src/services/evidence-diversity";
 
@@ -18,6 +18,19 @@ describe("OpenAI web-search fallback decision", () => {
     expect(shouldAttemptOpenAIWebSearchFallback({publishing:false,firstPassCount:1,personOrAcademic:false,evidenceDiverse:false,belowExpansionThreshold:true})).toBe(false);
     expect(shouldAttemptOpenAIWebSearchFallback({publishing:false,firstPassCount:0,personOrAcademic:false,evidenceDiverse:false,belowExpansionThreshold:true})).toBe(true);
     expect(shouldAttemptOpenAIWebSearchFallback({publishing:false,firstPassCount:2,personOrAcademic:true,evidenceDiverse:false,belowExpansionThreshold:true})).toBe(true);
+  });
+});
+
+describe("Google News retry budget", () => {
+  it("skips a second Google News call after a known HTTP failure", () => {
+    expect(shouldSkipGoogleNewsRetry(["Google News Search parsed=0 accepted=0 reason=http_503"])).toBe(true);
+    expect(shouldSkipGoogleNewsRetry(["Google News Search HTTP 403"])).toBe(true);
+  });
+
+  it("skips empty and timed-out responses but preserves retry after a successful response", () => {
+    expect(shouldSkipGoogleNewsRetry(["Google News Search raw=0"])).toBe(true);
+    expect(shouldSkipGoogleNewsRetry(["Google News Search failed: The operation was aborted"])).toBe(true);
+    expect(shouldSkipGoogleNewsRetry(["Google News Search parsed=7 accepted=7"])).toBe(false);
   });
 });
 

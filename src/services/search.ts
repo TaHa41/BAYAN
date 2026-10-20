@@ -11,7 +11,7 @@ import {sectionForOpenedStory,isContentForSection} from "./editorial";
 import {sections} from "../sections";
 import {requiredEvidencePublisherCount,requiredSearchExpansionPublisherCount,independentEvidenceHost,hasIndependentEvidenceDiversity} from "./evidence-diversity";
 import {getProviderBreaker} from "./ai-provider-resilience";
-import {shouldAttemptOpenAIWebSearchFallback} from "./search-recovery";
+import {shouldAttemptOpenAIWebSearchFallback,shouldSkipGoogleNewsRetry} from "./search-recovery";
 import {selectExpandedSearchCandidates} from "./search-expansion";
 const publicationErrorMessage=(error:unknown)=>String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
 const publicationFailureReason=(error:unknown)=>{const message=publicationErrorMessage(error);return /429|rate.?limit|timeout|timed out|abort|quota|neurons|overload|openai|workers ai|ai unavailable/i.test(message)?"ai_unavailable":"exception:"+message;};
@@ -632,9 +632,11 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
     // GDELT repeatedly timed out in production and amplified request fan-out.
     // Keep each recovery variant to three independent providers; try a second
     // wording only when the first one still lacks useful independent evidence.
+    const googleNewsRetrySkipped=shouldSkipGoogleNewsRetry(diagnostics);
+    if(googleNewsRetrySkipped)diagnostics.push("Google News Search retry skipped after prior failure");
     const results=await Promise.all([
       wikipediaRestSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Wikipedia REST Search",error);return[]}),
-      googleNewsSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Google News Search",error);return[]}),
+      googleNewsRetrySkipped?Promise.resolve([]):googleNewsSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Google News Search",error);return[]}),
       bingWebRssSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing Web RSS Search",error);return[]}),
       trustedPublisherRssSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Trusted Publisher RSS Search",error);return[]})
     ]);
@@ -925,7 +927,12 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
     providerAttempted.push("Expanded topic variants: Wikipedia REST Search, Google News Search, Bing Web RSS Search","OpenAI Web Search (fallback)");
     const expanded=await safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||""),providerAttempted,identityAliases,options.images===true,options.publicationContext||""),[]);
-    candidates.push(...selectExpandedSearchCandidates(expanded,12));
+    const selectedExpanded=selectExpandedSearchCandidates(expanded,12);
+    const selectedTrusted=selectedExpanded.filter(item=>item.provider==="Trusted Publisher RSS Search");
+    const relevantExpanded=selectedExpanded.filter(item=>languageSafe(item,language)&&candidateMatches(item));
+    const relevantTrusted=relevantExpanded.filter(item=>item.provider==="Trusted Publisher RSS Search");
+    providerAttempted.push("Expanded selection raw="+expanded.length+" selected="+selectedExpanded.length+" trusted="+selectedTrusted.length+" relevant="+relevantExpanded.length+" relevant_trusted="+relevantTrusted.length);
+    candidates.push(...selectedExpanded);
     // OpenAI web search is the final recovery path, not a parallel request on
     // every weak first pass. Skip it as soon as independent evidence is adequate.
     const shouldUseOpenAIWebSearch=shouldAttemptOpenAIWebSearchFallback({publishing:options.publish===true,firstPassCount:firstPassCount(),personOrAcademic:personQuery||academicQuery,evidenceDiverse:firstPassHasDiverseEvidence(),belowExpansionThreshold:firstPassCount()<expansionThreshold});

@@ -1,6 +1,12 @@
 import { safePublicImageUrl } from "../image-url";
 import type { Locale, SearchResult } from "../types";
 
+export function shouldSkipGoogleNewsRetry(diagnostics:string[]):boolean{
+  return diagnostics.some(entry=>{
+    const normalized=String(entry||"").toLowerCase().replace(/[ _-]+/g,"_");
+    return /google_news_search.*(?:http_401|http_403|http_404|http_429|http_500|http_502|http_503|http_504|timeout|timed_out|aborted|fetch_or_parse_exception|parsed=0_accepted=0|raw=0)/i.test(normalized);
+  });
+}
 export function shouldAttemptOpenAIWebSearchFallback(input:{publishing:boolean;firstPassCount:number;personOrAcademic:boolean;evidenceDiverse:boolean;belowExpansionThreshold:boolean}):boolean{
   if(input.firstPassCount===0)return true;
   if(input.publishing)return !input.evidenceDiverse;
