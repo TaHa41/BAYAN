@@ -134,7 +134,7 @@ describe("Bing News RSS URL safety", () => {
 
 describe("independent evidence diversity", () => {
   it("counts real HTTPS publisher hosts", () => {
-    expect(independentEvidenceHost("BBC News", "https://www.bbc.com/news/example")).toBe("bbc.com");
+    expect(independentEvidenceHost("BBC News", "https://www.bbc.com/news/example")).toBe("bbc.com");\n    expect(independentEvidenceHost("BBC News", "https://news.bbc.co.uk/news/example")).toBe("bbc.co.uk");\n    expect(independentEvidenceHost("BBC News", "https://sport.bbc.co.uk/news/example")).toBe("bbc.co.uk");
     expect(independentEvidenceHost("Reuters", "https://www.reuters.com/world/example")).toBe("reuters.com");
   });
 
