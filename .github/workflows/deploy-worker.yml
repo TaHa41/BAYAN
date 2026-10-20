@@ -102,6 +102,14 @@ jobs:
           }
           throw new Error(`Deployed Worker commit identity mismatch after 30 attempts: ${last}`);
           NODE
+      - name: Audit sensitive Worker binding types without printing values
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EXPECTED_COMMIT_SHA: ${{ github.sha }}
+          BAYAN_WORKER_NAME: bayan
+        run: node scripts/worker-binding-security-audit.mjs
 
 
   verify-production:
