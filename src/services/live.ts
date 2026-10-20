@@ -60,6 +60,32 @@ export async function fx(env?:Env){
     return{ok:false,provider:"Frankfurter / ExchangeRate-API",stale:true,message:"FX providers temporarily unavailable"};
   }
 }
+let yahooRateLimitedUntil=0;
+async function fredDailyQuote(symbol:string,series:string,env?:Env){
+  try{
+    const response=await fetch("https://fred.stlouisfed.org/graph/fredgraph.csv?id="+encodeURIComponent(series),{
+      signal:AbortSignal.timeout(3500),
+      headers:{accept:"text/csv,text/plain,*/*"}
+    });
+    if(!response.ok)throw new Error("http_"+response.status);
+    const csv=(await response.text()).trim();
+    const rows=csv.split(/\r?\n/).slice(1).reverse();
+    const now=Date.now();
+    for(const row of rows){
+      const fields=row.split(",");
+      const date=String(fields[0]||"").trim();
+      const price=Number(String(fields[1]||"").trim());
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(price)||price<=0)continue;
+      const updatedAt=new Date(date+"T00:00:00.000Z").toISOString();
+      if(now-Date.parse(updatedAt)>14*86400000)continue;
+      return{symbol,price,currency:"USD",provider:"FRED (daily reference)",updatedAt,stale:true};
+    }
+    throw new Error("no_recent_daily_observation");
+  }catch(error){
+    if(env)await recordRuntimeEventLimited(env,"market_fred_provider","fred_daily_quote_failed",error);
+    return null;
+  }
+}
 async function preciousMetalQuote(symbol:string,metal:"XAG",env?:Env){
   try{
     const r=await timeout("https://api.gold-api.com/price/"+metal,3500);
@@ -94,30 +120,44 @@ export async function marketQuote(symbol:string,env?:Env){
   const yahooQuote=async(host:string)=>{
     try{
       const r=await timeout("https://"+host+"/v8/finance/chart/"+encodeURIComponent(symbol)+"?range=1d&interval=1d",3500);
-      if(!r.ok){yahooFailures.push(host+":http_"+r.status);return null;}
+      if(!r.ok){
+        yahooFailures.push(host+":http_"+r.status);
+        if(r.status===429)yahooRateLimitedUntil=Math.max(yahooRateLimitedUntil,Date.now()+15*60*1000);
+        return null;
+      }
       const d=await r.json<any>(),meta=d?.chart?.result?.[0]?.meta,price=Number(meta?.regularMarketPrice);
       if(!Number.isFinite(price)||price<=0){yahooFailures.push(host+":empty_quote");return null;}
       return{symbol,price,currency:String(meta?.currency||"USD"),provider:"Yahoo Finance",updatedAt:meta?.regularMarketTime?new Date(Number(meta.regularMarketTime)*1000).toISOString():new Date().toISOString(),stale:false};
     }catch(error){yahooFailures.push(host+":"+String(error instanceof Error?error.message:error).slice(0,100));return null;}
   };
+  const logYahooFailure=async()=>{
+    if(env&&yahooFailures.length)await recordRuntimeEventLimited(env,"market_yahoo_provider","yahoo_quote_failed",yahooFailures.join("; "));
+  };
+  const freeFallback=async()=>{
+    if(symbol==="BTC-USD")return await cryptoQuote(symbol,"bitcoin","BTCUSDT",env);
+    if(symbol==="ETH-USD")return await cryptoQuote(symbol,"ethereum","ETHUSDT",env);
+    if(symbol==="SI=F")return await preciousMetalQuote(symbol,"XAG",env);
+    if(symbol==="CL=F")return await fredDailyQuote(symbol,"DCOILWTICO",env);
+    if(symbol==="^GSPC")return await fredDailyQuote(symbol,"SP500",env);
+    if(symbol==="^IXIC")return await fredDailyQuote(symbol,"NASDAQCOM",env);
+    return null;
+  };
+
+  if(Date.now()<yahooRateLimitedUntil)return await freeFallback();
   const primary=await yahooQuote("query1.finance.yahoo.com");
   if(primary)return primary;
-  if(symbol==="BTC-USD")return (await cryptoQuote(symbol,"bitcoin","BTCUSDT",env))||await logYahooFailure();
-  if(symbol==="ETH-USD")return (await cryptoQuote(symbol,"ethereum","ETHUSDT",env))||await logYahooFailure();
-  if(symbol==="SI=F"){
-    const metal=await preciousMetalQuote(symbol,"XAG",env);
-    if(metal)return metal;
-  }
-  // Yahoo's second public chart host replaces the repeatedly timing-out Stooq
-  // fallback without adding an API key, subscription, or third-party quota.
-  const mirror=await yahooQuote("query2.finance.yahoo.com");
-  if(mirror)return mirror;
-  return await logYahooFailure();
-
-  async function logYahooFailure(){
-    if(env&&yahooFailures.length)await recordRuntimeEventLimited(env,"market_yahoo_provider","yahoo_quote_failed",yahooFailures.join("; "));
+  if(Date.now()<yahooRateLimitedUntil){
+    const fallback=await freeFallback();
+    if(fallback)return fallback;
+    await logYahooFailure();
     return null;
   }
+  const mirror=await yahooQuote("query2.finance.yahoo.com");
+  if(mirror)return mirror;
+  const fallback=await freeFallback();
+  if(fallback)return fallback;
+  await logYahooFailure();
+  return null;
 }
 async function extraMarkets(env?:Env){
   const quotes=await mapWithConcurrency(["SI=F","CL=F","GC=F","BTC-USD","ETH-USD","^GSPC","^IXIC"],4,symbol=>marketQuote(symbol,env));
