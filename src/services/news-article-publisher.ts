@@ -1,6 +1,7 @@
 import type {Env,Locale} from "../types";
 import {search} from "./search";
 import {recordRuntimeEventLimited} from "../runtime-events";
+import {independentEvidenceHost} from "./evidence-diversity";
 import {NEWS_ARCHIVE_CANDIDATES_SQL,RECENT_LOW_EVIDENCE_SQL,pickCandidate} from "./news-article-publisher-query";
 
 const DAILY_D1_READ_CALL_LIMIT=12000;
@@ -96,9 +97,9 @@ async function publishNextArchivedNewsArticleInner(env:Env){
     }
     if(!slug){
       const sourceRecords=(Array.isArray(result.results)?result.results:[]).flatMap((item:any)=>Array.isArray(item.sources)?item.sources:[]);
-      const independentSources=sourceRecords.filter((source:any)=>{const publisher=String(source.publisher||"").trim().toLowerCase();const url=String(source.url||"");if(!url||["wikipedia","wikidata","google news","bing","duckduckgo","bayan recent news archive"].some(label=>publisher.includes(label)))return false;try{const parsed=new URL(url);const host=parsed.hostname.toLowerCase().replace(/^www[.]/,"");return parsed.protocol==="https:"&&!["wikipedia.org","wikidata.org","news.google.com","bing.com","duckduckgo.com"].some(domain=>host===domain||host.endsWith("."+domain))}catch{return false}});
-      const independentPublisherCount=new Set(independentSources.map((source:any)=>String(source.publisher||new URL(String(source.url)).hostname).trim().toLowerCase())).size;
-      const independentHostCount=new Set(independentSources.map((source:any)=>{try{return new URL(String(source.url)).hostname.toLowerCase().replace(/^www[.]/,"")}catch{return ""}}).filter(Boolean)).size;
+      const independentSources=sourceRecords.filter((source:any)=>Boolean(independentEvidenceHost(String(source.publisher||""),String(source.url||""))));
+      const independentPublisherCount=new Set(independentSources.map((source:any)=>String(source.publisher||independentEvidenceHost("",String(source.url||""))||"").trim().toLowerCase())).size;
+      const independentHostCount=new Set(independentSources.map((source:any)=>independentEvidenceHost(String(source.publisher||""),String(source.url||""))).filter(Boolean)).size;
       const attempts=Array.isArray(result.providerAttempted)?result.providerAttempted.map((value:any)=>String(value)):[];
       const expandedSearchAttempted=attempts.some((value:string)=>value.includes("Expanded topic variants")||value.includes("Expanded variant "));
       const providerFailures=attempts.filter((value:string)=>/timeout|failed|unavailable|HTTP [45][0-9]{2}/i.test(value)).map((value:string)=>value.split(" ").slice(0,3).join(" ")).slice(0,3);

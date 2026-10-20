@@ -135,6 +135,8 @@ describe("Bing News RSS URL safety", () => {
 describe("independent evidence diversity", () => {
   it("counts real HTTPS publisher hosts", () => {
     expect(independentEvidenceHost("BBC News", "https://www.bbc.com/news/example")).toBe("bbc.com");
+    expect(independentEvidenceHost("BBC News", "https://news.bbc.co.uk/news/example")).toBe("bbc.co.uk");
+    expect(independentEvidenceHost("BBC News", "https://sport.bbc.co.uk/news/example")).toBe("bbc.co.uk");
     expect(independentEvidenceHost("Reuters", "https://www.reuters.com/world/example")).toBe("reuters.com");
   });
 
@@ -146,13 +148,14 @@ describe("independent evidence diversity", () => {
 
   it("excludes aggregators, insecure URLs, and credential-bearing URLs", () => {
     expect(independentEvidenceHost("BBC News", "https://news.google.com/rss/articles/123")).toBeUndefined();
+    expect(independentEvidenceHost("Yahoo News", "https://news.yahoo.com/story")).toBeUndefined();
     expect(independentEvidenceHost("Reuters", "https://www.bing.com/news/articles/123")).toBeUndefined();
     expect(independentEvidenceHost("Reuters", "http://www.reuters.com/world/example")).toBeUndefined();
     expect(independentEvidenceHost("Reuters", "https://user:pass@reuters.com/world/example")).toBeUndefined();
   });
 
-  it("keeps the three-independent-publisher minimum while honoring stricter configuration", () => {
-    expect(requiredEvidencePublisherCount(true, 3)).toBe(3);
+  it("keeps the five-independent-publisher floor while honoring stricter configuration", () => {
+    expect(requiredEvidencePublisherCount(true, 3)).toBe(5);
     expect(requiredEvidencePublisherCount(true, 7)).toBe(7);
     expect(requiredEvidencePublisherCount(false, 3)).toBe(2);
   });
