@@ -74,7 +74,7 @@ describe("BAYAN AI admin diagnosis safety",()=>{
     expect(result.health.verification).toBe("read_only_not_verified");
     expect(result.health.actions).toEqual([]);
     expect(sql.some((statement)=>statement.trim().toUpperCase().startsWith("UPDATE ")||statement.trim().toUpperCase().startsWith("DELETE "))).toBe(false);
-    expect(sql.some((statement)=>statement.trim().toUpperCase().startsWith("UPDATE ")||statement.trim().toUpperCase().startsWith("DELETE "))).toBe(false);
+    expect(sql.some((statement)=>statement.includes("INSERT INTO runtime_events"))).toBe(true);
     expect(sql.some((statement)=>statement.includes("Test incident with private details"))).toBe(false);
   });
 });
