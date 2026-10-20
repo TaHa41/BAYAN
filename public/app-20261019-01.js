@@ -171,6 +171,7 @@
       placeholder.replaceWith(img);
     } catch {
       // Keep the intentional BAYAN placeholder; never insert an unrelated image.
+      return;
     }
   };
   const scanMissingImagePlaceholders = (root) => {
