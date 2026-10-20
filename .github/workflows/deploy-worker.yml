@@ -114,6 +114,7 @@ jobs:
         env:
           BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
           BAYAN_AI_MANAGER_TOKEN: ${{ secrets.BAYAN_AI_MANAGER_TOKEN }}
+          BAYAN_SMOKE_SEARCH_PROBES: ${{ contains(github.event.head_commit.message, '[full-smoke]') && '1' || '0' }}
         run: node scripts/production-self-heal.mjs
       - name: Report news sitemap eligibility (non-blocking)
         if: always()
