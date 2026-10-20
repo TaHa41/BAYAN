@@ -209,7 +209,7 @@ const readFeed = async (name: string, url: string, diagnostics?: string[]): Prom
     }
     // RSS uses <item>; Atom uses <entry>. Parse both so feeds do not silently
     // become empty just because a publisher changed its feed format.
-    const entries = [...xml.matchAll(/<(item|entry)\b[\s\S]*?<\/\1>/gi)].slice(0, 12);
+    const entries = [...xml.matchAll(/<(item|entry)\b[\s\S]*?<\/\1>/gi)].slice(0, 24);
     const contentType = String(response.headers.get("content-type") || "unknown").split(";")[0].slice(0, 80);
     if (!xml.trim()) {
       diagnostics?.push(name + " parsed=0 accepted=0 reason=empty_body content_type=" + contentType);
@@ -246,8 +246,9 @@ const readFeed = async (name: string, url: string, diagnostics?: string[]): Prom
       const imageUrl = isUsableNewsImage(rawImageUrl) ? rawImageUrl : undefined;
       const title = tag("title");
       const summary = tag("content:encoded", "description", "summary", "content").slice(0, 1800);
-      const sourceName = tag("source");
-      const publisher = sourceName || name;
+      const sourceName = tag("source").trim();
+      // Some RSS feeds put a taxonomy path or URL in <source>; that is not a publisher name.
+      const publisher = sourceName && !/(?:^|\/)taxonomy\/term\/\d+|^https?:\/\//i.test(sourceName) ? sourceName : name;
       const absoluteUrl = link ? (link.startsWith("http") ? link : new URL(link, url).toString()) : "";
       return {
         title,
