@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { areNearDuplicateEvidenceTitles, hasIndependentEvidenceDiversity, independentEvidenceHost, registrableEvidenceDomain, requiredEvidencePublisherCount, requiredSearchExpansionPublisherCount } from "../src/services/evidence-diversity";
+import { areNearDuplicateEvidenceTexts, areNearDuplicateEvidenceTitles, hasIndependentEvidenceDiversity, independentEvidenceHost, registrableEvidenceDomain, requiredEvidencePublisherCount, requiredSearchExpansionPublisherCount } from "../src/services/evidence-diversity";
 import { isSafeGdeltPublisherUrl, robotsAllowsPath } from "../src/services/gdelt-evidence";
 
 describe("publication evidence diversity threshold", () => {
@@ -35,6 +35,15 @@ describe("publication evidence diversity threshold", () => {
     expect(areNearDuplicateEvidenceTitles("Government announces major new economic reform plan today", "Government announces major economic reform plan for today")).toBe(true);
     expect(areNearDuplicateEvidenceTitles("Government announces major new economic reform plan today", "Local sports team wins regional championship final")).toBe(false);
     expect(areNearDuplicateEvidenceTitles("short headline", "short headline")).toBe(false);
+  });
+
+  it("detects copied three-word shingles in source excerpts conservatively", () => {
+    const copied = "The government announced a new economic policy after a long meeting with senior officials and international partners today.";
+    const syndicated = "The government announced a new economic policy after a long meeting with senior officials and international partners today.";
+    const different = "Local football players prepared for a regional tournament with a new coach and several young academy prospects.";
+    expect(areNearDuplicateEvidenceTexts(copied, syndicated)).toBe(true);
+    expect(areNearDuplicateEvidenceTexts(copied, different)).toBe(false);
+    expect(areNearDuplicateEvidenceTexts("short text", "short text")).toBe(false);
   });
 
   it("normalizes subdomains to one registrable eTLD+1 host", () => {
