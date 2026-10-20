@@ -551,3 +551,55 @@ body{line-height:1.75;-webkit-font-smoothing:antialiased;text-rendering:optimize
 .search-full-article summary{cursor:pointer;font-weight:650}
 .search-result .source-line{overflow-wrap:anywhere}
 @media(max-width:600px){.search-tools{padding:.75rem}.search-tools-top{align-items:flex-start}.search-filter{font-size:.85rem;padding:.45rem .65rem}.search-sort-label{width:100%;justify-content:space-between}.search-sort-label select{flex:1;max-width:65%}}
+
+/* BAYAN unified editorial article system — all article routes share this layout */
+.article-full{
+  width:min(100%,920px);margin:0 auto;padding:clamp(20px,4vw,42px);
+  border:1px solid var(--line);border-radius:24px;background:var(--surface);
+  box-shadow:0 18px 54px #102a4310;overflow-wrap:anywhere;
+}
+.article-full>.eyebrow,.article-full>.kicker{
+  display:inline-flex;align-items:center;gap:7px;margin:0 0 12px;padding:5px 11px;
+  border:1px solid var(--line);border-radius:999px;background:var(--soft);
+  color:var(--accent);font-size:12px;font-weight:900;letter-spacing:0;
+}
+.article-full h1{
+  max-width:800px;margin:8px 0 18px;font-size:clamp(2rem,5vw,3.35rem);
+  line-height:1.32;letter-spacing:-.025em;text-wrap:balance;
+}
+.article-full .lead{
+  margin:0;padding:0 18px;border-inline-start:4px solid var(--accent2);
+  color:var(--muted);font-size:clamp(1.05rem,2vw,1.25rem);line-height:2;
+}
+.article-full .article-hero-image{
+  display:block;width:100%;max-height:480px;aspect-ratio:16/9;object-fit:cover;
+  border-radius:18px;margin:0 0 26px;background:var(--soft);
+}
+.article-full .article-hero-placeholder{
+  display:grid;place-items:center;min-height:180px;margin:0 0 24px;padding:24px;
+  border:1px solid var(--line);border-radius:18px;background:var(--soft);
+  color:var(--muted);font-weight:800;text-align:center;
+}
+.article-full .article-hero-placeholder.is-unavailable{min-height:120px}
+.article-full .article-body{margin-top:28px;font-size:1.06rem;line-height:2.05;overflow-wrap:anywhere}
+.article-full .article-body p{margin:0 0 1.15em}
+.article-full .article-body h2{margin:1.8em 0 .65em;padding-bottom:.4em;border-bottom:1px solid var(--line);font-size:clamp(1.35rem,3vw,1.75rem);line-height:1.5}
+.article-full .article-body h3{margin:1.45em 0 .5em;font-size:1.18rem;line-height:1.55}
+.article-full .article-body ul,.article-full .article-body ol{padding-inline-start:1.5em;margin:0 0 1.3em}
+.article-full .article-body li{padding-inline-start:.25em;margin:.35em 0}
+.article-full .article-body blockquote{margin:1.5em 0;padding:14px 18px;border-inline-start:4px solid var(--accent);border-radius:0 12px 12px 0;background:var(--soft);color:var(--muted)}
+.article-full .sources-box{margin-top:36px;padding-top:22px;border-top:1px solid var(--line)}
+.article-full .sources-box h2{margin:0 0 10px;font-size:1.3rem;line-height:1.5}
+.article-full .sources-box .source-line{padding:12px 0;border-bottom:1px solid var(--line);line-height:1.65;overflow-wrap:anywhere}
+.article-full .sources-box .source-line:last-child{border-bottom:0}
+.article-full .notice{margin-top:22px}
+.article-full .social-actions,.article-full .social-actions-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}
+.article-full a{overflow-wrap:anywhere}
+@media(max-width:600px){
+  .article-full{padding:18px 16px;border-radius:17px}
+  .article-full h1{font-size:clamp(1.8rem,8vw,2.45rem);line-height:1.38}
+  .article-full .article-hero-image{aspect-ratio:4/3;max-height:340px;border-radius:12px}
+  .article-full .article-body{font-size:1rem;line-height:2}
+  .article-full .lead{padding-inline:13px}
+}
+.dark .article-full{box-shadow:0 18px 54px #00000020}
