@@ -17,6 +17,17 @@ export function registrableEvidenceDomain(rawHost: string): string | undefined {
     : lastTwo;
 }
 
+export function areNearDuplicateEvidenceTitles(a: string, b: string, threshold = 0.88): boolean {
+  const tokens = (value: string) => new Set(String(value || "").toLowerCase().normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " ").split(/\s+/).filter(token => token.length >= 3));
+  const left = tokens(a);
+  const right = tokens(b);
+  const smaller = Math.min(left.size, right.size);
+  if (smaller < 5) return false;
+  let overlap = 0;
+  for (const token of left) if (right.has(token)) overlap++;
+  return overlap / smaller >= threshold;
+}
+
 export function requiredEvidencePublisherCount(publishing: boolean, configuredMinimum: number): number {
   const minimum = Number.isFinite(configuredMinimum) && configuredMinimum > 0
     ? Math.floor(configuredMinimum)
