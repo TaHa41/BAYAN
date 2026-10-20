@@ -1,4 +1,4 @@
-import{safePublicImageUrl}from"./image-url";import{d1Blocked,isD1QuotaError,logD1QuotaOncePerHour,markD1Blocked}from"./services/d1-guard";import{recordRuntimeEventLimited}from"./runtime-events";
+import{isD1IndependentApiPath}from"./services/d1-independent-routes";import{safePublicImageUrl}from"./image-url";import{d1Blocked,isD1QuotaError,logD1QuotaOncePerHour,markD1Blocked}from"./services/d1-guard";import{recordRuntimeEventLimited}from"./runtime-events";
 import type{Env}from"./types";import{api}from"./routes/api";import{robots,sitemap,newsSitemap}from"./seo";import{selfHeal}from"./services/repair";import{news}from"./services/news";import{publishNextArchivedNewsArticle}from"./services/news-article-publisher";import{track}from"./db";import{analyticsExcluded,visitorId}from"./security";import{ensureSchema}from"./schema";import{ORIGIN,SECTIONS}from"./config";import{notify}from"./services/telegram";import{bundledArticleBySlug,bundledArticlesForSection}from"./fallback-content";
 const BUILD="2026.10.15.01";
 const COMMIT_SHA="0000000000000000000000000000000000000000";
@@ -302,8 +302,11 @@ if(apiCacheTtl){
 }
 if(u.pathname.startsWith("/api/")){
  const schemaOptional=["/api/search","/api/section","/api/article"].includes(u.pathname);
- if(d1Blocked())return new Response(JSON.stringify({degraded:true,reason:"d1_quota",error:"database_temporarily_unavailable"}),{status:200,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store","x-bayan-degraded":"d1_quota"}});
- try{await ensureSchema(env)}catch(error){if(isD1QuotaError(error)){markD1Blocked();logD1QuotaOncePerHour(error);return new Response(JSON.stringify({degraded:true,reason:"d1_quota",error:"database_temporarily_unavailable"}),{status:200,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store","x-bayan-degraded":"d1_quota"}})}if(!schemaOptional)return new Response(JSON.stringify({error:"database_unavailable"}),{status:503,headers:{"content-type":"application/json;charset=utf-8","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})}
+ const d1Independent=isD1IndependentApiPath(u.pathname);
+ if(!d1Independent){
+  if(d1Blocked())return new Response(JSON.stringify({degraded:true,reason:"d1_quota",error:"database_temporarily_unavailable"}),{status:200,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store","x-bayan-degraded":"d1_quota"}});
+  try{await ensureSchema(env)}catch(error){if(isD1QuotaError(error)){markD1Blocked();logD1QuotaOncePerHour(error);return new Response(JSON.stringify({degraded:true,reason:"d1_quota",error:"database_temporarily_unavailable"}),{status:200,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store","x-bayan-degraded":"d1_quota"}})}if(!schemaOptional)return new Response(JSON.stringify({error:"database_unavailable"}),{status:503,headers:{"content-type":"application/json;charset=utf-8","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})}
+ }
  try{
   const response=await api(request,env,ctx);
   if(apiCacheTtl&&response.ok){
