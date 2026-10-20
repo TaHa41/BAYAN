@@ -17,6 +17,7 @@ const evidenceDiversity = read("src/services/evidence-diversity.ts");
 const recovery = read("src/services/search-recovery.ts");
 const http = read("src/http.ts");
 const checks = [
+  ["section smoke skips content assertions only for explicit D1 quota degradation", read("scripts/production-smoke.mjs").includes('d.degraded===true&&d.reason==="d1_quota"') && read("scripts/production-smoke.mjs").includes("needs_at_least_two_articles") && read("scripts/production-smoke.mjs").includes("SECTION_CHECKS_SKIPPED_EXPLICIT_D1_QUOTA")],
   ["manual production smoke is read-only and never invokes self-heal", read(".github/workflows/production-smoke.yml").includes("node scripts/production-smoke.mjs") && !read(".github/workflows/production-smoke.yml").includes("node scripts/production-self-heal.mjs") && !read(".github/workflows/production-smoke.yml").includes("BAYAN_AI_MANAGER_TOKEN")],
   ["deployment verification is read-only unless a manual dispatch explicitly sets allow_repair=true", (()=>{const worker=read(".github/workflows/deploy-worker.yml");return worker.includes("allow_repair:") && worker.includes("type: boolean") && worker.includes("default: false") && worker.includes("node scripts/production-smoke.mjs") && worker.includes("inputs.allow_repair == true") && worker.includes("node scripts/production-self-heal.mjs") && !worker.includes("name: Verify and repair production if needed")})()],
 
