@@ -1,6 +1,6 @@
 # BAYAN Feature Ledger
 
-Status: baseline ledger created from the requested project brief and a read-only inspection of `main` on 2026-10-16. A ledger entry means the feature is required or found in source; it does **not** certify production health.
+Status: baseline ledger created 2026-10-16 and updated with production evidence on 2026-10-20. A ledger entry means the feature is required or found in source; it does **not** certify production health.
 
 ## Required features — preserve and verify
 
@@ -40,8 +40,23 @@ Status: baseline ledger created from the requested project brief and a read-only
 ## Baseline source observations (not production certification)
 
 - `src/sections.ts` defines 16 section slugs and localized labels; legacy slugs `egypt`, `arab`, and `world` are currently mapped to the newer display names.
-- `src/types.ts` declares D1/AI/assets bindings and optional OpenAI, GNews, Telegram, gold, and Wikimedia Enterprise environment fields.
+- `src/types.ts` declares D1/AI/assets bindings and optional OpenAI, GNews, Telegram, gold, Wikimedia Enterprise, and `NEWS_AI_MODEL` environment fields.
 - `src/services/news.ts` has an image URL guard rejecting Googleusercontent/Google News/gstatic image hosts.
 - `src/services/news-article-publisher.ts` currently performs a bounded single-article attempt per cron tick and catches an admin setting read failure with `.catch(()=>null)`; investigate and replace silent failure with reasoned logging in the relevant phase.
 - `src/seo.ts` emits robots and sitemap responses and logs sitemap query errors; inspect live HTTP and rendered HTML before drawing SEO conclusions.
-- `docs/FEATURE_LEDGER.md` and `docs/PHASE_REPORTS.md` were absent on the inspected `main` branch.
+- The feature ledger and phase reports were added in Phase 0; keep them current with every production release.
+
+
+## Production snapshot — 2026-10-20
+
+This is an observed snapshot, not a claim that the acceptance criteria are met.
+
+- Latest production commit whose deployment identity and post-deploy script completed: `3493f97edd9f35c319989b0bade47d9ba30e2cc5`. Main has since advanced to `333d83ec18c89f3ad43f48d28fb1777cb3ce8296`; the newest main deployment was still in progress at the time of this snapshot.
+- `NEWS_AI_DAILY_LIMIT=150` is in `wrangler.jsonc` and was merged through PR #410. The configured independent-publisher minimum remains five; no threshold reduction was made.
+- PR #432 added bounded RSS parser/provider diagnostics; PR #434 resolves bounded Google News/Bing redirect URLs before evidence-host counting; PR #433 requires both the configured publisher count and distinct HTTPS host count. These changes are merged into main.
+- The production monitor for SHA `3493f97` failed with `news_publication_gap`: the news sitemap had zero articles while 200 archive rows were ready for drafting. The latest read-only D1 snapshot is `news_archive total=1530, linked=0, exhausted=126, pending=1404, attempted_24h=64`.
+- `articles`: 162 total, 95 with no image, 126 with body length below 2,500 characters, zero at or above 5,000 characters, and five duplicate title/language groups.
+- The earlier `news_archive_read_unavailable` 503 did not reproduce in the latest health check; its original root cause is still unconfirmed. The direct D1 probe returned HTTP 200, `rows_read=1`, `sql_duration_ms=0.1592`. PR #436 adds sanitized Worker-log diagnostics if that failure recurs; the public health route still returns 503 on failure.
+- PR #431 was closed as superseded, not merged: its migration targets four rows whose production `image_url` values were already non-empty. External HTTP 200/content-type checks for those images remain unverified.
+- Search Console indexing, live canonical/hreflang/JSON-LD, all 14 section routes in both locales, mobile navigation, live weather/FX/prayer success, Telegram delivery, and GA4 event delivery are not certified by this snapshot.
+- Reproducible read-only inventory queries: `scripts/article-quality-report.sql`.
