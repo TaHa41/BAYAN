@@ -27,7 +27,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install Strix
-        run: python -m pip install --upgrade pipx && pipx install strix-agent
+        run: python -m pip install --upgrade pipx && python -m pipx install strix-agent
       - name: Verify required secret exists
         env:
           LLM_API_KEY: ${{ secrets.STRIX_LLM_API_KEY }}
