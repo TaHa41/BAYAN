@@ -1,4 +1,4 @@
-import type{Env}from"../types";import{recordRuntimeEventLimited}from"../runtime-events";import{now}from"../config";import{notify}from"./telegram";import{findRelatedImage,news}from"./news";import{search}from"./search";import{workersAiModel}from"./ai";
+import type{Env}from"../types";import{recordRuntimeEventLimited}from"../runtime-events";import{now}from"../config";import{notify}from"./telegram";import{findRelatedImage,news}from"./news";import{search,searchAvailabilityProbe}from"./search";import{workersAiModel}from"./ai";
 async function newsCacheHealthy(env:Env){
   const rows=await env.DB.prepare("SELECT language,payload FROM news_cache WHERE language IN ('ar','en')").all<any>();
   const cache=rows.results||[];
