@@ -263,7 +263,9 @@ export async function api(request:Request,env:Env,ctx?:ExecutionContext){const u
     return response;
   }catch(error){
     await recordRuntimeEventLimited(env,"news_archive_read","archive_read_failed",error)
-    return json({ok:false,language:lang,items:[],error:"news_archive_unavailable"},503);
+    // D1's daily free read quota can be exhausted while live news still works.
+    // Do not turn an unavailable archive into an HTTP 503 or invent archived items.
+    return json({ok:true,language:lang,section,items:[],count:0,degraded:true,archiveAvailable:false,message:lang==="ar"?"الأرشيف المحفوظ غير متاح مؤقتًا؛ يمكنك متابعة الأخبار المتحققة المباشرة.":"The saved archive is temporarily unavailable; verified live news may still be available."},200,"no-store");
   }
 }if(u.pathname==="/api/news"){try{return json(await news(env,lang),200,"public, max-age=45, stale-while-revalidate=180")}catch{return json({items:[],degraded:true,message:lang==="ar"?"الأخبار الحية غير متاحة مؤقتًا؛ لن نعرض أخبارًا غير متحققة.":"Live news is temporarily unavailable; unverified stories will not be shown."},200,"public, max-age=30")}}if(u.pathname==="/api/image"){const q=clean(u.searchParams.get("q")||"",500);if(!q)return json({error:"query_required"},400);return json({ok:true,imageUrl:safePublicImageUrl(await findRelatedImage(q))});}if(u.pathname==="/api/wisdom"){const section=clean(u.searchParams.get("section")||"world",80);if(!sectionBySlug(section))return json({error:"invalid_section"},400);return json({section,wisdom:wisdomFor(section,lang)});}if(u.pathname==="/api/section"){const section=clean(u.searchParams.get("section")||"",80);if(!section||!sectionBySlug(section))return json({error:"invalid_section"},400);if(section==="news"){
   let live:any;try{live=await news(env,lang)}catch{return json({section,items:[],degraded:true},200,"public, max-age=30")}
