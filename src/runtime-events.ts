@@ -1,4 +1,5 @@
 import type { Env } from "./types";
+import { d1Blocked, isD1QuotaError, logD1QuotaOncePerHour, markD1Blocked } from "./services/d1-guard";
 
 // Per-isolate limiter: repeated failures of one kind cause at most one D1
 // write per minute, without an extra D1 read on every suppressed event.
@@ -20,6 +21,8 @@ export async function recordRuntimeEventLimited(
   detail?: unknown,
 ): Promise<boolean> {
   const safeKind = sanitize(kind).slice(0, 80) || "runtime_unknown";
+  // Do not issue a telemetry write after D1 has rejected work for quota exhaustion.
+  if (d1Blocked()) return false;
   const now = Date.now();
   const previous = lastRuntimeEventAt.get(safeKind);
   if (previous !== undefined && now - previous < WINDOW_MS) return false;
@@ -41,8 +44,12 @@ export async function recordRuntimeEventLimited(
     ).bind("WARN", safeKind, message, new Date(now).toISOString(), safeKind, new Date(now - WINDOW_MS).toISOString()).run();
     return Number(result?.meta?.changes || 0) > 0;
   } catch (loggingError) {
+    // A quota error blocks all further telemetry writes for this isolate until UTC midnight.
+    if (isD1QuotaError(loggingError)) {
+      markD1Blocked();
+      logD1QuotaOncePerHour(loggingError);
+    }
     // Deliberately best-effort: do not recurse or throw when telemetry itself fails.
-    void loggingError;
     return false;
   }
 }
