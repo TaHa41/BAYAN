@@ -1,6 +1,6 @@
 # BAYAN Architecture Map
 
-Inspection date: 2026-10-16. Source-derived map; this document does not certify production health.
+Inspection date: 2026-10-20. Source-derived map; this document does not certify production health.
 
 ## Runtime
 - Cloudflare Worker configured in `wrangler.jsonc`; entry point `src/index.ts`; static assets in `public/` through `ASSETS`.
@@ -13,7 +13,7 @@ Inspection date: 2026-10-16. Source-derived map; this document does not certify 
 - `src/routes/api.ts`: public API composition: search/recovery, live data, news, AI, contributions, articles, saved content, analytics, editorial enrichment and repair/admin operations. Exact paths and authorization checks still require a full route inventory.
 - `src/services/search.ts`, `search-recovery.ts`: search providers, ranking and fallback.
 - `src/services/news.ts`, `news-article-publisher.ts`: RSS/news aggregation, image validation, archived-news article publishing.
-- `src/services/ai.ts`: AI answer/drafting integration.
+- `src/services/ai.ts`: AI answer/drafting integration; `NEWS_AI_MODEL` may override the default Workers AI model, with the existing Llama model as fallback.
 - `src/services/live.ts`: weather, FX/gold and prayer times.
 - `src/services/repair.ts`: self-healing and repair workflow.
 - `src/services/telegram.ts`: Telegram notifications.
@@ -32,8 +32,8 @@ Inspection date: 2026-10-16. Source-derived map; this document does not certify 
 ## Known tables in runtime schema source
 `src/schema.ts` contains `CREATE TABLE IF NOT EXISTS` statements for at least `articles`, `contributions`, `searches`, `saved_articles`, `article_likes`, `analytics`, `runtime_events`, `repair_jobs`, and `repair_attempts`. This is not a complete schema inventory; `news_archive`, admin settings and other tables must be reconciled with migrations and actual D1.
 
-## Integrations to inventory
-Cloudflare Workers/D1/Workers AI/AI Search; OpenAI; GNews; RSS feeds; Wikimedia/Wikimedia Enterprise; Open-Meteo; FX and gold providers; AlAdhan; Telegram; Resend; GA4 `G-Y16MK39Q6X`; Search Console; search providers/GDELT if present; sitemap/indexing endpoints.
+## Integrations inventory
+See `docs/INTEGRATIONS.md` for source-level configuration, observed production status, and explicit unverified items. RSS parser diagnostics and bounded Google News/Bing URL resolution were merged 2026-10-20; the production news publication acceptance check still fails.
 
 ## Required operational invariants
 1. Preserve production data and URL behavior.
@@ -43,3 +43,11 @@ Cloudflare Workers/D1/Workers AI/AI Search; OpenAI; GNews; RSS feeds; Wikimedia/
 5. Never expose secret values; report names/status only.
 6. Log bounded, redacted failure reasons rather than swallowing exceptions.
 7. Build/preview success is not production verification.
+
+
+## Production evidence snapshot — 2026-10-20
+
+- Main contains the RSS diagnostics, aggregator URL resolution, and five-distinct-host publication gate. The latest deployment verified at this snapshot is SHA `3493f97edd9f35c319989b0bade47d9ba30e2cc5`; main subsequently advanced to `333d83ec18c89f3ad43f48d28fb1777cb3ce8296` while its deployment was in progress.
+- The scheduled production monitor failed `news_publication_gap`: zero news sitemap URLs, zero news-linked articles, and 200 archive candidates ready for drafting.
+- The previous `news_archive_read_unavailable` 503 was not reproduced by the latest health probe; its cause remains unknown. The health route now logs a sanitized exception on future failures without changing the 503 response.
+- Current article quality counts and the read-only report command are recorded in `docs/PHASE_REPORTS.md` and `scripts/article-quality-report.sql`.
