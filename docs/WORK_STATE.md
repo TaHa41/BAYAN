@@ -1,6 +1,6 @@
 # BAYAN Work State
 
-Last updated: 2026-10-20 22:24 Cairo (UTC+03:00)
+Last updated: 2026-10-20 22:26 Cairo (UTC+03:00)
 
 ## Current verified state
 
@@ -14,7 +14,7 @@ Last updated: 2026-10-20 22:24 Cairo (UTC+03:00)
   - PR #485 — GDELT metadata discovery plus bounded, robots-aware publisher excerpts; strict five-publisher evidence floor, eTLD+1 normalization and syndicated-text checks.
   - PR #487 — server-rendered BreadcrumbList JSON-LD.
 - CI for the exact PR heads passed before merge for the above PRs.
-- Cloudflare Workers API last verified the deployed Worker source at 2026-10-20 19:20:14 UTC with `BAYAN_COMMIT_SHA=2b32226a0d83aaf02136788048a5fc9833032a99`. Main has since advanced to the BreadcrumbList commit `eacbda85e7646a633092080a9c70744454a1611e`; that SHA was **not yet observed deployed** at the last check.
+- Cloudflare Workers API last verified the deployed Worker source at 2026-10-20 19:24 UTC with `BAYAN_COMMIT_SHA=eacbda85e7646a633092080a9c70744454a1611e`; the deployed bundle contains both the GDELT integration and `BreadcrumbList` JSON-LD. The public `/.well-known/build.json` URL could not be fetched by the available web reader, so direct equality with its response remains **unverified**. The latest main commit after that is documentation-only and does not change Worker code.
 - PR #486 is open and CI passed on its current head `deeeb188e2eb4ed22c246f32fb2eacb7f25341f4`. It repairs four literal-NULL trend image URLs using migration 0039. Do not merge or apply it until the D1 daily quota has reset and the branch has been refreshed against current main. PR #431 was closed because it used migration number 0038, which is already occupied by `0038_news_archive_queue_indexes.sql`.
 - The missing-image runtime fallback from PR #469 is present in `public/app-20261019-01.js` on main. This proves the code is in the repository; an actual browser test of an article without an image is still required.
 - `public/og/bayan-og.png` is absent from main. Do not change the social-preview path to that file until the owner uploads it. Existing SVG fallback remains; PNG preview acceptance is blocked.
