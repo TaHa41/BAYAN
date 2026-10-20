@@ -386,8 +386,10 @@ try{
   for(const live of ["/api/live/weather","/api/live/fx","/api/live/gold"]){
     const z=await get(live);if(!z.text||z.text.length<20)throw new Error("live_data_empty_"+live);
     const payload=JSON.parse(z.text);
-    if(live.endsWith("/fx")&&payload.ok&&(!Number(payload.rates?.EGP)||!Date.parse(String(payload.updatedAt||""))))throw new Error("fx_payload_missing_rate_or_update_time");
-    if(live.endsWith("/gold")&&payload.ok&&(!Number(payload.price)||!Date.parse(String(payload.updatedAt||""))))throw new Error("gold_payload_missing_price_or_update_time");
+    if(payload.ok!==true||!payload.provider)throw new Error("live_provider_unavailable_"+live+":"+(payload.message||"no_provider_status"));
+    if(live.endsWith("/weather")&&(!payload.current||!Number.isFinite(Number(payload.current.temperature_2m))||!Date.parse(String(payload.updatedAt||""))))throw new Error("weather_payload_missing_current_temperature_or_update_time");
+    if(live.endsWith("/fx")&&(!Number.isFinite(Number(payload.rates?.EGP))||Number(payload.rates.EGP)<=0||!Date.parse(String(payload.updatedAt||""))))throw new Error("fx_payload_missing_rate_or_update_time");
+    if(live.endsWith("/gold")&&(!Number.isFinite(Number(payload.price))||Number(payload.price)<=0||!Date.parse(String(payload.updatedAt||""))))throw new Error("gold_payload_missing_price_or_update_time");
     if(live.endsWith("/gold")&&Array.isArray(payload.markets)&&payload.markets.some(item=>!Number(item.price)||!item.provider||!Date.parse(String(item.updatedAt||""))))throw new Error("market_quote_missing_price_provider_or_timestamp");
   }
   const prayer=await get("/api/live/prayer?city=Hurghada&country=Egypt");
