@@ -87,7 +87,7 @@
     img.dataset.retrying = "1";
     try {
       const query = img.dataset.imageQuery || img.alt || "";
-      const data = await api("/api/image?q=" + encodeURIComponent(query), {timeoutMs:18000});
+      const data = await getMissingImageLookup(query);
       if (data?.imageUrl && data.imageUrl !== img.src) { img.src = data.imageUrl; return; }
     } catch {}
     showFallback();
@@ -113,8 +113,87 @@
     const url = safeImageUrl(item.imageUrl);
     return url
       ? '<img loading="lazy" class="' + className + '" src="' + escapeHtml(url) + '" alt="' + escapeHtml(item.imageAlt || item.title || "") + '" data-image-query="' + escapeHtml(String(item.title || "") + ": " + String(item.summary || "")) + '" onerror="window.BAYAN_IMAGE_RETRY(this)">'
-      : '<div class="image-placeholder">BAYAN</div>';
+      : '<div class="image-placeholder" data-image-query="' + escapeHtml(String(item.title || "") + ": " + String(item.summary || "")) + '" data-image-alt="' + escapeHtml(item.imageAlt || item.title || "") + '" data-image-class="' + escapeHtml(className) + '">BAYAN</div>';
   };
+
+  // Missing-image placeholders must actively request a topic-matched image.
+  // Previously only broken <img> elements retried; records with image_url=NULL
+  // rendered a plain div and never called /api/image at all.
+  // Bound concurrent image lookups and coalesce identical queries so a page
+  // with many missing images cannot fan out dozens of Worker subrequests at once.
+  const missingImageLookupQueue = [];
+  const missingImageLookupPromises = new Map();
+  let activeMissingImageLookups = 0;
+  const pumpMissingImageLookupQueue = () => {
+    while (activeMissingImageLookups < 3 && missingImageLookupQueue.length) {
+      const item = missingImageLookupQueue.shift();
+      activeMissingImageLookups += 1;
+      api("/api/image?q=" + encodeURIComponent(item.query), {timeoutMs:18000})
+        .then(item.resolve, item.reject)
+        .finally(() => {
+          activeMissingImageLookups -= 1;
+          pumpMissingImageLookupQueue();
+        });
+    }
+  };
+  const getMissingImageLookup = (query) => {
+    const key = String(query || "").trim().toLowerCase();
+    if (!key) return Promise.resolve(null);
+    const existing = missingImageLookupPromises.get(key);
+    if (existing) return existing;
+    const promise = new Promise((resolve, reject) => {
+      missingImageLookupQueue.push({query:key,resolve,reject});
+      pumpMissingImageLookupQueue();
+    });
+    missingImageLookupPromises.set(key, promise);
+    promise.finally(() => {
+      if (missingImageLookupPromises.get(key) === promise) missingImageLookupPromises.delete(key);
+    }).catch(() => {});
+    return promise;
+  };
+  const resolveMissingImagePlaceholder = async (placeholder) => {
+    if (!placeholder || placeholder.dataset.imageRetry === "1") return;
+    placeholder.dataset.imageRetry = "1";
+    try {
+      const query = placeholder.dataset.imageQuery || placeholder.dataset.imageAlt || "";
+      if (!query.trim()) return;
+      const data = await api("/api/image?q=" + encodeURIComponent(query), {timeoutMs:18000});
+      const url = safeImageUrl(data && data.imageUrl);
+      if (!url || !placeholder.isConnected) return;
+      const img = document.createElement("img");
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.className = placeholder.dataset.imageClass || "article-card-image";
+      img.alt = placeholder.dataset.imageAlt || query;
+      img.src = url;
+      img.dataset.imageQuery = query;
+      img.onerror = () => window.BAYAN_IMAGE_RETRY(img);
+      placeholder.replaceWith(img);
+    } catch {
+      // Keep the intentional BAYAN placeholder; never insert an unrelated image.
+      return;
+    }
+  };
+  const scanMissingImagePlaceholders = (root) => {
+    if (!root) return;
+    if (root.matches && root.matches(".image-placeholder[data-image-query]")) {
+      void resolveMissingImagePlaceholder(root);
+    }
+    root.querySelectorAll?.(".image-placeholder[data-image-query]").forEach((node) => {
+      void resolveMissingImagePlaceholder(node);
+    });
+  };
+  if (app) {
+    scanMissingImagePlaceholders(app);
+    const missingImageObserver = new MutationObserver((records) => {
+      for (const record of records) {
+        record.addedNodes.forEach((node) => {
+          if (node.nodeType === 1) scanMissingImagePlaceholders(node);
+        });
+      }
+    });
+    missingImageObserver.observe(app, {childList:true,subtree:true});
+  }
 
   const heroImageHtml = (url, alt, query = alt) => {
     const safeUrl = safeImageUrl(url);
