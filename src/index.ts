@@ -396,6 +396,9 @@ try{return await page(request,env)}catch(error){if(isD1QuotaError(error)){await 
   }else if(env.NEWS_PIPELINE_ENABLED==="true"&&(task===1||(task===2&&scheduleSlot%12!==2&&scheduleSlot%12!==8))){
     try{
       const result=await publishNextArchivedNewsArticle(env);
+      // The publisher reports exhausted/unavailable D1 budget without throwing. Do not
+      // turn that expected quota state into a second D1 telemetry write.
+      if(result.status==="budget_exhausted")return;
       if(result.status!=="idle"){
         const level=result.status==="published"?"INFO":"WARN";
         const details=JSON.stringify(result).slice(0,900);
