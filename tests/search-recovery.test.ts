@@ -148,6 +148,7 @@ describe("independent evidence diversity", () => {
 
   it("excludes aggregators, insecure URLs, and credential-bearing URLs", () => {
     expect(independentEvidenceHost("BBC News", "https://news.google.com/rss/articles/123")).toBeUndefined();
+    expect(independentEvidenceHost("Yahoo News", "https://news.yahoo.com/story")).toBeUndefined();
     expect(independentEvidenceHost("Reuters", "https://www.bing.com/news/articles/123")).toBeUndefined();
     expect(independentEvidenceHost("Reuters", "http://www.reuters.com/world/example")).toBeUndefined();
     expect(independentEvidenceHost("Reuters", "https://user:pass@reuters.com/world/example")).toBeUndefined();
