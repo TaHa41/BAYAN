@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasIndependentEvidenceDiversity, independentEvidenceHost, registrableEvidenceDomain, requiredEvidencePublisherCount, requiredSearchExpansionPublisherCount } from "../src/services/evidence-diversity";
+import { areNearDuplicateEvidenceTitles, hasIndependentEvidenceDiversity, independentEvidenceHost, registrableEvidenceDomain, requiredEvidencePublisherCount, requiredSearchExpansionPublisherCount } from "../src/services/evidence-diversity";
 import { isSafeGdeltPublisherUrl, robotsAllowsPath } from "../src/services/gdelt-evidence";
 
 describe("publication evidence diversity threshold", () => {
@@ -7,8 +7,8 @@ describe("publication evidence diversity threshold", () => {
     expect(requiredEvidencePublisherCount(false, 5)).toBe(2);
   });
 
-  it("requires at least three independent publishers for publication attempts", () => {
-    expect(requiredEvidencePublisherCount(true, 3)).toBe(3);
+  it("never lowers publication attempts below five independent publishers", () => {
+    expect(requiredEvidencePublisherCount(true, 3)).toBe(5);
     expect(requiredEvidencePublisherCount(true, 5)).toBe(5);
   });
 
@@ -28,6 +28,13 @@ describe("publication evidence diversity threshold", () => {
     expect(hasIndependentEvidenceDiversity(5, 4, 5)).toBe(false);
     expect(hasIndependentEvidenceDiversity(5, 5, 5)).toBe(true);
     expect(hasIndependentEvidenceDiversity(4, 5, 5)).toBe(false);
+  });
+
+  it("treats near-identical long headlines as syndicated evidence", () => {
+    expect(areNearDuplicateEvidenceTitles("Government announces major new economic reform plan today", "Government announces major new economic reform plan today")).toBe(true);
+    expect(areNearDuplicateEvidenceTitles("Government announces major new economic reform plan today", "Government announces major economic reform plan for today")).toBe(true);
+    expect(areNearDuplicateEvidenceTitles("Government announces major new economic reform plan today", "Local sports team wins regional championship final")).toBe(false);
+    expect(areNearDuplicateEvidenceTitles("short headline", "short headline")).toBe(false);
   });
 
   it("normalizes subdomains to one registrable eTLD+1 host", () => {
