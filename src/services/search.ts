@@ -234,7 +234,7 @@ export function normalizeBingNewsUrl(raw:string):string|undefined {
           try{
             const target=new URL(candidate);
             if(target.protocol==="https:"&&!isBingAggregatorUrl(target.href)&&!target.username&&!target.password&&!/^(?:localhost|127(?:\.\d+){3}|0\.0\.0\.0|\[::1\])$/i.test(target.hostname))return target.href;
-          }catch{}
+          }catch(error){void error;}
           try{const decoded=decodeURIComponent(candidate);if(decoded===candidate)break;candidate=decoded}catch{break}
         }
       }
@@ -263,7 +263,7 @@ async function bingNewsSearch(q:string,language:Locale,diagnostics?:string[]):Pr
       }
       if(isBingAggregatorUrl(articleUrl)){rejectedUrl++;continue;}
       let publisher=cleanText(field("source")||"Bing News");
-      if(/^Bing News$/i.test(publisher)){try{publisher=new URL(articleUrl).hostname.replace(/^www\./i,"")}catch{}}
+      if(/^Bing News$/i.test(publisher)){try{publisher=new URL(articleUrl).hostname.replace(/^www\./i,"")}catch(error){void error;}}
       out.push({title,summary,section:"news",kind:"web",evidence:"mixed",sources:[source(title,publisher,articleUrl)],url:articleUrl,score:scoreSource(publisher,title,q)+3,provider:"Bing News RSS"});
       if(out.length>=8)break;
     }
