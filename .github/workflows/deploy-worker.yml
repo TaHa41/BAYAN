@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      allow_repair:
+        description: 'Allow the explicit post-deploy production repair pass'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -110,7 +116,12 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: 24
-      - name: Verify and repair production if needed
+      - name: Run read-only production smoke audit
+        env:
+          BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
+        run: node scripts/production-smoke.mjs
+      - name: Run explicitly authorized production repair
+        if: github.event_name == 'workflow_dispatch' && inputs.allow_repair == true
         env:
           BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
           BAYAN_AI_MANAGER_TOKEN: ${{ secrets.BAYAN_AI_MANAGER_TOKEN }}
