@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { hasIndependentEvidenceDiversity, requiredEvidencePublisherCount, requiredSearchExpansionPublisherCount } from "../src/services/evidence-diversity";
+import { hasIndependentEvidenceDiversity, independentEvidenceHost, registrableEvidenceDomain, requiredEvidencePublisherCount, requiredSearchExpansionPublisherCount } from "../src/services/evidence-diversity";
+import { isSafeGdeltPublisherUrl, robotsAllowsPath } from "../src/services/gdelt-evidence";
 
 describe("publication evidence diversity threshold", () => {
   it("keeps normal visitor search at the existing two-independent-source threshold", () => {
@@ -16,7 +17,7 @@ describe("publication evidence diversity threshold", () => {
   });
 
   it("searches beyond the publication minimum to account for final relevance and deduplication", () => {
-    expect(requiredSearchExpansionPublisherCount(true, 3)).toBe(5);
+    expect(requiredSearchExpansionPublisherCount(true, 3)).toBe(7);
     expect(requiredSearchExpansionPublisherCount(true, 5)).toBe(7);
     expect(requiredSearchExpansionPublisherCount(true, 7)).toBe(9);
     expect(requiredSearchExpansionPublisherCount(false, 5)).toBe(2);
@@ -29,8 +30,26 @@ describe("publication evidence diversity threshold", () => {
     expect(hasIndependentEvidenceDiversity(4, 5, 5)).toBe(false);
   });
 
+  it("normalizes subdomains to one registrable eTLD+1 host", () => {
+    expect(registrableEvidenceDomain("news.bbc.co.uk")).toBe("bbc.co.uk");
+    expect(independentEvidenceHost("BBC News", "https://www.bbc.co.uk/news/story")).toBe("bbc.co.uk");
+    expect(independentEvidenceHost("BBC", "https://sport.bbc.co.uk/story")).toBe("bbc.co.uk");
+    expect(independentEvidenceHost("Example", "https://sub.example.com/story")).toBe("example.com");
+  });
+
+  it("rejects unsafe GDELT URLs and respects robots.txt allow/disallow rules", () => {
+    expect(isSafeGdeltPublisherUrl("https://publisher.example/story")).toBe(true);
+    expect(isSafeGdeltPublisherUrl("http://publisher.example/story")).toBe(false);
+    expect(isSafeGdeltPublisherUrl("https://127.0.0.1/private")).toBe(false);
+    expect(isSafeGdeltPublisherUrl("https://news.google.com/rss")).toBe(false);
+    const robots = "User-agent: *\\nDisallow: /private\\nAllow: /private/public";
+    expect(robotsAllowsPath(robots, "/private/story")).toBe(false);
+    expect(robotsAllowsPath(robots, "/private/public/story")).toBe(true);
+    expect(robotsAllowsPath(robots, "/news/story")).toBe(true);
+  });
+
   it("uses a safe default for invalid configuration", () => {
-    expect(requiredEvidencePublisherCount(true, Number.NaN)).toBe(3);
+    expect(requiredEvidencePublisherCount(true, Number.NaN)).toBe(5);
     expect(requiredEvidencePublisherCount(false, 0)).toBe(2);
   });
 });
