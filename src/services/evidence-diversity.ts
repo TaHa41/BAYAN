@@ -28,6 +28,22 @@ export function areNearDuplicateEvidenceTitles(a: string, b: string, threshold =
   return overlap / smaller >= threshold;
 }
 
+export function areNearDuplicateEvidenceTexts(a: string, b: string, threshold = 0.9): boolean {
+  const shingles = (value: string) => {
+    const tokens = String(value || "").toLowerCase().normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " ").split(/\s+/).filter(token => token.length >= 3);
+    const out = new Set<string>();
+    for (let i = 0; i + 2 < tokens.length; i++) out.add(tokens.slice(i, i + 3).join(" "));
+    return out;
+  };
+  const left = shingles(a);
+  const right = shingles(b);
+  const smaller = Math.min(left.size, right.size);
+  if (smaller < 5) return false;
+  let overlap = 0;
+  for (const shingle of left) if (right.has(shingle)) overlap++;
+  return overlap / smaller >= threshold;
+}
+
 export function requiredEvidencePublisherCount(publishing: boolean, configuredMinimum: number): number {
   const minimum = Number.isFinite(configuredMinimum) && configuredMinimum > 0
     ? Math.floor(configuredMinimum)
