@@ -17,7 +17,7 @@ export function registrableEvidenceDomain(rawHost: string): string | undefined {
     : lastTwo;
 }
 
-export function areNearDuplicateEvidenceTitles(a: string, b: string, threshold = 0.88): boolean {
+export function areNearDuplicateEvidenceTitles(a: string, b: string, threshold = 0.85): boolean {
   const tokens = (value: string) => new Set(String(value || "").toLowerCase().normalize("NFKC").replace(/[^\p{L}\p{N}]+/gu, " ").split(/\s+/).filter(token => token.length >= 3));
   const left = tokens(a);
   const right = tokens(b);
