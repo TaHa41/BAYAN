@@ -10,7 +10,20 @@ export function robots(){
   return text("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nDisallow: /review\nDisallow: /saved\nSitemap: "+ORIGIN+"/sitemap.xml\n");
 }
 const xml=(s:string)=>Array.from(String(s)).filter((character)=>{const code=character.codePointAt(0)!;return code===0x9||code===0xA||code===0xD||(code>=0x20&&code<=0xD7FF)||(code>=0xE000&&code<=0xFFFD)||(code>=0x10000&&code<=0x10FFFF)}).join("").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
-export async function sitemap(env:Env){
+
+const cachedXmlResponse=async(path:string,env:Env,ttlSeconds:number,build:()=>Promise<Response>):Promise<Response>=>{
+  const scope=String((env as any).BAYAN_ENVIRONMENT||"default");
+  const key=new Request(ORIGIN+path+"?__bayan_cache_scope="+encodeURIComponent(scope));
+  try{if(typeof caches!=="undefined"){const cache=await caches.open("bayan-sitemap-cache-v1");const cached=await cache.match(key);if(cached){const hit=new Response(cached.body,cached);hit.headers.set("x-bayan-sitemap-cache","HIT");return hit;}}}catch{/* Cache is optional; sitemap generation must remain available. */}
+  const response=await build();
+  const degraded=response.headers.get("x-bayan-news-sitemap-degraded")==="d1-unavailable";
+  const ttl=degraded?30:ttlSeconds;
+  response.headers.set("Cache-Control","public, max-age="+ttl+", stale-while-revalidate="+(ttl*2));
+  response.headers.set("x-bayan-sitemap-cache","MISS");
+  try{if(typeof caches!=="undefined"){const cache=await caches.open("bayan-sitemap-cache-v1");await cache.put(key,response.clone());}}catch{/* Cache is optional; sitemap generation must remain available. */}
+  return response;
+};
+async function generateSitemap(env:Env){
   let articleUrls:Array<{url:string;lastmod?:string}>=[];
   try{
     const r=await env.DB.prepare("SELECT slug,language,updated_at FROM articles WHERE status='PUBLISHED' ORDER BY updated_at DESC LIMIT 1000").all<any>();
@@ -38,6 +51,8 @@ export async function sitemap(env:Env){
     return '<url><loc>'+xml(item.url)+'</loc>'+lastmod+alternates+'</url>';
   }).join("")+"</urlset>","application/xml;charset=utf-8");
 }
+export async function sitemap(env:Env){return cachedXmlResponse("/sitemap.xml",env,600,()=>generateSitemap(env));}
+
 const newsSitemapEligibility=async(row:any,now:number,env:Env)=>{
   const reject=(reason:string)=>({eligible:false,reason});
   const slug=String(row?.slug||"").trim(),title=String(row?.title||"").trim(),language=String(row?.language||"");
@@ -72,7 +87,7 @@ const archiveArticleCandidate=(row:any,now:number)=>{
   if(!Number.isFinite(fetched)||fetched>now+5*60*1000||now-fetched>48*60*60*1000)return false;
   try{const source=new URL(String(row?.url||""));return source.protocol==="https:"&&!source.username&&!source.password}catch{return false}
 };
-export async function newsSitemap(env:Env){
+async function generateNewsSitemap(env:Env){
   const now=Date.now();
   const recentCutoff=new Date(now-48*60*60*1000).toISOString();
   const futureLimit=new Date(now+5*60*1000).toISOString();
@@ -132,3 +147,5 @@ export async function newsSitemap(env:Env){
   // archive-to-publication gap, so returning valid XML does not hide pipeline failure.
   return response;
 }
+
+export async function newsSitemap(env:Env){return cachedXmlResponse("/news-sitemap.xml",env,300,()=>generateNewsSitemap(env));}

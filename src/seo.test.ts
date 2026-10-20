@@ -11,6 +11,7 @@ describe("newsSitemap database failure handling", () => {
       expect(response.status).toBe(200);
       expect(response.headers.get("content-type")).toContain("application/xml");
       expect(response.headers.get("x-bayan-news-sitemap-degraded")).toBe("d1-unavailable");
+      expect(response.headers.get("Cache-Control")).toContain("max-age=30");
       expect(response.headers.get("x-bayan-news-sitemap-candidate-count")).toBe("0");
       expect(response.headers.get("x-bayan-news-sitemap-eligible-count")).toBe("0");
       expect(body).toContain("<urlset");
@@ -89,6 +90,7 @@ describe("sitemap database failure handling", () => {
       expect(body).toContain("</urlset>");
       expect(body).toContain("/article/who-is-naguib-mahfouz-ar?lang=ar");
       expect(body).toContain("/article/who-is-naguib-mahfouz-en?lang=en");
+      expect(response.headers.get("Cache-Control")).toContain("max-age=600");
       expect(errorSpy).toHaveBeenCalledWith("sitemap_database_query_failed", "database unavailable");
     } finally { errorSpy.mockRestore(); }
   });
