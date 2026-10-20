@@ -61,31 +61,6 @@ export async function fx(env?:Env){
   }
 }
 let yahooRateLimitedUntil=0;
-async function fredDailyQuote(symbol:string,series:string,env?:Env){
-  try{
-    const response=await fetch("https://fred.stlouisfed.org/graph/fredgraph.csv?id="+encodeURIComponent(series),{
-      signal:AbortSignal.timeout(3500),
-      headers:{accept:"text/csv,text/plain,*/*"}
-    });
-    if(!response.ok)throw new Error("http_"+response.status);
-    const csv=(await response.text()).trim();
-    const rows=csv.split(/\r?\n/).slice(1).reverse();
-    const now=Date.now();
-    for(const row of rows){
-      const fields=row.split(",");
-      const date=String(fields[0]||"").trim();
-      const price=Number(String(fields[1]||"").trim());
-      if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(price)||price<=0)continue;
-      const updatedAt=new Date(date+"T00:00:00.000Z").toISOString();
-      if(now-Date.parse(updatedAt)>14*86400000)continue;
-      return{symbol,price,currency:"USD",provider:"FRED (daily reference)",updatedAt,stale:true};
-    }
-    throw new Error("no_recent_daily_observation");
-  }catch(error){
-    if(env)await recordRuntimeEventLimited(env,"market_fred_provider","fred_daily_quote_failed",error);
-    return null;
-  }
-}
 async function preciousMetalQuote(symbol:string,metal:"XAG",env?:Env){
   try{
     const r=await timeout("https://api.gold-api.com/price/"+metal,3500);
@@ -137,10 +112,7 @@ export async function marketQuote(symbol:string,env?:Env){
     if(symbol==="BTC-USD")return await cryptoQuote(symbol,"bitcoin","BTCUSDT",env);
     if(symbol==="ETH-USD")return await cryptoQuote(symbol,"ethereum","ETHUSDT",env);
     if(symbol==="SI=F")return await preciousMetalQuote(symbol,"XAG",env);
-    if(symbol==="CL=F")return await fredDailyQuote(symbol,"DCOILWTICO",env);
-    if(symbol==="^GSPC")return await fredDailyQuote(symbol,"SP500",env);
-    if(symbol==="^IXIC")return await fredDailyQuote(symbol,"NASDAQCOM",env);
-    return null;
+     return null;
   };
 
   if(Date.now()<yahooRateLimitedUntil)return await freeFallback();
