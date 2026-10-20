@@ -1,11 +1,29 @@
+const MULTI_LABEL_PUBLIC_SUFFIXES = new Set([
+  "co.uk","org.uk","gov.uk","ac.uk","com.au","net.au","org.au","edu.au","co.nz","org.nz",
+  "co.jp","ne.jp","or.jp","co.kr","com.br","com.eg","com.tr","com.mx","com.ar","com.sa",
+  "com.sg","com.hk","com.tw","com.cn","com.ng","com.pk","com.my","com.ph","co.za","co.in",
+  "firm.in","net.in","org.in","co.id","com.ua","com.bd","com.vn","com.co","com.pe","co.ke",
+  "co.ug","com.gh","com.lk","com.th","com.pl","com.ru"
+]);
+
+export function registrableEvidenceDomain(rawHost: string): string | undefined {
+  const host = String(rawHost || "").trim().toLowerCase().replace(/^www\./, "").replace(/\.$/, "");
+  if (!host || !host.includes(".") || host.includes(":")) return undefined;
+  const labels = host.split(".").filter(Boolean);
+  if (labels.length < 2 || labels.some(label => !/^[a-z0-9-]+$/.test(label))) return undefined;
+  const lastTwo = labels.slice(-2).join(".");
+  return MULTI_LABEL_PUBLIC_SUFFIXES.has(lastTwo) && labels.length >= 3
+    ? labels.slice(-3).join(".")
+    : lastTwo;
+}
+
 export function requiredEvidencePublisherCount(publishing: boolean, configuredMinimum: number): number {
   const minimum = Number.isFinite(configuredMinimum) && configuredMinimum > 0
     ? Math.floor(configuredMinimum)
-    : 3;
-  // Three genuinely independent publishers is a meaningful corroboration gate;
-  // requiring five here blocked otherwise well-supported stories when feed coverage
-  // was only three or four publishers, starving the publication pipeline.
-  return publishing ? Math.max(3, minimum) : 2;
+    : 5;
+  // Publication requires at least five independent publishers. Configuration may
+  // raise the bar but must never lower this evidence-integrity floor.
+  return publishing ? Math.max(5, minimum) : 2;
 }
 
 export function requiredSearchExpansionPublisherCount(publishing: boolean, configuredMinimum: number): number {
@@ -17,9 +35,8 @@ export function requiredSearchExpansionPublisherCount(publishing: boolean, confi
 }
 
 /**
- * Return a source host only when it can count as independent evidence.
- * Internal BAYAN indexes, aggregators, and non-HTTPS URLs must not satisfy
- * the publication recovery gate.
+ * Return the registrable eTLD+1 source host only when it can count as independent evidence.
+ * Internal BAYAN indexes, aggregators, and non-HTTPS URLs must not satisfy publication.
  */
 export function independentEvidenceHost(publisher: string, rawUrl: string): string | undefined {
   const label = String(publisher || "").trim().toLowerCase();
@@ -33,15 +50,14 @@ export function independentEvidenceHost(publisher: string, rawUrl: string): stri
     if (!host || /(?:^|\.)(?:wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com|workers\.dev)$/.test(host)) {
       return undefined;
     }
-    return host;
+    return registrableEvidenceDomain(host);
   } catch {
     return undefined;
   }
 }
 
-
-/** Publication requires the configured number of distinct publisher labels AND distinct HTTPS hosts. */
+/** Publication requires the configured number of distinct publisher labels AND distinct HTTPS eTLD+1 hosts. */
 export function hasIndependentEvidenceDiversity(publisherCount: number, hostCount: number, requiredCount: number): boolean {
-  const required = Number.isFinite(requiredCount) && requiredCount > 0 ? Math.floor(requiredCount) : 3;
+  const required = Number.isFinite(requiredCount) && requiredCount > 0 ? Math.floor(requiredCount) : 5;
   return publisherCount >= required && hostCount >= required;
 }
