@@ -14,13 +14,13 @@ const xml=(s:string)=>Array.from(String(s)).filter((character)=>{const code=char
 const cachedXmlResponse=async(path:string,env:Env,ttlSeconds:number,build:()=>Promise<Response>):Promise<Response>=>{
   const scope=String((env as any).BAYAN_ENVIRONMENT||"default");
   const key=new Request(ORIGIN+path+"?__bayan_cache_scope="+encodeURIComponent(scope));
-  try{if(typeof caches!=="undefined"){const cache=await caches.open("bayan-sitemap-cache-v1");const cached=await cache.match(key);if(cached){const hit=new Response(cached.body,cached);hit.headers.set("x-bayan-sitemap-cache","HIT");return hit;}}}catch{}
+  try{if(typeof caches!=="undefined"){const cache=await caches.open("bayan-sitemap-cache-v1");const cached=await cache.match(key);if(cached){const hit=new Response(cached.body,cached);hit.headers.set("x-bayan-sitemap-cache","HIT");return hit;}}}catch{/* Cache is optional; sitemap generation must remain available. */}
   const response=await build();
   const degraded=response.headers.get("x-bayan-news-sitemap-degraded")==="d1-unavailable";
   const ttl=degraded?30:ttlSeconds;
   response.headers.set("Cache-Control","public, max-age="+ttl+", stale-while-revalidate="+(ttl*2));
   response.headers.set("x-bayan-sitemap-cache","MISS");
-  try{if(typeof caches!=="undefined"){const cache=await caches.open("bayan-sitemap-cache-v1");await cache.put(key,response.clone());}}catch{}
+  try{if(typeof caches!=="undefined"){const cache=await caches.open("bayan-sitemap-cache-v1");await cache.put(key,response.clone());}}catch{/* Cache is optional; sitemap generation must remain available. */}
   return response;
 };
 async function generateSitemap(env:Env){
