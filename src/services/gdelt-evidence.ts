@@ -192,7 +192,7 @@ async function fetchPublisherExcerpt(article: GdeltArticle, lang: Locale, fetchI
     const transformed = new HTMLRewriter()
       .on("title", { text(chunk) { if (title.length < 240) title += chunk.text; } })
       .on("meta[name]", { element(element) { const name=(element.getAttribute("name") || "").toLowerCase(); if (name === "description") description = element.getAttribute("content") || description; if (["date","pubdate","datepublished","article:published_time"].includes(name) && !publishedRaw) publishedRaw = element.getAttribute("content") || ""; } })
-      .on("meta[property]", { element(element) { const property=(element.getAttribute("property") || "").toLowerCase(); if (["article:published_time","article:modified_time","og:updated_time"].includes(property) && !publishedRaw) publishedRaw = element.getAttribute("content") || ""; } })
+      .on("meta[property]", { element(element) { const property=(element.getAttribute("property") || "").toLowerCase(); if (["article:published_time"].includes(property) && !publishedRaw) publishedRaw = element.getAttribute("content") || ""; } })
       .on("time[datetime]", { element(element) { if (!publishedRaw) publishedRaw = element.getAttribute("datetime") || ""; } })
       .on("p", { text(chunk) { if (paragraphText.length < 1600) paragraphText += chunk.text + " "; } })
       .transform(html);
