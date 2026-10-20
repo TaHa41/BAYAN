@@ -87,7 +87,7 @@ const esc = (s: string) =>
 export function normalizeFeedPublisher(sourceName: string, fallback: string): string {
   const normalized = String(sourceName || "").trim();
   // Some RSS feeds put a taxonomy path or URL in <source>; that is not a publisher name.
-  return normalized && !/(?:taxonomy.{0,3}term.{0,3}\\d+)|^https?:/i.test(normalized) ? normalized : fallback;
+  return normalized && !/(?:taxonomy.{0,3}term.{0,3}[0-9]+)|^https?:/i.test(normalized) ? normalized : fallback;
 }
 
 const isNewsAggregatorHost = (hostname: string) => {
