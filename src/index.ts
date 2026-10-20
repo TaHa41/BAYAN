@@ -1,4 +1,4 @@
-import{safePublicImageUrl}from"./image-url";import{recordRuntimeEventLimited}from"./runtime-events";
+import{safePublicImageUrl}from"./image-url";import{d1Blocked,isD1QuotaError,logD1QuotaOncePerHour,markD1Blocked}from"./services/d1-guard";import{recordRuntimeEventLimited}from"./runtime-events";
 import type{Env}from"./types";import{api}from"./routes/api";import{robots,sitemap,newsSitemap}from"./seo";import{selfHeal}from"./services/repair";import{news}from"./services/news";import{publishNextArchivedNewsArticle}from"./services/news-article-publisher";import{track}from"./db";import{analyticsExcluded,visitorId}from"./security";import{ensureSchema}from"./schema";import{ORIGIN,SECTIONS}from"./config";import{notify}from"./services/telegram";import{bundledArticleBySlug}from"./fallback-content";
 const BUILD="2026.10.15.01";
 const COMMIT_SHA="0000000000000000000000000000000000000000";
@@ -273,7 +273,8 @@ if(apiCacheTtl){
 }
 if(u.pathname.startsWith("/api/")){
  const schemaOptional=["/api/search","/api/section","/api/article"].includes(u.pathname);
- try{await ensureSchema(env)}catch{if(!schemaOptional)return new Response(JSON.stringify({error:"database_unavailable"}),{status:503,headers:{"content-type":"application/json;charset=utf-8","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})}
+ if(d1Blocked())return new Response(JSON.stringify({degraded:true,reason:"d1_quota",error:"database_temporarily_unavailable"}),{status:200,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store","x-bayan-degraded":"d1_quota"}});
+ try{await ensureSchema(env)}catch(error){if(isD1QuotaError(error)){markD1Blocked();logD1QuotaOncePerHour(error);return new Response(JSON.stringify({degraded:true,reason:"d1_quota",error:"database_temporarily_unavailable"}),{status:200,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store","x-bayan-degraded":"d1_quota"}})}if(!schemaOptional)return new Response(JSON.stringify({error:"database_unavailable"}),{status:503,headers:{"content-type":"application/json;charset=utf-8","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})}
  try{
   const response=await api(request,env,ctx);
   if(apiCacheTtl&&response.ok){
@@ -287,6 +288,7 @@ if(u.pathname.startsWith("/api/")){
   }
   return response;
  }catch(error){
+  if(isD1QuotaError(error)){markD1Blocked();logD1QuotaOncePerHour(error);return new Response(JSON.stringify({degraded:true,reason:"d1_quota"}),{status:200,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store","x-bayan-degraded":"d1_quota"}})}
   const message=String(error).slice(0,800);
   try{await notify(env,"BAYAN API ERROR\\nPath: "+u.pathname+"\\nError: "+message)}catch(error){await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}
   return new Response(JSON.stringify({error:"internal_error"}),{status:500,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})
@@ -324,7 +326,8 @@ if(seoPath==="/sitemap.xml"||seoPath==="/news-sitemap.xml"){
 }
 try{return await page(request,env)}catch(error){const message=String((error as any)?.stack||error).slice(0,1200).replace(/https?:\/\/[^\s]+/g,"[url-redacted]");const rayId=request.headers.get("cf-ray")||"unknown";try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("ERROR","page_render_exception",JSON.stringify({path:u.pathname,rayId,error:message}).slice(0,1800),new Date().toISOString()).run()}catch(error){await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}try{await notify(env,"BAYAN PAGE ERROR\\nPath: "+u.pathname+"\\nError: "+message)}catch(error){await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}const lang=u.searchParams.get("lang")==="en"?"en":"ar";const title=lang==="en"?"BAYAN is temporarily unavailable":"بيان غير متاح مؤقتًا";const body=lang==="en"?"We could not complete this request. Please retry in a moment.":"تعذر إكمال الطلب هذه المرة. يرجى المحاولة بعد قليل.";const html='<!doctype html><html lang="'+lang+'" dir="'+(lang==="ar"?"rtl":"ltr")+'"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>'+title+'</title></head><body><main><h1>'+title+'</h1><p>'+body+'</p><a href="/?lang='+lang+'">'+(lang==="en"?"Return home":"العودة للرئيسية")+'</a></main></body></html>';return new Response(html,{status:500,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","Retry-After":"60","X-Content-Type-Options":"nosniff","Referrer-Policy":"strict-origin-when-cross-origin","X-Frame-Options":"DENY","Permissions-Policy":"camera=(), microphone=(), geolocation=()","X-BAYAN-Route-Error":"page-render-failed"}})}
 },async scheduled(event:ScheduledEvent,env:Env){
-  try{await ensureSchema(env)}catch(error){await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}
+  if(d1Blocked())return;
+  try{await ensureSchema(env)}catch(error){if(isD1QuotaError(error)){markD1Blocked();logD1QuotaOncePerHour(error);return;}await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}
   // Keep each cron invocation to one expensive task. Preserve news refresh every 15 minutes;
   // use the second maintenance slot for publication on most cycles, reserving two slots per hour
   // for self-healing. Each publication invocation still claims at most one row and uses bounded AI calls.
@@ -348,7 +351,7 @@ try{return await page(request,env)}catch(error){const message=String((error as a
     }catch(error){
       try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","scheduled_news_archive_refresh",String(error).slice(0,300),new Date().toISOString()).run()}catch(error){await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}
     }
-  }else if(task===1||(task===2&&scheduleSlot%12!==2&&scheduleSlot%12!==8)){
+  }else if(env.NEWS_PIPELINE_ENABLED==="true"&&(task===1||(task===2&&scheduleSlot%12!==2&&scheduleSlot%12!==8))){
     try{
       const result=await publishNextArchivedNewsArticle(env);
       if(result.status!=="idle"){
