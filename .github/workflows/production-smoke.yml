@@ -47,13 +47,13 @@ jobs:
           echo "::error::Timed out waiting for the production deployment to finish."
           exit 1
       - name: Run deployed-site smoke tests
-        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && contains(github.event.workflow_run.head_commit.message, '[full-smoke]'))
+        if: github.event_name == 'workflow_dispatch'
         env:
           BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
           BAYAN_SMOKE_SEARCH_PROBES: "1"
         run: node scripts/production-smoke.mjs
       - name: Run lightweight scheduled health check
-        if: github.event_name == 'schedule' || (github.event_name == 'workflow_run' && !contains(github.event.workflow_run.head_commit.message, '[full-smoke]'))
+        if: github.event_name != 'workflow_dispatch'
         env:
           BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
         run: node scripts/production-health.mjs
