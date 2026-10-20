@@ -1,0 +1,42 @@
+name: BAYAN Read-only Production Acceptance Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Public BAYAN base URL (leave blank for production)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bayan-production-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Read-only public acceptance audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout selected branch
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Audit public routes, metadata, sitemaps, and rendered images
+        env:
+          BAYAN_BASE_URL: ${{ inputs.base_url }}
+          AUDIT_TIMEOUT_MS: "12000"
+        run: node scripts/production-acceptance-audit.mjs
+      - name: Upload evidence report even when checks fail
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bayan-acceptance-audit-${{ github.run_id }}
+          path: bayan-acceptance-audit.json
+          if-no-files-found: warn
+          retention-days: 14
