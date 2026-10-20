@@ -625,3 +625,34 @@ body{line-height:1.75;-webkit-font-smoothing:antialiased;text-rendering:optimize
 .article-template-v1 .sources-empty{color:var(--muted);line-height:1.8}
 .article-template-v1 .article-hero-placeholder{margin:0 0 1.25rem}
 @media(max-width:640px){.article-template-v1{padding:18px}.article-template-v1 .article-heading h1{font-size:clamp(1.8rem,8vw,2.5rem)}.article-template-v1 .article-heading .lead{font-size:1rem}.article-template-v1 .article-hero-image{max-height:360px}}
+
+
+/* BAYAN 2026.10.20 — resilient drawer dismissal and consistent bilingual typography */
+.drawer{pointer-events:none;visibility:hidden;will-change:transform}
+.drawer.open{pointer-events:auto;visibility:visible}
+body.drawer-open{overflow:hidden}
+body.drawer-open:after{cursor:pointer}
+.drawer-head b,.drawer-link,.drawer-tools a{overflow-wrap:anywhere;word-break:normal;line-height:1.65}
+.drawer-head span{line-height:1.6}
+.drawer-link{min-width:0}
+.drawer-link>span:last-child{min-width:0;overflow-wrap:anywhere}
+.drawer-tools a{min-width:0;white-space:normal}
+#closeDrawer{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+body,button,input,textarea,select{font-family:Tahoma,"Segoe UI",Arial,sans-serif}
+h1,h2,h3,h4,p,li,.notice,.answer,.live,.search-result{overflow-wrap:anywhere;word-break:normal}
+p,li{line-height:1.85}
+.page-head h1,.home h1,.article-full h1{line-height:1.2;letter-spacing:normal;overflow-wrap:break-word}
+.article-card h2,.article-card h3,.section-card h2{line-height:1.55;letter-spacing:normal;overflow-wrap:anywhere}
+.article-card p,.section-card p,.page-head p{line-height:1.85}
+.article-card-link{display:flex;flex:1;flex-direction:column;min-width:0}
+.article-card-link .article-card-body{flex:1;min-width:0}
+.search-result h2{line-height:1.55;overflow-wrap:anywhere}
+@media(max-width:560px){
+  .drawer{inset-block-start:64px;width:min(100%,430px);padding:16px;border-radius:0}
+  .drawer-head{padding-top:8px}
+  .drawer-link{padding:12px 10px;gap:10px}
+  .drawer-tools a{padding:12px 10px}
+  .page-head h1{line-height:1.25}
+  .article-full h1{line-height:1.3}
+  .article-body{font-size:1rem;line-height:2}
+}
