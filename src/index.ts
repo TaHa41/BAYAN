@@ -390,11 +390,15 @@ try{return await page(request,env)}catch(error){if(isD1QuotaError(error)){await 
         await news(env,language,{forceRefresh:true});
       }
     }catch(error){
+      if(isD1QuotaError(error)){await persistD1Block();logD1QuotaOncePerHour(error);return;}
       try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","scheduled_news_archive_refresh",String(error).slice(0,300),new Date().toISOString()).run()}catch(error){await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}
     }
   }else if(env.NEWS_PIPELINE_ENABLED==="true"&&(task===1||(task===2&&scheduleSlot%12!==2&&scheduleSlot%12!==8))){
     try{
       const result=await publishNextArchivedNewsArticle(env);
+      // The publisher reports exhausted/unavailable D1 budget without throwing. Do not
+      // turn that expected quota state into a second D1 telemetry write.
+      if(result.status==="budget_exhausted")return;
       if(result.status!=="idle"){
         const level=result.status==="published"?"INFO":"WARN";
         const details=JSON.stringify(result).slice(0,900);
@@ -402,10 +406,12 @@ try{return await page(request,env)}catch(error){if(isD1QuotaError(error)){await 
         console.info("news_archive_article_generation",details);
       }
     }catch(error){
+      if(isD1QuotaError(error)){await persistD1Block();logD1QuotaOncePerHour(error);return;}
       try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","news_archive_article_generation",String(error).slice(0,350),new Date().toISOString()).run()}catch(error){await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}
     }
   }else{
     try{await selfHeal(env)}catch(error){
+      if(isD1QuotaError(error)){await persistD1Block();logD1QuotaOncePerHour(error);return;}
       try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","scheduled_self_heal",String(error).slice(0,300),new Date().toISOString()).run()}catch(error){await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}
     }
   }
