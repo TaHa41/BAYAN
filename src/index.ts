@@ -182,6 +182,21 @@ if(path==="/"||path==="/index.html"){
   const siteSchema={"@context":"https://schema.org","@graph":[{"@type":"Organization","name":"BAYAN | بيان","url":ORIGIN,"description":description,"logo":ORIGIN+"/favicon.svg"},{"@type":"WebSite","name":"BAYAN | بيان","url":ORIGIN,"inLanguage":["ar","en"],"description":description,"publisher":{"@type":"Organization","name":"BAYAN | بيان","logo":ORIGIN+"/favicon.svg"},"potentialAction":{"@type":"SearchAction","target":ORIGIN+"/search?q={search_term_string}","query-input":"required name=search_term_string"}}]};
   headExtras+='<script type="application/ld+json">'+JSON.stringify(siteSchema).replace(/</g,"\\u003c")+'</script>';
 }
+if(path==="/news"&&!u.searchParams.has("story")){
+  let liveStories:any[]=[];
+  try{const feed=await news(env,lang);liveStories=Array.isArray(feed.items)?feed.items.slice(0,8):[]}catch(error){await recordRuntimeEventLimited(env,"worker_operation","news_landing_seo_failed",error)}
+  const cards=liveStories.map((item:any)=>{
+    const storyTitle=String(item.title||"").trim();if(!storyTitle)return "";
+    const verifiedImage=safePublicImageUrl(item.imageUrl);
+    const image=verifiedImage||ORIGIN+"/sections/news.svg";
+    const imageAlt=verifiedImage?storyTitle:(lang==="en"?"BAYAN news section illustration":"رسم توضيحي لقسم الأخبار في بيان");
+    const summary=String(item.summary||"").trim();
+    const href="/news?story="+encodeURIComponent(storyTitle)+"&lang="+lang;
+    return '<article class="seo-content-item"><figure class="seo-content-image"><img src="'+seoEscape(image)+'" alt="'+seoEscape(imageAlt)+'" loading="lazy" decoding="async"></figure><h2><a href="'+seoEscape(href)+'">'+seoEscape(storyTitle)+'</a></h2>'+(summary?'<p>'+seoEscape(summary.slice(0,500))+'</p>':"")+'</article>';
+  }).filter(Boolean).join("");
+  const fallbackImage='<figure class="seo-content-image"><img src="'+ORIGIN+'/sections/news.svg" alt="'+(lang==="en"?"BAYAN news section illustration":"رسم توضيحي لقسم الأخبار في بيان")+'" loading="lazy" decoding="async"></figure>';
+  seoFallback='<section class="seo-content-fallback seo-news-landing"><h1>'+seoEscape(lang==="en"?"BAYAN Verified News & Sources":"أخبار بيان الموثقة ومصادرها")+'</h1><p>'+seoEscape(lang==="en"?"Recent reporting with clear source context. Illustrations are labeled when a story image is unavailable.":"تغطية حديثة مع سياق واضح للمصادر. تظهر الرسومات التوضيحية بوضوح عندما لا تتوفر صورة للقصة.")+'</p><div class="seo-content-grid">'+(cards||'<article class="seo-content-item">'+fallbackImage+'<h2>'+seoEscape(lang==="en"?"Verified news":"الأخبار الموثقة")+'</h2><p>'+seoEscape(lang==="en"?"Live news is temporarily unavailable; no story has been invented.":"الأخبار الحية غير متاحة مؤقتًا؛ لم نُنشئ أي خبر غير حقيقي.")+'</p></article>')+'</div></section>';
+}
 let storyCanonical="";
 if(path==="/news"&&u.searchParams.has("story")){
   const requestedStory=String(u.searchParams.get("story")||"").trim();
@@ -218,7 +233,9 @@ if(path==="/news"&&u.searchParams.has("story")){
       return heading?'<h2>'+seoEscape(heading[1])+'</h2>':'<p>'+seoEscape(section).replace(/\n/g," ")+'</p>';
     }).join(""):"";
     if(story)story.imageUrl=safePublicImageUrl(story.imageUrl)||"";
-    const storyImage=story?.imageUrl?'<figure class="seo-news-image"><img src="'+seoEscape(story.imageUrl)+'" alt="'+seoEscape(headline)+'" loading="lazy" decoding="async"></figure>':"";
+    const storyImageUrl=story?.imageUrl||ORIGIN+"/sections/news.svg";
+    const storyImageAlt=story?.imageUrl?headline:(lang==="en"?"BAYAN news section illustration":"رسم توضيحي لقسم الأخبار في بيان");
+    const storyImage='<figure class="seo-news-image"><img src="'+seoEscape(storyImageUrl)+'" alt="'+seoEscape(storyImageAlt)+'" loading="lazy" decoding="async"></figure>';
     const storyPublisher=String(story?.publisher||"BAYAN");
     const storyDate=Date.parse(String(story?.publishedAt||""));
     const storyDateText=Number.isFinite(storyDate)?new Date(storyDate).toISOString():"";
