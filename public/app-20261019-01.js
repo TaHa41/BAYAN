@@ -469,8 +469,9 @@
     let data = null, fallbackUsed = false;
     try { data = await api("/api/search?q=" + encodeURIComponent(query) + "&lang=" + lang, {timeoutMs:30000}); } catch {}
     const serverResults = Array.isArray(data?.results) ? data.results : [];
-    const shouldExpandWeakSearch = serverResults.length === 0 ||
-      (serverResults.length < 3 && data?.status !== "verified");
+    // A one-result response is not a complete general-purpose search, even when a provider labels it verified.
+    // Expand sparse result sets so one encyclopedia/cache item cannot suppress other relevant sources.
+    const shouldExpandWeakSearch = serverResults.length < 3;
     if (shouldExpandWeakSearch && !((data?.providers||[]).includes("BAYAN content safety"))) {
       fallbackUsed = true;
       const serverData = data || {};
