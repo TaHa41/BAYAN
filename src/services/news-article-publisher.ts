@@ -49,7 +49,7 @@ const settleDailyD1ReadCalls=async(env:Env,day:string,actualReads:number)=>{
 };
 
 export function shouldCountArticleDraftAttempt(publishReason: string): boolean {
-  return publishReason !== "ai_unavailable" && publishReason !== "no_independent_sources";
+  return !["ai_unavailable", "no_independent_sources", "skipped_low_evidence"].includes(publishReason);
 }
 
 // One bounded, evidence-gated article attempt per cron tick keeps the Worker responsive.
