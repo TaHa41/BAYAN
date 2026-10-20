@@ -384,28 +384,47 @@
       link("/admin?lang=" + lang, t("الإدارة","Admin")) +
       "</div>";
 
-    const closeDrawer = () => {
-      drawer.classList.remove("open");
-      document.body.classList.remove("drawer-open");
+    const menuButton = document.querySelector("#menu");
+    const syncDrawerState = (open) => {
+      drawer.classList.toggle("open", open);
+      document.body.classList.toggle("drawer-open", open);
+      drawer.setAttribute("aria-hidden", String(!open));
+      menuButton?.setAttribute("aria-expanded", String(open));
     };
-    const openDrawer = () => {
-      drawer.classList.add("open");
-      document.body.classList.add("drawer-open");
-    };
-    document.querySelector("#menu")?.addEventListener("click", () => {
+    const closeDrawer = () => syncDrawerState(false);
+    const openDrawer = () => syncDrawerState(true);
+    drawer.setAttribute("aria-hidden", "true");
+    menuButton?.setAttribute("aria-controls", "drawer");
+    menuButton?.setAttribute("aria-expanded", "false");
+    menuButton?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       drawer.classList.contains("open") ? closeDrawer() : openDrawer();
     });
-    const closeButton=drawer.querySelector("#closeDrawer");
-    if(closeButton){closeButton.type="button";closeButton.setAttribute("aria-label",t("إغلاق القائمة","Close menu"));closeButton.onclick=(event)=>{event.preventDefault();event.stopPropagation();closeDrawer();};closeButton.addEventListener("pointerup",(event)=>{event.preventDefault();event.stopPropagation();closeDrawer();},{passive:false});}
-    document.addEventListener("click",(event)=>{const target=event.target instanceof Element?event.target:null;if(target?.closest("#closeDrawer")){event.preventDefault();closeDrawer();return;}if(drawer.classList.contains("open")&&target&&!drawer.contains(target)&&!target.closest("#menu"))closeDrawer();},true);
+    // Use the click event only. Preventing pointerup can suppress the synthesized
+    // click on touch devices and leave the drawer visually stuck open.
+    const closeButton = drawer.querySelector("#closeDrawer");
+    if (closeButton) {
+      closeButton.type = "button";
+      closeButton.setAttribute("aria-label", t("إغلاق القائمة", "Close menu"));
+      closeButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        closeDrawer();
+      });
+    }
+    document.addEventListener("click", (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (!drawer.classList.contains("open") || !target) return;
+      if (target.closest("#closeDrawer")) { closeDrawer(); return; }
+      if (!drawer.contains(target) && !target.closest("#menu")) closeDrawer();
+    }, true);
     drawer.addEventListener("click", (event) => {
       const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest("#closeDrawer")) { event.preventDefault(); closeDrawer(); return; }
-      if (target?.closest("a")) closeDrawer();
-      if (target === drawer) closeDrawer();
+      if (target?.closest("#closeDrawer") || target?.closest("a")) closeDrawer();
     });
     document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") closeDrawer();
+      if (event.key === "Escape" && drawer.classList.contains("open")) closeDrawer();
     });
     document.querySelector("#lang")?.addEventListener("click", () => {
       const url = new URL(location.href);
