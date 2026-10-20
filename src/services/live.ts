@@ -89,7 +89,7 @@ async function cryptoQuote(symbol:string,id:string,pair:string,env?:Env){
   ]);
   return coingecko||binance;
 }
-async function marketQuote(symbol:string,env?:Env){
+export async function marketQuote(symbol:string,env?:Env){
   const yahooFailures:string[]=[];
   const yahooQuote=async(host:string)=>{
     try{
