@@ -68,7 +68,7 @@ describe("BAYAN AI admin diagnosis safety",()=>{
     const safeEnv={
       DB:{prepare:(statement:string)=>{sql.push(statement);return {bind:()=>({all:async()=>({results:[]}),first:async()=>null,run:async()=>({})}),all:async()=>({results:[]}),first:async()=>null,run:async()=>({})}}},
     } as any;
-    const result=await aiRepairRequest(safeEnv,"Test incident with private details");
+    const result=await aiRepairRequest(safeEnv,"Test incident with private details") as any;
     expect(result.ok).toBe(true);
     expect(result.mode).toBe("read_only");
     expect(result.health.verification).toBe("read_only_not_verified");
