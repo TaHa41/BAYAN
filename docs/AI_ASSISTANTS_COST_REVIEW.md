@@ -49,5 +49,6 @@ These are token arithmetic estimates, not measured BAYAN bills. Actual visitor t
 - Admin API remains protected by the existing manager-token gate.
 - User-supplied incident text is untrusted input, not an instruction to execute operations.
 - AI output is a diagnosis/hypothesis, not proof. UI states that no repair was performed and production was not verified.
+- This endpoint does not run live health checks; an empty failure list is not evidence that the site is healthy.
 - Regression test proves the diagnostic function does not issue UPDATE/DELETE and does not persist the raw report.
 - Existing `npm run check` remains the required CI gate; no database migration is needed.
