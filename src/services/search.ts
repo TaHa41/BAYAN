@@ -4,7 +4,7 @@ import type {Env,Locale,SearchResponse,SearchResult,Source} from "../types";
 import {searchArticles,saveSearch,publishVerifiedResearch,publicationRejectionReason} from "../db";
 import {boundedLikeKeywords,escapedLikePattern} from "../search-patterns";
 import {recordRuntimeEventLimited} from "../runtime-events";
-import {ask,draftArticle,ARTICLE_DRAFT_TIMEOUT_MS,answerHasUnsupportedSpecifics,answerUnsupportedSpecificsDetail,handleOpenAIResponseFailure,consumeDailyNewsAiCall} from "./ai";
+import {ask,draftArticle,ARTICLE_DRAFT_TIMEOUT_MS,answerHasUnsupportedSpecifics,answerUnsupportedSpecificsDetail,handleOpenAIResponseFailure,consumeDailyNewsAiCall,openAIAllowed} from "./ai";
 import {findRelatedImage,searchNewsFeed,searchTrustedNewsFeeds,resolvePublisherArticleUrl} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 import {sectionForOpenedStory,isContentForSection} from "./editorial";
@@ -298,7 +298,7 @@ async function pubmedSearch(q:string,language:Locale,diagnostics?:string[]):Prom
 }
 
 async function openAiWebSearch(env:Env,q:string,language:Locale,diagnostics?:string[],backgroundBudget=false):Promise<Candidate[]>{
-  if(!env.OPENAI_API_KEY)return[];
+  if(!env.OPENAI_API_KEY||!(await openAIAllowed(env)))return[];
   const breaker=await getProviderBreaker(env,"openai");
   if(breaker.open){diagnostics?.push("OpenAI Web Search skipped: circuit_breaker_open code="+breaker.code);return[];}
   if(backgroundBudget&&!(await consumeDailyNewsAiCall(env))){diagnostics?.push("OpenAI Web Search skipped: background AI budget exhausted");return[];}
