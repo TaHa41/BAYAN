@@ -1,6 +1,10 @@
 import { safePublicImageUrl } from "../image-url";
 import type { Locale, SearchResult } from "../types";
 
+export function shouldSkipGoogleNewsRetry(diagnostics:string[]):boolean{
+  return diagnostics.some(entry=>/Google News Search.*(?:http[_\\s-]?(?:401|403|404|429|500|502|503|504)|timeout|timed out|aborted|fetch_or_parse_exception|parsed=0 accepted=0|raw=0)/i.test(String(entry||"")));
+}
+
 export function shouldAttemptOpenAIWebSearchFallback(input:{publishing:boolean;firstPassCount:number;personOrAcademic:boolean;evidenceDiverse:boolean;belowExpansionThreshold:boolean}):boolean{
   if(input.firstPassCount===0)return true;
   if(input.publishing)return !input.evidenceDiverse;
