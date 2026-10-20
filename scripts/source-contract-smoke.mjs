@@ -325,6 +325,8 @@ const checks = [
   ["full commit identity is injected and exposed by a no-store endpoint", index.includes('const COMMIT_SHA="0000000000000000000000000000000000000000";') && index.includes('u.pathname==="/.well-known/build.json"') && index.includes('headers.set("X-BAYAN-Commit",COMMIT_SHA)') && read("scripts/inject-build-id.mjs").includes("^[a-f0-9]{40}$") && read("scripts/inject-build-id.mjs").includes("const COMMIT_SHA=") && read(".github/workflows/deploy-worker.yml").includes("Verify deployed commit identity")],
   ["optional searches columns are inspected before ALTER and duplicate-column races are not logged as schema failures", schema.includes('PRAGMA table_info(searches)') && schema.includes('if(!searchesColumns.has("topic_section"))') && schema.includes('if(!searchesColumns.has("results_json"))') && schema.includes("/duplicate column name: topic_section/i") && schema.includes("/duplicate column name: results_json/i")],
 ];
+checks.push(["sparse verified search results trigger browser-side expansion instead of stopping at one result", app.includes("const shouldExpandWeakSearch = serverResults.length < 3;") && !app.includes("(serverResults.length < 3 && data?.status !== \"verified\")")]);
+
 let failed = 0;
 for (const [name, ok] of checks) {
   console.log((ok ? "PASS " : "FAIL ") + name);
