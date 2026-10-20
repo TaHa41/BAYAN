@@ -50,8 +50,8 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         env:
           BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
-          BAYAN_AI_MANAGER_TOKEN: ${{ secrets.BAYAN_AI_MANAGER_TOKEN }}
-        run: node scripts/production-self-heal.mjs
+          BAYAN_SMOKE_SEARCH_PROBES: "1"
+        run: node scripts/production-smoke.mjs
       - name: Run lightweight scheduled health check
         if: github.event_name != 'workflow_dispatch'
         env:
