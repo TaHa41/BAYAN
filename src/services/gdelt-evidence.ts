@@ -130,20 +130,21 @@ async function loadGdeltMetadata(fetchImpl: typeof fetch, diagnostics: string[])
 async function fetchRobotsAllowed(url: URL, fetchImpl: typeof fetch): Promise<boolean> {
   const key = cacheKey("/__bayan_internal_cache/robots?host=" + encodeURIComponent(url.hostname.toLowerCase()));
   const cached = await cacheJson(key);
-  if (cached && typeof cached.allowed === "boolean") return cached.allowed;
+  if (cached && typeof cached.text === "string") return robotsAllowsPath(cached.text, url.pathname + url.search);
+  if (cached?.notFound === true) return true;
+  if (cached?.unknown === true) return false;
   try {
     const response = await fetchImpl(new URL("/robots.txt", url.origin), { signal: AbortSignal.timeout(1800), headers: { accept: "text/plain", "user-agent": "BAYAN/1.3 (+https://bayan.tahaomar411.workers.dev)" } });
-    if (response.status === 404) { await putJson(key, { allowed: true }, 24 * 60 * 60); return true; }
-    if (!response.ok) { await putJson(key, { allowed: false }, 300); return false; }
+    if (response.status === 404) { await putJson(key, { notFound: true }, 24 * 60 * 60); return true; }
+    if (!response.ok) { await putJson(key, { unknown: true }, 300); return false; }
     const bytes = await readBoundedBody(response, 64 * 1024);
-    if (!bytes) { await putJson(key, { allowed: false }, 300); return false; }
+    if (!bytes) { await putJson(key, { unknown: true }, 300); return false; }
     const text = new TextDecoder().decode(bytes);
-    const allowed = robotsAllowsPath(text, url.pathname + url.search);
-    await putJson(key, { allowed }, 24 * 60 * 60);
-    return allowed;
+    await putJson(key, { text }, 24 * 60 * 60);
+    return robotsAllowsPath(text, url.pathname + url.search);
   } catch {
     // Unknown robots policy means do not fetch the page.
-    await putJson(key, { allowed: false }, 300);
+    await putJson(key, { unknown: true }, 300);
     return false;
   }
 }
