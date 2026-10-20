@@ -1,8 +1,7 @@
 import type {Env,Locale} from "../types";
 import {search} from "./search";
 import {recordRuntimeEventLimited} from "../runtime-events";
-import {NEWS_ARCHIVE_QUEUE_SQL} from "./news-article-publisher-query";
-export {RECENT_LOW_EVIDENCE_DUPLICATE_FILTER} from "./news-article-publisher-query";
+import {NEWS_ARCHIVE_CANDIDATES_SQL,RECENT_LOW_EVIDENCE_SQL,pickCandidate} from "./news-article-publisher-query";
 
 const DAILY_D1_READ_CALL_LIMIT=12000;
 export const D1_READ_RESERVATION=120;
@@ -61,7 +60,12 @@ async function publishNextArchivedNewsArticleInner(env:Env){
   let setting:any=null;try{setting=await env.DB.prepare("SELECT value FROM admin_settings WHERE key=? LIMIT 1").bind("news_article_queue_language").first<any>()}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","settings_read_failed",error)}
   const preferred:Locale=String(setting?.value||"ar")==="en"?"en":"ar";
   const futureLimit=new Date(now+5*60*1000).toISOString();
-  const pick=async(language:Locale)=>env.DB.prepare(NEWS_ARCHIVE_QUEUE_SQL).bind(language,cutoff,futureLimit,cutoff,retryBefore,lowEvidenceRetryBefore).first<any>();
+  const pick=async(language:Locale)=>{
+    const candidates=await env.DB.prepare(NEWS_ARCHIVE_CANDIDATES_SQL).bind(language,cutoff,futureLimit,cutoff,retryBefore,lowEvidenceRetryBefore).all<any>();
+    const recent=await env.DB.prepare(RECENT_LOW_EVIDENCE_SQL).bind(language,lowEvidenceRetryBefore).all<any>();
+    const last=await env.DB.prepare("SELECT value FROM admin_settings WHERE key=? LIMIT 1").bind("news_article_queue_last_publisher").first<any>();
+    return pickCandidate(candidates.results||[],recent.results||[],last?.value?String(last.value):null);
+  };
   let row=await pick(preferred);
   if(!row)row=await pick(preferred==="ar"?"en":"ar");
   if(!row)return{status:"idle" as const};
