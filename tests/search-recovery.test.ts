@@ -151,8 +151,8 @@ describe("independent evidence diversity", () => {
     expect(independentEvidenceHost("Reuters", "https://user:pass@reuters.com/world/example")).toBeUndefined();
   });
 
-  it("keeps the three-independent-publisher minimum while honoring stricter configuration", () => {
-    expect(requiredEvidencePublisherCount(true, 3)).toBe(3);
+  it("keeps the five-independent-publisher floor while honoring stricter configuration", () => {
+    expect(requiredEvidencePublisherCount(true, 3)).toBe(5);
     expect(requiredEvidencePublisherCount(true, 7)).toBe(7);
     expect(requiredEvidencePublisherCount(false, 3)).toBe(2);
   });
