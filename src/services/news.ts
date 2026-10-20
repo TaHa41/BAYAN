@@ -109,7 +109,7 @@ export async function resolvePublisherArticleUrl(rawUrl: string, diagnostics?: s
         try {
           const decoded = new URL(candidate);
           if (decoded.protocol === "https:" && !isNewsAggregatorHost(decoded.hostname)) {
-            diagnostics?.push("Bing aggregator URL unwrapped host=" + decoded.hostname.toLowerCase());
+            diagnostics?.push("Bing aggregator URL unwrapped host=" + decoded.hostname.toLowerCase().replace(/^www\./, ""));
             return decoded.href;
           }
         } catch { /* Try one additional URL decode for nested redirect parameters. */ }
@@ -140,7 +140,7 @@ export async function resolvePublisherArticleUrl(rawUrl: string, diagnostics?: s
     if (finalUrl) {
       const resolved = new URL(finalUrl);
       if (resolved.protocol === "https:" && !isNewsAggregatorHost(resolved.hostname)) {
-        diagnostics?.push("Google/Bing aggregator URL resolved host=" + resolved.hostname.toLowerCase());
+        diagnostics?.push("Google/Bing aggregator URL resolved host=" + resolved.hostname.toLowerCase().replace(/^www\./, ""));
         return resolved.href;
       }
     }
