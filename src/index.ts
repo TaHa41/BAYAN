@@ -296,6 +296,12 @@ if(seoPath==="/llms.txt"){const body=`# BAYAN | بيان\n\n> Evidence-first Ara
 if(seoPath==="/ai-catalog.json"||seoPath==="/.well-known/ai-catalog.json"){const catalog={specVersion:"1.0",host:{displayName:"BAYAN | بيان",identifier:"bayan.tahaomar411.workers.dev",documentationUrl:ORIGIN+"/methodology?lang=en"},entries:[]};return new Response(JSON.stringify(catalog,null,2),{status:200,headers:{"Content-Type":"application/ai-catalog+json; charset=utf-8","Cache-Control":"public, max-age=3600","X-Content-Type-Options":"nosniff","Referrer-Policy":"strict-origin-when-cross-origin","X-Frame-Options":"DENY","Permissions-Policy":"camera=(), microphone=(), geolocation=()","Link":'<'+ORIGIN+'/.well-known/ai-catalog.json>; rel="self"'}})}
 if(seoPath==="/robots.txt")return robots();
 if(seoPath==="/sitemap.xml"||seoPath==="/news-sitemap.xml"){
+  const sitemapCache=(caches as unknown as {default:Cache}).default;
+  const sitemapCacheKey=new Request(new URL(seoPath,ORIGIN).toString(),{method:"GET"});
+  try{
+    const cached=await sitemapCache.match(sitemapCacheKey);
+    if(cached)return cached;
+  }catch(error){console.warn("sitemap_edge_cache_read_failed",String(error).slice(0,120))}
   try{
     const response=seoPath==="/sitemap.xml"?await sitemap(env):await newsSitemap(env);
     const headers=new Headers(response.headers);
@@ -308,7 +314,9 @@ if(seoPath==="/sitemap.xml"||seoPath==="/news-sitemap.xml"){
     }
     headers.set("Content-Type","application/xml; charset=utf-8");
     headers.set("Cache-Control","public, max-age=300, s-maxage=300, stale-while-revalidate=3600");
-    return new Response(response.body,{status:response.status,headers});
+    const finalResponse=new Response(response.body,{status:response.status,headers});
+    if(response.status===200){try{await sitemapCache.put(sitemapCacheKey,finalResponse.clone())}catch(error){console.warn("sitemap_edge_cache_write_failed",String(error).slice(0,120))}}
+    return finalResponse;
   }catch(error){
     try{await notify(env,"BAYAN SITEMAP ERROR\\nPath: "+seoPath+"\\nError: "+String(error).slice(0,300))}catch(error){await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}
     return new Response("Sitemap temporarily unavailable; retry later.",{status:503,headers:{"Content-Type":"text/plain; charset=utf-8","Cache-Control":"no-store","Retry-After":"300","X-Content-Type-Options":"nosniff","X-BAYAN-SEO":"sitemap-unavailable"}});
