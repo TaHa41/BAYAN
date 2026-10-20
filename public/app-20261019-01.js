@@ -1086,11 +1086,11 @@
   async function renderTools() {
     app.innerHTML='<section class="page"><div class="page-head"><span class="eyebrow">'+t("أدوات بيان","BAYAN tools")+'</span><h1>'+t("الأدوات","Tools")+'</h1><p>'+t("أدوات مباشرة للبحث والبيانات والتحقق.","Direct tools for search, live data and verification.")+'</p></div><div class="section-grid">'+[
       ["/search?lang="+lang,t("البحث","Search"),t("ابحث في المعرفة والمصادر.","Search knowledge and sources.")],
-      ["/ask?lang="+lang,t("اسأل بيان","Ask BAYAN"),t("اسأل سؤالًا واجمع الأدلة.","Ask a question and gather evidence.")],
+      ["/ask?lang="+lang,t("اسأل بيان","Ask BAYAN"),t("مساعد بيان للبحث والإجابة اعتمادًا على الأدلة المتاحة.","BAYAN assistant for research and evidence-based answers.")],
       ["/prices?lang="+lang,t("البيانات الحية","Live Data"),t("الطقس والعملات والذهب.","Weather, FX and gold.")],
       ["/prayer?lang="+lang,t("مواقيت الصلاة","Prayer Times"),t("مواقيت حسب المدينة والتقويم الهجري والمناسبات الإسلامية.","City-based prayer times, Hijri calendar and Islamic occasions.")],
       ["/contribute?lang="+lang,t("المساهمة","Contribute"),t("أرسل معلومة للمراجعة.","Submit information for review.")]
-    ].map(x=>'<a class="section-card" href="'+x[0]+'"><div><h2>'+x[1]+'</h2><p>'+x[2]+'</p></div><b>↗</b></a>').join("")+'</div></section>';
+    ].map(x=>'<a class="section-card" href="'+x[0]+'"><div><h2>'+x[1]+'</h2><p>'+x[2]+'</p></div><b>↗</b></a>').join("")+'</div><div class="page-head"><h2>'+t("أدوات ذكاء اصطناعي خارجية","External AI tools")+'</h2><p>'+t("تفتح هذه الخدمات خارج بيان. بعض الميزات قد تتطلب حسابًا أو أرصدة؛ لم نفعّل أي API مدفوع.","These services open outside BAYAN. Some features may require an account or credits; no paid API is enabled.")+'</p></div><div class="section-grid"><a class="section-card" href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer"><div><h2>ChatGPT</h2><p>'+t("افتح ChatGPT في صفحة منفصلة. استخدام API داخل المواقع له فوترة مستقلة؛ لذلك يعتمد بيان افتراضيًا على الخدمة المجانية الموجودة لديه.","Open ChatGPT separately. Website API usage is billed separately, so BAYAN defaults to its existing free AI service.")+'</p></div><b>↗</b></a><a class="section-card" href="https://www.flova.ai/en/" target="_blank" rel="noopener noreferrer"><div><h2>Flova AI</h2><p>'+t("أداة خارجية لإنشاء الفيديو والمحتوى المرئي بالذكاء الاصطناعي. قد تتطلب بعض عمليات التوليد أرصدة مدفوعة.","External AI video and visual-creation tool. Some generation features may require paid credits.")+'</p></div><b>↗</b></a></div></section>';
   }
 
   async function renderStatic(kind) {
