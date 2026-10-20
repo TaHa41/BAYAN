@@ -16,3 +16,18 @@ for (const route of publicRoutes) {
     await expect(page.locator("body")).toBeVisible();
   });
 }
+
+
+test("navigation drawer closes with its close button and Escape", async ({ page }) => {
+  await page.goto("/?lang=ar", { waitUntil: "domcontentloaded" });
+  const drawer = page.locator("#drawer");
+  await page.locator("#menu").click();
+  await expect(drawer).toHaveClass(/open/);
+  await page.locator("#closeDrawer").click();
+  await expect(drawer).not.toHaveClass(/open/);
+  await expect(page.locator("body")).not.toHaveClass(/drawer-open/);
+  await page.locator("#menu").click();
+  await expect(drawer).toHaveClass(/open/);
+  await page.keyboard.press("Escape");
+  await expect(drawer).not.toHaveClass(/open/);
+});
