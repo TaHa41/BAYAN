@@ -135,7 +135,9 @@ async function fetchRobotsAllowed(url: URL, fetchImpl: typeof fetch): Promise<bo
     const response = await fetchImpl(new URL("/robots.txt", url.origin), { signal: AbortSignal.timeout(1800), headers: { accept: "text/plain", "user-agent": "BAYAN/1.3 (+https://bayan.tahaomar411.workers.dev)" } });
     if (response.status === 404) { await putJson(key, { allowed: true }, 24 * 60 * 60); return true; }
     if (!response.ok) { await putJson(key, { allowed: false }, 300); return false; }
-    const text = await response.text();
+    const bytes = await readBoundedBody(response, 64 * 1024);
+    if (!bytes) { await putJson(key, { allowed: false }, 300); return false; }
+    const text = new TextDecoder().decode(bytes);
     const allowed = robotsAllowsPath(text, url.pathname + url.search);
     await putJson(key, { allowed }, 24 * 60 * 60);
     return allowed;
@@ -174,6 +176,9 @@ async function fetchPublisherExcerpt(article: GdeltArticle, lang: Locale, fetchI
   try {
     const response = await fetchImpl(url, { signal: AbortSignal.timeout(3500), redirect: "follow", headers: { accept: "text/html,application/xhtml+xml", "user-agent": "BAYAN/1.3 (+https://bayan.tahaomar411.workers.dev)" } });
     if (!response.ok || !/text\/html|application\/xhtml\+xml/i.test(response.headers.get("content-type") || "")) return undefined;
+    const finalUrl = new URL(response.url || url.toString());
+    if (!isSafeGdeltPublisherUrl(finalUrl.toString()) || finalUrl.hostname.toLowerCase().replace(/^www\./, "") !== url.hostname.toLowerCase().replace(/^www\./, "")) return undefined;
+    if ((finalUrl.pathname !== url.pathname || finalUrl.search !== url.search) && !await fetchRobotsAllowed(finalUrl, fetchImpl)) return undefined;
     const length = Number(response.headers.get("content-length") || 0);
     if (length > MAX_PAGE_BYTES) { diagnostics.push("GDELT page skipped oversized: " + url.hostname); return undefined; }
     const bytes = await readBoundedBody(response);
