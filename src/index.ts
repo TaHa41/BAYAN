@@ -7,10 +7,11 @@ const SHELL_EN=`<!doctype html><html><head><meta charset="utf-8"><meta name="vie
 
 const isKnownAppPage=(pathname:string)=>{const path=pathname.replace(/\/+$/,"")||"/";return path==="/"||["/index.html","/search","/ask","/research","/contribute","/saved","/tools","/about","/methodology","/privacy","/terms","/news","/prices","/trends","/admin","/review"].includes(path)||SECTIONS.some(section=>path==="/"+section[0])||/^\/article\/[^/]+$/.test(path)||/^\/review\/.+/.test(path)};
 const notFoundResponse=(language:string)=>new Response(language==="en"?"Page not found":"الصفحة غير موجودة",{status:404,headers:{"content-type":"text/plain; charset=utf-8","cache-control":"no-store","x-robots-tag":"noindex, nofollow","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}});
+const isPublicSvgAsset=(pathname:string)=>/^\/sections\/[a-z0-9-]+\.svg$/.test(pathname)||/^\/og-(?:bayan|article)\.svg$/.test(pathname);
 async function page(request:Request,env:Env){
   const u=new URL(request.url);
-  // Static assets should bypass HTML transformation and remain edge-cacheable.
-  if (/^\/(app(?:-[^/]+)?\.js|styles\.css|manifest\.json|favicon\.(?:ico|png|svg))$/.test(u.pathname)) {
+  // Social preview and section SVG files must bypass HTML metadata injection.
+  if (isPublicSvgAsset(u.pathname) || /^\/(app(?:-[^/]+)?\.js|styles\.css|manifest\.json|favicon\.(?:ico|png|svg))$/.test(u.pathname)) {
     const response = await env.ASSETS.fetch(request);
     const headers = new Headers(response.headers);
     headers.set("Cache-Control", "public, max-age=0, must-revalidate");
@@ -244,9 +245,10 @@ ensureMeta("property","og:url",canonical);
 ensureMeta("property","og:site_name","BAYAN | بيان");
 ensureMeta("property","og:locale",lang==="en"?"en_US":"ar_EG");
 ensureMeta("property","og:type",path.startsWith("/article/")||hasNewsStory?"article":"website");
-if(!html.includes('property="og:image"'))ensureMeta("property","og:image",ORIGIN+"/og-bayan.svg");
+const defaultSocialImage=(path.startsWith("/article/")||hasNewsStory)?ORIGIN+"/og-article.svg":ORIGIN+"/og-bayan.svg";
+if(!html.includes('property="og:image"'))ensureMeta("property","og:image",defaultSocialImage);
 const ogImageMatch=html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i);
-const socialImage=ogImageMatch?.[1]||ORIGIN+"/og-bayan.svg";
+const socialImage=ogImageMatch?.[1]||defaultSocialImage;
 ensureMeta("name","twitter:card","summary_large_image");
 ensureMeta("name","twitter:title",title);
 ensureMeta("name","twitter:description",description);
