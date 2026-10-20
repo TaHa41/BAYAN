@@ -1,6 +1,6 @@
 import {parseNewsSitemap} from "./news-sitemap-contract.mjs";
 const origin=process.env.BAYAN_ORIGIN||"https://bayan.tahaomar411.workers.dev";
-const checks=["/","/saved?lang=ar","/tools?lang=ar","/about?lang=ar","/methodology?lang=ar","/privacy?lang=ar","/terms?lang=ar","/api/health","/api/features","/api/news/archive?lang=ar","/api/news/archive?lang=en","/api/live/weather","/api/live/fx","/api/live/gold","/news?lang=ar","/news?lang=en","/prices?lang=ar","/art?lang=ar","/trends?lang=ar","/robots.txt","/sitemap.xml","/news-sitemap.xml","/llms.txt","/.well-known/ai-catalog.json","/ai-catalog.json"];
+const checks=["/","/saved?lang=ar","/tools?lang=ar","/about?lang=ar","/methodology?lang=ar","/privacy?lang=ar","/terms?lang=ar","/api/health","/api/features","/api/live/weather","/api/live/fx","/api/live/gold","/news?lang=ar","/news?lang=en","/prices?lang=ar","/art?lang=ar","/trends?lang=ar","/robots.txt","/sitemap.xml","/news-sitemap.xml","/llms.txt","/.well-known/ai-catalog.json","/ai-catalog.json"];
 const sections=["science","technology","economy","politics","health","history","people","sports","travel","art","news","trends","prices","egypt","arab","world"];
 let bad=0;
 let bundleText="";
