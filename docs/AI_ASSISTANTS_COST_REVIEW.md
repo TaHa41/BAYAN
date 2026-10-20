@@ -15,7 +15,7 @@ Public list prices checked 2026-10-20. Prices vary by model, region, caching, an
 | Option | Published token price (USD per 1M) | Practical trade-off for BAYAN |
 | --- | ---: | --- |
 | Cloudflare Workers AI, published `@cf/meta/llama-3.1-8b-instruct-fp8-fast` price row | $0.045 input / $0.384 output; 10,000 neurons/day free allocation, then $0.011 per 1,000 neurons on Workers Paid | Already bound to this Worker; lowest integration overhead and good default for bounded admin triage. BAYAN currently names the non-`fast` `fp8` variant, so this estimate is a proxy until the exact SKU price is confirmed. Quality may be lower on complex reasoning; keep uncertainty explicit. |
-| OpenAI GPT-6 Luna | $0.10 input / $0.50 output (standard short-context price) | Stronger optional fallback without adding a new vendor integration; usage is paid and requires an already-configured OpenAI key. |
+| OpenAI GPT-6 Luna | $0.10 input / $0.50 output (standard short-context price) | Optional paid fallback without adding a new vendor integration; usage is paid and requires an already-configured OpenAI key. Actual quality must be benchmarked on BAYAN's Arabic/English cases. |
 | OpenAI GPT-5 mini | $0.25 input / $2.00 output | Existing code previously used this as an admin diagnostic fallback; the current official model page marks it deprecated. Avoid selecting it for new work. |
 | Anthropic Claude Haiku 5.5 | $0.10 input / $0.50 output for prompts up to 100K tokens | Similar token pricing to GPT-6 Luna, but requires a new provider integration, secret, failure handling, and monitoring; not justified for this minimal change. |
 
