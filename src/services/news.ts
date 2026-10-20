@@ -95,12 +95,13 @@ const readFeed = async (name: string, url: string, diagnostics?: string[]): Prom
         signal: controller.signal,
         headers: { accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, */*", "user-agent": "BAYAN/1.3 (+https://bayan.tahaomar411.workers.dev)" },
       });
-      if (!response.ok) { diagnostics?.push(name + " HTTP " + response.status); return []; }
+      if (!response.ok) { diagnostics?.push(name + " parsed=0 accepted=0 reason=http_" + response.status); return []; }
       // RSS feeds are untrusted upstream payloads. Keep the abort timer active
       // while consuming the body, and cap decompressed bytes before regex parsing.
       const maxFeedBytes = 384 * 1024;
       const declaredSize = Number(response.headers.get("content-length") || 0);
       if (declaredSize > maxFeedBytes) {
+        diagnostics?.push(name + " parsed=0 accepted=0 reason=declared_body_too_large bytes=" + declaredSize);
         await response.body?.cancel().catch(error => { void error; });
         return [];
       }
@@ -114,6 +115,7 @@ const readFeed = async (name: string, url: string, diagnostics?: string[]): Prom
             if (part.done) break;
             total += part.value.byteLength;
             if (total > maxFeedBytes) {
+              diagnostics?.push(name + " parsed=0 accepted=0 reason=streamed_body_too_large bytes_gt=" + maxFeedBytes);
               await reader.cancel().catch(error => { void error; });
               return [];
             }
@@ -133,7 +135,16 @@ const readFeed = async (name: string, url: string, diagnostics?: string[]): Prom
     // RSS uses <item>; Atom uses <entry>. Parse both so feeds do not silently
     // become empty just because a publisher changed its feed format.
     const entries = [...xml.matchAll(/<(item|entry)\b[\s\S]*?<\/\1>/gi)].slice(0, 12);
-    return entries.map((match) => {
+    const contentType = String(response.headers.get("content-type") || "unknown").split(";")[0].slice(0, 80);
+    if (!xml.trim()) {
+      diagnostics?.push(name + " parsed=0 accepted=0 reason=empty_body content_type=" + contentType);
+      return [];
+    }
+    if (!entries.length) {
+      diagnostics?.push(name + " parsed=0 accepted=0 reason=no_item_or_entry_markup content_type=" + contentType + " bytes=" + new TextEncoder().encode(xml).length);
+      return [];
+    }
+    const parsedStories = entries.map((match) => {
       const item = match[0];
       const tag = (...names: string[]) => {
         for (const name of names) {
@@ -172,9 +183,13 @@ const readFeed = async (name: string, url: string, diagnostics?: string[]): Prom
         imageUrl,
         imageAlt: title,
       };
-    }).filter((story) => story.title && story.url);
+    });
+    const acceptedStories = parsedStories.filter((story) => story.title && story.url);
+    diagnostics?.push(name + " parsed=" + entries.length + " accepted=" + acceptedStories.length + (acceptedStories.length ? "" : " reason=no_valid_title_or_url"));
+    return acceptedStories;
   } catch (error) {
-    diagnostics?.push(name + " failed: " + String(error instanceof Error ? error.message : error).slice(0, 120));
+    const detail = String(error instanceof Error ? error.message : error).replace(/https?:\/\/[^\s]+/g, "[url]").slice(0, 120);
+    diagnostics?.push(name + " parsed=0 accepted=0 reason=fetch_or_parse_exception detail=" + detail);
     return [];
   }
 };
@@ -574,23 +589,23 @@ const archiveNewsStories = async (env: Env, lang: Locale, items: Story[]) => {
   }
 };
 
-const googleArabicFallback = async (): Promise<Story[]> => {
+const googleArabicFallback = async (diagnostics?: string[]): Promise<Story[]> => {
   const feeds = [
     ["أخبار Google عربية", "https://news.google.com/rss?hl=ar&gl=EG&ceid=EG:ar"],
     ["أخبار مصر", "https://news.google.com/rss/search?q=مصر&hl=ar&gl=EG&ceid=EG:ar"],
     ["أخبار عربية", "https://news.google.com/rss/search?q=العالم%20العربي&hl=ar&gl=EG&ceid=EG:ar"],
   ] as [string,string][];
-  const batches = await Promise.all(feeds.map(([name,url]) => readFeed(name,url)));
+  const batches = await Promise.all(feeds.map(([name,url]) => readFeed(name,url,diagnostics)));
   return batches.flat().filter(x => hasArabic(x.title));
 };
 
-const googleEnglishFallback = async (): Promise<Story[]> => {
+const googleEnglishFallback = async (diagnostics?: string[]): Promise<Story[]> => {
   const feeds = [
     ["Google News English", "https://news.google.com/rss?hl=en&gl=US&ceid=US:en"],
     ["Google News World", "https://news.google.com/rss/search?q=world&hl=en&gl=US&ceid=US:en"],
     ["Google News Technology", "https://news.google.com/rss/search?q=technology&hl=en&gl=US&ceid=US:en"],
   ] as [string,string][];
-  const batches = await Promise.all(feeds.map(([name,url]) => readFeed(name,url)));
+  const batches = await Promise.all(feeds.map(([name,url]) => readFeed(name,url,diagnostics)));
   return batches.flat().filter(x => !hasArabic(x.title));
 };
 
@@ -642,11 +657,11 @@ const directNewsPageFallback = async (lang: Locale, env?: Env): Promise<Story[]>
   return out;
 };
 
-const bingNewsFallback = async (lang: Locale): Promise<Story[]> => {
+const bingNewsFallback = async (lang: Locale, diagnostics?: string[]): Promise<Story[]> => {
   const queries = lang === "ar"
     ? [["Bing News عربية","https://www.bing.com/news/search?q=%D8%A3%D8%AD%D8%AF%D8%AB+%D8%A7%D9%84%D8%A3%D8%AE%D8%A8%D8%A7%D8%B1&format=rss&setlang=ar"],["Bing News مصر","https://www.bing.com/news/search?q=%D9%85%D8%B5%D8%B1&format=rss&setlang=ar"]]
     : [["Bing News","https://www.bing.com/news/search?q=latest+news&format=rss&setlang=en-us"],["Bing World News","https://www.bing.com/news/search?q=world+news&format=rss&setlang=en-us"]];
-  const batches = await Promise.all(queries.map(([name,url]) => readFeed(name,url)));
+  const batches = await Promise.all(queries.map(([name,url]) => readFeed(name,url,diagnostics)));
   return batches.flat().filter(x => lang === "ar" ? hasArabic(x.title) : !hasArabic(x.title));
 };
 
@@ -704,9 +719,10 @@ export async function news(env: Env, lang: Locale, options: {forceRefresh?:boole
       })),
     };
   }
+  const feedDiagnostics: string[] = [];
   const providers = feeds(lang).slice(0, 7);
   const batches = await Promise.all(
-    providers.map(([name, url]) => readFeed(name, url)),
+    providers.map(([name, url]) => readFeed(name, url, feedDiagnostics)),
   );
   let all = batches.flat()
     .filter((story) => lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title))
@@ -730,9 +746,9 @@ export async function news(env: Env, lang: Locale, options: {forceRefresh?:boole
   // discovery. A large batch from one or two feeds is not source diversity.
   if (all.length < 3 || distinctPublisherCount(all) < 3) {
     const [google, aiSearch, bing] = await Promise.all([
-      lang === "ar" ? googleArabicFallback() : googleEnglishFallback(),
+      lang === "ar" ? googleArabicFallback(feedDiagnostics) : googleEnglishFallback(feedDiagnostics),
       aiSearchNews(env, lang),
-      bingNewsFallback(lang),
+      bingNewsFallback(lang, feedDiagnostics),
     ]);
     const fallback = [...google, ...aiSearch, ...bing]
       .filter((story) => lang === "ar" ? hasArabic(story.title) : !hasArabic(story.title))
@@ -798,6 +814,9 @@ export async function news(env: Env, lang: Locale, options: {forceRefresh?:boole
     return (Number.isFinite(bt) ? bt : 0) - (Number.isFinite(at) ? at : 0);
   });
 
+  if (feedDiagnostics.some((item) => /parsed=0|reason=| HTTP \d{3}|failed:/i.test(item))) {
+    console.warn("BAYAN_NEWS_FEED_DIAGNOSTICS " + JSON.stringify({ language: lang, providers: feedDiagnostics }));
+  }
   const seen = new Set<string>();
   const limit = Math.max(
     6,
