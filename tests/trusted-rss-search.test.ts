@@ -1,9 +1,41 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { searchTrustedNewsFeeds } from "../src/services/news";
+import { resolvePublisherArticleUrl, searchTrustedNewsFeeds } from "../src/services/news";
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+describe("aggregator article URL resolution", () => {
+  it("unwraps a direct HTTPS publisher URL embedded in a Bing redirect", async () => {
+    const target = "https://www.reuters.com/world/example-story";
+    const redirect = "https://www.bing.com/news/apiclick.aspx?url=" + encodeURIComponent(target);
+    const diagnostics: string[] = [];
+    expect(await resolvePublisherArticleUrl(redirect, diagnostics)).toBe(target);
+    expect(diagnostics.some(value => value.includes("Bing aggregator URL unwrapped host=reuters.com"))).toBe(true);
+  });
+
+  it("follows a Google News RSS redirect to the actual HTTPS publisher host", async () => {
+    const fetchMock = vi.fn(async () => {
+      const response = new Response("", { status: 200 });
+      Object.defineProperty(response, "url", { value: "https://www.reuters.com/world/example-story" });
+      return response;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const diagnostics: string[] = [];
+    const resolved = await resolvePublisherArticleUrl("https://news.google.com/rss/articles/example-id", diagnostics);
+    expect(resolved).toBe("https://www.reuters.com/world/example-story");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(diagnostics.some(value => value.includes("resolved host=reuters.com"))).toBe(true);
+  });
+
+  it("does not make extra network requests for direct publisher URLs", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const direct = "https://www.bbc.com/news/example";
+    expect(await resolvePublisherArticleUrl(direct)).toBe(direct);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("trusted publisher RSS search fallback", () => {
