@@ -1,6 +1,7 @@
 import {describe,it,expect} from "vitest";
 import worker from "../src/index";
 import {body,json,text} from "../src/http";
+import {aiRepairRequest} from "../src/services/repair";
 const env={ASSETS:{fetch:async()=>new Response("asset")},DB:{prepare:(sql:string)=>({bind:()=>({all:async()=>({results:[]}),first:async()=>null,run:async()=>({})}),all:async()=>({results:[]}),first:async()=>sql.trim().startsWith("SELECT 1 AS ready")?{ready:1}:null,run:async()=>({})}),batch:async()=>[]}} as any;
 describe("BAYAN public page routing",()=>{
   it("renders the public homepage instead of returning no response",async()=>{
@@ -58,5 +59,22 @@ describe("BAYAN API",()=>{
       if(!r) throw new Error(`admin request returned no response: ${path}`);
       expect(r.status).toBe(401);
     }
+  });
+});
+
+describe("BAYAN AI admin diagnosis safety",()=>{
+  it("keeps AI diagnosis read-only and does not persist the raw problem",async()=>{
+    const sql:string[]=[];
+    const safeEnv={
+      DB:{prepare:(statement:string)=>{sql.push(statement);return {bind:()=>({all:async()=>({results:[]}),first:async()=>null,run:async()=>({})}),all:async()=>({results:[]}),first:async()=>null,run:async()=>({})}}},
+    } as any;
+    const result=await aiRepairRequest(safeEnv,"Test incident with private details");
+    expect(result.ok).toBe(true);
+    expect(result.mode).toBe("read_only");
+    expect(result.health.verification).toBe("read_only_not_verified");
+    expect(result.health.actions).toEqual([]);
+    expect(sql.some((statement)=>/\\bUPDATE\\b|\\bDELETE\\b/i.test(statement))).toBe(false);
+    expect(sql.some((statement)=>/INSERT INTO runtime_events/i.test(statement))).toBe(true);
+    expect(sql.some((statement)=>statement.includes("Test incident with private details"))).toBe(false);
   });
 });
