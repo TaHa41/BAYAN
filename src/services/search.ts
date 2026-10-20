@@ -5,7 +5,7 @@ import {searchArticles,saveSearch,publishVerifiedResearch,publicationRejectionRe
 import {boundedLikeKeywords,escapedLikePattern} from "../search-patterns";
 import {recordRuntimeEventLimited} from "../runtime-events";
 import {ask,draftArticle,ARTICLE_DRAFT_TIMEOUT_MS,answerHasUnsupportedSpecifics,answerUnsupportedSpecificsDetail,handleOpenAIResponseFailure,consumeDailyNewsAiCall} from "./ai";
-import {findRelatedImage,searchNewsFeed,searchTrustedNewsFeeds} from "./news";
+import {findRelatedImage,searchNewsFeed,searchTrustedNewsFeeds,resolvePublisherArticleUrl} from "./news";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 import {sectionForOpenedStory,isContentForSection} from "./editorial";
 import {sections} from "../sections";
@@ -222,22 +222,49 @@ async function googleNewsSearch(q:string,language:Locale,diagnostics?:string[]):
   }catch(error){reportProviderFailure(diagnostics,"Google News Search",error);return[]}
 }
 
-export function normalizeBingNewsUrl(raw:string):string|undefined{try{const url=new URL(String(raw||"").trim());if(url.protocol==="http:"&&/(^|\.)bing\.com$/i.test(url.hostname))url.protocol="https:";if(url.protocol!=="https:"||url.username||url.password||/^(?:localhost|127(?:\.\d+){3}|0\.0\.0\.0|\[::1\])$/i.test(url.hostname))return;return url.toString()}catch{return}}
+export function normalizeBingNewsUrl(raw:string):string|undefined {
+  try {
+    const url=new URL(String(raw||"").trim());
+    if(url.protocol==="http:"&&/(^|\.)bing\.com$/i.test(url.hostname))url.protocol="https:";
+    if(url.protocol!=="https:"||url.username||url.password||/^(?:localhost|127(?:\.\d+){3}|0\.0\.0\.0|\[::1\])$/i.test(url.hostname))return;
+    if(isBingAggregatorUrl(url.href)){
+      for(const key of ["url","URL","u"]){
+        let candidate=url.searchParams.get(key)||"";
+        for(let attempt=0;candidate&&attempt<2;attempt++){
+          try{
+            const target=new URL(candidate);
+            if(target.protocol==="https:"&&!isBingAggregatorUrl(target.href)&&!target.username&&!target.password&&!/^(?:localhost|127(?:\.\d+){3}|0\.0\.0\.0|\[::1\])$/i.test(target.hostname))return target.href;
+          }catch{}
+          try{const decoded=decodeURIComponent(candidate);if(decoded===candidate)break;candidate=decoded}catch{break}
+        }
+      }
+    }
+    return url.toString();
+  }catch{return}
+}
+const isBingAggregatorUrl=(value:string)=>{try{return /(^|\.)bing\.com$/i.test(new URL(value).hostname)}catch{return false}};
 async function bingNewsSearch(q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
   try{
     const setlang=language==="ar"?"ar":"en-US";
     const url="https://www.bing.com/news/search?q="+encodeURIComponent(q)+"&format=rss&setlang="+setlang;
     const response=await timeout(url,4500,diagnostics,"Bing News RSS");if(!response.ok){diagnostics?.push("Bing News RSS HTTP "+response.status);return[];}
-    const xml=await response.text();const out:Candidate[]=[];let rawItems=0,rejectedTitle=0,rejectedUrl=0;
+    const xml=await response.text();const out:Candidate[]=[];let rawItems=0,rejectedTitle=0,rejectedUrl=0,aggregatorResolutions=0;
     for(const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
       rawItems++;
       const block=match[1];
-      const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
+      const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
       const title=cleanText(field("title")),rawUrl=field("link"),summary=cleanText(field("description")).slice(0,1200);
       if(!title){rejectedTitle++;continue;}
-      const url=normalizeBingNewsUrl(rawUrl);if(!url){rejectedUrl++;continue;}
-      const publisher=cleanText(field("source")||"Bing News");
-      out.push({title,summary,section:"news",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+3,provider:"Bing News RSS"});
+      let articleUrl=normalizeBingNewsUrl(rawUrl);if(!articleUrl){rejectedUrl++;continue;}
+      if(isBingAggregatorUrl(articleUrl)){
+        if(aggregatorResolutions>=3){rejectedUrl++;continue;}
+        aggregatorResolutions++;
+        articleUrl=await resolvePublisherArticleUrl(articleUrl,diagnostics);
+      }
+      if(isBingAggregatorUrl(articleUrl)){rejectedUrl++;continue;}
+      let publisher=cleanText(field("source")||"Bing News");
+      if(/^Bing News$/i.test(publisher)){try{publisher=new URL(articleUrl).hostname.replace(/^www\./i,"")}catch{}}
+      out.push({title,summary,section:"news",kind:"web",evidence:"mixed",sources:[source(title,publisher,articleUrl)],url:articleUrl,score:scoreSource(publisher,title,q)+3,provider:"Bing News RSS"});
       if(out.length>=8)break;
     }
     diagnostics?.push("Bing News RSS raw="+rawItems+" accepted="+out.length+" rejected_title="+rejectedTitle+" rejected_url="+rejectedUrl);
@@ -369,21 +396,31 @@ async function bingWebSearch(q:string,language:Locale,diagnostics?:string[]):Pro
   }catch(error){reportProviderFailure(diagnostics,"Bing Web Search",error);return[]}
 }
 async function bingWebRssSearch(q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
-  // Bing's RSS endpoint is a lighter fallback than parsing the changing HTML search page.
+  // Bing's RSS endpoint is a bounded fallback. Aggregator URLs are resolved to
+  // publisher hosts before they can contribute independent evidence.
   try{
     const setlang=language==="ar"?"ar":"en-US";
     const url="https://www.bing.com/search?q="+encodeURIComponent(q)+"&format=rss&setlang="+setlang;
     const response=await timeout(url,3200,diagnostics,"Bing Web RSS");if(!response.ok)return[];
-    const xml=await response.text();const out:Candidate[]=[];
+    const xml=await response.text();const out:Candidate[]=[];let rawItems=0,aggregatorResolutions=0;
     for(const match of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)){
+      rawItems++;
       const block=match[1];
       const field=(name:string)=>decodeXml(block.match(new RegExp("<"+name+"\\b[^>]*>([\\s\\S]*?)</"+name+">","i"))?.[1]||"").trim();
-      const title=cleanText(field("title")),url=field("link"),summary=cleanText(field("description")).slice(0,1200);
-      if(!title||!/^https:\/\//i.test(url))continue;
-      let publisher="Bing Web";try{publisher=new URL(url).hostname.replace(/^www\./i,"")}catch(error){reportProviderFailure(diagnostics,"Bing RSS result URL",error)}
-      out.push({title,summary,section:"world",kind:"web",evidence:"mixed",sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+8,provider:"Bing Web RSS"});
+      const title=cleanText(field("title")),rawUrl=field("link"),summary=cleanText(field("description")).slice(0,1200);
+      if(!title)continue;
+      let target=normalizeBingNewsUrl(rawUrl);if(!target)continue;
+      if(isBingAggregatorUrl(target)){
+        if(aggregatorResolutions>=3)continue;
+        aggregatorResolutions++;
+        target=await resolvePublisherArticleUrl(target,diagnostics);
+      }
+      if(isBingAggregatorUrl(target))continue;
+      let publisher="Bing Web";try{publisher=new URL(target).hostname.replace(/^www\./i,"")}catch(error){reportProviderFailure(diagnostics,"Bing RSS result URL",error)}
+      out.push({title,summary,section:"world",kind:"web",evidence:"mixed",sources:[source(title,publisher,target)],url:target,score:scoreSource(publisher,title,q)+8,provider:"Bing Web RSS"});
       if(out.length>=8)break;
     }
+    diagnostics?.push("Bing Web RSS raw="+rawItems+" accepted="+out.length+" resolved="+aggregatorResolutions);
     return out;
   }catch(error){reportProviderFailure(diagnostics,"Bing Web RSS",error);return[]}
 }
