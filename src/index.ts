@@ -390,6 +390,7 @@ try{return await page(request,env)}catch(error){if(isD1QuotaError(error)){await 
         await news(env,language,{forceRefresh:true});
       }
     }catch(error){
+      if(isD1QuotaError(error)){await persistD1Block();logD1QuotaOncePerHour(error);return;}
       try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","scheduled_news_archive_refresh",String(error).slice(0,300),new Date().toISOString()).run()}catch(error){await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}
     }
   }else if(env.NEWS_PIPELINE_ENABLED==="true"&&(task===1||(task===2&&scheduleSlot%12!==2&&scheduleSlot%12!==8))){
@@ -402,10 +403,12 @@ try{return await page(request,env)}catch(error){if(isD1QuotaError(error)){await 
         console.info("news_archive_article_generation",details);
       }
     }catch(error){
+      if(isD1QuotaError(error)){await persistD1Block();logD1QuotaOncePerHour(error);return;}
       try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","news_archive_article_generation",String(error).slice(0,350),new Date().toISOString()).run()}catch(error){await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}
     }
   }else{
     try{await selfHeal(env)}catch(error){
+      if(isD1QuotaError(error)){await persistD1Block();logD1QuotaOncePerHour(error);return;}
       try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","scheduled_self_heal",String(error).slice(0,300),new Date().toISOString()).run()}catch(error){await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}
     }
   }
