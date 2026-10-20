@@ -27,7 +27,7 @@ for(const query of queries){
           const parsed=new URL(rawUrl);
           const host=parsed.hostname.toLowerCase().replace(/^www\./,"");
           if(parsed.protocol==="https:"&&!excludedHosts.some(domain=>host===domain||host.endsWith("."+domain)))hosts.add(host);
-        }catch{}
+        }catch(error){void error;}
       }
     }
     console.log("SEARCH_SMOKE",JSON.stringify({query:query.label,lang:query.lang,results:data.results.length,hosts:[...hosts].sort(),providers:[...providers].sort()}));
