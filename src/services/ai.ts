@@ -1,4 +1,4 @@
-import type{Env,Locale,SearchResult}from"../types";import{classifyOpenAIFailure,classifyWorkersAIFailure,getProviderBreaker,updateProviderBreaker,recordProviderDiagnostic,normalizeDraftJson,isOpenAIQuotaFailure,workersAIResponseText}from"./ai-provider-resilience";import{notify}from"./telegram";export{normalizeDraftJson};
+import type{Env,Locale,SearchResult}from"../types";import{classifyOpenAIFailure,classifyWorkersAIFailure,classifyGeminiFailure,getProviderBreaker,updateProviderBreaker,recordProviderDiagnostic,normalizeDraftJson,isOpenAIQuotaFailure,workersAIResponseText}from"./ai-provider-resilience";import{notify}from"./telegram";import{callGemini}from"./gemini";export{normalizeDraftJson};
 import{recordRuntimeEventLimited}from"../runtime-events";
 export const DEFAULT_WORKERS_AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8";
 export function workersAiModel(env: Pick<Env, "NEWS_AI_MODEL">): string {
@@ -8,6 +8,22 @@ export function workersAiModel(env: Pick<Env, "NEWS_AI_MODEL">): string {
 
 const aiFailureDetail=(error:unknown)=>String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
 async function recordAiFailure(env:Env,provider:string,detail:string){await recordRuntimeEventLimited(env,"ai_generation","ai_provider_failure",provider+": "+detail);}
+async function callGeminiText(env:Env,provider:string,system:string,prompt:string,options:{json?:boolean;temperature?:number;maxOutputTokens?:number;timeoutMs?:number}={}):Promise<string>{
+  if(!String(env.GEMINI_API_KEY||"").trim())return "";
+  const breaker=await getProviderBreaker(env,"gemini");
+  if(breaker.open){
+    await recordRuntimeEventLimited(env,"ai_circuit_breaker","gemini_breaker_open",JSON.stringify({state:"open",code:breaker.code,openedUntil:new Date(breaker.openedUntil).toISOString()}));
+    return "";
+  }
+  const result=await callGemini(env,prompt,{system,...options});
+  if(result.ok)return result.text;
+  const failure=classifyGeminiFailure(result.kind,result.status,result.detail);
+  const state=await updateProviderBreaker(env,"gemini",failure);
+  await recordProviderDiagnostic(env,failure);
+  await recordAiFailure(env,provider,result.detail);
+  await recordRuntimeEventLimited(env,"ai_circuit_breaker",state.open?"gemini_breaker_open":"gemini_breaker_closed",JSON.stringify({state:state.open?"open":"closed",code:state.code,openedUntil:state.openedUntil?new Date(state.openedUntil).toISOString():null}));
+  return "";
+}
 export function paidAiEnabled(env:Pick<Env,"BAYAN_ALLOW_PAID_AI">){return String(env.BAYAN_ALLOW_PAID_AI||"").trim().toLowerCase()==="true";}
 export async function openAIAllowed(env:Env){
   // OpenAI API usage can incur charges independent of ChatGPT; free-first mode is the default.
@@ -217,6 +233,10 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
   };
   const generate=async(extraInstruction:string)=>{
     const messages=[{role:"system",content:system},{role:"user",content:"Topic/question: "+question+"\nEvidence excerpts (only these snippets may be used): "+evidenceText+(extraInstruction?"\nCorrection required: "+extraInstruction:"")}];
+    if(env.GEMINI_API_KEY&&(!backgroundBudget||await consumeDailyNewsAiCall(env))){
+      const answer=await callGeminiText(env,"Gemini draft",system,"Topic/question: "+question+"\nEvidence excerpts (only these snippets may be used): "+evidenceText+(extraInstruction?"\nCorrection required: "+extraInstruction:""),{json:true,temperature:0,maxOutputTokens:3600,timeoutMs:9000});
+      if(answer)return answer;
+    }
     if(env.OPENAI_API_KEY&&await openAIAllowed(env)&&(!backgroundBudget||await consumeDailyNewsAiCall(env)))try{
       const response=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(9000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",messages,temperature:0,max_tokens:3600,response_format:{type:"json_object"}})});
       if(response.ok){
@@ -270,6 +290,14 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
 export async function ask(env:Env,question:string,locale:Locale,evidence:SearchResult[]){
   if(!evidence.length)return{status:"insufficient" as const,answer:locale==="ar"?"لا أملك أدلة موثقة كافية للإجابة بثقة.":"I do not have enough verified evidence to answer confidently.",sources:[]};
   const evidenceText=JSON.stringify(evidence).slice(0,18000);
+  const geminiSystem=locale==="ar"
+    ?"أنت بيان. أجب بالعربية الفصحى فقط وبالاعتماد على الأدلة المرفقة وحدها. لا تخترع أسماء أو أرقامًا أو مصادر. ميّز الحقائق من الاستنتاجات، واذكر بوضوح ما لا تثبته الأدلة."
+    :"You are BAYAN. Answer in English only using only the supplied evidence. Do not invent names, numbers, or sources. Distinguish facts from inference and state clearly what the evidence does not establish.";
+  if(env.GEMINI_API_KEY){
+    const answer=await callGeminiText(env,"Gemini answer",geminiSystem,"Question: "+question+"\nEvidence: "+evidenceText,{temperature:0.1,maxOutputTokens:1200,timeoutMs:10000});
+    if(answer&&languageConsistent(answer,locale))return{status:independentSourceCount(env,evidence)>=2&&!answerHasUnsupportedSpecifics(answer,evidence,question)?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(x=>x.sources)};
+    if(answer)await recordAiFailure(env,"Gemini answer","language_mismatch");
+  }
   if(env.OPENAI_API_KEY&&await openAIAllowed(env))try{
     const r=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(12000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",messages:[{role:"system",content:locale==="ar"?"أنت BAYAN. أجب بالعربية الفصحى فقط، ولا تضع جملًا إنجليزية أو فقرات بلغة أخرى. استخدم الأدلة المقدمة فقط، ولا تضف اسم شخص أو نادٍ أو مؤسسة أو رقمًا غير موجود في الأدلة. احتفظ بالتهجئة الأصلية للأسماء الخاصة بين قوسين إذا كانت موجودة في المصدر. ابدأ بإجابة مباشرة، ثم نظّم الأفكار في أقسام قصيرة مترابطة عند الحاجة. لا تكرر الفكرة أو الجملة بصياغة أخرى، ولا تخلط بين أشخاص أو أحداث متشابهة. ميّز بين الحقيقة والاستنتاج وعدم اليقين، ولا تخترع معلومة.":"You are BAYAN. Answer in English only. Do not include Arabic sentences or paragraphs. Use only the supplied evidence, and do not introduce any person, club, organization or number that does not appear in the evidence. Start with a direct answer, then organize related ideas into concise sections when useful. Never repeat the same claim in different wording or conflate similar people/events. Distinguish facts from inference and uncertainty, and never invent facts."},{role:"user",content:"Question: "+question+"\nEvidence: "+evidenceText}],temperature:.1})});
     if(r.ok){const d=await r.json<any>();const answer=String(d.choices?.[0]?.message?.content||"").trim();if(answer && languageConsistent(answer,locale) )return{status:independentSourceCount(env,evidence)>=2&&!answerHasUnsupportedSpecifics(answer,evidence,question)?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(x=>x.sources)};await recordAiFailure(env,"OpenAI answer",answer?"language_mismatch":"empty_response")}
