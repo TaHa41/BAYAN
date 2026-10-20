@@ -1,4 +1,4 @@
-import type{Env,Locale,SearchResult}from"../types";import{classifyOpenAIFailure,classifyWorkersAIFailure,classifyGeminiFailure,getProviderBreaker,updateProviderBreaker,recordProviderDiagnostic,normalizeDraftJson,isOpenAIQuotaFailure,workersAIResponseText}from"./ai-provider-resilience";import{notify}from"./telegram";import{callGemini}from"./gemini";export{normalizeDraftJson};
+import type{Env,Locale,SearchResult}from"../types";import{classifyOpenAIFailure,classifyWorkersAIFailure,classifyGeminiFailure,getProviderBreaker,updateProviderBreaker,recordProviderDiagnostic,normalizeDraftJson,isOpenAIQuotaFailure,workersAIResponseText}from"./ai-provider-resilience";import{notify}from"./telegram";import{callGemini}from"./gemini";import{callOmniRoute}from"./omniroute";export{normalizeDraftJson};
 import{recordRuntimeEventLimited}from"../runtime-events";
 export const DEFAULT_WORKERS_AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8";
 export function workersAiModel(env: Pick<Env, "NEWS_AI_MODEL">): string {
@@ -237,6 +237,11 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
       const answer=await callGeminiText(env,"Gemini draft",system,"Topic/question: "+question+"\nEvidence excerpts (only these snippets may be used): "+evidenceText+(extraInstruction?"\nCorrection required: "+extraInstruction:""),{json:true,temperature:0,maxOutputTokens:3600,timeoutMs:9000});
       if(answer)return answer;
     }
+    if(env.OMNIROUTE_BASE_URL&&env.OMNIROUTE_API_KEY&&(!backgroundBudget||await consumeDailyNewsAiCall(env))){
+      const routed=await callOmniRoute(env,[{role:"system",content:system},{role:"user",content:"Topic/question: "+question+"\\nEvidence excerpts (only these snippets may be used): "+evidenceText+(extraInstruction?"\\nCorrection required: "+extraInstruction:"")}],{json:true,temperature:0,maxTokens:3600,timeoutMs:9000});
+      if(routed.ok&&routed.text)return routed.text;
+      if(!routed.ok)await recordAiFailure(env,"OmniRoute draft",routed.detail);
+    }
     if(env.OPENAI_API_KEY&&await openAIAllowed(env)&&(!backgroundBudget||await consumeDailyNewsAiCall(env)))try{
       const response=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(9000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",messages,temperature:0,max_tokens:3600,response_format:{type:"json_object"}})});
       if(response.ok){
@@ -297,6 +302,15 @@ export async function ask(env:Env,question:string,locale:Locale,evidence:SearchR
     const answer=await callGeminiText(env,"Gemini answer",geminiSystem,"Question: "+question+"\nEvidence: "+evidenceText,{temperature:0.1,maxOutputTokens:1200,timeoutMs:10000});
     if(answer&&languageConsistent(answer,locale))return{status:independentSourceCount(env,evidence)>=2&&!answerHasUnsupportedSpecifics(answer,evidence,question)?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(x=>x.sources)};
     if(answer)await recordAiFailure(env,"Gemini answer","language_mismatch");
+  }
+  if(env.OMNIROUTE_BASE_URL&&env.OMNIROUTE_API_KEY){
+    const system=locale==="ar"
+      ?"أنت بيان. أجب بالعربية الفصحى فقط وبالاعتماد على الأدلة المرفقة وحدها. لا تخترع أسماء أو أرقامًا أو مصادر. ميّز الحقائق من الاستنتاجات، واذكر بوضوح ما لا تثبته الأدلة."
+      :"You are BAYAN. Answer in English only using only the supplied evidence. Do not invent names, numbers, or sources. Distinguish facts from inference and state clearly what the evidence does not establish.";
+    const routed=await callOmniRoute(env,[{role:"system",content:system},{role:"user",content:"Question: "+question+"\\nEvidence: "+evidenceText}],{temperature:0.1,maxTokens:1200,timeoutMs:10000});
+    if(routed.ok&&routed.text&&languageConsistent(routed.text,locale))return{status:independentSourceCount(env,evidence)>=2&&!answerHasUnsupportedSpecifics(routed.text,evidence,question)?"verified" as const:"mixed" as const,answer:routed.text,sources:evidence.flatMap(x=>x.sources)};
+    if(!routed.ok)await recordAiFailure(env,"OmniRoute answer",routed.detail);
+    else if(routed.text)await recordAiFailure(env,"OmniRoute answer","language_mismatch");
   }
   if(env.OPENAI_API_KEY&&await openAIAllowed(env))try{
     const r=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(12000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",messages:[{role:"system",content:locale==="ar"?"أنت BAYAN. أجب بالعربية الفصحى فقط، ولا تضع جملًا إنجليزية أو فقرات بلغة أخرى. استخدم الأدلة المقدمة فقط، ولا تضف اسم شخص أو نادٍ أو مؤسسة أو رقمًا غير موجود في الأدلة. احتفظ بالتهجئة الأصلية للأسماء الخاصة بين قوسين إذا كانت موجودة في المصدر. ابدأ بإجابة مباشرة، ثم نظّم الأفكار في أقسام قصيرة مترابطة عند الحاجة. لا تكرر الفكرة أو الجملة بصياغة أخرى، ولا تخلط بين أشخاص أو أحداث متشابهة. ميّز بين الحقيقة والاستنتاج وعدم اليقين، ولا تخترع معلومة.":"You are BAYAN. Answer in English only. Do not include Arabic sentences or paragraphs. Use only the supplied evidence, and do not introduce any person, club, organization or number that does not appear in the evidence. Start with a direct answer, then organize related ideas into concise sections when useful. Never repeat the same claim in different wording or conflate similar people/events. Distinguish facts from inference and uncertainty, and never invent facts."},{role:"user",content:"Question: "+question+"\nEvidence: "+evidenceText}],temperature:.1})});
