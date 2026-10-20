@@ -55,8 +55,8 @@ These tools are developer-side checks, not Worker runtime dependencies. A tool b
 - **Scrapling MCP:** not yet confirmed installed or connected. Treat it as an external MCP server; verify the package/source, pinned version, launch command, transport, and least-privilege permissions before connecting it to an agent.
 - **Agent Reach:** not yet confirmed installed or diagnosed. Verify the exact upstream repository/package and installation instructions before execution; run diagnostics in an isolated developer environment and review any account/network permissions.
 - **`bayan-maintenance` skill:** present at `skills/bayan-maintenance/SKILL.md`.
-- **`bayan-performance` skill:** recommended companion workflow is to be added in a separate reviewed change; do not assume it exists until it appears in the repository.
-- **Lighthouse/PageSpeed:** no verified measurement is implied by this inventory. A Lighthouse CI run should save JSON/HTML artifacts and record the commit and timestamp. PageSpeed Insights field/lab data and Search Console indexing are separate checks.
+- **`bayan-performance` skill:** present at `skills/bayan-performance/SKILL.md`; it defines evidence-first browser, performance, SEO, image, news, and deployment checks. Its presence does not mean those checks have been run.
+- **Lighthouse/PageSpeed:** no verified measurement is implied by this inventory. The workflows directory currently has no dedicated Lighthouse workflow; add one through a reviewed PR or run a controlled local audit, save JSON/HTML artifacts, and record commit and timestamp. PageSpeed Insights field/lab data and Search Console indexing are separate checks.
 
 ### Operational gate
 Never report a tool as “installed”, “connected”, “working”, or “passed” based only on configuration text. Record the command or workflow run, version, timestamp, exit status, and sanitized output. Missing credentials must be reported as a blocker, not worked around by embedding keys in code.
