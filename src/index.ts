@@ -149,7 +149,17 @@ if(path==="/"&&!section){
     title=homeTitle;
     description=homeDescription;
     headExtras+='<script type="application/ld+json">'+JSON.stringify({"@context":"https://schema.org","@type":"CollectionPage","name":homeTitle,"description":homeDescription,"inLanguage":lang,"url":ORIGIN+(lang==="en"?"/?lang=en":"/")})+'</script>';
-  }catch(error){await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}
+  }catch(error){
+    await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error);
+    const fallbackRows=SECTIONS.flatMap(section=>bundledArticlesForSection(section[0],lang,2)).filter((item:any)=>item.slug&&item.title).slice(0,8);
+    const fallbackCards=fallbackRows.map((item:any)=>{
+      const verifiedImage=safePublicImageUrl(item.imageUrl);
+      const image=verifiedImage||ORIGIN+"/sections/"+String(item.section||"science")+".svg";
+      const imageAlt=verifiedImage?String(item.imageAlt||item.title):(lang==="en"?"BAYAN section illustration":"رسم توضيحي لقسم بيان");
+      return '<article class="seo-content-item"><figure class="seo-content-image"><img src="'+seoEscape(image)+'" alt="'+seoEscape(imageAlt)+'" loading="lazy" decoding="async"></figure><h2><a href="/article/'+encodeURIComponent(String(item.slug))+'?lang='+lang+'">'+seoEscape(String(item.title))+'</a></h2><p>'+seoEscape(String(item.summary||""))+'</p></article>';
+    }).join("");
+    seoFallback='<section class="seo-content-fallback seo-home-featured"><h2>'+seoEscape(lang==="en"?"Reviewed knowledge articles":"مقالات معرفية موثقة")+'</h2><p>'+seoEscape(lang==="en"?"Showing reviewed bundled articles while the saved database is temporarily unavailable.":"نعرض مقالات معرفية موثقة مدمجة بالموقع مؤقتًا لتعذر الوصول إلى قاعدة البيانات المحفوظة.")+'</p><div class="seo-content-grid">'+(fallbackCards||'<p>'+seoEscape(lang==="en"?"Reviewed articles are temporarily unavailable.":"المقالات الموثقة غير متاحة مؤقتًا.")+'</p>')+'</div></section>';
+  }
 }
 const staticPage=staticPageContent[path];
 if(staticPage){
