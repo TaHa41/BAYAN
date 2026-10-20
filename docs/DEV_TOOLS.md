@@ -36,3 +36,7 @@ The intended project is https://github.com/gishamer/skill-ui, a desktop/CLI mana
 ## Visitor-facing tools
 
 The existing public tools route is `/tools?lang=ar` or `/tools?lang=en`. Playwright checks that route is served, but this change does not claim to add new public capabilities. Developer utilities, MCP servers, and security scanners must remain private and must not be exposed to anonymous visitors.
+
+## Performance and reliability skill
+
+Use [PERFORMANCE_TOOLING.md](PERFORMANCE_TOOLING.md) and [the `bayan-performance` agent skill](../skills/bayan-performance/SKILL.md) for evidence-driven Core Web Vitals, accessibility, broken-image, search-provider, and news-pipeline diagnosis. These are agent workflows and checklists; they do not imply the live issues have been fixed. Prefer existing Playwright and health scripts before adding dependencies or paid services.
