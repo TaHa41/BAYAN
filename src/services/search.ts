@@ -12,6 +12,7 @@ import {sections} from "../sections";
 import {requiredEvidencePublisherCount,requiredSearchExpansionPublisherCount,independentEvidenceHost,hasIndependentEvidenceDiversity} from "./evidence-diversity";
 import {getProviderBreaker} from "./ai-provider-resilience";
 import {shouldAttemptOpenAIWebSearchFallback} from "./search-recovery";
+import {selectExpandedSearchCandidates} from "./search-expansion";
 const publicationErrorMessage=(error:unknown)=>String((error as {message?:string})?.message||error||"unknown").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").slice(0,300);
 const publicationFailureReason=(error:unknown)=>{const message=publicationErrorMessage(error);return /429|rate.?limit|timeout|timed out|abort|quota|neurons|overload|openai|workers ai|ai unavailable/i.test(message)?"ai_unavailable":"exception:"+message;};
 async function recordPublicationWarning(env:Env,message:string){await recordRuntimeEventLimited(env,"news_archive_article_generation","publication_warning",message);}
@@ -916,7 +917,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
     providerAttempted.push("Expanded topic variants: Wikipedia REST Search, Google News Search, Bing Web RSS Search","OpenAI Web Search (fallback)");
     const expanded=await safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||""),providerAttempted,identityAliases,options.images===true,options.publicationContext||""),[]);
-    candidates.push(...expanded.slice(0,12));
+    candidates.push(...selectExpandedSearchCandidates(expanded,12));
     // OpenAI web search is the final recovery path, not a parallel request on
     // every weak first pass. Skip it as soon as independent evidence is adequate.
     const shouldUseOpenAIWebSearch=shouldAttemptOpenAIWebSearchFallback({publishing:options.publish===true,firstPassCount:firstPassCount(),personOrAcademic:personQuery||academicQuery,evidenceDiverse:firstPassHasDiverseEvidence(),belowExpansionThreshold:firstPassCount()<expansionThreshold});
