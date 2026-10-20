@@ -31,8 +31,7 @@
   ],
   "keep_vars": true,
   "vars": {
-    "NEWS_AI_DAILY_LIMIT": "150",
-    "NEWS_PIPELINE_ENABLED": "true"
+    "NEWS_AI_DAILY_LIMIT": "150"
   },
   "observability": {
     "enabled": true,
