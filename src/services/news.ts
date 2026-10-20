@@ -58,14 +58,14 @@ const feeds = (lang: Locale) =>
         ["فرانس 24 عربي", "https://www.france24.com/ar/top-stories/rss"],
         ["سكاي نيوز عربية", "https://www.skynewsarabia.com/rss"],
         ["اندبندنت عربية", "https://www.independentarabia.com/rss.xml"],
-        ["الشرق الأوسط", "https://aawsat.com/feed/news"],
+        ["الشرق الأوسط", "https://aawsat.com/feed"],
         ["أخبار Google عربية", "https://news.google.com/rss?hl=ar&gl=EG&ceid=EG:ar"],
         ["أخبار مصر", "https://news.google.com/rss/search?q=مصر&hl=ar&gl=EG&ceid=EG:ar"],
         ["أخبار عربية", "https://news.google.com/rss/search?q=العالم%20العربي&hl=ar&gl=EG&ceid=EG:ar"],
       ]
     : [
         ["BBC News", "https://feeds.bbci.co.uk/news/rss.xml"],
-        ["Reuters", "https://www.reuters.com/world/rss"],
+        ["Reuters via Google News", "https://news.google.com/rss/search?q=site%3Areuters.com&hl=en-US&gl=US&ceid=US:en"],
         ["Associated Press", "https://feeds.apnews.com/rss/apf-topnews"],
         ["Al Jazeera English", "https://www.aljazeera.com/xml/rss/all.xml"],
         ["DW English", "https://rss.dw.com/rdf/rss-en-all"],
@@ -154,10 +154,15 @@ export async function resolvePublisherArticleUrl(rawUrl: string, diagnostics?: s
   return original.href;
 }
 
+export function rssFetchTimeoutMs(rawUrl: string): number {
+  try { return new URL(rawUrl).hostname.toLowerCase() === "news.google.com" ? 8000 : 5000; }
+  catch { return 5000; }
+}
+
 const readFeed = async (name: string, url: string, diagnostics?: string[]): Promise<Story[]> => {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
+    const timer = setTimeout(() => controller.abort(), rssFetchTimeoutMs(url));
     let response: Response;
     let xml = "";
     try {
@@ -258,7 +263,7 @@ const readFeed = async (name: string, url: string, diagnostics?: string[]): Prom
     diagnostics?.push(name + " parsed=" + entries.length + " accepted=" + acceptedStories.length + (acceptedStories.length ? "" : " reason=no_valid_title_or_url"));
     return await Promise.all(acceptedStories.map(async (story, index) => {
       // Resolve only a bounded prefix; direct publisher URLs incur no extra request.
-      const resolvedUrl = index < 8 ? await resolvePublisherArticleUrl(story.url, diagnostics) : story.url;
+      const resolvedUrl = index < 3 ? await resolvePublisherArticleUrl(story.url, diagnostics) : story.url;
       let publisher = story.publisher;
       if (/^(?:Google News.*|Bing News.*|Bing World News|أخبار Google.*|أخبار مصر|أخبار عربية)$/i.test(publisher)) {
         try {

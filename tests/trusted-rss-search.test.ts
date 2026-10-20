@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { resolvePublisherArticleUrl, searchTrustedNewsFeeds } from "../src/services/news";
+import { resolvePublisherArticleUrl, rssFetchTimeoutMs, searchTrustedNewsFeeds } from "../src/services/news";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -92,7 +92,14 @@ describe("trusted publisher RSS search fallback", () => {
     await searchTrustedNewsFeeds("أخبار عربية", "ar", []);
     expect(seen).toContain("https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdff8b8cab9");
     expect(seen).toContain("https://www.france24.com/ar/top-stories/rss");
-    expect(seen).toContain("https://aawsat.com/feed/news");
+    expect(seen).toContain("https://aawsat.com/feed");
+    expect(seen).not.toContain("https://aawsat.com/feed/news");
+  });
+
+  it("gives Google News RSS a bounded longer timeout than direct feeds", () => {
+    expect(rssFetchTimeoutMs("https://news.google.com/rss/search?q=example")).toBe(8000);
+    expect(rssFetchTimeoutMs("https://www.bbc.co.uk/news/rss.xml")).toBe(5000);
+    expect(rssFetchTimeoutMs("not a URL")).toBe(5000);
   });
 
   it("records a concrete reason when a feed responds with HTML but no RSS/Atom entries", async () => {
