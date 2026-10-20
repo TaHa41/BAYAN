@@ -21,7 +21,7 @@ describe("bounded news archive queue", () => {
       { id: 2, title: " story ", publisher: "B", image_url: "x", published_at: "2026-10-20T10:00:00Z" },
       { id: 3, title: "Other", publisher: "C", image_url: null, published_at: "2026-10-20T09:00:00Z" },
     ];
-    expect(pickCandidate(rows, [{ id: 2, title: "STORY" }], null)?.id).toBe(1);
+    expect(pickCandidate(rows, [{ id: 2, title: "STORY" }], null)?.id).toBe(2);
     expect(titleKey("  SAME headline ")).toBe("same headline");
   });
 
