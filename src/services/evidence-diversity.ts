@@ -38,3 +38,10 @@ export function independentEvidenceHost(publisher: string, rawUrl: string): stri
     return undefined;
   }
 }
+
+
+/** Publication requires the configured number of distinct publisher labels AND distinct HTTPS hosts. */
+export function hasIndependentEvidenceDiversity(publisherCount: number, hostCount: number, requiredCount: number): boolean {
+  const required = Number.isFinite(requiredCount) && requiredCount > 0 ? Math.floor(requiredCount) : 3;
+  return publisherCount >= required && hostCount >= required;
+}
