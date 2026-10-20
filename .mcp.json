@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "scrapling": {
+      "command": "scrapling-mcp"
+    },
+    "scrapegraph-mcp": {
+      "command": "python",
+      "args": ["-m", "scrapegraph_mcp.server"],
+      "env": {
+        "SGAI_API_KEY": "SET_LOCALLY_DO_NOT_COMMIT_A_REAL_KEY"
+      }
+    }
+  }
+}

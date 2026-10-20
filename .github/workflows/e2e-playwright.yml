@@ -1,0 +1,38 @@
+name: BAYAN Playwright E2E
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["BAYAN Worker Deploy"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bayan-playwright-e2e
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout tested revision
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Test public Arabic and English routes
+        env:
+          CI: "true"
+          BAYAN_E2E_BASE_URL: https://bayan.tahaomar411.workers.dev
+        run: npm run test:e2e
