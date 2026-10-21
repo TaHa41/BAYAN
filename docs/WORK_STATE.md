@@ -94,3 +94,12 @@ This verifies Worker version metadata, not a direct successful read of `/.well-k
 - `.env.example` documents Gemini and Workers AI configuration names without storing secrets. Deployed Worker bindings and secret validity remain unverified from this repository change.
 - GDELT PR #339 was closed unmerged and its branch is 166 commits behind current `main`; do not merge that branch directly. Later GDELT topic-recovery work is recorded as deployed, but production linked-source diversity and news publication remain unverified.
 - No production article publication or successful `scripts/production-smoke.mjs` result is claimed by this entry.
+
+## Continuation update — 2026-10-21 07:00 Cairo
+
+- PR #500 merged as commit `4c49bc39869794eb514b7ff65eded254de4f8437`: production smoke now aborts the broad route matrix when health preflight is unavailable, malformed, unhealthy, or reports D1 quota exhaustion. All three CI workflows passed on the final head before merge.
+- PR #519 merged as commit `796447bc014442cc8ddf5f9c5799a9bf038a8669`: GDELT topic query recall widened and request timeout adjusted. All three CI workflows passed before merge.
+- Cloudflare deployment verified the same `BAYAN_COMMIT_SHA=796447bc014442cc8ddf5f9c5799a9bf038a8669`. Worker deployment succeeded; post-deploy health remains failing with `news_publication_gap`: `archiveReady=200`, `eligible=0`, `newsArticleCount=0`. This is a real unresolved production gap, not a green release.
+- A read-only Cloudflare Observability query found a publication attempt with `publishReason=no_independent_sources`, `publishers=1`, `hosts=1`, `required=5`, and a GDELT request failure. The failure detail was truncated by the publisher's diagnostic summary; exact underlying exception remains unconfirmed. No D1 rows were queried during this diagnostic.
+- Follow-up branch `fix/gdelt-query-fallback-retry` adds a bounded topic-query retry using a language-level GDELT query after timeout, HTTP/non-JSON failure, or an empty result. It does not lower the five-publisher evidence floor or invent evidence. Mock tests cover timeout recovery, empty-topic recovery, and honest empty results when both requests fail. CI must pass before merge.
+- D1 daily row-read usage and query-plan measurements remain deferred to the next reset window; do not infer the D1 consumption from Cloudflare Observability query `rows_read`, which measures the observability query, not D1.
