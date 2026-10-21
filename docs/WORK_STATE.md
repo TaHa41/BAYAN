@@ -103,3 +103,11 @@ This verifies Worker version metadata, not a direct successful read of `/.well-k
 - Read-only production D1 check at this checkpoint: `news_archive=1697`, `linked=0`, `published_news=0`. The live Worker settings report `NEWS_PIPELINE_ENABLED=true`. Recent failures include `ai_unavailable` / Gemini timeouts and insufficient independent publishers. This confirms that cron timing is not the only blocker.
 - Status: implementation and contract guard are merged in PR #521; CI passed (including typecheck, tests, source contracts, smoke contracts, and Worker build); PR #521 is merged. Cloudflare deployment `cc780839-f5a2-416e-bfac-6ee45f89e78c` at `2026-10-21T04:05:09.751Z` reports `BAYAN_COMMIT_SHA=a2742156705222230533c1422e5d59d5e081d519`. No authenticated production trigger call has been made, and no article is published yet. Do not mark the first article criterion complete until a real published slug is returned and verified in `/news-sitemap.xml`.
 - A production trigger call requires the manager token in an authenticated POST. The token is not read or printed by this audit. Do not expose it in browser code, query strings, logs, or repository files.
+
+
+## 2026-10-21 — GDELT recovery continuation
+
+- Rebuilt the GDELT topic-recovery change on current `main` after the original PR #520 branch became merge-conflicted with the authenticated manual-trigger change.
+- Corrected source-contract assertions to match the explicit `topic` / `language-fallback` query labels; the earlier CI failure was caused by stale literal expectations, not evidence that the intended fallback was absent.
+- Added a 512 KiB cap before buffering/parsing GDELT metadata, with fallback to the language query and a bounded diagnostic when a topic response exceeds the cap.
+- Added regression coverage for oversized metadata response fallback. This branch is not yet merged or production-verified; do not claim publication success until a real article passes the unchanged five-independent-publisher evidence checks.
