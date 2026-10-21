@@ -75,3 +75,13 @@ This verifies Worker version metadata, not a direct successful read of `/.well-k
 2. Confirm the latest Worker commit and the public build identity endpoint, then perform non-destructive route checks.
 3. Verify the post-deploy sensitive-binding audit warning; owner must rotate and move the two named credentials to Secrets.
 4. Continue only with evidence-backed repairs; leave the OG PNG, key rotation, and Search Console tasks marked as blocked until the required owner action or access is available.
+
+
+## Execution checkpoint — 2026-10-21 03:13 UTC
+
+- Live Worker commit: `4c49bc39869794eb514b7ff65eded254de4f8437`; deployment ID `7d388c07-d4f5-42a1-abe6-8c99ef490ba6`. The deployed binding audit reports `NEWS_PIPELINE_ENABLED=true` and `OPENAI_ENABLED` absent, so paid OpenAI remains off.
+- Merged implementation PRs: #501 (initial D1 quota guard), #502 (indexed news-queue rewrite/contract tests), #500 (production smoke preflight abort), #503 (smoke assertions cannot silently pass), #504 (Egypt section check), #506 (topic-specific GDELT publisher-text recovery), #507 (global D1 quota interception), #508 (restore persisted quota block before all routes), #509 (designed section-image fallback), #511 (explicit OpenAI opt-in).
+- Latest production check is still **red** for a specific reason: `news_publication_gap`; `archiveReady=200`, `candidateCount=0`, `urlCount=0`, `eligible=0`, `rejectedCount=0`. The health preflight itself is healthy, so the smoke audit reaches and reports the publication gap. Do not mark news publication resolved.
+- GDELT topic recovery is deployed, but `news_archive.linked>0` in both languages is not yet proven. No D1 read-count measurement was run outside the requested first-hour window.
+- A one-time measurement automation was created for 2026-10-22 00:05 UTC; the scheduler returned `next_run_time=null`, so execution time is not yet confirmed.
+- Manual blockers: upload `public/og/bayan-og.png`; add the missing `GEMINI_API_KEY` Secret binding to the live Worker without exposing its value; identify the intended provider for the currently unreferenced `SEARCH_API_KEY` before wiring it; approve RSS sources before activation. Do not merge #348 or #275 without owner approval.
