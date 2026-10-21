@@ -139,3 +139,10 @@ This verifies Worker version metadata, not a direct successful read of `/.well-k
 
 
 - Follow-up PR #527 merged as `655b9b7f034fd41eeedaf4b3d37671e5c726e108`; Cloudflare now reports `NEWS_AI_DAILY_LIMIT=10` and the `GEMINI_API_KEY` binding remains `secret_text`. Post-deploy smoke passed, but health still reports `archiveReady=200`, `eligible=0`, `newsArticleCount=0`.
+
+
+## 2026-10-21 — secondary deploy path safety (pending PR)
+
+- Found that `.github/workflows/deploy-direct.yml` could be dispatched from a non-main branch, always read D1 migration history even for code-only releases, and did not inject/verify `BAYAN_COMMIT_SHA`.
+- This branch restricts production deployment to `main`, injects and verifies the deployed build SHA, compares migration files against the currently deployed SHA without touching D1, and requires `apply_migrations=true` only when a migration delta exists. Self-heal remains gated by `allow_repair=true`.
+- Adds the same read-only smoke preflight and conditional post-deploy health checks used by the primary workflow. Pending CI; do not merge until all three checks pass.
