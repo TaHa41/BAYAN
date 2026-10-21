@@ -1,4 +1,4 @@
-import{isD1IndependentApiPath}from"./services/d1-independent-routes";import{safePublicImageUrl}from"./image-url";import{d1Blocked,d1BlockedPersisted,isD1QuotaError,logD1QuotaOncePerHour,persistD1Block,withD1QuotaGuard}from"./services/d1-guard";import{recordRuntimeEventLimited}from"./runtime-events";
+import{isD1IndependentApiPath,isD1QuotaTolerantApiPath}from"./services/d1-independent-routes";import{safePublicImageUrl}from"./image-url";import{d1Blocked,d1BlockedPersisted,isD1QuotaError,logD1QuotaOncePerHour,persistD1Block,withD1QuotaGuard}from"./services/d1-guard";import{recordRuntimeEventLimited}from"./runtime-events";
 import type{Env}from"./types";import{api}from"./routes/api";import{robots,sitemap,newsSitemap}from"./seo";import{selfHeal}from"./services/repair";import{news}from"./services/news";import{publishNextArchivedNewsArticle}from"./services/news-article-publisher";import{track}from"./db";import{analyticsExcluded,manager,visitorId}from"./security";import{ensureSchema}from"./schema";import{ORIGIN,SECTIONS}from"./config";import{notify}from"./services/telegram";import{bundledArticleBySlug,bundledArticlesForSection}from"./fallback-content";
 const BUILD="2026.10.15.01";
 const COMMIT_SHA="0000000000000000000000000000000000000000";
@@ -293,6 +293,13 @@ const publicApiCacheTtl=(request:Request,url:URL):number=>{
  if(url.pathname==="/api/wisdom")return 60_000;
  return 0;
 };
+const markD1QuotaDegradedResponse=async(response:Response)=>{
+ const headers=new Headers(response.headers);
+ headers.set("x-bayan-degraded","d1_quota");
+ const payload=await response.clone().json().catch(()=>null);
+ if(payload&&typeof payload==="object"&&!Array.isArray(payload))return new Response(JSON.stringify({...payload,degraded:true,reason:"d1_quota"}),{status:response.status,headers});
+ return new Response(response.body,{status:response.status,headers});
+};
 const d1QuotaFallback=(url:URL)=>{
  const lang=url.searchParams.get("lang")==="en"?"en":"ar";
  const headers={"content-type":"application/json;charset=utf-8","cache-control":"no-store","x-bayan-degraded":"d1_quota","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"};
@@ -337,13 +344,16 @@ if(apiCacheTtl&&!d1Blocked()){
 if(u.pathname.startsWith("/api/")){
  const schemaOptional=["/api/search","/api/section","/api/article"].includes(u.pathname);
  const d1Independent=isD1IndependentApiPath(u.pathname);
+ const d1QuotaTolerant=isD1QuotaTolerantApiPath(u.pathname);
  if(!d1Independent){
-  if(await d1BlockedPersisted())return d1QuotaFallback(u);
-  try{await ensureSchema(env)}catch(error){if(isD1QuotaError(error)){await persistD1Block();logD1QuotaOncePerHour(error);return d1QuotaFallback(u)}if(!schemaOptional)return new Response(JSON.stringify({error:"database_unavailable"}),{status:503,headers:{"content-type":"application/json;charset=utf-8","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})}
+  const quotaAlreadyBlocked=await d1BlockedPersisted();
+  if(quotaAlreadyBlocked&&!d1QuotaTolerant)return d1QuotaFallback(u);
+  if(!quotaAlreadyBlocked)try{await ensureSchema(env)}catch(error){if(isD1QuotaError(error)){await persistD1Block();logD1QuotaOncePerHour(error);if(!d1QuotaTolerant)return d1QuotaFallback(u)}else if(!schemaOptional)return new Response(JSON.stringify({error:"database_unavailable"}),{status:503,headers:{"content-type":"application/json;charset=utf-8","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY","permissions-policy":"camera=(), microphone=(), geolocation=()"}})}
  }
  try{
-  const response=await api(request,env,ctx);
-  if(apiCacheTtl&&response.ok){
+  let response=await api(request,env,ctx);
+  if(d1QuotaTolerant&&d1Blocked()&&response.ok)response=await markD1QuotaDegradedResponse(response);
+  if(apiCacheTtl&&response.ok&&!d1Blocked()){
    const bodyText=await response.clone().text();
    if(bodyText.length<=512*1024){
     const headers:Array<[string,string]>=[];
@@ -352,7 +362,7 @@ if(u.pathname.startsWith("/api/")){
     publicApiResponseCache.set(apiCacheKey,{expiresAt:Date.now()+apiCacheTtl,body:bodyText,status:response.status,headers});
    }
   }
-  if(d1Blocked()&&!d1Independent&&u.pathname!=="/api/health")return d1QuotaFallback(u);
+  if(d1Blocked()&&!d1Independent&&u.pathname!=="/api/health"&&!d1QuotaTolerant)return d1QuotaFallback(u);
   return response;
  }catch(error){
   if(isD1QuotaError(error)){await persistD1Block();logD1QuotaOncePerHour(error);return d1QuotaFallback(u)}
