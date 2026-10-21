@@ -327,7 +327,7 @@ if(u.pathname.startsWith("/api/")){
     publicApiResponseCache.set(apiCacheKey,{expiresAt:Date.now()+apiCacheTtl,body:bodyText,status:response.status,headers});
    }
   }
-  if(d1Blocked()&&!d1Independent)return d1QuotaFallback(u);
+  if(d1Blocked()&&!d1Independent&&u.pathname!=="/api/health")return d1QuotaFallback(u);
   return response;
  }catch(error){
   if(isD1QuotaError(error)){await persistD1Block();logD1QuotaOncePerHour(error);return d1QuotaFallback(u)}
