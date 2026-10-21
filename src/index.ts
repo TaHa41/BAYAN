@@ -340,6 +340,7 @@ if(seoPath==="/llms.txt"){const body=`# BAYAN | بيان\n\n> Evidence-first Ara
 if(seoPath==="/ai-catalog.json"||seoPath==="/.well-known/ai-catalog.json"){const catalog={specVersion:"1.0",host:{displayName:"BAYAN | بيان",identifier:"bayan.tahaomar411.workers.dev",documentationUrl:ORIGIN+"/methodology?lang=en"},entries:[]};return new Response(JSON.stringify(catalog,null,2),{status:200,headers:{"Content-Type":"application/ai-catalog+json; charset=utf-8","Cache-Control":"public, max-age=3600","X-Content-Type-Options":"nosniff","Referrer-Policy":"strict-origin-when-cross-origin","X-Frame-Options":"DENY","Permissions-Policy":"camera=(), microphone=(), geolocation=()","Link":'<'+ORIGIN+'/.well-known/ai-catalog.json>; rel="self"'}})}
 if(seoPath==="/robots.txt")return robots();
 if(seoPath==="/sitemap.xml"||seoPath==="/news-sitemap.xml"){
+  const degradedSitemap=()=>new Response(seoPath==="/news-sitemap.xml"?'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"></urlset>':'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml"></urlset>',{status:200,headers:{"Content-Type":"application/xml; charset=utf-8","Cache-Control":"no-store","X-BAYAN-Degraded":"d1_quota","X-BAYAN-SEO":"sitemap-degraded-d1-quota","X-Content-Type-Options":"nosniff"}});
   const sitemapCache=(caches as unknown as {default:Cache}).default;
   const sitemapCacheKey=new Request(new URL(seoPath,ORIGIN).toString(),{method:"GET"});
   try{
@@ -351,6 +352,7 @@ if(seoPath==="/sitemap.xml"||seoPath==="/news-sitemap.xml"){
     const headers=new Headers(response.headers);
     headers.set("X-Content-Type-Options","nosniff");
     headers.set("X-BAYAN-SEO",response.status>=500?"sitemap-unavailable":"sitemap-v1");
+    if(response.status>=500&&d1Blocked())return degradedSitemap();
     if(response.status>=500){
       headers.set("Cache-Control","no-store");
       headers.set("Retry-After",response.headers.get("Retry-After")||"300");
@@ -361,7 +363,7 @@ if(seoPath==="/sitemap.xml"||seoPath==="/news-sitemap.xml"){
     const finalResponse=new Response(response.body,{status:response.status,headers});
     if(response.status===200){try{await sitemapCache.put(sitemapCacheKey,finalResponse.clone())}catch(error){console.warn("sitemap_edge_cache_write_failed",String(error).slice(0,120))}}
     return finalResponse;
-  }catch(error){
+  }catch(error){if(isD1QuotaError(error)||d1Blocked()){if(!d1Blocked())await persistD1Block();logD1QuotaOncePerHour(error);return degradedSitemap()}
     try{await notify(env,"BAYAN SITEMAP ERROR\\nPath: "+seoPath+"\\nError: "+String(error).slice(0,300))}catch(error){await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}
     return new Response("Sitemap temporarily unavailable; retry later.",{status:503,headers:{"Content-Type":"text/plain; charset=utf-8","Cache-Control":"no-store","Retry-After":"300","X-Content-Type-Options":"nosniff","X-BAYAN-SEO":"sitemap-unavailable"}});
   }
