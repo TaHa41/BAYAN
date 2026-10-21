@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyOpenAIFailure, classifyWorkersAIFailure, exponentialBackoffMs, normalizeDraftJson, parseRetryAfter, isOpenAIQuotaFailure, workersAIResponseText } from "./ai-provider-resilience";
+import { classifyOpenAIFailure, classifyWorkersAIFailure, exponentialBackoffMs, normalizeDraftJson, parseRetryAfter, isGeminiAuthenticationFailure, isOpenAIQuotaFailure, workersAIResponseText, classifyGeminiFailure } from "./ai-provider-resilience";
 import { DEFAULT_WORKERS_AI_MODEL, workersAiModel } from "./ai";
 
 describe("AI provider resilience", () => {
@@ -16,6 +16,13 @@ describe("AI provider resilience", () => {
     expect(isOpenAIQuotaFailure("credit_balance_exhausted")).toBe(true);
     expect(isOpenAIQuotaFailure("insufficient_quota")).toBe(true);
     expect(isOpenAIQuotaFailure("rate_limit_exceeded")).toBe(false);
+  });
+
+  it("recognizes invalid Gemini credentials so the provider is briefly cooled down and fallback can run", () => {
+    const failure = classifyGeminiFailure("auth", 400, "API key not valid");
+    expect(failure.code).toBe("authentication_failed");
+    expect(isGeminiAuthenticationFailure(failure)).toBe(true);
+    expect(isGeminiAuthenticationFailure({ provider: "workers_ai", code: "authentication_failed", detail: "x" })).toBe(false);
   });
 
   it("parses Retry-After seconds and dates", () => {
