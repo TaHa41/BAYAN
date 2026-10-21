@@ -71,6 +71,21 @@ describe("GDELT topic query recovery", () => {
     expect(diagnostics).toContain("GDELT topic query empty; trying language fallback");
   });
 
+  it("bounds metadata response bodies and retries the language fallback", async () => {
+    const diagnostics: string[] = [];
+    let calls = 0;
+    const fetchImpl = (async () => {
+      calls++;
+      if (calls === 1) return new Response("x".repeat(512 * 1024 + 1), { status: 200 });
+      return new Response(JSON.stringify({ articles: [{ title: "Verified topic", url: "https://example.org/story", language: "English" }] }), { status: 200 });
+    }) as typeof fetch;
+    const result = await fetchGdeltMetadataWithFallback("en", fetchImpl, diagnostics, "public health policy");
+    expect(calls).toBe(2);
+    expect(result).toHaveLength(1);
+    expect(diagnostics).toContain("GDELT topic request failed: response_body_too_large");
+    expect(diagnostics).toContain("GDELT language-fallback parsed=1");
+  });
+
   it("does not fabricate results when both GDELT requests fail", async () => {
     const diagnostics: string[] = [];
     const fetchImpl = (async () => { throw new Error("network unavailable"); }) as typeof fetch;
