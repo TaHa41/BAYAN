@@ -305,7 +305,7 @@ export default{async fetch(request:Request,env:Env,ctx?:ExecutionContext){env=wi
 if(u.pathname==="/.well-known/build.json"){return new Response(JSON.stringify({service:"BAYAN",commit:COMMIT_SHA,build:BUILD}),{status:200,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store, max-age=0","cdn-cache-control":"no-store","x-bayan-commit":COMMIT_SHA,"x-bayan-build":BUILD,"x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY"}})}
 await d1BlockedPersisted();
 const apiCacheTtl=publicApiCacheTtl(request,u),apiCacheKey=u.pathname+u.search;
-if(apiCacheTtl){
+if(apiCacheTtl&&!d1Blocked()){
  const cached=publicApiResponseCache.get(apiCacheKey);
  if(cached&&cached.expiresAt>Date.now())return new Response(cached.body,{status:cached.status,headers:cached.headers});
  if(cached)publicApiResponseCache.delete(apiCacheKey);
