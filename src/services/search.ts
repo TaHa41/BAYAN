@@ -770,7 +770,7 @@ const languageSafe=(x:Candidate,language:Locale)=>{
     if(!terms.length)return[];
     const predicates=terms.map(()=>"(title LIKE ? ESCAPE '!' OR summary LIKE ? ESCAPE '!')").join(" OR ");
     const patterns=terms.flatMap(term=>[escapedLikePattern(term),escapedLikePattern(term)]);
-    const response=await env.DB.prepare("SELECT title,summary,url,publisher,published_at,image_url,image_alt,section FROM news_archive WHERE language=? AND fetched_at>=? AND published_at>=? AND published_at<=? AND length(summary)>=80 AND ("+predicates+") ORDER BY fetched_at DESC LIMIT 60").bind(language,cutoff,cutoff,future,...patterns).all<any>();
+    const response=await env.DB.prepare("SELECT title,summary,url,publisher,published_at,image_url,image_alt,section FROM news_archive WHERE language=? AND fetched_at>=? AND published_at>=? AND published_at<=? AND length(summary)>=50 AND ("+predicates+") ORDER BY fetched_at DESC LIMIT 60").bind(language,cutoff,cutoff,future,...patterns).all<any>();
     const output:Candidate[]=[];
     const seenPublishers=new Set<string>();
     for(const row of response.results||[]){
@@ -1091,7 +1091,9 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     for(const item of items){
       const itemTitle=String(item.title||"").trim();
       const itemSummary=String(item.summary||"").trim();
-      const substantive=itemSummary.length>=100;
+      // RSS summaries from reputable publishers can be brief; count them from 50 characters,
+      // while still requiring independent publisher hosts and non-syndicated evidence.
+      const substantive=itemSummary.length>=50;
       if(!substantive)continue;
       if(seenStoryEvidence.some(previous=>areNearDuplicateEvidenceTitles(previous.title,itemTitle)||areNearDuplicateEvidenceTexts(previous.summary,itemSummary)))continue;
       seenStoryEvidence.push({title:itemTitle,summary:itemSummary});
