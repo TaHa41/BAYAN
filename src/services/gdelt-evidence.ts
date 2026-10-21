@@ -247,9 +247,10 @@ export async function fetchGdeltEvidenceStories(lang: Locale, env: Env, diagnost
     return Boolean(date && Date.now() - Date.parse(date) <= 72 * 60 * 60_000 && Date.parse(date) <= Date.now() + 5 * 60_000);
   });
   const seenHosts = new Set<string>();
+  // Publication recovery shares the Worker subrequest budget with search, AI and image work; cap topic page fetches and concurrency.
   const candidates: GdeltArticle[] = [];
   for (const article of recent) {
-    if (candidates.length >= (topic ? 12 : 10)) break;
+    if (candidates.length >= (topic ? 4 : 10)) break;
     if (!isSafeGdeltPublisherUrl(String(article.url || ""))) continue;
     const host = new URL(String(article.url)).hostname.toLowerCase().replace(/^www\./, "");
     if (seenHosts.has(host)) continue;
@@ -265,8 +266,8 @@ export async function fetchGdeltEvidenceStories(lang: Locale, env: Env, diagnost
       fetched[index] = await fetchPublisherExcerpt(candidates[index], lang, fetchImpl, diagnostics);
     }
   };
-  await Promise.all(Array.from({ length: topic ? 3 : 2 }, () => worker()));
-  const output = fetched.filter((story): story is GdeltEvidenceStory => Boolean(story)).slice(0, topic ? 5 : 3);
+  await Promise.all(Array.from({ length: 2 }, () => worker()));
+  const output = fetched.filter((story): story is GdeltEvidenceStory => Boolean(story)).slice(0, 3);
   diagnostics.push("GDELT evidence accepted=" + output.length + " lang=" + lang);
   await putJson(outputKey, output, output.length ? CACHE_TTL_SECONDS : 300);
   if (!output.length) await recordRuntimeEventLimited(env, "news_gdelt", "no_page_evidence", "GDELT metadata returned no robots-permitted page excerpts for " + lang);
