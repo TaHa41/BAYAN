@@ -74,6 +74,13 @@ export function isOpenAIQuotaFailure(code: string): boolean {
   return ["insufficient_quota", "quota_exceeded", "credit_balance_exhausted", "billing_hard_limit_reached", "billing_not_active"].some(value => normalized.includes(value));
 }
 
+/** Avoid repeating a known-invalid Gemini credential on every queued article.
+ * The short cooldown is intentionally bounded so a rotated secret can recover quickly.
+ */
+export function isGeminiAuthenticationFailure(failure: ProviderFailure): boolean {
+  return failure.provider === "gemini" && /authentication_failed|invalid_api_key|unauthorized/.test(String(failure.code || "").toLowerCase());
+}
+
 export function exponentialBackoffMs(attempt: number, baseMs = 15 * 60_000, capMs = 2 * 60 * 60_000): number {
   const n = Math.max(0, Math.floor(attempt));
   return Math.min(capMs, baseMs * 2 ** Math.min(n, 16));
@@ -114,7 +121,11 @@ export async function updateProviderBreaker(env: Pick<Env, "DB">, provider: "ope
       ? isOpenAIQuotaFailure(failure.code)
       : /quota|quota_exceeded|neurons/.test(failure.code.toLowerCase());
     const rateLimited = failure.status === 429 || /rate_limited|rate_limit/.test(failure.code.toLowerCase());
-    if (quota || rateLimited) {
+    if (isGeminiAuthenticationFailure(failure)) {
+      // Skip the invalid credential briefly, but allow a newly rotated secret to recover.
+      next.openedUntil = now + 5 * 60_000;
+      next.code = failure.code;
+    } else if (quota || rateLimited) {
       next.consecutive429 = previous.consecutive429 + 1;
       next.code = failure.code;
       const open = quota || next.consecutive429 >= 3;
