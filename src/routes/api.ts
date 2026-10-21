@@ -386,7 +386,7 @@ try{
 }catch(error){await recordRuntimeEventLimited(env,"section_news_archive","section_news_archive_query_failed",error)}
 }
 if(section==="people")items=items.filter((item:any)=>String(item.content_type||"")==="biography"||String(item.kind||"")==="biography"||/^who-is-[a-z0-9-]+-(?:ar|en)$/i.test(String(item.slug||"")));
-if(items.length<2&&section!=="news"&&section!=="prices"&&section!=="people"){
+if(items.length<2&&section!=="news"&&section!=="prices"){
  const existingSlugs=new Set(items.map((item:any)=>String(item.slug||"")).filter(Boolean));
  const existingTitles=new Set(items.map((item:any)=>String(item.title||"").normalize("NFKC").toLowerCase().trim()).filter(Boolean));
  const bundled=bundledArticlesForSection(section,lang,24).filter((item:any)=>item.slug&&!existingSlugs.has(String(item.slug))&&!existingTitles.has(String(item.title||"").normalize("NFKC").toLowerCase().trim())&&localeSafeItem(item)&&articleBodyQuality(String(item.body||"")).ok&&articleEvidenceQuality(item.sources)&&String(item.section||"")===section&&(!item.imageUrl||/^https:\/\//i.test(String(item.imageUrl||""))));
