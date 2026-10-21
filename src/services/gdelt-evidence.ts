@@ -10,12 +10,12 @@ export function gdeltQueryForLanguage(lang: Locale): string {
 
 const topicStopWords = new Set(["the","and","for","with","from","that","this","after","before","about","into","over","under","how","why","what","when","where","news","latest","update","breaking","من","في","على","الى","إلى","عن","ما","كيف","لماذا","متى","هذا","هذه","بعد","قبل","مع","حول","أمام","أثناء"]);
 export function gdeltQueryForTopic(topic: string, lang: Locale): string {
-  const words = [...new Set(cleanTopic(topic).split(/\\s+/).filter(word => word.length >= (lang === "ar" ? 3 : 4) && !topicStopWords.has(word)))].slice(0, 8);
+  const words = [...new Set(cleanTopic(topic).split(/\s+/).filter(word => word.length >= (lang === "ar" ? 3 : 4) && !topicStopWords.has(word)))].slice(0, 8);
   const phrases = [...new Set(words.slice(0, -1).map((word, index) => word + " " + words[index + 1]))].slice(0, 4);
   const query = phrases.length ? "(" + phrases.map(phrase => '"' + phrase + '"' ).join(" OR ") + ")" : words.slice(0, 3).join(" OR ");
   return (query || "(news OR breaking OR update)") + (lang === "ar" ? " sourcelang:arabic" : " sourcelang:english");
 }
-const cleanTopic = (value: string) => String(value || "").normalize("NFKC").toLowerCase().replace(/[^\\p{L}\\p{N}\\s]/gu, " ").replace(/\\s+/g, " ").trim().slice(0, 240);
+const cleanTopic = (value: string) => String(value || "").normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 240);
 
 export type GdeltEvidenceStory = {
   title: string;
