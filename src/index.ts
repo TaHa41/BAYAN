@@ -321,7 +321,7 @@ if(u.pathname==="/api/internal/trigger-news-pipeline"){
   const detail={status,publishReason:(result as any)?.publishReason||null,publishReasonDetail:(result as any)?.publishReasonDetail||null,articleId:(result as any)?.id||null,language:(result as any)?.language||null,slug:(result as any)?.slug||null};
   await recordRuntimeEventLimited(env,"news_archive_manual_trigger",status,JSON.stringify(detail));
   const published=status==="published"&&typeof (result as any)?.slug==="string";
-  return respond(status==="budget_exhausted"?503:200,{ok:status!=="attempted_failed"&&status!=="budget_exhausted",published,...detail,articleUrl:published?ORIGIN+"/article/"+encodeURIComponent(String((result as any).slug)):null});
+  return respond(status==="budget_exhausted"?503:200,{ok:status!=="attempted_failed"&&status!=="budget_exhausted",published,...detail,articleUrl:published?ORIGIN+"/article/"+encodeURIComponent(String((result as any).slug))+"?lang="+(String((result as any).language)==="en"?"en":"ar"):null});
  }catch(error){
   if(isD1QuotaError(error)){await persistD1Block();logD1QuotaOncePerHour(error);return respond(503,{ok:false,error:"database_temporarily_unavailable"});}
   await recordRuntimeEventLimited(env,"news_archive_manual_trigger","trigger_failed",error);
