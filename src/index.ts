@@ -12,12 +12,12 @@ const isPublicSvgAsset=(pathname:string)=>/^\/sections\/[a-z0-9-]+\.svg$/.test(p
 async function page(request:Request,env:Env){
   const u=new URL(request.url);
   // Social preview and section SVG files must bypass HTML metadata injection.
-  if (isPublicSvgAsset(u.pathname) || /^\\/(app(?:-[^/]+)?\\.js|styles\\.css|manifest\\.json|favicon\\.(?:ico|png|svg))$/.test(u.pathname)) {
+  if (isPublicSvgAsset(u.pathname) || /^\/(app(?:-[^/]+)?\.js|styles\.css|manifest\.json|favicon\.(?:ico|png|svg))$/.test(u.pathname)) {
     const response = await env.ASSETS.fetch(request);
     // Prefer the designed static artwork; synthesize SVG only if a section asset
     // is missing or the SPA returns HTML for an image URL.
-    if (/^\\/sections\\/[a-z0-9-]+\\.svg$/.test(u.pathname) &&
-        (!response.ok || !/^image\\/svg\\+xml(?:;|$)/i.test(String(response.headers.get("content-type") || "")))) {
+    if (/^\/sections\/[a-z0-9-]+\.svg$/.test(u.pathname) &&
+        (!response.ok || !/^image\/svg\+xml(?:;|$)/i.test(String(response.headers.get("content-type") || "")))) {
       const slug = u.pathname.slice("/sections/".length, -".svg".length);
       const themes: Record<string, [string, string, string]> = {
         science:["#0f4c5c","#e36414","⚗"],technology:["#1d3557","#457b9d","⌘"],
