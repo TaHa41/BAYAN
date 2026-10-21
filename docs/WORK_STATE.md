@@ -128,3 +128,11 @@ This verifies Worker version metadata, not a direct successful read of `/.well-k
 - This change lowers the Worker-configured daily news-AI budget to 10 attempts and lowers the code fallback default to 10. It is a conservative guard, not proof that the project's account-specific free quota is 10 or higher.
 - Google documents that limits vary by model, project tier, and account status, and directs owners to view active limits in AI Studio: https://ai.google.dev/gemini-api/docs/rate-limits
 - OpenAI remains disabled unless `OPENAI_ENABLED=true`; no paid-provider opt-in is introduced here.
+
+
+## 2026-10-21 — Ask BAYAN degraded search fix (pending PR)
+
+- Found a concrete quota-path gap: `src/index.ts` returned the generic D1 degraded fallback before `/api/ask` could run the independent external-search recovery already present in `src/routes/api.ts`.
+- This branch allows only `/api/ask` to bypass that early fallback; D1 remains guarded and schema setup is skipped when quota is already blocked. Successful responses carry `degraded=true`, `reason=d1_quota`, and `X-BAYAN-Degraded: d1_quota`.
+- If all external sources fail, the route now returns an explicit insufficient-evidence message and does not ask AI to invent an answer.
+- Added integration tests for quota-blocked external recovery and zero-results behavior. Pending CI and production deployment; no D1 query was run during this change.
