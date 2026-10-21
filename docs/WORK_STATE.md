@@ -84,7 +84,7 @@ This verifies Worker version metadata, not a direct successful read of `/.well-k
 - Latest production check is still **red** for a specific reason: `news_publication_gap`; `archiveReady=200`, `candidateCount=0`, `urlCount=0`, `eligible=0`, `rejectedCount=0`. The health preflight itself is healthy, so the smoke audit reaches and reports the publication gap. Do not mark news publication resolved.
 - GDELT topic recovery is deployed, but `news_archive.linked>0` in both languages is not yet proven. No D1 read-count measurement was run outside the requested first-hour window.
 - A one-time measurement automation was created for 2026-10-22 00:05 UTC; the scheduler returned `next_run_time=null`, so execution time is not yet confirmed.
-- Manual blockers: upload `public/og/bayan-og.png`; add the missing `GEMINI_API_KEY` Secret binding to the live Worker without exposing its value; identify the intended provider for the currently unreferenced `SEARCH_API_KEY` before wiring it; approve RSS sources before activation. Do not merge #348 or #275 without owner approval.
+- Manual blockers: upload `public/og/bayan-og.png`; the deployed Worker version has a `GEMINI_API_KEY` `secret_text` binding, but the key's validity is **not verified** (do not expose it; rotate/update it only if a safe provider probe confirms authentication failure); identify the intended provider for the `SEARCH_API_KEY` currently stored as `plain_text` before wiring or rotating it; approve RSS sources before activation. Do not merge #348 or #275 without owner approval.
 
 
 ## 2026-10-21 — AI fallback investigation (not yet production-verified)
