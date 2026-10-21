@@ -15,6 +15,7 @@ export function containsD1QuotaSignal(payload) {
   return visit(value);
 }
 
+
 /** Fail closed before broad probes when health is unavailable or quota is exhausted. */
 export function shouldAbortBroadProductionSmoke({ responseOk, healthParsed, healthPayload }) {
   if (responseOk !== true || healthParsed !== true) return true;
