@@ -1038,6 +1038,33 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     }
   }
   const results=[...uniqueByTitle.values()].slice(0,max).map(({score,provider,identityAliases,...x})=>{const rawSources=Array.isArray(x.sources)?x.sources:[];const hasOnlyReferenceSources=rawSources.length>0&&rawSources.every(src=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(src.publisher||"")));return{...x,evidence:hasOnlyReferenceSources?"source_only":(x.evidence||"mixed"),summary:localeSafeText(x.summary,language)?x.summary:(personQuery&&normalizedEntityTitle(x.title)===normalizedEntityTitle(q)?localizedPersonDescription(x.summary,language):""),sources:rawSources.map((s)=>({...s,publisher:localizedSource(s.publisher,language)}))}});
+  // Last-resort recovery for relevant reviewed bundled articles. These are
+  // curated, language-specific records; do not relabel them as externally
+  // verified and never use this recovery to publish new articles.
+  if (!results.length && options.publish !== true && !options.healthCheck) {
+    const terms = searchTerms(q);
+    if (terms.length) {
+      const normalize = (value: string) => String(value || "").normalize("NFKC").toLowerCase().replace(/[\\u064B-\\u065F\\u0670]/g, "");
+      const emergency = bundledFallback.filter(item => {
+        const title = normalize(item.title);
+        const text = normalize(item.title + " " + item.summary);
+        const titleHits = matchingSearchTerms(title, terms);
+        const totalHits = matchingSearchTerms(text, terms);
+        const minimumHits = terms.length === 1 ? 1 : Math.min(2, terms.length);
+        return titleHits >= 1 && totalHits >= minimumHits;
+      }).sort((a, b) => candidateRelevance(b) - candidateRelevance(a)).slice(0, Math.min(max, 6));
+      for (const item of emergency) {
+        results.push({
+          title: item.title, summary: item.summary, section: item.section,
+          slug: item.slug, kind: "article",
+          evidence: item.evidence === "verified" ? "verified" : "source_only",
+          sources: Array.isArray(item.sources) ? item.sources : [],
+          url: item.url, imageUrl: safePublicImageUrl(item.imageUrl),
+          imageAlt: item.imageAlt || item.title
+        } as SearchResult);
+      }
+    }
+  }
   // Resolve a subject-specific image for the canonical person result before returning
   // cards, so the exact image can also be carried into the opened article.
   if(personQuery&&options.images!==false){
