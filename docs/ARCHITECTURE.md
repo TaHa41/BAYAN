@@ -51,3 +51,12 @@ See `docs/INTEGRATIONS.md` for source-level configuration, observed production s
 - The scheduled production monitor failed `news_publication_gap`: zero news sitemap URLs, zero news-linked articles, and 200 archive candidates ready for drafting.
 - The previous `news_archive_read_unavailable` 503 was not reproduced by the latest health probe; its cause remains unknown. The health route now logs a sanitized exception on future failures without changing the 503 response.
 - Current article quality counts and the read-only report command are recorded in `docs/PHASE_REPORTS.md` and `scripts/article-quality-report.sql`.
+
+
+## Runtime reliability updates — 2026-10-21
+
+- Every Worker request wraps the D1 binding so rejected `first/all/raw/run/batch/exec` operations can set the quota block even if downstream code catches the rejection.
+- Once the isolate is blocked, subsequent D1 calls are rejected before reaching the binding. The block is persisted via Cache API, not D1, and quota logging is rate-limited.
+- On cold isolates, the persisted block is loaded before route handling. API routes return explicit degraded responses; health remains explicit; a sitemap cache is served if available, otherwise quota-specific empty XML is marked with `X-BAYAN-Degraded: d1_quota`.
+- Publication evidence recovery calls GDELT only in the publication flow and only while the current five-publisher evidence gate remains unmet. Metadata alone is not accepted as proof; source-page text must be fetched under robots and size/date limits.
+- Article API image behavior is presentation-only: valid remote images are retained; otherwise the existing section illustration is returned with `imageFallback=true`. This does not change D1 records.
