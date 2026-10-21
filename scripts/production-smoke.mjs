@@ -1,5 +1,5 @@
 import {parseNewsSitemap} from "./news-sitemap-contract.mjs";
-import {shouldAbortBroadProductionSmoke} from "./production-d1-quota-guard.mjs";
+import {containsD1QuotaSignal,shouldAbortBroadProductionSmoke} from "./production-d1-quota-guard.mjs";
 const origin=process.env.BAYAN_ORIGIN||"https://bayan.tahaomar411.workers.dev";
 // D1 quota is a production outage signal. Stop before the broad route matrix so
 // this audit does not amplify read-quota exhaustion with dozens of extra requests.
