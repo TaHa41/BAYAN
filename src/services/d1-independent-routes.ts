@@ -17,3 +17,15 @@ const D1_INDEPENDENT_API_PATHS = new Set([
 export function isD1IndependentApiPath(pathname: string): boolean {
   return D1_INDEPENDENT_API_PATHS.has(pathname);
 }
+
+/**
+ * Routes that can still produce useful results without D1. Unlike the strict
+ * D1-independent allowlist, these may attempt D1 reads, but must catch quota
+ * errors and return an explicit degraded response rather than short-circuiting
+ * before external recovery can run.
+ */
+const D1_QUOTA_TOLERANT_API_PATHS = new Set(["/api/ask"]);
+
+export function isD1QuotaTolerantApiPath(pathname: string): boolean {
+  return D1_QUOTA_TOLERANT_API_PATHS.has(pathname);
+}
