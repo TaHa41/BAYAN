@@ -84,3 +84,9 @@ export function pickCandidate<T extends QueueCandidate>(
     || Number(b.id) - Number(a.id)
   )[0] ?? null;
 }
+
+export function summarizeProviderFailures(attempts: string[]): string[] {
+ return attempts.filter(value=>/timeout|failed|unavailable|HTTP [45][0-9]{2}/i.test(value))
+  .map(value=>String(value).replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").replace(/\s+/g," ").slice(0,120))
+  .slice(0,5);
+}
