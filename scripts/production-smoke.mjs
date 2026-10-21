@@ -1,4 +1,5 @@
 import {parseNewsSitemap} from "./news-sitemap-contract.mjs";
+import {containsD1QuotaSignal} from "./production-d1-quota-guard.mjs";
 const origin=process.env.BAYAN_ORIGIN||"https://bayan.tahaomar411.workers.dev";
 // D1 quota is a production outage signal. Stop before the broad route matrix so
 // this audit does not amplify read-quota exhaustion with dozens of extra requests.
@@ -7,7 +8,7 @@ try {
   const raw = await response.text();
   let health = null;
   try { health = JSON.parse(raw); } catch { /* Existing strict checks report malformed health responses. */ }
-  if (health?.error === "d1_quota") {
+  if (containsD1QuotaSignal(health)) {
     console.error("PRODUCTION_PREFLIGHT_ABORT: D1 daily quota is exhausted; skipping the D1-heavy route matrix. Production health remains a hard failure.");
     process.exit(1);
   }
@@ -24,6 +25,12 @@ let bundleVersion="";
 async function get(path){
   const r=await fetch(origin+path,{redirect:"manual",headers:{accept:"application/json,text/plain,*/*","user-agent":"BAYAN-Production-Smoke/1.0"},signal:AbortSignal.timeout(25000)});
   const text=await r.text();
+  let payload=null;
+  try { payload=JSON.parse(text); } catch { /* Non-JSON routes are validated below. */ }
+  if (containsD1QuotaSignal(payload)) {
+    console.error("PRODUCTION_ABORT: D1 quota exhaustion detected at "+path+"; stopping immediately to avoid amplifying production reads.");
+    process.exit(1);
+  }
   console.log(path,r.status,text.slice(0,220));
   const pathname=new URL(path,origin).pathname;
   const emptyNewsSitemapUnavailable=pathname==="/news-sitemap.xml"&&r.status===503&&r.headers.get("x-bayan-news-sitemap-eligible-count")==="0";
