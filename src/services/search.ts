@@ -1072,12 +1072,13 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     const curated=bundledFallback.find(item=>
       item.section==="people" &&
       item.evidence==="verified" &&
-      item.slug.startsWith("who-is-") &&
-      item.slug.endsWith(language==="ar"?"-ar":"-en") &&
+      String(item.slug||"").startsWith("who-is-") &&
+      String(item.slug||"").endsWith(language==="ar"?"-ar":"-en") &&
       normalizedEntityTitle(item.title).startsWith(exactName) &&
       String(item.summary||"").trim().length>80
     );
     if(curated){
+      const curatedSlug=String(curated.slug||"");
       const hosts=new Set<string>();
       for(const src of curated.sources||[]){
         const host=independentEvidenceHost(String(src.publisher||""),String(src.url||""));
@@ -1085,13 +1086,13 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
       }
       if(hosts.size>=2){
         const profile:SearchResult={
-          title:curated.title,summary:curated.summary,section:"people",slug:curated.slug,kind:"article",
+          title:curated.title,summary:curated.summary,section:"people",slug:curatedSlug,kind:"article",
           evidence:"verified",
           sources:(curated.sources||[]).map(src=>({...src,publisher:localizedSource(String(src.publisher||""),language)})),
-          url:"https://bayan.tahaomar411.workers.dev/article/"+encodeURIComponent(curated.slug)+"?lang="+language,
+          url:"https://bayan.tahaomar411.workers.dev/article/"+encodeURIComponent(curatedSlug)+"?lang="+language,
           imageUrl:safePublicImageUrl(curated.imageUrl),imageAlt:curated.imageAlt||curated.title
         };
-        const duplicates=results.filter(item=>item.slug!==curated.slug &&
+        const duplicates=results.filter(item=>item.slug!==curatedSlug &&
           !(item.section==="people" && normalizedEntityTitle(item.title).startsWith(exactName) &&
             /who-is-mohamed-salah/.test(String(item.slug||""))));
         results.splice(0,results.length,profile,...duplicates.slice(0,Math.max(0,max-1)));
