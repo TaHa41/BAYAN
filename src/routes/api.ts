@@ -288,7 +288,7 @@ const providerFailures=Array.isArray(r?.providerAttempted)?r.providerAttempted.f
     const articleBody=generatedBody;
     const sources=evidenceSources.slice(0,12);const exactSubject=found.results.find((x:any)=>identityNormalized(String(x.title||""))===identityNormalized(title));if(!image)image=safePublicImageUrl(exactSubject?.imageUrl)||safePublicImageUrl(exactSubject?.sources?.find((source:any)=>/^https:\/\//i.test(String(source.imageUrl||"")) )?.imageUrl)||await bounded(findRelatedImage(title,exactSubject?.url||exactSubject?.sources?.[0]?.url,exactSubject?.summary||"",env),3500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","verified_article_image_lookup_failed",error);return undefined})||"";
     const articleSection=editorialSectionForOpenedStory(title,found.results[0]?.summary||"");
-    const articleImage=safePublicImageUrl(image)||new URL("/sections/"+articleSection+".svg",request.url).toString();
+    const articleImage=safePublicImageUrl(image)||null;
     const articleSummary=String(exactSubject?.summary||exactSubject?.sources?.[0]?.title||"");const article={title,summary:articleSummary,body:articleBody,sources,image:articleImage,status:hasFullAnalysis?generated.status:"source_only",providerCount:new Set(sources.map((s:any)=>s.publisher).filter(Boolean)).size};const savedSlug=await persistOpenedNewsArticle(env,article,lang);return json({ok:true,article:{...article,section:articleSection,savedSlug}});
   }catch(error){await track(env,vid,"news_article_error","/news",lang);return json({error:"news_article_failed",status:"unavailable"},502)}
 }if(u.pathname==="/api/news/archive"){
