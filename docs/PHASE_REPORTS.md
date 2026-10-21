@@ -58,3 +58,13 @@
 - **Current read-only production counts:** `news_archive total=1530, linked=0, exhausted=126, pending=1404, attempted_24h=64`; `articles total=162, no_image=95, short_lt2500=126, long_ge5000=0, duplicate_title_groups=5`. The aggregation query reported `rows_read=1530`, `sql_duration_ms=1.646`; the one-row health probe reported `rows_read=1`, `sql_duration_ms=0.1592`, and zero rows written.
 - **Acceptance:** **Not met.** No news item is linked to a published article, so the sitemap remains empty and the monitor correctly fails. The 503's original cause is unconfirmed because the first failing health catch did not log its exception; the new diagnostic code needs a production deployment and a future occurrence or successful recheck to validate it.
 - **Remaining:** Wait for a scheduled cycle after the aggregator and distinct-host changes, inspect actual provider diagnostics and publication reasons, and verify a real Arabic and English published news article before declaring the pipeline repaired. Do not reset `article_attempts`, lower the evidence threshold, or publish merely to drain the queue.
+
+
+## Phase report — 2026-10-21: quota guard, evidence recovery, and image fallback
+
+- PR #500 merged: broad production route probes now abort when the health preflight is unavailable, malformed, or signals D1 quota exhaustion. The deployed health preflight currently succeeds; the separate news-publication assertion remains red.
+- PR #506 merged and deployed: publication-only GDELT queries now use candidate-title phrases and fetch bounded publisher text under robots and freshness checks. The five-independent-publisher gate was not relaxed. Production `linked>0` is still unverified.
+- PR #507 and #508 merged: D1 quota exceptions are intercepted even when a route-local catch swallows them; the persisted block is restored before fetch routes; public routes have explicit degraded behavior and sitemap avoids D1 during a persisted block.
+- PR #509 merged: missing/invalid article images no longer force a 422 for an otherwise published article; API returns a designed section SVG with `imageFallback=true`. This does not modify stored `image_url` values or claim a real photo was backfilled.
+- PR #511 merged: paid OpenAI requires explicit `OPENAI_ENABLED=true`; the live binding is absent, so paid OpenAI stays disabled.
+- Production acceptance still fails only on the known `news_publication_gap` in the latest check: 200 archive candidates, zero eligible/published news URLs. D1 row-read metrics are deferred to 2026-10-22 00:00–01:00 UTC.
