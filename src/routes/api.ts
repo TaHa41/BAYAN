@@ -38,6 +38,28 @@ const normalizeArticleBody=(value:string)=>{
  return output.join("\n\n").trim();
 };
 const sourceExcerpt=(value:string,max=1000)=>{const text=String(value||"").replace(/\s+/g," ").trim();if(text.length<=max)return text;const head=text.slice(0,max);const boundary=Math.max(head.lastIndexOf("。"),head.lastIndexOf("."),head.lastIndexOf("؟"),head.lastIndexOf("?"),head.lastIndexOf("!"));if(boundary>=Math.floor(max*0.55))return head.slice(0,boundary+1).trim();const space=head.lastIndexOf(" ");return (head.slice(0,space>0?space:head.length).trimEnd()+"…");};
+const structuredSourceOnlyBiography=(name:string,rawText:string,sources:any[],lang:Locale)=>{
+ const excerpt=sourceExcerpt(rawText,900);
+ const sourceLines=(Array.isArray(sources)?sources:[]).filter((source:any)=>/^https:\/\//i.test(String(source?.url||""))).slice(0,6);
+ const evidence=sourceLines.length?sourceLines.map((source:any)=>"- "+String(source.publisher||"Source")+": "+String(source.title||name)).join("\n"):(lang==="ar"?"لم تُرفق روابط مصادر قابلة للتحقق مع هذه النتيجة.":"No verifiable source links were attached to this result.");
+ const missing=lang==="ar"?"لا تتضمن الأدلة المتاحة معلومات مستقلة كافية لتأكيد تفاصيل هذا الجانب؛ لذلك لا يضيف بيان وقائع أو تواريخ أو إنجازات غير موجودة في المصادر.":"The available evidence does not independently establish details for this section, so BAYAN does not add facts, dates, or achievements absent from the sources.";
+ return [
+  "## "+(lang==="ar"?"خلاصة":"Overview"),excerpt||missing,
+  "## "+(lang==="ar"?"النشأة والبدايات":"Early life and beginnings"),missing,
+  "## "+(lang==="ar"?"المسيرة والبطولات الكبرى":"Career and major milestones"),missing,
+  "## "+(lang==="ar"?"الجوائز والإنجازات الموثقة":"Documented awards and achievements"),missing,
+  "## "+(lang==="ar"?"الأثر والمكانة العامة":"Public impact and standing"),missing,
+  "## "+(lang==="ar"?"كيف نقرأ مسيرته بدقة؟":"How to read this profile accurately?"),lang==="ar"?"ينبغي التمييز بين المعلومات الواردة في المقتطف والتفاصيل التي لم تثبتها المصادر المستقلة. هذا عرض منظم للمعلومات المتاحة وليس سيرة مكتملة أو تأكيدًا مستقلًا لكل ادعاء.":"Distinguish information present in the excerpt from details not established by independent sources. This is a structured presentation of available information, not a complete biography or independent confirmation of every claim.",
+  "## "+(lang==="ar"?"الأدلة والمصادر":"Evidence and sources"),evidence
+ ].join("\n\n");
+};
+const looksLikePersonBiography=(title:string,summary:string)=>{
+ const value=String(title||"").trim();
+ if(/سيرة|من هو|من هي|biography|profile of|who is/i.test(value))return true;
+ const arabicName=/^[\u0600-\u06FF]+(?:\s+[\u0600-\u06FF]+){1,3}$/.test(value);
+ const englishName=/^[A-Z][\p{L}'’.-]+(?:\s+[A-Z][\p{L}'’.-]+){1,3}$/u.test(value);
+ return (arabicName||englishName)&&/(?:لاعب|لاعبة|كاتب|كاتبة|رئيس|ممثل|ممثلة|مغن|مغنية|athlete|footballer|writer|actor|president|singer|born|career|player|Egyptian|Brazilian|Argentinian)/i.test(String(summary||""));
+};
 const articleEvidenceQuality=(sources:any[])=>{
  const rows=Array.isArray(sources)?sources:[];
  const hosts=new Set<string>(),publishers=new Set<string>();
@@ -245,7 +267,9 @@ const providerFailures=Array.isArray(r?.providerAttempted)?r.providerAttempted.f
       const referenceTitle=String(referenceCandidate?.title||title).trim().slice(0,500);
       if(referenceCandidate&&referenceSummary){
         if(!image)image=String(referenceCandidate.imageUrl||"")||await bounded(findRelatedImage(referenceTitle,referenceCandidate.url,referenceSummary,env),2500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","reference_image_lookup_failed",error);return undefined})||"";
-        return json({ok:true,article:{title:referenceTitle,summary:referenceSummary,body:referenceSummary,sources:referenceSources,image:image||null,status:"source_only",providerCount:referenceSources.length,section:editorialSectionForOpenedStory(referenceTitle,referenceSummary),publishedAt}});
+        const isBiography=looksLikePersonBiography(referenceTitle,referenceSummary)||editorialSectionForOpenedStory(referenceTitle,referenceSummary)==="people";
+        const bodyText=isBiography?structuredSourceOnlyBiography(referenceTitle,referenceSummary,referenceSources,lang):referenceSummary;
+        return json({ok:true,article:{title:referenceTitle,summary:referenceSummary,body:bodyText,sources:referenceSources,image:image||null,status:"source_only",providerCount:referenceSources.length,section:isBiography?"people":editorialSectionForOpenedStory(referenceTitle,referenceSummary),publishedAt}});
       }
       return json({error:"article_evidence_insufficient",status:"insufficient",message:lang==="ar"?"لم تتوفر مصادر مستقلة كافية لإعداد مقال موثق.":"There were not enough independent sources to prepare a verified article."},422);
     }
