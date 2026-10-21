@@ -11,8 +11,11 @@ export function gdeltQueryForLanguage(lang: Locale): string {
 const topicStopWords = new Set(["the","and","for","with","from","that","this","after","before","about","into","over","under","how","why","what","when","where","news","latest","update","breaking","من","في","على","الى","إلى","عن","ما","كيف","لماذا","متى","هذا","هذه","بعد","قبل","مع","حول","أمام","أثناء"]);
 export function gdeltQueryForTopic(topic: string, lang: Locale): string {
   const words = [...new Set(cleanTopic(topic).split(/\s+/).filter(word => word.length >= (lang === "ar" ? 3 : 4) && !topicStopWords.has(word)))].slice(0, 8);
-  const phrases = [...new Set(words.slice(0, -1).map((word, index) => word + " " + words[index + 1]))].slice(0, 4);
-  const query = phrases.length ? "(" + phrases.map(phrase => '"' + phrase + '"' ).join(" OR ") + ")" : words.slice(0, 3).join(" OR ");
+  // Mix short topic phrases with individual terms so alternate headlines from independent publishers can match.
+  const phrases = [...new Set(words.slice(0, -1).map((word, index) => word + " " + words[index + 1]))].slice(0, 3);
+  const terms = words.slice(0, 6);
+  const clauses = [...phrases.map(phrase => '"' + phrase + '"'), ...terms];
+  const query = clauses.length ? "(" + [...new Set(clauses)].join(" OR ") + ")" : "";
   return (query || "(news OR breaking OR update)") + (lang === "ar" ? " sourcelang:arabic" : " sourcelang:english");
 }
 const cleanTopic = (value: string) => String(value || "").normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim().slice(0, 240);
@@ -120,7 +123,7 @@ async function loadGdeltMetadata(lang: Locale, fetchImpl: typeof fetch, diagnost
     const query = encodeURIComponent(topic ? gdeltQueryForTopic(topic, lang) : gdeltQueryForLanguage(lang));
     const url = "https://api.gdeltproject.org/api/v2/doc/doc?query=" + query + "&mode=artlist&format=json&maxrecords=" + (topic ? "50" : "20") + "&timespan=3d&sort=DateDesc";
     try {
-      const response = await fetchImpl(url, { signal: AbortSignal.timeout(5000), headers: { accept: "application/json", "user-agent": "BAYAN/1.3 (+https://bayan.tahaomar411.workers.dev)" } });
+      const response = await fetchImpl(url, { signal: AbortSignal.timeout(12000), headers: { accept: "application/json", "user-agent": "BAYAN/1.3 (+https://bayan.tahaomar411.workers.dev)" } });
       const raw = await response.text();
       if (!response.ok) {
         diagnostics.push("GDELT HTTP " + response.status);
