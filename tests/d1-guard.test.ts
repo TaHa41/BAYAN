@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { d1Blocked, d1BlockedPersisted, isD1QuotaError, nextUtcMidnight, persistD1Block, resetD1GuardForTests } from "../src/services/d1-guard";
+import { d1Blocked, d1BlockedPersisted, isD1QuotaError, nextUtcMidnight, persistD1Block, resetD1GuardForTests, withD1QuotaGuard } from "../src/services/d1-guard";
 
 function fakeCache() {
   const values = new Map<string, Response>();
@@ -48,5 +48,48 @@ describe("D1 quota error recognition", () => {
     expect(isD1QuotaError("free tier daily row read limit")).toBe(true);
     expect(isD1QuotaError(new Error("no such table: articles"))).toBe(false);
     expect(isD1QuotaError(undefined)).toBe(false);
+  });
+});
+
+
+describe("global D1 quota interception", () => {
+  it("marks quota exhaustion even when a caller catches the D1 rejection", async () => {
+    resetD1GuardForTests();
+    const fakeDb = {
+      prepare: () => ({
+        bind() { return this; },
+        first: async () => { throw new Error("7500: free tier daily row read limit"); },
+      }),
+    };
+    const guarded = withD1QuotaGuard({ DB: fakeDb }) as any;
+    try { await guarded.DB.prepare("SELECT 1").bind().first(); } catch { /* emulate a route-local catch */ }
+    const { d1Blocked } = await import("../src/services/d1-guard");
+    expect(d1Blocked()).toBe(true);
+  });
+
+  it("marks quota exhaustion from D1 batch failures", async () => {
+    resetD1GuardForTests();
+    const fakeDb = { batch: async () => { throw new Error("exceeded D1's free tier"); } };
+    const guarded = withD1QuotaGuard({ DB: fakeDb }) as any;
+    await expect(guarded.DB.batch([])).rejects.toThrow("exceeded D1");
+    const { d1Blocked } = await import("../src/services/d1-guard");
+    expect(d1Blocked()).toBe(true);
+  });
+});
+
+describe("D1 quota guard stops repeated reads in the same isolate", () => {
+  it("does not invoke the underlying D1 statement after the first quota failure", async () => {
+    resetD1GuardForTests();
+    let calls = 0;
+    const fakeDb = {
+      prepare: () => ({
+        bind() { return this; },
+        first: async () => { calls++; throw new Error("7500: free tier daily row read limit"); },
+      }),
+    };
+    const guarded = withD1QuotaGuard({ DB: fakeDb }) as any;
+    try { await guarded.DB.prepare("SELECT 1").bind().first(); } catch {}
+    try { await guarded.DB.prepare("SELECT 2").bind().first(); } catch {}
+    expect(calls).toBe(1);
   });
 });
