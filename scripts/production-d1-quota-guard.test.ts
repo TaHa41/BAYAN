@@ -22,14 +22,14 @@ describe("containsD1QuotaSignal", () => {
 
 
 describe("shouldAbortBroadProductionSmoke", () => {
-  it("aborts broad route probes when health is unavailable", () => {
-    expect(shouldAbortBroadProductionSmoke({ responseOk:false, healthParsed:false, healthPayload:null })).toBe(true);
-    expect(shouldAbortBroadProductionSmoke({ responseOk:true, healthParsed:false, healthPayload:null })).toBe(true);
+  it("aborts broad route probes when health is unavailable or malformed", () => {
+    expect(shouldAbortBroadProductionSmoke({ responseOk: false, healthParsed: false, healthPayload: null })).toBe(true);
+    expect(shouldAbortBroadProductionSmoke({ responseOk: true, healthParsed: false, healthPayload: null })).toBe(true);
   });
   it("aborts broad route probes when D1 quota is exhausted", () => {
-    expect(shouldAbortBroadProductionSmoke({ responseOk:true, healthParsed:true, healthPayload:{ok:false,error:"d1_quota"} })).toBe(true);
+    expect(shouldAbortBroadProductionSmoke({ responseOk: true, healthParsed: true, healthPayload: { ok: false, error: "d1_quota" } })).toBe(true);
   });
-  it("allows smoke probes only after valid healthy preflight without quota signal", () => {
-    expect(shouldAbortBroadProductionSmoke({ responseOk:true, healthParsed:true, healthPayload:{ok:true,database:true} })).toBe(false);
+  it("allows probes only after a valid healthy preflight", () => {
+    expect(shouldAbortBroadProductionSmoke({ responseOk: true, healthParsed: true, healthPayload: { ok: true, database: true } })).toBe(false);
   });
 });
