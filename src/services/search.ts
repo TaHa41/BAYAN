@@ -837,18 +837,19 @@ export async function search(env:Env,q:string,language:Locale,options:{publish?:
   const s=await settings(env);const max=Math.max(5,Math.min(30,Number(s.max_sources||12)));const providerDiagnostics:string[]=[];const safe=async<T>(task:Promise<T>,fallback:T,provider="external provider"):Promise<T>=>{try{return await task}catch(error){reportProviderFailure(providerDiagnostics,provider,error);return fallback}};const academicQuery=/(research|paper|papers|study|studies|journal|doi|scholar|academic|citation|crossref|openalex|pubmed|clinical trial|systematic review|بحث علمي|أبحاث|دراسة|دراسات|مجلة علمية|ورقة بحثية|مصدر أكاديمي|دراسات سريرية|مراجعة منهجية)/i.test(q);
 const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|medicine|health study|بحث طبي|دراسة طبية|دراسات سريرية|تجربة سريرية|مراجعة منهجية)/i.test(q);
 // Stage discovery: query the local index and compact reference providers first.
-  // Broad HTML/RSS providers run only if the first batch lacks relevant evidence,
-  // preventing each visitor search from launching a dozen expensive requests at once.
+  // Article publication skips encyclopedia and academic lookups; they rarely establish
+  // current-event publisher diversity and can exhaust the Worker's subrequest budget.
+  // Broad HTML/RSS news providers are deferred until the first pass lacks relevant evidence.
   let [local, wiki, wikiRest, wd, remote, dd, oa, crossref, pubmed] = await Promise.all([
     safe(searchArticles(env,q,language,max),[],"BAYAN Knowledge Base"),
-    safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language,providerDiagnostics),[],"Wikipedia"),
-    safe(s.source_wikipedia==="0"?Promise.resolve([]):wikipediaRestSearch(q,language,providerDiagnostics),[],"Wikipedia REST Search"),
-    safe(s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language,providerDiagnostics),[],"Wikidata"),
+    safe(options.publish===true||s.source_wikipedia==="0"?Promise.resolve([]):wikipedia(env,q,language,providerDiagnostics),[],"Wikipedia"),
+    safe(options.publish===true||s.source_wikipedia==="0"?Promise.resolve([]):wikipediaRestSearch(q,language,providerDiagnostics),[],"Wikipedia REST Search"),
+    safe(options.publish===true||s.source_wikidata==="0"?Promise.resolve([]):wikidata(q,language,providerDiagnostics),[],"Wikidata"),
     safe(s.source_ai_search==="0"?Promise.resolve([]):aiSearch(env,q,language,providerDiagnostics),[],"Cloudflare AI Search"),
     safe(duck(q,language,providerDiagnostics),[],"DuckDuckGo Instant Answers"),
-    safe((s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q,providerDiagnostics),[],"OpenAlex"),
-    safe((academicQuery&&!personLookup(q))?crossrefSearch(q,providerDiagnostics):Promise.resolve([]),[],"Crossref"),
-    safe((language!=="en"||!medicalQuery)?Promise.resolve([]):pubmedSearch(q,language,providerDiagnostics),[],"PubMed / NCBI")
+    safe((options.publish===true||s.source_openalex==="0"||!academicQuery)?Promise.resolve([]):openAlex(q,providerDiagnostics),[],"OpenAlex"),
+    safe((options.publish!==true&&academicQuery&&!personLookup(q))?crossrefSearch(q,providerDiagnostics):Promise.resolve([]),[],"Crossref"),
+    safe((options.publish!==true&&language==="en"&&medicalQuery)?pubmedSearch(q,language,providerDiagnostics):Promise.resolve([]),[],"PubMed / NCBI")
   ]);
 
   let google:Candidate[]=[];
