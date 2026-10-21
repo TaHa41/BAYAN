@@ -101,3 +101,47 @@ describe.each(["ar", "en"] as const)("evidence-grounded article drafting (%s)", 
     expect((result as any).verification?.retried).toBe(true);
   });
 });
+
+
+it("keeps Workers AI fallback available after a failed Gemini attempt under the daily budget", async () => {
+  let budgetReservations = 0;
+  let workersCalls = 0;
+  const db = {
+    prepare(sql: string) {
+      return {
+        bind(..._values: unknown[]) {
+          return {
+            async first() {
+              if (sql.includes("INSERT INTO admin_settings(key,value,updated_at) VALUES('news_ai_budget_daily'")) {
+                budgetReservations += 1;
+                return budgetReservations === 1 ? { value: new Date().toISOString().slice(0, 10) + ":1" } : null;
+              }
+              return null;
+            },
+            async run() { return { success: true }; },
+          };
+        },
+      };
+    },
+  };
+  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+    if (String(input).includes("generativelanguage.googleapis.com")) {
+      return new Response(JSON.stringify({ error: { status: "INVALID_ARGUMENT", message: "simulated Gemini failure" } }), { status: 400 });
+    }
+    return new Response("unexpected provider request", { status: 500 });
+  }));
+  const result = await draftArticle({
+    DB: db,
+    GEMINI_API_KEY: "test-key",
+    NEWS_AI_DAILY_LIMIT: "80",
+    AI: {
+      async run() {
+        workersCalls += 1;
+        return { response: draftJson("en") };
+      },
+    },
+  } as any, "documented topic", "en", evidenceFor("en"), true);
+  expect(budgetReservations).toBe(1);
+  expect(workersCalls).toBe(1);
+  expect(result.status).toBe("verified");
+});
