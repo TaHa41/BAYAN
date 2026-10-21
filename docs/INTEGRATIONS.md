@@ -52,3 +52,11 @@ Status date: 2026-10-20. “Present in source/config” is not the same as a suc
 - **SEARCH_API_KEY:** the binding was previously observed as plain text, but repository search found no active code reference. Do not rotate or reclassify it blindly; identify the intended search provider and confirm that its integration is live first.
 - **RSS additions awaiting owner approval (not enabled):** BBC World RSS (`https://feeds.bbci.co.uk/news/world/rss.xml`), Al Jazeera English (`https://www.aljazeera.com/xml/rss/all.xml`), DW English (`https://rss.dw.com/xml/rss-en-all`), France 24 English (`https://www.france24.com/en/rss`), and Guardian World (`https://www.theguardian.com/world/rss`). Validate each endpoint, licensing/terms, redirects, robots policy, and publisher independence before activation. Guardian API remains blocked on an approved key.
 - **Share preview:** `public/og/bayan-og.png` is still not present in main; do not point metadata at a nonexistent file.
+
+
+## Manual news pipeline trigger — 2026-10-21 (pending verification)
+
+- Source branch adds `POST /api/internal/trigger-news-pipeline`, protected by the existing `BAYAN_AI_MANAGER_TOKEN` bearer/header authentication. It is not a public unauthenticated trigger and does not accept the token in a URL.
+- The route requires `NEWS_PIPELINE_ENABLED=true`, has a five-minute per-isolate cooldown, invokes the same bounded publisher as cron, and logs `news_archive_manual_trigger` without exposing secrets. It preserves independent-publisher/host checks and the normal D1 budget guard.
+- This implementation is not yet confirmed merged or deployed, and no production call has been made from this session because the secret value is not available to the caller. Endpoint existence in source is not proof of live operation.
+- AI integration is not currently certified healthy: the latest production events show Gemini timeouts / `all_providers_unavailable`. Scrapling, ScrapeGraphAI, Context7, and Agent Reach are not to be labelled integrated until actual connection/configuration, bounded-cost review, and runtime tests provide evidence. Playwright is present as a project dependency/configuration; production E2E execution still needs an Actions run with saved results.

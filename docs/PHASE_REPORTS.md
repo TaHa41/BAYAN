@@ -68,3 +68,12 @@
 - PR #509 merged: missing/invalid article images no longer force a 422 for an otherwise published article; API returns a designed section SVG with `imageFallback=true`. This does not modify stored `image_url` values or claim a real photo was backfilled.
 - PR #511 merged: paid OpenAI requires explicit `OPENAI_ENABLED=true`; the live binding is absent, so paid OpenAI stays disabled.
 - Production acceptance still fails only on the known `news_publication_gap` in the latest check: 200 archive candidates, zero eligible/published news URLs. D1 row-read metrics are deferred to 2026-10-22 00:00–01:00 UTC.
+
+
+## Follow-up — authenticated manual news trigger (2026-10-21, pending CI/deployment)
+
+- Added `POST /api/internal/trigger-news-pipeline` to `src/index.ts`. It authenticates through the existing manager token, checks `NEWS_PIPELINE_ENABLED`, rejects other methods, rate-limits repeated calls per isolate, and calls the same `publishNextArchivedNewsArticle` function used by scheduled publication.
+- Added a source-contract assertion in `scripts/source-contract-smoke.mjs` for the security gates and guarded-publisher call.
+- Updated docs to distinguish source implementation from production proof. No production data was directly modified by this work; only read-only D1 queries were run.
+- Production snapshot during implementation: archive rows 1,697; linked publications 0; published news 0; live `NEWS_PIPELINE_ENABLED=true`. Last logged failures include Gemini timeouts / `all_providers_unavailable` and GDELT no-page-evidence. The first article is still not verified.
+- Next gates: run full CI; review the diff; merge only if checks pass; wait for GitHub Actions deployment; verify active SHA; then invoke the endpoint using an authorized secret-bearing client and check both D1 publication state and `/news-sitemap.xml`. Do not claim publication until both are confirmed.
