@@ -7,6 +7,11 @@ on:
         required: false
         type: boolean
         default: false
+      apply_migrations:
+        description: 'Apply D1 migrations only when migration files differ from the deployed commit'
+        required: false
+        type: boolean
+        default: false
 permissions:
   contents: read
 # Share one release lock with the automatic Worker deployment workflow.
@@ -18,12 +23,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
+      - name: Reject non-main production deployment
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo '::error::Production deployment is main-only. Dispatch this workflow from main.'
+          exit 1
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - run: npm install
-      - run: npm run check
+      - run: npm install --no-audit --no-fund
+      - name: Inject commit-specific build identity
+        run: node scripts/inject-build-id.mjs
+      - name: Run typecheck, unit tests, source contracts, and Worker build
+        run: npm run check
       - name: Verify Cloudflare deployment credentials
         shell: bash
         env:
@@ -34,7 +50,28 @@ jobs:
             echo "::error::Set repository Actions secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID to enable production deployment."
             exit 1
           fi
-      - name: Apply D1 migrations
+      - name: Detect migration changes since the deployed commit
+        id: migration_delta
+        env:
+          BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
+          APPLY_MIGRATIONS: ${{ inputs.apply_migrations }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from "node:fs";
+          import { execFileSync } from "node:child_process";
+          const response = await fetch(`${process.env.BAYAN_ORIGIN}/.well-known/build.json`, { cache: "no-store", signal: AbortSignal.timeout(5000) });
+          if (!response.ok) throw new Error(`Cannot safely determine deployed commit: HTTP ${response.status}`);
+          const payload = await response.json();
+          const deployedSha = String(payload.commit || "");
+          if (!/^[a-f0-9]{40}$/.test(deployedSha)) throw new Error("Deployed build.json has no valid commit SHA; refusing D1 migration apply.");
+          execFileSync("git", ["cat-file", "-e", `${deployedSha}^{commit}`]);
+          const changed = execFileSync("git", ["diff", "--name-only", deployedSha, process.env.GITHUB_SHA, "--", "migrations_v1"], { encoding: "utf8" }).trim();
+          if (changed && process.env.APPLY_MIGRATIONS !== "true") throw new Error("Migration files differ from the deployed commit. Re-dispatch from main with apply_migrations=true only during an approved D1 window. No D1 operation was performed.");
+          appendFileSync(process.env.GITHUB_OUTPUT, `changed=${changed ? "true" : "false"}\n`);
+          console.log(changed ? "Migration delta detected; explicit migration opt-in is required and present." : "No migration delta; skipping remote D1 migration reads.");
+          NODE
+      - name: Apply D1 migrations only when an explicit migration delta exists
+        if: steps.migration_delta.outputs.changed == 'true' && inputs.apply_migrations == true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -44,9 +81,49 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy
+      - name: Verify deployed commit identity
+        id: verify_identity
+        env:
+          EXPECTED_COMMIT_SHA: ${{ github.sha }}
+          BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
+        run: |
+          node --input-type=module <<'NODE'
+          const expected = process.env.EXPECTED_COMMIT_SHA;
+          const endpoint = `${process.env.BAYAN_ORIGIN}/.well-known/build.json`;
+          if (!/^[a-f0-9]{40}$/.test(expected || "")) throw new Error("GITHUB_SHA is not a full 40-character SHA");
+          let last = "no response";
+          for (let attempt = 1; attempt <= 30; attempt++) {
+            try {
+              const response = await fetch(endpoint, { cache: "no-store", headers: { "cache-control": "no-cache" } });
+              const payload = await response.json();
+              if (response.ok && payload.commit === expected) {
+                console.log(`Verified deployed commit ${payload.commit}`);
+                process.exit(0);
+              }
+              last = `HTTP ${response.status}; endpoint commit=${payload.commit ?? "missing"}; expected=${expected}`;
+            } catch (error) { last = String(error); }
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+          throw new Error(`Deployed Worker commit identity mismatch after 30 attempts: ${last}`);
+          NODE
+      - name: Run read-only production smoke audit
+        id: smoke
+        env:
+          BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
+        run: node scripts/production-smoke.mjs
       - name: Run explicitly authorized production repair
-        if: github.event_name == 'workflow_dispatch' && inputs.allow_repair == true
+        if: always() && inputs.allow_repair == true && steps.verify_identity.outcome == 'success'
         env:
           BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
           BAYAN_AI_MANAGER_TOKEN: ${{ secrets.BAYAN_AI_MANAGER_TOKEN }}
         run: node scripts/production-self-heal.mjs
+      - name: Enforce production health when smoke is safe to continue
+        if: always() && steps.verify_identity.outcome == 'success' && (steps.smoke.outcome == 'success' || inputs.allow_repair == true)
+        env:
+          BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
+        run: node scripts/production-health.mjs
+      - name: Report news sitemap eligibility when safe to continue
+        if: always() && steps.verify_identity.outcome == 'success' && (steps.smoke.outcome == 'success' || inputs.allow_repair == true)
+        env:
+          BAYAN_PRODUCTION_URL: https://bayan.tahaomar411.workers.dev
+        run: node scripts/news-sitemap-diagnostics.mjs
