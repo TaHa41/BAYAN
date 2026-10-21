@@ -142,7 +142,7 @@ export async function api(request:Request,env:Env,ctx?:ExecutionContext){const u
   let image=safePublicImageUrl(item?.imageUrl);
   if(!image&&imageBudget>0){
    imageBudget--;
-   image=await bounded(findRelatedImage(String(item?.title||""),undefined,String(item?.summary||""),env),1400).catch(()=>undefined);
+   image=await bounded(findRelatedImage(String(item?.title||""),undefined,String(item?.summary||""),env),1400).catch((error)=>{void recordRuntimeEventLimited(env,"search_image_enrichment","image_lookup_failed",error);return undefined;});
    image=safePublicImageUrl(image);
   }
   const sectionSlug=sectionBySlug(String(item?.section||""))?String(item.section):"world";
