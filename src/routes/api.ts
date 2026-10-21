@@ -274,7 +274,8 @@ const providerFailures=Array.isArray(r?.providerAttempted)?r.providerAttempted.f
       const referenceSummary=sourceExcerpt(String(referenceCandidate?.summary||""),1000);
       // Preserve the headline the visitor actually opened instead of silently replacing it with another result.
       const referenceTitle=String(title).trim().slice(0,500);
-      if(referenceCandidate&&referenceSummary){
+      if(referenceCandidate&&referenceSummary&&referenceSources.length>=2){
+        // A single encyclopedia excerpt is not enough to build a pseudo-article; return the explicit insufficient-evidence response below instead.
         if(!image)image=String(referenceCandidate.imageUrl||"")||await bounded(findRelatedImage(referenceTitle,referenceCandidate.url,referenceSummary,env),2500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","reference_image_lookup_failed",error);return undefined})||"";
         const isBiography=looksLikePersonBiography(referenceTitle,referenceSummary)||editorialSectionForOpenedStory(referenceTitle,referenceSummary)==="people";
         const section=isBiography?"people":editorialSectionForOpenedStory(referenceTitle,referenceSummary);
