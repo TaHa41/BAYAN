@@ -46,12 +46,12 @@ const guardedStatements = new WeakMap<object, any>();
 const rawD1Objects = new WeakMap<object, object>();
 const noteQuotaWithoutD1 = (error: unknown): void => {
   if (!isD1QuotaError(error)) return;
-  void persistD1Block();
+  if (!d1Blocked()) void persistD1Block();
   logD1QuotaOncePerHour(error);
 };
 const guardD1Promise = <T>(value: Promise<T>): Promise<T> => Promise.resolve(value).catch(async (error: unknown) => {
   if (isD1QuotaError(error)) {
-    await persistD1Block();
+    if (!d1Blocked()) await persistD1Block();
     logD1QuotaOncePerHour(error);
   }
   throw error;
@@ -65,6 +65,7 @@ const guardD1Statement = <T extends object>(statement: T): T => {
       if (typeof member !== "function") return member;
       return (...args: unknown[]) => {
         try {
+          if (d1Blocked()) throw new Error("D1 free tier daily row read limit guard active (7500)");
           const result = member.apply(target, args);
           if (property === "bind" && result && typeof result === "object") return guardD1Statement(result);
           return result && typeof result.then === "function" ? guardD1Promise(result) : result;
@@ -88,6 +89,7 @@ const guardD1Binding = <T extends object>(database: T): T => {
       if (typeof member !== "function") return member;
       return (...args: unknown[]) => {
         try {
+          if (d1Blocked()) throw new Error("D1 free tier daily row read limit guard active (7500)");
           const callArgs = property === "batch" && Array.isArray(args[0]) ? [[...(args[0] as object[]).map(item => rawD1Objects.get(item) || item)], ...args.slice(1)] : args;
           const result = member.apply(target, callArgs);
           if (property === "prepare" && result && typeof result === "object") return guardD1Statement(result);
