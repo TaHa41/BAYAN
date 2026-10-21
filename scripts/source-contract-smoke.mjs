@@ -345,6 +345,8 @@ const checks = [
 ];
 checks.push(["sparse verified search results trigger browser-side expansion instead of stopping at one result", app.includes("const shouldExpandWeakSearch = serverResults.length < 3;") && !app.includes("(serverResults.length < 3 && data?.status !== \"verified\")")]);
 
+checks.push(["ask analytics failure does not discard a successfully retrieved answer", api.includes('try{await track(env,vid,"ask","/ask",lang)}catch(error){console.warn("ask_analytics_tracking_failed",error instanceof Error?error.name:"unknown")}")]);
+
 let failed = 0;
 for (const [name, ok] of checks) {
   console.log((ok ? "PASS " : "FAIL ") + name);
