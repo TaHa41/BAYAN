@@ -853,7 +853,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   ]);
 
   let google:Candidate[]=[];
-  const providerAttempted:string[]=["BAYAN Knowledge Base",...(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"]),...(s.source_wikidata==="0"?[]:["Wikidata"]),...((s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((academicQuery&&!personLookup(q))?["Crossref"]:[]),...((language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers"];
+  const providerAttempted:string[]=["BAYAN Knowledge Base",...(options.publish===true?[]:(s.source_wikipedia==="0"?[]:["Wikipedia","Wikipedia REST Search"])),...(options.publish===true||s.source_wikidata==="0"?[]:["Wikidata"]),...((options.publish!==true&&s.source_openalex!=="0"&&academicQuery)?["OpenAlex"]:[]),...((options.publish!==true&&academicQuery&&!personLookup(q))?["Crossref"]:[]),...((options.publish!==true&&language==="en"&&medicalQuery)?["PubMed / NCBI"]:[]),...(s.source_ai_search==="0"?[]:["Cloudflare AI Search"]),"DuckDuckGo Instant Answers"];
   providerAttempted.push(...providerDiagnostics);
   const bundledFallback:Candidate[]=bundledSearchArticles(q,language,Math.min(max,12)).map((item:any):Candidate=>({
     title:String(item.title||""),summary:String(item.summary||""),section:String(item.section||"world"),slug:String(item.slug||""),kind:"article",
