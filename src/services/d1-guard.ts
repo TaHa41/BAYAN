@@ -46,7 +46,7 @@ const guardedStatements = new WeakMap<object, any>();
 const rawD1Objects = new WeakMap<object, object>();
 const noteQuotaWithoutD1 = (error: unknown): void => {
   if (!isD1QuotaError(error)) return;
-  markD1Blocked();
+  void persistD1Block();
   logD1QuotaOncePerHour(error);
 };
 const guardD1Promise = <T>(value: Promise<T>): Promise<T> => Promise.resolve(value).catch(async (error: unknown) => {
