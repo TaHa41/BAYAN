@@ -64,7 +64,7 @@ async function publishNextArchivedNewsArticleInner(env:Env){
   const preferred:Locale=String(setting?.value||"ar")==="en"?"en":"ar";
   const futureLimit=new Date(now+5*60*1000).toISOString();
   const pick=async(language:Locale)=>{
-    const candidates=await env.DB.prepare(NEWS_ARCHIVE_CANDIDATES_SQL).bind(language,cutoff,futureLimit,cutoff,lowEvidenceRetryBefore,retryBefore).all<any>();
+    const candidates=await env.DB.prepare(NEWS_ARCHIVE_CANDIDATES_SQL).bind(language,cutoff,futureLimit,cutoff,retryBefore,lowEvidenceRetryBefore,retryBefore).all<any>();
     const recent=await env.DB.prepare(RECENT_LOW_EVIDENCE_SQL).bind(language,lowEvidenceRetryBefore).all<any>();
     const last=await env.DB.prepare("SELECT value FROM admin_settings WHERE key=? LIMIT 1").bind("news_article_queue_last_publisher").first<any>();
     return pickCandidate(candidates.results||[],recent.results||[],last?.value?String(last.value):null);
@@ -75,7 +75,7 @@ async function publishNextArchivedNewsArticleInner(env:Env){
   const id=Number(row.id),language=row.language as Locale,title=String(row.title||"").trim();
   if(!Number.isInteger(id)||id<1||!title)return{status:"invalid_queue_item" as const};
   const stamp=new Date(now).toISOString();
-  const claim=await env.DB.prepare("UPDATE news_archive SET article_last_attempt_at=? WHERE id=? AND article_slug IS NULL AND article_attempts<2 AND "+ARTICLE_RETRY_DUE_SQL).bind(stamp,id,lowEvidenceRetryBefore,retryBefore).run();
+  const claim=await env.DB.prepare("UPDATE news_archive SET article_last_attempt_at=? WHERE id=? AND article_slug IS NULL AND article_attempts<2 AND "+ARTICLE_RETRY_DUE_SQL).bind(stamp,id,retryBefore,lowEvidenceRetryBefore,retryBefore).run();
   if(Number((claim.meta as any)?.changes||0)!==1)return{status:"already_claimed" as const,id};
   // Persist the next language before drafting so a failed Arabic attempt cannot
   // starve English news forever (and vice versa).
