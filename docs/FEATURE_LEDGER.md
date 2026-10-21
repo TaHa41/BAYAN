@@ -60,3 +60,10 @@ This is an observed snapshot, not a claim that the acceptance criteria are met.
 - PR #431 was closed as superseded, not merged: its migration targets four rows whose production `image_url` values were already non-empty. External HTTP 200/content-type checks for those images remain unverified.
 - Search Console indexing, live canonical/hreflang/JSON-LD, all 14 section routes in both locales, mobile navigation, live weather/FX/prayer success, Telegram delivery, and GA4 event delivery are not certified by this snapshot.
 - Reproducible read-only inventory queries: `scripts/article-quality-report.sql`.
+
+
+## 2026-10-21 execution delta
+
+- **Implemented in main:** D1 quota interception across prepared statements and batch operations; persisted block restored before request routes; quota-specific degraded sitemap responses; topic-specific GDELT publisher-page evidence recovery behind the existing five-independent-publisher gate; designed section illustrations when an article has no verified image; explicit `OPENAI_ENABLED=true` opt-in for paid OpenAI.
+- **Production verified:** deploy SHA `4c49bc39869794eb514b7ff65eded254de4f8437` matches Cloudflare's deployed binding; production smoke is strict and currently reports the real news-publication gap.
+- **Not proven:** any linked archive article, a verified real-image backfill for existing rows, PNG share preview, and D1 daily read usage before/after measurement.
