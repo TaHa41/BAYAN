@@ -67,3 +67,12 @@ This is an observed snapshot, not a claim that the acceptance criteria are met.
 - **Implemented in main:** D1 quota interception across prepared statements and batch operations; persisted block restored before request routes; quota-specific degraded sitemap responses; topic-specific GDELT publisher-page evidence recovery behind the existing five-independent-publisher gate; designed section illustrations when an article has no verified image; explicit `OPENAI_ENABLED=true` opt-in for paid OpenAI.
 - **Production verified:** deploy SHA `4c49bc39869794eb514b7ff65eded254de4f8437` matches Cloudflare's deployed binding; production smoke is strict and currently reports the real news-publication gap.
 - **Not proven:** any linked archive article, a verified real-image backfill for existing rows, PNG share preview, and D1 daily read usage before/after measurement.
+
+
+## Manual news pipeline trigger — 2026-10-21 (pending verification)
+
+- [x] Source-level implementation: manager-authenticated `POST /api/internal/trigger-news-pipeline` invokes the existing bounded publisher, checks the feature flag and applies a cooldown.
+- [x] Source contract guard checks POST-only, manager authorization, feature flag, cooldown, existing publisher call, runtime event, and evidence-diversity code.
+- [ ] CI checks and deployment are not yet confirmed for this change.
+- [ ] Production trigger invocation and first published article are not verified. Latest read-only snapshot: 1,697 archive rows, zero linked articles, zero published news articles.
+- Evidence thresholds remain unchanged; no direct D1 article insertion or fabricated article is allowed.
