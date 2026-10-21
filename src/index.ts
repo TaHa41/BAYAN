@@ -296,7 +296,8 @@ const publicApiCacheTtl=(request:Request,url:URL):number=>{
 const markD1QuotaDegradedResponse=async(response:Response)=>{
  const headers=new Headers(response.headers);
  headers.set("x-bayan-degraded","d1_quota");
- const payload=await response.clone().json().catch(()=>null);
+ let payload:any=null;
+ try{payload=await response.clone().json()}catch(error){console.warn("d1_quota_response_json_failed",error instanceof Error?error.name:"unknown")}
  if(payload&&typeof payload==="object"&&!Array.isArray(payload))return new Response(JSON.stringify({...payload,degraded:true,reason:"d1_quota"}),{status:response.status,headers});
  return new Response(response.body,{status:response.status,headers});
 };
