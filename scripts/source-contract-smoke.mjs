@@ -368,6 +368,8 @@ checks.push(["research fallback rejects unrelated title/snippet pairs and sectio
 
 checks.push(["source-only research shows the actual excerpt without fabricated biography sections", api.includes("const bodyText=referenceSummary;") && !api.includes("const bodyText=isBiography?structuredSourceOnlyBiography(referenceTitle,referenceSummary,referenceSources,lang):referenceSummary;")]);
 
+checks.push(["search cards never expose generic section illustrations as topic images", api.includes("if(Array.isArray(r?.results))r.results=r.results.map((item:any)=>({...item,imageUrl:storyImage(item.imageUrl)") && api.includes("sources.map((source:any)=>({...source,imageUrl:storyImage(source.imageUrl)}))")]);
+
 let failed = 0;
 for (const [name, ok] of checks) {
   console.log((ok ? "PASS " : "FAIL ") + name);
