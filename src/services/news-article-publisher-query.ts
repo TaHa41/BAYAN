@@ -8,7 +8,7 @@
  */
 export const ARTICLE_RETRY_DUE_SQL = `(
  article_last_attempt_at IS NULL
- OR article_last_reason IS NULL
+ OR (article_last_reason IS NULL AND datetime(article_last_attempt_at)<=datetime(?))
  OR (article_last_reason='skipped_low_evidence' AND datetime(article_last_attempt_at)<=datetime(?))
  OR (article_last_reason='ai_unavailable' AND datetime(article_last_attempt_at)<=datetime(
    'now','-' || CASE
