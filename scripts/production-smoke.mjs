@@ -474,5 +474,9 @@ try{
   }
 
 if(degradedSections)console.warn("SECTION_CHECKS_SKIPPED_EXPLICIT_D1_QUOTA",degradedSections);
+if(bad>0){
+  console.error("BAYAN_PRODUCTION_SMOKE_FAILED",JSON.stringify({failures:bad,degradedSections}));
+  process.exit(1);
+}
 console.log("BAYAN production smoke passed; degraded section checks skipped="+degradedSections);
 console.log("BAYAN production smoke passed");
