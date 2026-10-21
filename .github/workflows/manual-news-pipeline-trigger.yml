@@ -1,0 +1,104 @@
+name: BAYAN Manual News Pipeline Trigger
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bayan-manual-news-trigger
+  cancel-in-progress: false
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Validate manager secret is configured
+        env:
+          BAYAN_AI_MANAGER_TOKEN: ${{ secrets.BAYAN_AI_MANAGER_TOKEN }}
+        shell: bash
+        run: |
+          if [[ -z "$BAYAN_AI_MANAGER_TOKEN" ]]; then
+            echo "::error::Repository Actions secret BAYAN_AI_MANAGER_TOKEN is not configured."
+            exit 1
+          fi
+
+      - name: Trigger one bounded production news-pipeline attempt
+        id: trigger
+        env:
+          BAYAN_AI_MANAGER_TOKEN: ${{ secrets.BAYAN_AI_MANAGER_TOKEN }}
+          BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
+        shell: bash
+        run: |
+          set -euo pipefail
+          status=$(curl --silent --show-error --max-time 480 \
+            --output trigger-result.json --write-out '%{http_code}' \
+            --request POST \
+            --header "Authorization: Bearer ${BAYAN_AI_MANAGER_TOKEN}" \
+            --header 'Accept: application/json' \
+            "${BAYAN_ORIGIN}/api/internal/trigger-news-pipeline")
+          echo "HTTP status: $status"
+          RESULT_HTTP_STATUS="$status" node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          const status = Number(process.env.RESULT_HTTP_STATUS);
+          let result;
+          try { result = JSON.parse(readFileSync("trigger-result.json", "utf8")); }
+          catch { throw new Error("Trigger endpoint returned non-JSON output."); }
+          const safe = {
+            httpStatus: status,
+            ok: result.ok === true,
+            published: result.published === true,
+            status: result.status ?? null,
+            publishReason: result.publishReason ?? null,
+            publishReasonDetail: result.publishReasonDetail ?? null,
+            articleId: result.articleId ?? null,
+            language: result.language ?? null,
+            slug: result.slug ?? null,
+            articleUrl: result.articleUrl ?? null
+          };
+          console.log("News pipeline result:", JSON.stringify(safe));
+          if (status < 200 || status >= 300) throw new Error("Trigger endpoint returned a non-success HTTP status.");
+          if (result.published !== true || typeof result.articleUrl !== "string") {
+            throw new Error("This attempt did not publish an article; see the bounded publish reason above.");
+          }
+          NODE
+
+      - name: Verify published article appears in the news sitemap
+        env:
+          BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+          const result = JSON.parse(readFileSync("trigger-result.json", "utf8"));
+          const articleUrl = String(result.articleUrl || "");
+          if (!articleUrl.startsWith(process.env.BAYAN_ORIGIN + "/article/")) {
+            throw new Error("Published article URL is missing or outside the BAYAN origin.");
+          }
+          let lastStatus = 0;
+          for (let attempt = 1; attempt <= 10; attempt++) {
+            const response = await fetch(process.env.BAYAN_ORIGIN + "/news-sitemap.xml", {
+              cache: "no-store",
+              headers: { "cache-control": "no-cache", accept: "application/xml" },
+              signal: AbortSignal.timeout(12000)
+            });
+            lastStatus = response.status;
+            const xml = await response.text();
+            if (response.ok && xml.includes(articleUrl)) {
+              console.log("Verified article URL in production news sitemap:", articleUrl);
+              process.exit(0);
+            }
+            await new Promise(resolve => setTimeout(resolve, 3000));
+          }
+          throw new Error("Article was reported published but was not found in news-sitemap.xml after bounded retries (last HTTP " + lastStatus + ").");
+          NODE
+
+      - name: Upload sanitized trigger response
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bayan-news-trigger-${{ github.run_id }}
+          path: trigger-result.json
+          if-no-files-found: ignore
+          retention-days: 7
