@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   NEWS_ARCHIVE_CANDIDATES_SQL,
@@ -7,6 +8,14 @@ import {
 } from "./news-article-publisher-query";
 
 describe("bounded news archive queue", () => {
+  it("keeps the queue query and additive migration aligned with the bounded indexes", () => {
+    const migration = readFileSync(new URL("../../migrations_v1/0038_news_archive_queue_indexes.sql", import.meta.url), "utf8");
+    expect(migration).toContain("CREATE INDEX IF NOT EXISTS idx_news_archive_queue ON news_archive(language, article_slug, published_at DESC)");
+    expect(migration).toContain("CREATE INDEX IF NOT EXISTS idx_news_archive_reason ON news_archive(language, article_last_reason, article_last_attempt_at)");
+    expect(NEWS_ARCHIVE_CANDIDATES_SQL).toContain("language=? AND article_slug IS NULL AND article_attempts<2");
+    expect(NEWS_ARCHIVE_CANDIDATES_SQL).toContain("ORDER BY published_at DESC, id DESC LIMIT 40");
+  });
+
   it("does not use a correlated title scan against news_archive", () => {
     expect(NEWS_ARCHIVE_CANDIDATES_SQL).not.toMatch(/NOT\s+EXISTS/i);
     expect(NEWS_ARCHIVE_CANDIDATES_SQL).not.toContain("lower(trim(");
