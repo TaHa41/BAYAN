@@ -366,6 +366,8 @@ checks.push(["manual news pipeline trigger is POST-only, manager-authenticated, 
 
 checks.push(["research fallback rejects unrelated title/snippet pairs and section-placeholder images", api.includes('let image=""; // Resolve images from the exact matched subject, never from a client-supplied card URL.') && api.includes("if(!sourceSummary||!newsArticleEvidenceRelevant(title,{title:\"\",summary:sourceSummary}))return json({error:\"article_subject_mismatch\"") && api.includes("The available snippet could not be matched to this title")]);
 
+checks.push(["source-only research shows the actual excerpt without fabricated biography sections", api.includes("const bodyText=referenceSummary;") && !api.includes("const bodyText=isBiography?structuredSourceOnlyBiography(referenceTitle,referenceSummary,referenceSources,lang):referenceSummary;")]);
+
 let failed = 0;
 for (const [name, ok] of checks) {
   console.log((ok ? "PASS " : "FAIL ") + name);
