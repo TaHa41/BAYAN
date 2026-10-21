@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { d1Blocked, d1BlockedPersisted, nextUtcMidnight, persistD1Block, resetD1GuardForTests } from "../src/services/d1-guard";
+import { d1Blocked, d1BlockedPersisted, isD1QuotaError, nextUtcMidnight, persistD1Block, resetD1GuardForTests } from "../src/services/d1-guard";
 
 function fakeCache() {
   const values = new Map<string, Response>();
@@ -37,5 +37,16 @@ describe("persistent D1 quota guard", () => {
     await persistD1Block(now, cache);
     expect(d1Blocked(now + 1000)).toBe(true);
     expect(await d1BlockedPersisted(now + 1000, cache)).toBe(true);
+  });
+});
+
+
+describe("D1 quota error recognition", () => {
+  it("recognizes Cloudflare daily read/write quota failures without matching unrelated errors", () => {
+    expect(isD1QuotaError(new Error("D1 DB is currently experiencing an issue: 7500"))).toBe(true);
+    expect(isD1QuotaError("exceeded D1's free tier")).toBe(true);
+    expect(isD1QuotaError("free tier daily row read limit")).toBe(true);
+    expect(isD1QuotaError(new Error("no such table: articles"))).toBe(false);
+    expect(isD1QuotaError(undefined)).toBe(false);
   });
 });
