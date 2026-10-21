@@ -23,6 +23,8 @@ describe("GDELT topic evidence discovery", () => {
     const query = gdeltQueryForTopic("Egypt social protection programmes update", "en");
     expect(query).toContain('"egypt social"');
     expect(query).toContain('"social protection"');
+    expect(query).toContain("OR egypt");
+    expect(query).toContain("OR protection");
     expect(query).toContain("sourcelang:english");
     expect(query.length).toBeLessThan(240);
   });
