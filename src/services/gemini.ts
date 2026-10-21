@@ -13,7 +13,7 @@ export type GeminiOptions = {
   fetchImpl?: typeof fetch;
 };
 
-export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
 const MODEL_PATTERN = /^[a-z0-9][a-z0-9.\-]{1,60}$/i;
 export const resolveGeminiModel = (raw: unknown): string => {
   const model = String(raw ?? "").trim();
