@@ -3,6 +3,23 @@ name: BAYAN Worker Deploy
 on:
   push:
     branches: [main]
+    # Avoid deploying and running D1-heavy production probes for docs-only or test-only changes.
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'migrations/**'
+      - 'migrations_v1/**'
+      - 'wrangler.*'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'index.html'
+      - 'vite.config.*'
+      - 'tsconfig.json'
+      - 'tailwind.config.*'
+      - 'postcss.config.*'
+      - 'scripts/production-*.mjs'
+      - 'scripts/seed-article-quality-smoke.mjs'
+      - 'scripts/news-sitemap-contract.mjs'
   workflow_dispatch:
     inputs:
       allow_repair:
