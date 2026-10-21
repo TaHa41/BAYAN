@@ -70,7 +70,7 @@
 - Production acceptance still fails only on the known `news_publication_gap` in the latest check: 200 archive candidates, zero eligible/published news URLs. D1 row-read metrics are deferred to 2026-10-22 00:00–01:00 UTC.
 
 
-## Follow-up — authenticated manual news trigger (2026-10-21, pending CI/deployment)
+## Follow-up — authenticated manual news trigger (2026-10-21, merged and deployed; publication pending)
 
 - Added `POST /api/internal/trigger-news-pipeline` to `src/index.ts`. It authenticates through the existing manager token, checks `NEWS_PIPELINE_ENABLED`, rejects other methods, rate-limits repeated calls per isolate, and calls the same `publishNextArchivedNewsArticle` function used by scheduled publication.
 - Added a source-contract assertion in `scripts/source-contract-smoke.mjs` for the security gates and guarded-publisher call.
