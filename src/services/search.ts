@@ -6,6 +6,7 @@ import {boundedLikeKeywords,escapedLikePattern} from "../search-patterns";
 import {recordRuntimeEventLimited} from "../runtime-events";
 import {ask,draftArticle,ARTICLE_DRAFT_TIMEOUT_MS,answerHasUnsupportedSpecifics,answerUnsupportedSpecificsDetail,handleOpenAIResponseFailure,consumeDailyNewsAiCall,openAIAllowed} from "./ai";
 import {findRelatedImage,searchNewsFeed,searchTrustedNewsFeeds,resolvePublisherArticleUrl} from "./news";
+import {fetchGdeltEvidenceStories} from "./gdelt-evidence";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
 import {sectionForOpenedStory,isContentForSection} from "./editorial";
 import {sections} from "../sections";
@@ -209,6 +210,16 @@ async function trustedPublisherRssSearch(q:string,language:Locale,diagnostics?:s
     const summary=cleanText(story.summary||"").slice(0,1400);
     return {title,summary,section:sectionForOpenedStory(title,summary),kind:"web" as const,evidence:"mixed" as const,sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+8,provider:"Trusted Publisher RSS Search"};
   }).filter(item=>item.title&&item.summary.length>=80&&/^https:\/\//i.test(item.url));
+}
+async function gdeltTopicEvidenceSearch(env:Env,q:string,language:Locale,diagnostics:string[]):Promise<Candidate[]>{
+  const stories=await fetchGdeltEvidenceStories(language,env,diagnostics,fetch,q);
+  const out=stories.map(story=>{
+    const title=cleanText(story.title),url=String(story.url||""),publisher=cleanText(story.publisher||"");
+    const summary=cleanText(story.summary||"").slice(0,1400);
+    return {title,summary,section:sectionForOpenedStory(title,summary),kind:"web" as const,evidence:"mixed" as const,sources:[source(title,publisher,url)],url,score:scoreSource(publisher,title,q)+10,provider:"GDELT Publisher Text"};
+  }).filter(item=>item.title&&item.summary.length>=120&&/^https:\/\//i.test(item.url));
+  diagnostics.push("GDELT topic evidence accepted="+out.length+" language="+language);
+  return out;
 }
 async function googleNewsSearch(q:string,language:Locale,diagnostics?:string[]):Promise<Candidate[]>{
   try{
@@ -942,6 +953,15 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     }
   }
   
+  // Publication-only recovery: query GDELT for this headline and fetch real publisher text under robots.txt and byte limits.
+  // This runs only after normal providers remain below the five-independent-publisher gate; it does not weaken that gate.
+  if(options.publish===true&&!firstPassHasDiverseEvidence()){
+    const diagnosticStart=providerDiagnostics.length;
+    const gdelt=await safe(gdeltTopicEvidenceSearch(env,q,language,providerDiagnostics),[],"GDELT Topic Evidence");
+    candidates.push(...gdelt);
+    providerAttempted.push("GDELT Topic Evidence",...providerDiagnostics.slice(diagnosticStart));
+  }
+
   // Expanded providers are appended after the first-pass identity cleanup; sanitize them too before ranking.
   for(const candidate of candidates){candidate.summary=sanitizeConflictingCurrentClubClaims(candidate.summary||"");}
   const safeCandidates=candidates.filter(x=>(language==="ar"?hasArabic(x.title):!hasArabic(x.title))&&!disallowedContent(x.title+" "+x.summary)&&!hasConflictingCurrentClubClaims(x.summary));
