@@ -358,6 +358,8 @@ checks.push(["Egypt section has bilingual source-backed fallback articles for sp
 
 checks.push(["ask analytics failure does not discard a successfully retrieved answer", api.includes(`try{await track(env,vid,"ask","/ask",lang)}catch(error){console.warn("ask_analytics_tracking_failed",error instanceof Error?error.name:"unknown")}`)]);
 
+checks.push(["manual news pipeline trigger is POST-only, manager-authenticated, pipeline-gated, rate-limited, and uses the guarded publisher", (()=>{const route=read("src/index.ts");const publisher=read("src/services/news-article-publisher.ts");const trigger=route.slice(route.indexOf('if(u.pathname==="/api/internal/trigger-news-pipeline")'),route.indexOf("const apiCacheTtl=publicApiCacheTtl"));return trigger.includes('request.method!=="POST"') && trigger.includes("manager(request,env)") && trigger.includes('env.NEWS_PIPELINE_ENABLED!=="true"') && trigger.includes("lastManualNewsTriggerAt<5*60*1000") && trigger.includes("publishNextArchivedNewsArticle(env)") && trigger.includes('recordRuntimeEventLimited(env,"news_archive_manual_trigger"') && publisher.includes("independentPublisherCount") && publisher.includes("independentHostCount")})()]);
+
 let failed = 0;
 for (const [name, ok] of checks) {
   console.log((ok ? "PASS " : "FAIL ") + name);
