@@ -85,3 +85,12 @@ This verifies Worker version metadata, not a direct successful read of `/.well-k
 - GDELT topic recovery is deployed, but `news_archive.linked>0` in both languages is not yet proven. No D1 read-count measurement was run outside the requested first-hour window.
 - A one-time measurement automation was created for 2026-10-22 00:05 UTC; the scheduler returned `next_run_time=null`, so execution time is not yet confirmed.
 - Manual blockers: upload `public/og/bayan-og.png`; add the missing `GEMINI_API_KEY` Secret binding to the live Worker without exposing its value; identify the intended provider for the currently unreferenced `SEARCH_API_KEY` before wiring it; approve RSS sources before activation. Do not merge #348 or #275 without owner approval.
+
+
+## 2026-10-21 — AI fallback investigation (not yet production-verified)
+
+- PR #517 adds one daily AI-budget reservation per article-drafting attempt and a regression test for Gemini failure followed by Workers AI fallback.
+- Initial CI found a stale source-contract assertion encoding the old per-provider budget guard. The contract now checks the single-reservation draft behavior and separately verifies OpenAI web-search circuit-breaker evaluation before that provider's budget reservation.
+- `.env.example` documents Gemini and Workers AI configuration names without storing secrets. Deployed Worker bindings and secret validity remain unverified from this repository change.
+- GDELT PR #339 was closed unmerged and its branch is 166 commits behind current `main`; do not merge that branch directly. Later GDELT topic-recovery work is recorded as deployed, but production linked-source diversity and news publication remain unverified.
+- No production article publication or successful `scripts/production-smoke.mjs` result is claimed by this entry.

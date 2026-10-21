@@ -233,11 +233,14 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
   };
   const generate=async(extraInstruction:string)=>{
     const messages=[{role:"system",content:system},{role:"user",content:"Topic/question: "+question+"\nEvidence excerpts (only these snippets may be used): "+evidenceText+(extraInstruction?"\nCorrection required: "+extraInstruction:"")}];
-    if(env.GEMINI_API_KEY&&(!backgroundBudget||await consumeDailyNewsAiCall(env))){
+    // Reserve one daily budget unit per generation attempt, not per provider.
+    // A failed provider must not consume the budget needed for fallback providers.
+    if(backgroundBudget&&!await consumeDailyNewsAiCall(env))return "";
+    if(env.GEMINI_API_KEY){
       const answer=await callGeminiText(env,"Gemini draft",system,"Topic/question: "+question+"\nEvidence excerpts (only these snippets may be used): "+evidenceText+(extraInstruction?"\nCorrection required: "+extraInstruction:""),{json:true,temperature:0,maxOutputTokens:3600,timeoutMs:9000});
       if(answer)return answer;
     }
-    if(env.OPENAI_API_KEY&&await openAIAllowed(env)&&(!backgroundBudget||await consumeDailyNewsAiCall(env)))try{
+    if(env.OPENAI_API_KEY&&await openAIAllowed(env))try{
       const response=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(9000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",messages,temperature:0,max_tokens:3600,response_format:{type:"json_object"}})});
       if(response.ok){
         const data=await response.json<any>(),answer=String(data.choices?.[0]?.message?.content||"").trim();
@@ -245,7 +248,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
         await recordAiFailure(env,"OpenAI draft","empty_response");
       }else await handleOpenAIResponseFailure(env,"OpenAI draft",response);
     }catch(error){await recordAiFailure(env,"OpenAI draft",aiFailureDetail(error));}
-    if(env.AI&&(!backgroundBudget||await consumeDailyNewsAiCall(env)))try{
+    if(env.AI)try{
       const response=await env.AI.run(workersAiModel(env),{messages,max_tokens:3600,temperature:0,response_format:{type:"json_object"}});
       const answer=workersAIResponseText(response);
       if(answer)return answer;
