@@ -94,3 +94,12 @@ This verifies Worker version metadata, not a direct successful read of `/.well-k
 - `.env.example` documents Gemini and Workers AI configuration names without storing secrets. Deployed Worker bindings and secret validity remain unverified from this repository change.
 - GDELT PR #339 was closed unmerged and its branch is 166 commits behind current `main`; do not merge that branch directly. Later GDELT topic-recovery work is recorded as deployed, but production linked-source diversity and news publication remain unverified.
 - No production article publication or successful `scripts/production-smoke.mjs` result is claimed by this entry.
+
+
+## 2026-10-21 — authenticated manual news trigger (PR pending)
+
+- Added `POST /api/internal/trigger-news-pipeline` in `src/index.ts`. It uses the existing `BAYAN_AI_MANAGER_TOKEN` manager authorization, rejects non-POST requests, requires `NEWS_PIPELINE_ENABLED=true`, and applies a per-isolate five-minute cooldown.
+- The endpoint calls the existing `publishNextArchivedNewsArticle` publisher; it does not insert article rows directly, bypass evidence checks, lower the five-independent-publisher/host threshold, or reset attempt counters. It records a bounded `news_archive_manual_trigger` runtime event and only returns an article URL when the publisher reports a published slug.
+- Read-only production D1 check at this checkpoint: `news_archive=1697`, `linked=0`, `published_news=0`. The live Worker settings report `NEWS_PIPELINE_ENABLED=true`. Recent failures include `ai_unavailable` / Gemini timeouts and insufficient independent publishers. This confirms that cron timing is not the only blocker.
+- Status: implementation and contract guard are on branch `fix/secure-news-pipeline-trigger`; **not yet CI-verified, merged, deployed, or called in production**. Do not mark the first article criterion complete until a real published slug is returned and verified in `/news-sitemap.xml`.
+- A production trigger call requires the manager token in an authenticated POST. The token is not read or printed by this audit. Do not expose it in browser code, query strings, logs, or repository files.
