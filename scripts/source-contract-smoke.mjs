@@ -347,6 +347,8 @@ const checks = [
 ];
 checks.push(["sparse verified search results trigger browser-side expansion instead of stopping at one result", app.includes("const shouldExpandWeakSearch = serverResults.length < 3;") && !app.includes("(serverResults.length < 3 && data?.status !== \"verified\")")]);
 
+checks.push(["production smoke fails when any assertion increments the failure counter", (()=>{const script=read("scripts/production-smoke.mjs");const end=script.slice(script.lastIndexOf("if(degradedSections)"));return end.includes("if(bad>0)") && end.includes("process.exit(1)") && end.indexOf("process.exit(1)")<end.indexOf('console.log("BAYAN production smoke passed')})()]);
+
 checks.push(["ask analytics failure does not discard a successfully retrieved answer", api.includes(`try{await track(env,vid,"ask","/ask",lang)}catch(error){console.warn("ask_analytics_tracking_failed",error instanceof Error?error.name:"unknown")}`)]);
 
 let failed = 0;
