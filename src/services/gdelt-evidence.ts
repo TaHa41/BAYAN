@@ -31,6 +31,37 @@ export type GdeltEvidenceStory = {
 
 type CacheLike = { match(request: Request): Promise<Response | undefined>; put(request: Request, response: Response): Promise<void> };
 type GdeltArticle = { title?: string; url?: string; domain?: string; seendate?: string; language?: string; socialimage?: string };
+
+const MAX_GDELT_METADATA_BYTES = 512 * 1024;
+
+/** Bound upstream metadata buffering before JSON parsing inside the Worker. */
+async function readBoundedMetadataText(response: Response, maxBytes = MAX_GDELT_METADATA_BYTES): Promise<string> {
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const part = await reader.read();
+      if (part.done) break;
+      total += part.value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new Error("response_body_too_large");
+      }
+      chunks.push(part.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
 type RobotRule = { path: string; allow: boolean };
 type RobotGroup = { agents: string[]; rules: RobotRule[] };
 
@@ -117,7 +148,7 @@ export async function fetchGdeltMetadataWithFallback(lang: Locale, fetchImpl: ty
     const url = "https://api.gdeltproject.org/api/v2/doc/doc?query=" + encodeURIComponent(candidate.query) + "&mode=artlist&format=json&maxrecords=" + (candidate.label === "topic" ? "50" : "20") + "&timespan=3d&sort=DateDesc";
     try {
       const response = await fetchImpl(url, { signal: AbortSignal.timeout(candidate.label === "topic" ? 8000 : 5000), headers: { accept: "application/json", "user-agent": "BAYAN/1.3 (+https://bayan.tahaomar411.workers.dev)" } });
-      const raw = await response.text();
+      const raw = await readBoundedMetadataText(response);
       if (!response.ok) {
         diagnostics.push("GDELT " + candidate.label + " HTTP " + response.status);
         continue;
@@ -132,7 +163,9 @@ export async function fetchGdeltMetadataWithFallback(lang: Locale, fetchImpl: ty
       if (articles.length) return articles;
       if (index + 1 < queries.length) diagnostics.push("GDELT topic query empty; trying language fallback");
     } catch (error) {
-      diagnostics.push("GDELT " + candidate.label + " request failed: " + String((error as any)?.name || "error"));
+      const message = String((error as any)?.message || "");
+      const reason = message === "response_body_too_large" ? message : String((error as any)?.name || "error");
+      diagnostics.push("GDELT " + candidate.label + " request failed: " + reason);
     }
   }
   return [];
