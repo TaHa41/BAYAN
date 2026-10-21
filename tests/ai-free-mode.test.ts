@@ -6,6 +6,8 @@ describe("paid AI cost guard", () => {
     expect(paidAiEnabled({})).toBe(false);
     expect(paidAiEnabled({ OPENAI_ENABLED: "" })).toBe(false);
     expect(paidAiEnabled({ OPENAI_ENABLED: "false" })).toBe(false);
+    const legacyOnly = { OPENAI_ENABLED: "false", BAYAN_ALLOW_PAID_AI: "true" };
+    expect(paidAiEnabled(legacyOnly)).toBe(false);
   });
 
   it("only enables paid API calls after an explicit true opt-in", () => {
