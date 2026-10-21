@@ -173,8 +173,9 @@ export async function api(request:Request,env:Env,ctx?:ExecutionContext){const u
    image=await bounded(findRelatedImage(String(item?.title||""),undefined,String(item?.summary||""),env),1400).catch((error)=>{void recordRuntimeEventLimited(env,"search_image_enrichment","image_lookup_failed",error);return undefined;});
    image=safePublicImageUrl(image);
   }
-  const sectionSlug=sectionBySlug(String(item?.section||""))?String(item.section):"world";
-  return {...item,imageUrl:image||new URL("/sections/"+sectionSlug+".svg",request.url).toString(),imageAlt:image?String(item?.imageAlt||item?.title||""):(lang==="en"?"BAYAN "+sectionSlug+" illustration":"رسم توضيحي لقسم "+sectionSlug),imageFallback:!image};
+  const sectionSlug=sectionBySlug(String(item?.section||""))?String(item.section):undefined;
+  // Never attach a section illustration as if it depicted the searched story.
+  return {...item,imageUrl:image||null,imageAlt:image?String(item?.imageAlt||item?.title||""):undefined,imageFallback:!image,section:sectionSlug||item?.section};
  }));
 }
 const providerFailures=Array.isArray(r?.providerAttempted)?r.providerAttempted.filter((item:any)=>/(?:timeout|connection_failure|invalid_response|request_failure|http_\d{3})/i.test(String(item))).slice(0,20):[];if(providerFailures.length){try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind("WARN","external_search_provider_failures",JSON.stringify({language:lang,queryLength:q.length,failures:providerFailures}),new Date().toISOString()).run()}catch(error){await recordRuntimeEventLimited(env,"api_suppressed_failure","operation_failed",error)}}try{await track(env,vid,"search","/search",lang)}catch(error){await recordRuntimeEventLimited(env,"api_suppressed_failure","operation_failed",error)}return json(r)}if(u.pathname==="/api/news/article"){
@@ -278,16 +279,16 @@ const providerFailures=Array.isArray(r?.providerAttempted)?r.providerAttempted.f
         const isBiography=looksLikePersonBiography(referenceTitle,referenceSummary)||editorialSectionForOpenedStory(referenceTitle,referenceSummary)==="people";
         const section=isBiography?"people":editorialSectionForOpenedStory(referenceTitle,referenceSummary);
         const bodyText=isBiography?structuredSourceOnlyBiography(referenceTitle,referenceSummary,referenceSources,lang):referenceSummary;
-        const articleImage=safePublicImageUrl(image)||new URL("/sections/"+section+".svg",request.url).toString();
+        const articleImage=safePublicImageUrl(image)||null;
         return json({ok:true,article:{title:referenceTitle,summary:referenceSummary,body:bodyText,sources:referenceSources,image:articleImage,status:"source_only",providerCount:referenceSources.length,section,publishedAt}});
       }
       return json({error:"article_evidence_insufficient",status:"insufficient",message:lang==="ar"?"لم تتوفر مصادر مستقلة كافية لإعداد مقال موثق.":"There were not enough independent sources to prepare a verified article."},422);
     }
     const articleBody=generatedBody;
-    const sources=evidenceSources.slice(0,12);const exactSubject=found.results.find((x:any)=>identityNormalized(String(x.title||""))===identityNormalized(title));if(!image)image=exactSubject?.imageUrl||exactSubject?.sources?.find((source:any)=>/^https:\/\//i.test(String(source.imageUrl||"")) )?.imageUrl||found.results.find((x:any)=>/^https:\/\//i.test(String(x.imageUrl||"")) )?.imageUrl||sources.find((source:any)=>/^https:\/\//i.test(String(source.imageUrl||"")) )?.imageUrl||await bounded(findRelatedImage(title,exactSubject?.url||exactSubject?.sources?.[0]?.url,found.results[0]?.summary||"",env),3500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","verified_article_image_lookup_failed",error);return undefined})||"";
+    const sources=evidenceSources.slice(0,12);const exactSubject=found.results.find((x:any)=>identityNormalized(String(x.title||""))===identityNormalized(title));if(!image)image=safePublicImageUrl(exactSubject?.imageUrl)||safePublicImageUrl(exactSubject?.sources?.find((source:any)=>/^https:\/\//i.test(String(source.imageUrl||"")) )?.imageUrl)||await bounded(findRelatedImage(title,exactSubject?.url||exactSubject?.sources?.[0]?.url,exactSubject?.summary||"",env),3500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","verified_article_image_lookup_failed",error);return undefined})||"";
     const articleSection=editorialSectionForOpenedStory(title,found.results[0]?.summary||"");
     const articleImage=safePublicImageUrl(image)||new URL("/sections/"+articleSection+".svg",request.url).toString();
-    const article={title,summary:found.results[0]?.summary||"",body:articleBody,sources,image:articleImage,status:hasFullAnalysis?generated.status:"source_only",providerCount:new Set(sources.map((s:any)=>s.publisher).filter(Boolean)).size};const savedSlug=await persistOpenedNewsArticle(env,article,lang);return json({ok:true,article:{...article,section:articleSection,savedSlug}});
+    const articleSummary=String(exactSubject?.summary||exactSubject?.sources?.[0]?.title||"");const article={title,summary:articleSummary,body:articleBody,sources,image:articleImage,status:hasFullAnalysis?generated.status:"source_only",providerCount:new Set(sources.map((s:any)=>s.publisher).filter(Boolean)).size};const savedSlug=await persistOpenedNewsArticle(env,article,lang);return json({ok:true,article:{...article,section:articleSection,savedSlug}});
   }catch(error){await track(env,vid,"news_article_error","/news",lang);return json({error:"news_article_failed",status:"unavailable"},502)}
 }if(u.pathname==="/api/news/archive"){
   const q=clean(u.searchParams.get("q")||"",300);
