@@ -136,7 +136,7 @@ export const answerUnsupportedSpecificsDetail=(answer:string,evidence:SearchResu
 export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[],question="")=>Boolean(answerUnsupportedSpecificsDetail(answer,evidence,question));
 // Daily cap for background news AI calls. Defaults to 80; override with the
 // NEWS_AI_DAILY_LIMIT variable (accepted range 10-500) without a code change.
-export const newsAiDailyLimit=(env:Env):number=>{const n=Number(env.NEWS_AI_DAILY_LIMIT);return Number.isFinite(n)&&n>=10?Math.min(Math.floor(n),500):80};
+export const newsAiDailyLimit=(env:Env):number=>{const n=Number(env.NEWS_AI_DAILY_LIMIT);return Number.isFinite(n)&&n>=10?Math.min(Math.floor(n),500):10};
 export const consumeDailyNewsAiCall=async(env:Env)=>{
   const limit=newsAiDailyLimit(env);
   const day=new Date().toISOString().slice(0,10);
