@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { paidAiEnabled } from "../src/services/ai";
+import { newsAiDailyLimit, paidAiEnabled } from "../src/services/ai";
+
+describe("conservative free-first news AI budget", () => {
+  it("defaults to ten attempts per UTC day unless a valid configured limit is supplied", () => {
+    expect(newsAiDailyLimit({} as any)).toBe(10);
+    expect(newsAiDailyLimit({ NEWS_AI_DAILY_LIMIT: "10" } as any)).toBe(10);
+    expect(newsAiDailyLimit({ NEWS_AI_DAILY_LIMIT: "150" } as any)).toBe(150);
+  });
+});
 
 describe("paid AI cost guard", () => {
   it("keeps paid API calls disabled when no explicit opt-in is configured", () => {

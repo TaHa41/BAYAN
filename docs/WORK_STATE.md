@@ -120,3 +120,11 @@ This verifies Worker version metadata, not a direct successful read of `/.well-k
 - PR #524 merged as `e121aeaceea376d55f0e1174ec54909b57386837`: the secondary manual deploy workflow now requires `allow_repair=true` before invoking self-heal. CI passed.
 - PR #525 merged as `eeea75269b0af1d3f4c3cb881e5211f8630f4450`: added a manually dispatched, one-attempt news trigger workflow with post-publication sitemap verification. It has not been manually run; do not treat it as publication evidence.
 - D1 usage/rows-read measurement is deferred to the next post-reset window. Do not run broad D1 reads before that window.
+
+
+## 2026-10-21 — conservative Gemini/Workers AI daily budget
+
+- Cloudflare's active Worker version had `NEWS_AI_DAILY_LIMIT=150` as a plain-text variable. The connected account does not expose the project's active Gemini AI Studio rate-limit values, so the exact free-tier request/day ceiling is **unknown**.
+- This change lowers the Worker-configured daily news-AI budget to 10 attempts and lowers the code fallback default to 10. It is a conservative guard, not proof that the project's account-specific free quota is 10 or higher.
+- Google documents that limits vary by model, project tier, and account status, and directs owners to view active limits in AI Studio: https://ai.google.dev/gemini-api/docs/rate-limits
+- OpenAI remains disabled unless `OPENAI_ENABLED=true`; no paid-provider opt-in is introduced here.
