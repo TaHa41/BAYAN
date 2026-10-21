@@ -303,6 +303,7 @@ const d1QuotaFallback=(url:URL)=>{
 };
 export default{async fetch(request:Request,env:Env,ctx?:ExecutionContext){env=withD1QuotaGuard(env);const u=new URL(request.url);
 if(u.pathname==="/.well-known/build.json"){return new Response(JSON.stringify({service:"BAYAN",commit:COMMIT_SHA,build:BUILD}),{status:200,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store, max-age=0","cdn-cache-control":"no-store","x-bayan-commit":COMMIT_SHA,"x-bayan-build":BUILD,"x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY"}})}
+await d1BlockedPersisted();
 const apiCacheTtl=publicApiCacheTtl(request,u),apiCacheKey=u.pathname+u.search;
 if(apiCacheTtl){
  const cached=publicApiResponseCache.get(apiCacheKey);
@@ -347,6 +348,7 @@ if(seoPath==="/sitemap.xml"||seoPath==="/news-sitemap.xml"){
     const cached=await sitemapCache.match(sitemapCacheKey);
     if(cached)return cached;
   }catch(error){console.warn("sitemap_edge_cache_read_failed",String(error).slice(0,120))}
+  if(d1Blocked())return degradedSitemap();
   try{
     const response=seoPath==="/sitemap.xml"?await sitemap(env):await newsSitemap(env);
     const headers=new Headers(response.headers);
