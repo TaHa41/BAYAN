@@ -8,6 +8,15 @@ export function gdeltQueryForLanguage(lang: Locale): string {
     : "(news OR breaking OR update) sourcelang:english";
 }
 
+const topicStopWords = new Set(["the","and","for","with","from","that","this","after","before","about","into","over","under","how","why","what","when","where","news","latest","update","breaking","من","في","على","الى","إلى","عن","ما","كيف","لماذا","متى","هذا","هذه","بعد","قبل","مع","حول","أمام","أثناء"]);
+export function gdeltQueryForTopic(topic: string, lang: Locale): string {
+  const words = [...new Set(cleanTopic(topic).split(/\\s+/).filter(word => word.length >= (lang === "ar" ? 3 : 4) && !topicStopWords.has(word)))].slice(0, 8);
+  const phrases = [...new Set(words.slice(0, -1).map((word, index) => word + " " + words[index + 1]))].slice(0, 4);
+  const query = phrases.length ? "(" + phrases.map(phrase => '"' + phrase + '"' ).join(" OR ") + ")" : words.slice(0, 3).join(" OR ");
+  return (query || "(news OR breaking OR update)") + (lang === "ar" ? " sourcelang:arabic" : " sourcelang:english");
+}
+const cleanTopic = (value: string) => String(value || "").normalize("NFKC").toLowerCase().replace(/[^\\p{L}\\p{N}\\s]/gu, " ").replace(/\\s+/g, " ").trim().slice(0, 240);
+
 export type GdeltEvidenceStory = {
   title: string;
   summary: string;
@@ -25,7 +34,7 @@ type RobotGroup = { agents: string[]; rules: RobotRule[] };
 const CACHE_ORIGIN = "https://bayan.tahaomar411.workers.dev";
 const MAX_PAGE_BYTES = 512 * 1024;
 const CACHE_TTL_SECONDS = 15 * 60;
-const metadataFlights = new Map<Locale, Promise<GdeltArticle[]>>();
+const metadataFlights = new Map<string, Promise<GdeltArticle[]>>();
 
 const getCache = (): CacheLike | undefined => {
   try { return (globalThis as any).caches?.default as CacheLike | undefined; } catch { return undefined; }
@@ -96,18 +105,20 @@ const parseDate = (raw: unknown): string | undefined => {
   return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : undefined;
 };
 
-async function loadGdeltMetadata(lang: Locale, fetchImpl: typeof fetch, diagnostics: string[]): Promise<GdeltArticle[]> {
-  const key = cacheKey("/__bayan_internal_cache/gdelt-metadata-v1?lang=" + lang);
+async function loadGdeltMetadata(lang: Locale, fetchImpl: typeof fetch, diagnostics: string[], topic?: string): Promise<GdeltArticle[]> {
+  const topicKey = topic ? encodeURIComponent(cleanTopic(topic).slice(0, 160)) : "";
+  const key = cacheKey("/__bayan_internal_cache/gdelt-metadata-v1?lang=" + lang + (topicKey ? "&topic=" + topicKey : ""));
   const cached = await cacheJson(key);
   if (Array.isArray(cached)) {
     diagnostics.push("GDELT metadata cache hit count=" + cached.length);
     return cached as GdeltArticle[];
   }
-  const inFlight = metadataFlights.get(lang);
+  const flightKey = lang + ":" + topicKey;
+  const inFlight = metadataFlights.get(flightKey);
   if (inFlight) return inFlight;
   const flight = (async () => {
-    const query = encodeURIComponent(gdeltQueryForLanguage(lang));
-    const url = "https://api.gdeltproject.org/api/v2/doc/doc?query=" + query + "&mode=artlist&format=json&maxrecords=20&timespan=3d&sort=DateDesc";
+    const query = encodeURIComponent(topic ? gdeltQueryForTopic(topic, lang) : gdeltQueryForLanguage(lang));
+    const url = "https://api.gdeltproject.org/api/v2/doc/doc?query=" + query + "&mode=artlist&format=json&maxrecords=" + (topic ? "50" : "20") + "&timespan=3d&sort=DateDesc";
     try {
       const response = await fetchImpl(url, { signal: AbortSignal.timeout(5000), headers: { accept: "application/json", "user-agent": "BAYAN/1.3 (+https://bayan.tahaomar411.workers.dev)" } });
       const raw = await response.text();
@@ -132,8 +143,8 @@ async function loadGdeltMetadata(lang: Locale, fetchImpl: typeof fetch, diagnost
       return [];
     }
   })();
-  metadataFlights.set(lang, flight);
-  try { return await flight; } finally { metadataFlights.delete(lang); }
+  metadataFlights.set(flightKey, flight);
+  try { return await flight; } finally { metadataFlights.delete(flightKey); }
 }
 
 async function fetchRobotsAllowed(url: URL, fetchImpl: typeof fetch): Promise<boolean> {
@@ -221,11 +232,12 @@ async function fetchPublisherExcerpt(article: GdeltArticle, lang: Locale, fetchI
   }
 }
 
-export async function fetchGdeltEvidenceStories(lang: Locale, env: Env, diagnostics: string[] = [], fetchImpl: typeof fetch = fetch): Promise<GdeltEvidenceStory[]> {
-  const outputKey = cacheKey("/__bayan_internal_cache/gdelt-evidence-v1?lang=" + lang);
+export async function fetchGdeltEvidenceStories(lang: Locale, env: Env, diagnostics: string[] = [], fetchImpl: typeof fetch = fetch, topic?: string): Promise<GdeltEvidenceStory[]> {
+  const topicKey = topic ? encodeURIComponent(cleanTopic(topic).slice(0, 160)) : "";
+  const outputKey = cacheKey("/__bayan_internal_cache/gdelt-evidence-v1?lang=" + lang + (topicKey ? "&topic=" + topicKey : ""));
   const cached = await cacheJson(outputKey);
   if (Array.isArray(cached)) { diagnostics.push("GDELT evidence cache hit lang=" + lang + " count=" + cached.length); return cached as GdeltEvidenceStory[]; }
-  const metadata = await loadGdeltMetadata(lang, fetchImpl, diagnostics);
+  const metadata = await loadGdeltMetadata(lang, fetchImpl, diagnostics, topic);
   const recent = metadata.filter(article => {
     const title = String(article.title || "");
     const language = String(article.language || "").toLowerCase();
@@ -237,7 +249,7 @@ export async function fetchGdeltEvidenceStories(lang: Locale, env: Env, diagnost
   const seenHosts = new Set<string>();
   const output: GdeltEvidenceStory[] = [];
   for (const article of recent) {
-    if (output.length >= 3) break;
+    if (output.length >= (topic ? 5 : 3)) break;
     if (!isSafeGdeltPublisherUrl(String(article.url || ""))) continue;
     const host = new URL(String(article.url)).hostname.toLowerCase().replace(/^www\./, "");
     if (seenHosts.has(host)) continue;
