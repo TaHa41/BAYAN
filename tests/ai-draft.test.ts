@@ -40,7 +40,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe.each(["ar", "en"] as const)("evidence-grounded article drafting (%s)", locale => {
   it("removes unsupported names, numbers and dates after at most one correction generation", async () => {
     const fetchMock = mockGeneration([draftJson(locale, { unsupported: true }), draftJson(locale, { unsupported: true })]);
-    const result = await draftArticle({ OPENAI_API_KEY: "test-key", BAYAN_ALLOW_PAID_AI: "true" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
+    const result = await draftArticle({ OPENAI_API_KEY: "test-key", OPENAI_ENABLED: "true" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect((result as any).verification?.retried).toBe(true);
     expect((result as any).verification?.removedSentences).toBe(1);
@@ -51,7 +51,7 @@ describe.each(["ar", "en"] as const)("evidence-grounded article drafting (%s)", 
 
   it("accepts a well-formed supported draft", async () => {
     mockGeneration([draftJson(locale)]);
-    const result = await draftArticle({ OPENAI_API_KEY: "test-key", BAYAN_ALLOW_PAID_AI: "true" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
+    const result = await draftArticle({ OPENAI_API_KEY: "test-key", OPENAI_ENABLED: "true" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
     expect(result.status).toBe("verified");
     expect((result as any).verification?.remainingSentences).toBe(16);
     expect((result as any).verification?.removedSentences).toBe(0);
@@ -60,7 +60,7 @@ describe.each(["ar", "en"] as const)("evidence-grounded article drafting (%s)", 
 
   it("rejects malformed JSON safely after one retry", async () => {
     const fetchMock = mockGeneration(["{not-json", "{still-not-json"]);
-    const result = await draftArticle({ OPENAI_API_KEY: "test-key", BAYAN_ALLOW_PAID_AI: "true" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
+    const result = await draftArticle({ OPENAI_API_KEY: "test-key", OPENAI_ENABLED: "true" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result.status).toBe("mixed");
     expect(result.answer).toBe("");
@@ -69,7 +69,7 @@ describe.each(["ar", "en"] as const)("evidence-grounded article drafting (%s)", 
 
   it("salvages supported sentences while rejecting an unknown source ID", async () => {
     const fetchMock = mockGeneration([draftJson(locale, { invalidSource: true }), draftJson(locale, { invalidSource: true })]);
-    const result = await draftArticle({ OPENAI_API_KEY: "test-key", BAYAN_ALLOW_PAID_AI: "true" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
+    const result = await draftArticle({ OPENAI_API_KEY: "test-key", OPENAI_ENABLED: "true" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result.status).toBe("verified");
     expect((result as any).verification?.remainingSentences).toBe(15);
@@ -86,7 +86,7 @@ describe.each(["ar", "en"] as const)("evidence-grounded article drafting (%s)", 
     }
     const fence = String.fromCharCode(96).repeat(3);
     const fetchMock = mockGeneration([fence + "json" + String.fromCharCode(10) + JSON.stringify(value).replace(/,\s*([}\]])/g, "$1") + String.fromCharCode(10) + fence]);
-    const result = await draftArticle({ OPENAI_API_KEY: "test-key", BAYAN_ALLOW_PAID_AI: "true" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
+    const result = await draftArticle({ OPENAI_API_KEY: "test-key", OPENAI_ENABLED: "true" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(result.status).toBe("verified");
     expect((result as any).verification?.remainingSentences).toBe(16);
@@ -94,7 +94,7 @@ describe.each(["ar", "en"] as const)("evidence-grounded article drafting (%s)", 
 
   it("rejects a draft if every sentence has an unknown source ID", async () => {
     const fetchMock = mockGeneration([draftJson(locale, { invalidSource: "all" }), draftJson(locale, { invalidSource: "all" })]);
-    const result = await draftArticle({ OPENAI_API_KEY: "test-key", BAYAN_ALLOW_PAID_AI: "true" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
+    const result = await draftArticle({ OPENAI_API_KEY: "test-key", OPENAI_ENABLED: "true" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result.status).toBe("mixed");
     expect(result.answer).toBe("");
