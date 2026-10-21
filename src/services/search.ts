@@ -1065,6 +1065,23 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
       }
     }
   }
+  // Pin only an existing curated biography with explicit verification and at least
+  // two independent publisher hosts. A single-source person result is never upgraded.
+  if(personQuery){
+    const exactName=normalizedEntityTitle(personQueryName(q));
+    const independentBiography=(item:SearchResult)=>{
+      if(item.section!=="people"||item.evidence!=="verified"||!item.slug)return false;
+      if(!normalizedEntityTitle(item.title).startsWith(exactName)||!item.summary.trim())return false;
+      const hosts=new Set<string>();
+      for(const source of item.sources||[]){
+        const host=independentEvidenceHost(String(source.publisher||""),String(source.url||""));
+        if(host)hosts.add(host);
+      }
+      return hosts.size>=2;
+    };
+    const biographyIndex=results.findIndex(independentBiography);
+    if(biographyIndex>0){const [biography]=results.splice(biographyIndex,1);results.unshift(biography);}
+  }
   // Resolve a subject-specific image for the canonical person result before returning
   // cards, so the exact image can also be carried into the opened article.
   if(personQuery&&options.images!==false){
