@@ -1,5 +1,5 @@
 import {parseNewsSitemap} from "./news-sitemap-contract.mjs";
-import {containsD1QuotaSignal} from "./production-d1-quota-guard.mjs";
+import {containsD1QuotaSignal, shouldAbortBroadProductionSmoke} from "./production-d1-quota-guard.mjs";
 const origin=process.env.BAYAN_ORIGIN||"https://bayan.tahaomar411.workers.dev";
 // D1 quota is a production outage signal. Stop before the broad route matrix so
 // this audit does not amplify read-quota exhaustion with dozens of extra requests.
@@ -8,7 +8,7 @@ try {
   const raw = await response.text();
   let health = null;
   try { health = JSON.parse(raw); } catch { /* Existing strict checks report malformed health responses. */ }
-  if (containsD1QuotaSignal(health)) {
+  if (shouldAbortBroadProductionSmoke({ responseOk:response.ok, healthParsed:health !== null, healthPayload:health })) {
     console.error("PRODUCTION_PREFLIGHT_ABORT: D1 daily quota is exhausted; skipping the D1-heavy route matrix. Production health remains a hard failure.");
     process.exit(1);
   }
