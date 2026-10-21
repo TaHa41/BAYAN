@@ -92,12 +92,18 @@ const isVideoUrl=(value:string)=>{
 };
 
 const newsArticleEvidenceRelevant=(headline:string,candidate:any)=>{
-  const stop=new Set(["the","and","for","with","from","that","this","over","after","before","about","into","amid","says","said","new","latest","today","news","على","في","من","إلى","عن","هذا","هذه","الذي","التي","مع","بعد","قبل","بين","حول","أمام","أثناء","قال","تقول","يدعو","تدعو","وصف","بـ"]);
-  const tokens=Array.from(new Set(String(headline||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").split(/\s+/).map((token)=>token.length>4&&token.startsWith("ال")?token.slice(2):token).filter((token)=>token.length>2&&!stop.has(token))));
-  if(!tokens.length)return false;
-  const evidence=(String(candidate?.title||"")+" "+String(candidate?.summary||"")).normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"");
-  const hits=tokens.filter((token)=>evidence.includes(token)).length;
-  return tokens.length===1?hits===1:hits>=2&&hits/Math.min(tokens.length,5)>=0.4;
+  const stop=new Set(["the","and","for","with","from","that","this","over","after","before","about","into","amid","says","said","new","latest","today","news","على","في","من","إلى","عن","هذا","هذه","الذي","التي","مع","بعد","قبل","بين","حول","أمام","أثناء","قال","تقول","يدعو","تدعو","وصف","بـ","قائمة","إنجازات","إنجاز","أبرز","كل","حول","نبذة","سيرة","من هو","من هي","list","achievements","achievement","career","profile","biography","who","what","complete","greatest"]);
+  const normalize=(value:string)=>String(value||"").normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670]/g,"").replace(/[^\p{L}\p{N}]+/gu," ").split(/\s+/).map(token=>token.length>4&&token.startsWith("ال")?token.slice(2):token).filter(token=>token.length>2&&!stop.has(token));
+  const tokens=Array.from(new Set(normalize(headline)));
+  const titleText=normalize(String(candidate?.title||"")).join(" ");
+  const summaryText=normalize(String(candidate?.summary||"")).join(" ");
+  if(!tokens.length||!summaryText)return false;
+  const titleHits=tokens.filter(token=>titleText.includes(token));
+  const summaryHits=tokens.filter(token=>summaryText.includes(token));
+  // A matching headline alone is not proof that the attached excerpt belongs to it.
+  // Require the evidence text itself to mention at least one meaningful query term.
+  if(!summaryHits.length)return false;
+  return tokens.length===1?summaryHits.length===1:summaryHits.length/Math.min(tokens.length,5)>=0.2||titleHits.length>=2&&summaryHits.length>=1;
 };
 const articleLocaleSafe=(value:string,lang:Locale)=>{
   if(!value.trim())return false;
@@ -261,10 +267,12 @@ const providerFailures=Array.isArray(r?.providerAttempted)?r.providerAttempted.f
     let hasFullAnalysis=quality.ok&&generated.status==="verified"&&hasIndependentSources;
     if(!hasFullAnalysis&&hasIndependentSources&&generated.status==="verified"&&!quality.ok&&generatedBody.length>0){try{const stricter=await bounded(ask(env,articlePromptForTopic(title,lang,found.results)+"\n\n"+(lang==="ar"?"مراجعة تحريرية إلزامية: احذف التكرار، تأكد من ترابط الفقرات، واستخدم أربعة عناوين فرعية على الأقل.":"Mandatory editorial pass: remove repetition, ensure logical transitions, and use at least four subheadings."),lang,found.results),6500);const retry=articleBodyQuality(String(stricter.answer||""));if(retry.ok&&stricter.status==="verified"&&hasIndependentSources){generatedBody=retry.body;hasFullAnalysis=true;generated=stricter as any;}}catch(error){await recordRuntimeEventLimited(env,"api_suppressed_failure","operation_failed",error)}}
     if(!hasFullAnalysis){
-      const referenceCandidate=(found.results as any[]).find((item:any)=>String(item.summary||"").trim().length>0);
-      const referenceSources=(found.results as any[]).flatMap((item:any)=>Array.isArray(item.sources)?item.sources:[]).filter((source:any)=>/^https:\/\//i.test(String(source?.url||""))).filter((source:any,index:number,all:any[])=>all.findIndex((other:any)=>{try{return new URL(String(other.url)).hostname===new URL(String(source.url)).hostname}catch{return false}})===index).slice(0,6);
-      const referenceSummary=sourceExcerpt(String(referenceCandidate?.summary||summary||""),1000);
-      const referenceTitle=String(referenceCandidate?.title||title).trim().slice(0,500);
+      const referenceCandidate=(found.results as any[]).find((item:any)=>String(item.summary||"").trim().length>0&&newsArticleEvidenceRelevant(title,item));
+      // Sources belong to the selected evidence item; never pool citations from unrelated search results.
+      const referenceSources=(Array.isArray(referenceCandidate?.sources)?referenceCandidate.sources:[]).filter((source:any)=>/^https:\/\//i.test(String(source?.url||""))).filter((source:any,index:number,all:any[])=>all.findIndex((other:any)=>{try{return new URL(String(other.url)).hostname===new URL(String(source.url)).hostname}catch{return false}})===index).slice(0,6);
+      const referenceSummary=sourceExcerpt(String(referenceCandidate?.summary||""),1000);
+      // Preserve the headline the visitor actually opened instead of silently replacing it with another result.
+      const referenceTitle=String(title).trim().slice(0,500);
       if(referenceCandidate&&referenceSummary){
         if(!image)image=String(referenceCandidate.imageUrl||"")||await bounded(findRelatedImage(referenceTitle,referenceCandidate.url,referenceSummary,env),2500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","reference_image_lookup_failed",error);return undefined})||"";
         const isBiography=looksLikePersonBiography(referenceTitle,referenceSummary)||editorialSectionForOpenedStory(referenceTitle,referenceSummary)==="people";
