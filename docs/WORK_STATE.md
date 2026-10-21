@@ -110,7 +110,7 @@ This verifies Worker version metadata, not a direct successful read of `/.well-k
 - Rebuilt the GDELT topic-recovery change on current `main` after the original PR #520 branch became merge-conflicted with the authenticated manual-trigger change.
 - Corrected source-contract assertions to match the explicit `topic` / `language-fallback` query labels; the earlier CI failure was caused by stale literal expectations, not evidence that the intended fallback was absent.
 - Added a 512 KiB cap before buffering/parsing GDELT metadata, with fallback to the language query and a bounded diagnostic when a topic response exceeds the cap.
-- Added regression coverage for oversized metadata response fallback. This branch is not yet merged or production-verified; do not claim publication success until a real article passes the unchanged five-independent-publisher evidence checks.
+- Added regression coverage for oversized metadata response fallback. PR #523 is merged and deployed as `1d521c63249dddb6350cb3a730946bef6eeb112b`; production smoke passed, but publication health still fails until a real article passes the unchanged five-independent-publisher evidence checks.
 
 
 ## 2026-10-21 — continuation checkpoint after PR #523
@@ -136,3 +136,6 @@ This verifies Worker version metadata, not a direct successful read of `/.well-k
 - This branch allows only `/api/ask` to bypass that early fallback; D1 remains guarded and schema setup is skipped when quota is already blocked. Successful responses carry `degraded=true`, `reason=d1_quota`, and `X-BAYAN-Degraded: d1_quota`.
 - If all external sources fail, the route now returns an explicit insufficient-evidence message and does not ask AI to invent an answer.
 - Added integration tests for quota-blocked external recovery and zero-results behavior. Pending CI and production deployment; no D1 query was run during this change.
+
+
+- Follow-up PR #527 merged as `655b9b7f034fd41eeedaf4b3d37671e5c726e108`; Cloudflare now reports `NEWS_AI_DAILY_LIMIT=10` and the `GEMINI_API_KEY` binding remains `secret_text`. Post-deploy smoke passed, but health still reports `archiveReady=200`, `eligible=0`, `newsArticleCount=0`.
