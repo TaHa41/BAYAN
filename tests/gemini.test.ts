@@ -12,14 +12,14 @@ describe("Gemini REST client", () => {
 
   it("uses the official generateContent endpoint and extracts candidate text", async () => {
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      expect(String(input)).toBe("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent");
+      expect(String(input)).toBe("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent");
       expect(new Headers(init?.headers).get("x-goog-api-key")).toBe("test-key-not-real");
       const body = JSON.parse(String(init?.body));
       expect(body.generationConfig.responseMimeType).toBe("application/json");
       return new Response(JSON.stringify({ candidates: [{ finishReason: "STOP", content: { parts: [{ text: '{"sections":[]}' }] } }] }), { status: 200 });
     });
     const result = await callGemini({ GEMINI_API_KEY: "test-key-not-real" }, "write JSON", { json: true, fetchImpl: fetchImpl as typeof fetch });
-    expect(result).toMatchObject({ ok: true, text: '{"sections":[]}', model: "gemini-2.5-flash" });
+    expect(result).toMatchObject({ ok: true, text: '{"sections":[]}', model: "gemini-3.8-flash" });
   });
 
   it("classifies quota errors without retaining the API key in details", async () => {
@@ -31,9 +31,9 @@ describe("Gemini REST client", () => {
     expect(classifyGeminiFailure("quota", 429, "daily quota exceeded").code).toBe("quota_exceeded");
   });
 
-  it("rejects unstable latest aliases and uses a fixed default", () => {
-    expect(resolveGeminiModel("gemini-2.5-flash-latest")).toBe("gemini-2.5-flash");
-    expect(resolveGeminiModel("bad model")).toBe("gemini-2.5-flash");
-    expect(resolveGeminiModel("gemini-2.5-flash")).toBe("gemini-2.5-flash");
+  it("uses the supported fixed Gemini default and rejects unstable latest aliases", () => {
+    expect(resolveGeminiModel("gemini-3.8-flash-latest")).toBe("gemini-3.8-flash");
+    expect(resolveGeminiModel("bad model")).toBe("gemini-3.8-flash");
+    expect(resolveGeminiModel("gemini-3.8-flash")).toBe("gemini-3.8-flash");
   });
 });
