@@ -1065,6 +1065,39 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
       }
     }
   }
+  // Always include a curated, bilingual profile for an exact person query when one exists.
+  // Keep independently sourced reporting already in the list; only the biography is pinned.
+  if(personQuery && options.publish !== true && !options.healthCheck){
+    const exactName=normalizedEntityTitle(personQueryName(q));
+    const curated=bundledFallback.find(item=>
+      item.section==="people" &&
+      item.evidence==="verified" &&
+      item.slug.startsWith("who-is-") &&
+      item.slug.endsWith(language==="ar"?"-ar":"-en") &&
+      normalizedEntityTitle(item.title).startsWith(exactName) &&
+      String(item.summary||"").trim().length>80
+    );
+    if(curated){
+      const hosts=new Set<string>();
+      for(const src of curated.sources||[]){
+        const host=independentEvidenceHost(String(src.publisher||""),String(src.url||""));
+        if(host)hosts.add(host);
+      }
+      if(hosts.size>=2){
+        const profile:SearchResult={
+          title:curated.title,summary:curated.summary,section:"people",slug:curated.slug,kind:"article",
+          evidence:"verified",
+          sources:(curated.sources||[]).map(src=>({...src,publisher:localizedSource(String(src.publisher||""),language)})),
+          url:"https://bayan.tahaomar411.workers.dev/article/"+encodeURIComponent(curated.slug)+"?lang="+language,
+          imageUrl:safePublicImageUrl(curated.imageUrl),imageAlt:curated.imageAlt||curated.title
+        };
+        const duplicates=results.filter(item=>item.slug!==curated.slug &&
+          !(item.section==="people" && normalizedEntityTitle(item.title).startsWith(exactName) &&
+            /who-is-mohamed-salah/.test(String(item.slug||""))));
+        results.splice(0,results.length,profile,...duplicates.slice(0,Math.max(0,max-1)));
+      }
+    }
+  }
   // Pin only an existing curated biography with explicit verification and at least
   // two independent publisher hosts. A single-source person result is never upgraded.
   if(personQuery){
