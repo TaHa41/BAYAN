@@ -5,6 +5,7 @@ const newsQueue = read("src/services/news-article-publisher-query.ts");
 const seo = read("src/seo.ts");
 const live = read("src/services/live.ts");
 const search = read("src/services/search.ts");
+const gdelt = read("src/services/gdelt-evidence.ts");
 const db = read("src/db.ts");
 const ai = read("src/services/ai.ts");
 const repair = read("src/services/repair.ts");
@@ -52,7 +53,8 @@ const checks = [
   ["bundled article pages avoid D1 article reads and database hreflang pairing uses one exact counterpart lookup", read("src/index.ts").includes('const bundled=bundledArticleBySlug(slug,lang);let row:any=bundled?') && read("src/index.ts").includes("row._bundled?new Set<string>()") && read("src/index.ts").includes("SELECT slug,sources_json FROM articles WHERE slug=? AND language=?") && !read("src/index.ts").includes("AND slug<>? LIMIT 12")],
 
   ["news never invents dates or serves expired cached stories as current", !news.includes("publishedAt:new Date().toISOString()") && news.includes("const publishedAt = dateMatch") && news.includes("&& isFreshNews(story)")],
-  ["news fallback uses cached GDELT metadata only to discover robots-permitted bounded page excerpts", news.includes("const [google, aiSearch, bing, gdelt] = await Promise.all") && news.includes("gdeltFallback(lang, env, feedDiagnostics)") && read("src/services/gdelt-evidence.ts").includes("robotsAllowsPath") && read("src/services/gdelt-evidence.ts").includes("MAX_PAGE_BYTES") && read("src/services/gdelt-evidence.ts").includes("maxrecords=20") && read("src/services/gdelt-evidence.ts").includes("parseDate(publishedRaw)") && !read("src/services/gdelt-evidence.ts").includes("const publishedAt = parseDate(article.seendate)") && news.lastIndexOf("all = all.filter(isFreshNews)") > news.indexOf("const [google, aiSearch, bing, gdelt")],
+  ["news fallback uses cached GDELT metadata only to discover robots-permitted bounded page excerpts", news.includes("const [google, aiSearch, bing, gdelt] = await Promise.all") && news.includes("gdeltFallback(lang, env, feedDiagnostics)") && read("src/services/gdelt-evidence.ts").includes("robotsAllowsPath") && read("src/services/gdelt-evidence.ts").includes("MAX_PAGE_BYTES") && read("src/services/gdelt-evidence.ts").includes('(topic ? "50" : "20")') && read("src/services/gdelt-evidence.ts").includes("parseDate(publishedRaw)") && !read("src/services/gdelt-evidence.ts").includes("publishedAt: parseDate(article.seendate)") && news.lastIndexOf("all = all.filter(isFreshNews)") > news.indexOf("const [google, aiSearch, bing, gdelt")],
+checks.push(["publication-only search recovery can add bounded topic-specific GDELT publisher text", search.includes('if(options.publish===true&&!firstPassHasDiverseEvidence())') && search.includes("fetchGdeltEvidenceStories(language,env,diagnostics,fetch,q)") && gdelt.includes('(topic ? "50" : "20")') && gdelt.includes("slice(0, topic ? 5 : 3)")]);
   ["wisdom endpoint rotates every 30 seconds", wisdom.includes("Date.now()/1000/30")],
   ["wisdom has dedicated news and arts entries", /news:\{ar:/.test(wisdom) && /art:\{ar:/.test(wisdom)],
   ["browser refreshes wisdom every 30 seconds", app.includes("const wisdomTimer = setInterval") && app.includes("}, 30000)")],
@@ -350,6 +352,7 @@ checks.push(["sparse verified search results trigger browser-side expansion inst
 checks.push(["bounded news archive queue remains aligned with additive indexes", read("migrations_v1/0038_news_archive_queue_indexes.sql").includes("CREATE INDEX IF NOT EXISTS idx_news_archive_queue ON news_archive(language, article_slug, published_at DESC)") && read("migrations_v1/0038_news_archive_queue_indexes.sql").includes("CREATE INDEX IF NOT EXISTS idx_news_archive_reason ON news_archive(language, article_last_reason, article_last_attempt_at)") && newsQueue.includes("ORDER BY published_at DESC, id DESC LIMIT 40") && !newsQueue.includes("NOT EXISTS (SELECT") && !newsQueue.includes("lower(trim(")]);
 
 checks.push(["Egypt section has bilingual source-backed fallback articles for sparse database results", (()=>{const fallback=read("src/fallback-content.ts");return fallback.includes('"slug":"egypt-household-surveys-daily-life-en","section":"egypt","language":"en"') && fallback.includes('"slug":"egypt-household-surveys-daily-life-ar","section":"egypt","language":"ar"') && fallback.includes("https://www.censusinfo.capmas.gov.eg/en/index.php/catalog/747") && fallback.includes("https://www.worldbank.org/ext/en/country/egypt?section=6076")})()]);
+
 
 checks.push(["ask analytics failure does not discard a successfully retrieved answer", api.includes(`try{await track(env,vid,"ask","/ask",lang)}catch(error){console.warn("ask_analytics_tracking_failed",error instanceof Error?error.name:"unknown")}`)]);
 
