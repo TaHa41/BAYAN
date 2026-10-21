@@ -73,6 +73,6 @@ This is an observed snapshot, not a claim that the acceptance criteria are met.
 
 - [x] Source-level implementation: manager-authenticated `POST /api/internal/trigger-news-pipeline` invokes the existing bounded publisher, checks the feature flag and applies a cooldown.
 - [x] Source contract guard checks POST-only, manager authorization, feature flag, cooldown, existing publisher call, runtime event, and evidence-diversity code.
-- [ ] CI checks and deployment are not yet confirmed for this change.
-- [ ] Production trigger invocation and first published article are not verified. Latest read-only snapshot: 1,697 archive rows, zero linked articles, zero published news articles.
+- [x] CI checks passed for PR #521; production Worker deployment verified at SHA `a2742156705222230533c1422e5d59d5e081d519` (deployment `cc780839-f5a2-416e-bfac-6ee45f89e78c`, 2026-10-21T04:05:09.751Z).
+- [ ] Authenticated production trigger invocation and first published article are not verified. Latest read-only snapshot: 1,697 archive rows, zero linked articles, zero published news articles.
 - Evidence thresholds remain unchanged; no direct D1 article insertion or fabricated article is allowed.
