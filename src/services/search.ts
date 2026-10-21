@@ -559,10 +559,16 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
      // Exclude encyclopedia pages whose titles append a second person's identity.
      if(title.startsWith(name+" ")&&/(?:دندراوي|زكريا|مصطفى|العزب|جندي|ممثل|مدرب|توضيح|تشالدران|denrawi|zakaria|mustafa|al.?azab|soldier|actor|disambiguation)/i.test(title.slice(name.length)))return false;
      const text=String(item.title||"")+" "+String(item.summary||"");
-     if(context)return context.test(text)&&personIdentityMatches(text,name,item.identityAliases);
-     return personIdentityMatches(text,name,item.identityAliases);
+     // Keep related reporting for the same identity even when it is not in the
+     // profile's subject-specific context (e.g. a match report for an athlete).
+     // Context remains a ranking hint, not a hard exclusion for relevant coverage.
+     const sameIdentity=personIdentityMatches(text,name,item.identityAliases);
+     const titleMentionsIdentity=normalizedEntityTitle(item.title).includes(name);
+     if(!sameIdentity&&!titleMentionsIdentity)return false;
+     return !context||context.test(text)||sameIdentity||titleMentionsIdentity;
    });
-   return safe.length?safe:cleanExact;
+   // The verified exact profile leads, but distinct relevant coverage remains below it.
+   return safe.length?[canonical,...safe.filter(item=>item!==canonical)]:[canonical];
  }
  // A bare Arabic name becomes a strict person lookup only when an exact profile exists.
  if(nameOnlyArabicQuery(personQueryName(query))&&exactTitle.length)return [];
