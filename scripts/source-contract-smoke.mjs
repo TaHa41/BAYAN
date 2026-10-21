@@ -349,6 +349,8 @@ checks.push(["sparse verified search results trigger browser-side expansion inst
 
 checks.push(["bounded news archive queue remains aligned with additive indexes", read("migrations_v1/0038_news_archive_queue_indexes.sql").includes("CREATE INDEX IF NOT EXISTS idx_news_archive_queue ON news_archive(language, article_slug, published_at DESC)") && read("migrations_v1/0038_news_archive_queue_indexes.sql").includes("CREATE INDEX IF NOT EXISTS idx_news_archive_reason ON news_archive(language, article_last_reason, article_last_attempt_at)") && newsQueue.includes("ORDER BY published_at DESC, id DESC LIMIT 40") && !newsQueue.includes("NOT EXISTS (SELECT") && !newsQueue.includes("lower(trim(")]);
 
+checks.push(["publication-only search recovery can add bounded topic-specific GDELT publisher text", search.includes('if(options.publish===true&&!firstPassHasDiverseEvidence())') && search.includes("fetchGdeltEvidenceStories(language,env,diagnostics,fetch,q)") && gdelt.includes("maxrecords=" + ' + (topic ? "50" : "20") + ') && gdelt.includes("slice(0, topic ? 5 : 3)")]);
+
 checks.push(["ask analytics failure does not discard a successfully retrieved answer", api.includes(`try{await track(env,vid,"ask","/ask",lang)}catch(error){console.warn("ask_analytics_tracking_failed",error instanceof Error?error.name:"unknown")}`)]);
 
 let failed = 0;
