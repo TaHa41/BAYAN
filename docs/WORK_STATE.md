@@ -142,8 +142,15 @@ This verifies Worker version metadata, not a direct successful read of `/.well-k
 - Follow-up PR #527 merged as `655b9b7f034fd41eeedaf4b3d37671e5c726e108`; Cloudflare now reports `NEWS_AI_DAILY_LIMIT=10` and the `GEMINI_API_KEY` binding remains `secret_text`. Post-deploy smoke passed, but health still reports `archiveReady=200`, `eligible=0`, `newsArticleCount=0`.
 
 
-## 2026-10-21 — secondary deploy path safety (pending PR)
+## 2026-10-21 — secondary deploy path safety (PR #530 merged)
 
 - Found that `.github/workflows/deploy-direct.yml` could be dispatched from a non-main branch, always read D1 migration history even for code-only releases, and did not inject/verify `BAYAN_COMMIT_SHA`.
-- This branch restricts production deployment to `main`, injects and verifies the deployed build SHA, compares migration files against the currently deployed SHA without touching D1, and requires `apply_migrations=true` only when a migration delta exists. Self-heal remains gated by `allow_repair=true`.
-- Adds the same read-only smoke preflight and conditional post-deploy health checks used by the primary workflow. Pending CI; do not merge until all three checks pass.
+- PR #530 merged as `d223a376e9a07ba74dd2d574aed78f7d24507bac` after all three CI workflows passed. It restricts production deployment to `main`, checks out the exact dispatch SHA with full history, injects and verifies the build SHA, compares migration files against the currently deployed SHA without touching D1, and requires `apply_migrations=true` only when a migration delta exists. Self-heal remains gated by `allow_repair=true`.
+- Adds read-only smoke preflight and conditional post-deploy health checks. This PR changed workflow/test/docs only; no new Worker deployment was triggered, so the deployed Worker SHA remains `19e79f2b8cbed0b8dd2ae99a7ace11360176ec97`.
+
+
+## Next required production window
+
+- Do not query D1 broadly before `2026-10-22 00:05 UTC (03:05 Cairo)`.
+- The existing exact-schedule automation is enabled but still reports `next_run_time=null`; its execution is not confirmed. Verify the automation run record before assuming measurement occurred.
+- After the reset, run the bounded D1 read-only measurement first. Only if health/preflight is good and the free-first budget remains available, manually dispatch `BAYAN Manual News Pipeline Trigger` once; capture its result and the resulting article's five independent sources. Do not repeat blindly if it fails.
