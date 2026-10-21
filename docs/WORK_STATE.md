@@ -111,3 +111,12 @@ This verifies Worker version metadata, not a direct successful read of `/.well-k
 - Corrected source-contract assertions to match the explicit `topic` / `language-fallback` query labels; the earlier CI failure was caused by stale literal expectations, not evidence that the intended fallback was absent.
 - Added a 512 KiB cap before buffering/parsing GDELT metadata, with fallback to the language query and a bounded diagnostic when a topic response exceeds the cap.
 - Added regression coverage for oversized metadata response fallback. This branch is not yet merged or production-verified; do not claim publication success until a real article passes the unchanged five-independent-publisher evidence checks.
+
+
+## 2026-10-21 — continuation checkpoint after PR #523
+
+- PR #523 merged as `1d521c63249dddb6350cb3a730946bef6eeb112b`. CI passed on all three workflows before merge; Cloudflare deployment `01cdea2d-b6c3-445b-8a0d-e15b7f19eead` reports the same `BAYAN_COMMIT_SHA`.
+- Production smoke passed, but post-deploy health remains failed: `archiveReady=200`, `eligible=0`, `newsArticleCount=0`. This is still the primary production blocker; no verified news article has been published.
+- PR #524 merged as `e121aeaceea376d55f0e1174ec54909b57386837`: the secondary manual deploy workflow now requires `allow_repair=true` before invoking self-heal. CI passed.
+- PR #525 merged as `eeea75269b0af1d3f4c3cb881e5211f8630f4450`: added a manually dispatched, one-attempt news trigger workflow with post-publication sitemap verification. It has not been manually run; do not treat it as publication evidence.
+- D1 usage/rows-read measurement is deferred to the next post-reset window. Do not run broad D1 reads before that window.
