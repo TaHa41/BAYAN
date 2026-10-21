@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ARTICLE_RETRY_DUE_SQL,
   NEWS_ARCHIVE_CANDIDATES_SQL,
   RECENT_LOW_EVIDENCE_SQL,
   pickCandidate,
@@ -13,6 +14,16 @@ describe("bounded news archive queue", () => {
     expect(NEWS_ARCHIVE_CANDIDATES_SQL).toContain("LIMIT 40");
     expect(NEWS_ARCHIVE_CANDIDATES_SQL).toContain("published_at DESC");
     expect(RECENT_LOW_EVIDENCE_SQL).toContain("LIMIT 300");
+  });
+
+  it("honors each persisted AI retry delay without weakening low-evidence cooldowns", () => {
+    expect(NEWS_ARCHIVE_CANDIDATES_SQL).toContain("article_last_detail");
+    expect(ARTICLE_RETRY_DUE_SQL).toContain("article_last_reason='ai_unavailable'");
+    expect(ARTICLE_RETRY_DUE_SQL).toContain("$.retryMinutes");
+    expect(ARTICLE_RETRY_DUE_SQL).toContain("json_valid(article_last_detail)");
+    expect(ARTICLE_RETRY_DUE_SQL).toContain("article_last_reason='skipped_low_evidence'");
+    expect(ARTICLE_RETRY_DUE_SQL).toContain("datetime(?)");
+    expect(ARTICLE_RETRY_DUE_SQL).toContain("ELSE 60");
   });
 
   it("filters recently rejected title duplicates but keeps the same row eligible", () => {
