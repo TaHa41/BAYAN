@@ -24,7 +24,7 @@ async function callGeminiText(env:Env,provider:string,system:string,prompt:strin
   await recordRuntimeEventLimited(env,"ai_circuit_breaker",state.open?"gemini_breaker_open":"gemini_breaker_closed",JSON.stringify({state:state.open?"open":"closed",code:state.code,openedUntil:state.openedUntil?new Date(state.openedUntil).toISOString():null}));
   return "";
 }
-export function paidAiEnabled(env:Pick<Env,"BAYAN_ALLOW_PAID_AI">){return String(env.BAYAN_ALLOW_PAID_AI||"").trim().toLowerCase()==="true";}
+export function paidAiEnabled(env:Pick<Env,"OPENAI_ENABLED">){return String(env.OPENAI_ENABLED||"").trim().toLowerCase()==="true";}
 export async function openAIAllowed(env:Env){
   // OpenAI API usage can incur charges independent of ChatGPT; free-first mode is the default.
   if(!paidAiEnabled(env))return false;
