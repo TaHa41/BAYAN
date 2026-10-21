@@ -14,6 +14,25 @@ async function page(request:Request,env:Env){
   // Social preview and section SVG files must bypass HTML metadata injection.
   if (isPublicSvgAsset(u.pathname) || /^\/(app(?:-[^/]+)?\.js|styles\.css|manifest\.json|favicon\.(?:ico|png|svg))$/.test(u.pathname)) {
     const response = await env.ASSETS.fetch(request);
+    // Prefer the designed static artwork; synthesize SVG only if a section asset
+    // is missing or the SPA returns HTML for an image URL.
+    if (/^\/sections\/[a-z0-9-]+\.svg$/.test(u.pathname) &&
+        (!response.ok || !/^image\/svg\+xml(?:;|$)/i.test(String(response.headers.get("content-type") || "")))) {
+      const slug = u.pathname.slice("/sections/".length, -".svg".length);
+      const themes: Record<string, [string, string, string]> = {
+        science:["#0f4c5c","#e36414","⚗"],technology:["#1d3557","#457b9d","⌘"],
+        economy:["#1b4332","#2d6a4f","◈"],politics:["#3d0c02","#872517","▣"],
+        health:["#005f73","#0a9396","+"],history:["#582f0e","#7f4f24","▱"],
+        people:["#2b2d42","#8d99ae","●"],sports:["#004b23","#38b000","△"],
+        travel:["#0077b6","#0096c7","✈"],art:["#5c038c","#890cb5","✦"],
+        news:["#9a031e","#d90429","◉"],trends:["#d00000","#dc2f02","↗"],
+        prices:["#3f37c9","#4361ee","◌"],egypt:["#7f5539","#9c6644","⌂"],
+        arab:["#143601","#245501","☷"],world:["#0b090a","#161a1d","◎"]
+      };
+      const [dark, light, glyph] = themes[slug] || ["#176b67","#e06b3c","✦"];
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="BAYAN section artwork"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${dark}"/><stop offset="100%" stop-color="${light}"/></linearGradient></defs><rect width="1200" height="630" fill="url(#g)"/><circle cx="600" cy="275" r="190" fill="#fff" fill-opacity=".08"/><text x="600" y="315" font-size="150" fill="#fff" text-anchor="middle" font-family="sans-serif">${glyph}</text><text x="600" y="490" font-size="38" fill="#fff" fill-opacity=".9" text-anchor="middle" font-family="Tahoma,sans-serif" font-weight="700">BAYAN | بيان</text></svg>`;
+      return new Response(svg, {status:200, headers:{"Content-Type":"image/svg+xml; charset=utf-8","Cache-Control":"public, max-age=604800, s-maxage=604800","X-Content-Type-Options":"nosniff"}});
+    }
     const headers = new Headers(response.headers);
     headers.set("Cache-Control", "public, max-age=0, must-revalidate");
     headers.set("X-Content-Type-Options", "nosniff");
