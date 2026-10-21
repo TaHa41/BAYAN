@@ -86,7 +86,7 @@ async function diagnose(env:Env,failures:string[],readOnly=false){
     if(r.ok){const d=await r.json<any>();return String(d.output_text||"").slice(0,3000)}
   }catch(error){await logDiagnosticFailure("diagnostic_openai_failed",error)}
   if(env.AI)try{const d=await env.AI.run(workersAiModel(env),{prompt});return String((d as any)?.response||"").slice(0,3000)}catch(error){await logDiagnosticFailure("diagnostic_workers_ai_failed",error)}
-  return"AI diagnostic unavailable; deterministic health evidence recorded.";
+  return readOnly?"AI diagnostic unavailable; no repair was performed.":"AI diagnostic unavailable; deterministic health evidence recorded.";
 }
 
 async function repairTaxonomy(env:Env){
