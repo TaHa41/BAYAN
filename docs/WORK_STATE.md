@@ -130,12 +130,13 @@ This verifies Worker version metadata, not a direct successful read of `/.well-k
 - OpenAI remains disabled unless `OPENAI_ENABLED=true`; no paid-provider opt-in is introduced here.
 
 
-## 2026-10-21 — Ask BAYAN degraded search fix (pending PR)
+## 2026-10-21 — Ask BAYAN degraded search fix (PR #528)
 
-- Found a concrete quota-path gap: `src/index.ts` returned the generic D1 degraded fallback before `/api/ask` could run the independent external-search recovery already present in `src/routes/api.ts`.
-- This branch allows only `/api/ask` to bypass that early fallback; D1 remains guarded and schema setup is skipped when quota is already blocked. Successful responses carry `degraded=true`, `reason=d1_quota`, and `X-BAYAN-Degraded: d1_quota`.
-- If all external sources fail, the route now returns an explicit insufficient-evidence message and does not ask AI to invent an answer.
-- Added integration tests for quota-blocked external recovery and zero-results behavior. Pending CI and production deployment; no D1 query was run during this change.
+- PR #528 merged as `19e79f2b8cbed0b8dd2ae99a7ace11360176ec97` after all three CI workflows passed.
+- Cloudflare deployment `edd19a19-77b0-4a03-b48b-7f8502e249cb` reports the matching `BAYAN_COMMIT_SHA`. The read-only production smoke audit passed; post-deploy health still fails on the separate news publication gap (`archiveReady=200`, `eligible=0`, `newsArticleCount=0`).
+- The `/api/ask` route now continues external evidence recovery when D1 is blocked, skips schema setup while blocked, and marks successful responses `degraded=true`, `reason=d1_quota`, and `X-BAYAN-Degraded: d1_quota`.
+- If all external sources fail, it returns an explicit insufficient-evidence message and does not call AI without evidence. Integration tests cover both source recovery and zero-results behavior.
+- No D1 measurement was run during this change. The next step is a bounded post-reset D1 measurement and one explicitly triggered news-pipeline attempt; neither has been run yet.
 
 
 - Follow-up PR #527 merged as `655b9b7f034fd41eeedaf4b3d37671e5c726e108`; Cloudflare now reports `NEWS_AI_DAILY_LIMIT=10` and the `GEMINI_API_KEY` binding remains `secret_text`. Post-deploy smoke passed, but health still reports `archiveReady=200`, `eligible=0`, `newsArticleCount=0`.
