@@ -562,10 +562,9 @@ export const isolateExactPerson=(query:string,items:Candidate[])=>{
      // Keep related reporting for the same identity even when it is not in the
      // profile's subject-specific context (e.g. a match report for an athlete).
      // Context remains a ranking hint, not a hard exclusion for relevant coverage.
-     const sameIdentity=personIdentityMatches(text,name,item.identityAliases);
-     const titleMentionsIdentity=normalizedEntityTitle(item.title).includes(name);
-     if(!sameIdentity&&!titleMentionsIdentity)return false;
-     return !context||context.test(text)||sameIdentity||titleMentionsIdentity;
+     // Identity is the hard safety boundary; topical context only affects ranking.
+     // Do not admit title-only matches, which can merge different people with similar names.
+     return personIdentityMatches(text,name,item.identityAliases);
    });
    // The verified exact profile leads, but distinct relevant coverage remains below it.
    return safe.length?[canonical,...safe.filter(item=>item!==canonical)]:[canonical];
