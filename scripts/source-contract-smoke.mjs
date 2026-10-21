@@ -349,6 +349,8 @@ checks.push(["sparse verified search results trigger browser-side expansion inst
 
 checks.push(["bounded news archive queue remains aligned with additive indexes", read("migrations_v1/0038_news_archive_queue_indexes.sql").includes("CREATE INDEX IF NOT EXISTS idx_news_archive_queue ON news_archive(language, article_slug, published_at DESC)") && read("migrations_v1/0038_news_archive_queue_indexes.sql").includes("CREATE INDEX IF NOT EXISTS idx_news_archive_reason ON news_archive(language, article_last_reason, article_last_attempt_at)") && newsQueue.includes("ORDER BY published_at DESC, id DESC LIMIT 40") && !newsQueue.includes("NOT EXISTS (SELECT") && !newsQueue.includes("lower(trim(")]);
 
+checks.push(["Egypt section has bilingual source-backed fallback articles for sparse database results", (()=>{const fallback=read("src/fallback-content.ts");return fallback.includes('"slug":"egypt-household-surveys-daily-life-en","section":"egypt","language":"en"') && fallback.includes('"slug":"egypt-household-surveys-daily-life-ar","section":"egypt","language":"ar"') && fallback.includes("https://www.censusinfo.capmas.gov.eg/en/index.php/catalog/747") && fallback.includes("https://www.worldbank.org/ext/en/country/egypt?section=6076")})()]);
+
 checks.push(["ask analytics failure does not discard a successfully retrieved answer", api.includes(`try{await track(env,vid,"ask","/ask",lang)}catch(error){console.warn("ask_analytics_tracking_failed",error instanceof Error?error.name:"unknown")}`)]);
 
 let failed = 0;
