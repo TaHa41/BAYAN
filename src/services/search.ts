@@ -640,13 +640,12 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,publicationResearch?2:1);
   const labels=["Wikipedia REST Search","Google News Search","Bing Web RSS Search","Trusted Publisher RSS Search"];
   const runVariant=async(variant:string,variantIndex:number):Promise<Candidate[]>=>{
-    // GDELT repeatedly timed out in production and amplified request fan-out.
-    // Keep each recovery variant to three independent providers; try a second
-    // wording only when the first one still lacks useful independent evidence.
+    // Publication recovery skips encyclopedia lookups and keeps only current-news providers.
+    // Try a second wording only when the first still lacks useful independent evidence.
     const googleNewsRetrySkipped=shouldSkipGoogleNewsRetry(diagnostics);
     if(googleNewsRetrySkipped)diagnostics.push("Google News Search retry skipped after prior failure");
     const results=await Promise.all([
-      wikipediaRestSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Wikipedia REST Search",error);return[]}),
+      publicationResearch?Promise.resolve([]):wikipediaRestSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Wikipedia REST Search",error);return[]}),
       googleNewsRetrySkipped?Promise.resolve([]):googleNewsSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Google News Search",error);return[]}),
       bingWebRssSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Bing Web RSS Search",error);return[]}),
       trustedPublisherRssSearch(variant,language,diagnostics).catch(error=>{reportProviderFailure(diagnostics,"Trusted Publisher RSS Search",error);return[]})
@@ -937,7 +936,7 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     providerAttempted.push("Bing Web RSS Search","Google News Search",...providerDiagnostics.slice(diagnosticStart));
   }
   if(firstPassCount()<expansionThreshold||!firstPassHasDiverseEvidence()){
-    providerAttempted.push("Expanded topic variants: Wikipedia REST Search, Google News Search, Bing Web RSS Search","OpenAI Web Search (fallback)");
+    providerAttempted.push(options.publish===true?"Expanded topic variants: Google News Search, Bing Web RSS Search, Trusted Publisher RSS Search":"Expanded topic variants: Wikipedia REST Search, Google News Search, Bing Web RSS Search, Trusted Publisher RSS Search","OpenAI Web Search (fallback)");
     const expanded=await safe(expandedSearch(env,q,language,personQuery,String(candidates.find(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQuery?personQueryName(q):"")&&personEvidence(item))?.summary||""),providerAttempted,identityAliases,options.images===true,options.publicationContext||""),[]);
     const selectedExpanded=selectExpandedSearchCandidates(expanded,12);
     const selectedTrusted=selectedExpanded.filter(item=>item.provider==="Trusted Publisher RSS Search");
