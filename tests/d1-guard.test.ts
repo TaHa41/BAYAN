@@ -76,3 +76,20 @@ describe("global D1 quota interception", () => {
     expect(d1Blocked()).toBe(true);
   });
 });
+
+describe("D1 quota guard stops repeated reads in the same isolate", () => {
+  it("does not invoke the underlying D1 statement after the first quota failure", async () => {
+    resetD1GuardForTests();
+    let calls = 0;
+    const fakeDb = {
+      prepare: () => ({
+        bind() { return this; },
+        first: async () => { calls++; throw new Error("7500: free tier daily row read limit"); },
+      }),
+    };
+    const guarded = withD1QuotaGuard({ DB: fakeDb }) as any;
+    try { await guarded.DB.prepare("SELECT 1").bind().first(); } catch {}
+    try { await guarded.DB.prepare("SELECT 2").bind().first(); } catch {}
+    expect(calls).toBe(1);
+  });
+});
