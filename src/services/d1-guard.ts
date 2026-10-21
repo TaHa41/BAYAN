@@ -43,6 +43,7 @@ export const d1BlockedPersisted = async (now = Date.now(), cache: D1BlockCache |
 
 const guardedDatabases = new WeakMap<object, any>();
 const guardedStatements = new WeakMap<object, any>();
+const rawD1Objects = new WeakMap<object, object>();
 const noteQuotaWithoutD1 = (error: unknown): void => {
   if (!isD1QuotaError(error)) return;
   markD1Blocked();
@@ -75,6 +76,7 @@ const guardD1Statement = <T extends object>(statement: T): T => {
     },
   });
   guardedStatements.set(statement, proxy);
+  rawD1Objects.set(proxy, statement);
   return proxy as T;
 };
 const guardD1Binding = <T extends object>(database: T): T => {
@@ -86,7 +88,8 @@ const guardD1Binding = <T extends object>(database: T): T => {
       if (typeof member !== "function") return member;
       return (...args: unknown[]) => {
         try {
-          const result = member.apply(target, args);
+          const callArgs = property === "batch" && Array.isArray(args[0]) ? [[...(args[0] as object[]).map(item => rawD1Objects.get(item) || item)], ...args.slice(1)] : args;
+          const result = member.apply(target, callArgs);
           if (property === "prepare" && result && typeof result === "object") return guardD1Statement(result);
           if (property === "withSession" && result && typeof result === "object") return guardD1Binding(result);
           return result && typeof result.then === "function" ? guardD1Promise(result) : result;
@@ -104,5 +107,5 @@ const guardD1Binding = <T extends object>(database: T): T => {
 export const withD1QuotaGuard = <T extends { DB?: unknown }>(env: T): T => {
   const db = env.DB;
   if (!db || typeof db !== "object") return env;
-  return { ...env, DB: guardD1Binding(db as object) };
+  return { ...env, DB: guardD1Binding(db as object) } as T;
 };
