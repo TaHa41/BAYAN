@@ -279,9 +279,10 @@ const providerFailures=Array.isArray(r?.providerAttempted)?r.providerAttempted.f
       if(referenceCandidate&&referenceSummary&&referenceSources.length>=2){
         // A single encyclopedia excerpt is not enough to build a pseudo-article; return the explicit insufficient-evidence response below instead.
         if(!image)image=String(referenceCandidate.imageUrl||"")||await bounded(findRelatedImage(referenceTitle,referenceCandidate.url,referenceSummary,env),2500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_lookup","reference_image_lookup_failed",error);return undefined})||"";
-        const isBiography=looksLikePersonBiography(referenceTitle,referenceSummary)||editorialSectionForOpenedStory(referenceTitle,referenceSummary)==="people";
-        const section=isBiography?"people":editorialSectionForOpenedStory(referenceTitle,referenceSummary);
-        const bodyText=isBiography?structuredSourceOnlyBiography(referenceTitle,referenceSummary,referenceSources,lang):referenceSummary;
+        const section=editorialSectionForOpenedStory(referenceTitle,referenceSummary);
+        // A source-only result must show only the excerpt actually supported by its sources.
+        // Do not manufacture biography headings with repeated "insufficient evidence" filler.
+        const bodyText=referenceSummary;
         const articleImage=storyImage(image)||null;
         return json({ok:true,article:{title:referenceTitle,summary:referenceSummary,body:bodyText,sources:referenceSources,image:articleImage,status:"source_only",providerCount:referenceSources.length,section,publishedAt}});
       }
