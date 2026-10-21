@@ -31,6 +31,37 @@ export type GdeltEvidenceStory = {
 
 type CacheLike = { match(request: Request): Promise<Response | undefined>; put(request: Request, response: Response): Promise<void> };
 type GdeltArticle = { title?: string; url?: string; domain?: string; seendate?: string; language?: string; socialimage?: string };
+
+const MAX_GDELT_METADATA_BYTES = 512 * 1024;
+
+/** Bound upstream metadata buffering before JSON parsing inside the Worker. */
+async function readBoundedMetadataText(response: Response, maxBytes = MAX_GDELT_METADATA_BYTES): Promise<string> {
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const part = await reader.read();
+      if (part.done) break;
+      total += part.value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw new Error("response_body_too_large");
+      }
+      chunks.push(part.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
 type RobotRule = { path: string; allow: boolean };
 type RobotGroup = { agents: string[]; rules: RobotRule[] };
 
@@ -108,9 +139,41 @@ const parseDate = (raw: unknown): string | undefined => {
   return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : undefined;
 };
 
+export async function fetchGdeltMetadataWithFallback(lang: Locale, fetchImpl: typeof fetch, diagnostics: string[], topic?: string): Promise<GdeltArticle[]> {
+  const queries = topic
+    ? [{ label: "topic", query: gdeltQueryForTopic(topic, lang) }, { label: "language-fallback", query: gdeltQueryForLanguage(lang) }]
+    : [{ label: "language", query: gdeltQueryForLanguage(lang) }];
+  for (let index = 0; index < queries.length; index++) {
+    const candidate = queries[index];
+    const url = "https://api.gdeltproject.org/api/v2/doc/doc?query=" + encodeURIComponent(candidate.query) + "&mode=artlist&format=json&maxrecords=" + (candidate.label === "topic" ? "50" : "20") + "&timespan=3d&sort=DateDesc";
+    try {
+      const response = await fetchImpl(url, { signal: AbortSignal.timeout(candidate.label === "topic" ? 8000 : 5000), headers: { accept: "application/json", "user-agent": "BAYAN/1.3 (+https://bayan.tahaomar411.workers.dev)" } });
+      const raw = await readBoundedMetadataText(response);
+      if (!response.ok) {
+        diagnostics.push("GDELT " + candidate.label + " HTTP " + response.status);
+        continue;
+      }
+      let data: any;
+      try { data = JSON.parse(raw); } catch {
+        diagnostics.push("GDELT " + candidate.label + " non-JSON response");
+        continue;
+      }
+      const articles = Array.isArray(data?.articles) ? data.articles.filter((item: any) => item && typeof item.url === "string" && typeof item.title === "string") as GdeltArticle[] : [];
+      diagnostics.push("GDELT " + candidate.label + " parsed=" + articles.length);
+      if (articles.length) return articles;
+      if (index + 1 < queries.length) diagnostics.push("GDELT topic query empty; trying language fallback");
+    } catch (error) {
+      const message = String((error as any)?.message || "");
+      const reason = message === "response_body_too_large" ? message : String((error as any)?.name || "error");
+      diagnostics.push("GDELT " + candidate.label + " request failed: " + reason);
+    }
+  }
+  return [];
+}
+
 async function loadGdeltMetadata(lang: Locale, fetchImpl: typeof fetch, diagnostics: string[], topic?: string): Promise<GdeltArticle[]> {
   const topicKey = topic ? encodeURIComponent(cleanTopic(topic).slice(0, 160)) : "";
-  const key = cacheKey("/__bayan_internal_cache/gdelt-metadata-v1?lang=" + lang + (topicKey ? "&topic=" + topicKey : ""));
+  const key = cacheKey("/__bayan_internal_cache/gdelt-metadata-v2?lang=" + lang + (topicKey ? "&topic=" + topicKey : ""));
   const cached = await cacheJson(key);
   if (Array.isArray(cached)) {
     diagnostics.push("GDELT metadata cache hit count=" + cached.length);
@@ -120,36 +183,13 @@ async function loadGdeltMetadata(lang: Locale, fetchImpl: typeof fetch, diagnost
   const inFlight = metadataFlights.get(flightKey);
   if (inFlight) return inFlight;
   const flight = (async () => {
-    const query = encodeURIComponent(topic ? gdeltQueryForTopic(topic, lang) : gdeltQueryForLanguage(lang));
-    const url = "https://api.gdeltproject.org/api/v2/doc/doc?query=" + query + "&mode=artlist&format=json&maxrecords=" + (topic ? "50" : "20") + "&timespan=3d&sort=DateDesc";
-    try {
-      const response = await fetchImpl(url, { signal: AbortSignal.timeout(12000), headers: { accept: "application/json", "user-agent": "BAYAN/1.3 (+https://bayan.tahaomar411.workers.dev)" } });
-      const raw = await response.text();
-      if (!response.ok) {
-        diagnostics.push("GDELT HTTP " + response.status);
-        await putJson(key, [], 300);
-        return [];
-      }
-      let data: any;
-      try { data = JSON.parse(raw); } catch {
-        diagnostics.push("GDELT non-JSON response (rate limit or invalid query)");
-        await putJson(key, [], 300);
-        return [];
-      }
-      const articles = Array.isArray(data?.articles) ? data.articles.filter((item: any) => item && typeof item.url === "string" && typeof item.title === "string") as GdeltArticle[] : [];
-      diagnostics.push("GDELT parsed=" + articles.length);
-      await putJson(key, articles);
-      return articles;
-    } catch (error) {
-      diagnostics.push("GDELT request failed: " + String((error as any)?.name || "error"));
-      await putJson(key, [], 300);
-      return [];
-    }
+    const articles = await fetchGdeltMetadataWithFallback(lang, fetchImpl, diagnostics, topic);
+    await putJson(key, articles, articles.length ? CACHE_TTL_SECONDS : 300);
+    return articles;
   })();
   metadataFlights.set(flightKey, flight);
   try { return await flight; } finally { metadataFlights.delete(flightKey); }
 }
-
 async function fetchRobotsAllowed(url: URL, fetchImpl: typeof fetch): Promise<boolean> {
   const key = cacheKey("/__bayan_internal_cache/robots?host=" + encodeURIComponent(url.hostname.toLowerCase()));
   const cached = await cacheJson(key);
