@@ -1,6 +1,12 @@
 name: BAYAN production direct deploy
 on:
   workflow_dispatch:
+    inputs:
+      allow_repair:
+        description: 'Allow the explicitly requested post-deploy production repair pass'
+        required: false
+        type: boolean
+        default: false
 permissions:
   contents: read
 # Share one release lock with the automatic Worker deployment workflow.
@@ -38,7 +44,8 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx wrangler deploy
-      - name: Verify and repair production if needed
+      - name: Run explicitly authorized production repair
+        if: github.event_name == 'workflow_dispatch' && inputs.allow_repair == true
         env:
           BAYAN_ORIGIN: https://bayan.tahaomar411.workers.dev
           BAYAN_AI_MANAGER_TOKEN: ${{ secrets.BAYAN_AI_MANAGER_TOKEN }}
