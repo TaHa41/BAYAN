@@ -8,12 +8,13 @@ try {
   const raw = await response.text();
   let health = null;
   try { health = JSON.parse(raw); } catch { /* Existing strict checks report malformed health responses. */ }
-  if (shouldAbortBroadProductionSmoke({ responseOk:response.ok, healthParsed:health !== null, healthPayload:health })) {
-    console.error("PRODUCTION_PREFLIGHT_ABORT: D1 daily quota is exhausted; skipping the D1-heavy route matrix. Production health remains a hard failure.");
+  if (shouldAbortBroadProductionSmoke({ responseOk: response.ok, healthParsed: health !== null, healthPayload: health })) {
+    console.error("PRODUCTION_PREFLIGHT_ABORT: health is unavailable, malformed, or D1 quota is exhausted; skipping the D1-heavy route matrix. Production health remains a hard failure.");
     process.exit(1);
   }
 } catch (error) {
-  console.warn("PRODUCTION_PREFLIGHT_WARNING: health preflight unavailable; continuing with existing strict checks.", String(error));
+  console.error("PRODUCTION_PREFLIGHT_ABORT: health preflight unavailable; skipping the D1-heavy route matrix.", String(error));
+  process.exit(1);
 }
 const checks=["/","/saved?lang=ar","/tools?lang=ar","/about?lang=ar","/methodology?lang=ar","/privacy?lang=ar","/terms?lang=ar","/api/health","/api/features","/api/live/weather","/api/live/fx","/api/live/gold","/news?lang=ar","/news?lang=en","/prices?lang=ar","/art?lang=ar","/trends?lang=ar","/robots.txt","/sitemap.xml","/news-sitemap.xml","/llms.txt","/.well-known/ai-catalog.json","/ai-catalog.json"];
 const sections=["science","technology","economy","politics","health","history","people","sports","travel","art","news","trends","prices","egypt","arab","world"];
@@ -474,5 +475,9 @@ try{
   }
 
 if(degradedSections)console.warn("SECTION_CHECKS_SKIPPED_EXPLICIT_D1_QUOTA",degradedSections);
+if(bad>0){
+  console.error("BAYAN_PRODUCTION_SMOKE_FAILED",JSON.stringify({failures:bad,degradedSections}));
+  process.exit(1);
+}
 console.log("BAYAN production smoke passed; degraded section checks skipped="+degradedSections);
 console.log("BAYAN production smoke passed");
