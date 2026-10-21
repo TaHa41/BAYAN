@@ -39,3 +39,70 @@ export const d1BlockedPersisted = async (now = Date.now(), cache: D1BlockCache |
     return true;
   } catch { return d1Blocked(now); }
 };
+
+
+const guardedDatabases = new WeakMap<object, any>();
+const guardedStatements = new WeakMap<object, any>();
+const noteQuotaWithoutD1 = (error: unknown): void => {
+  if (!isD1QuotaError(error)) return;
+  markD1Blocked();
+  logD1QuotaOncePerHour(error);
+};
+const guardD1Promise = <T>(value: Promise<T>): Promise<T> => Promise.resolve(value).catch(async (error: unknown) => {
+  if (isD1QuotaError(error)) {
+    await persistD1Block();
+    logD1QuotaOncePerHour(error);
+  }
+  throw error;
+});
+const guardD1Statement = <T extends object>(statement: T): T => {
+  const cached = guardedStatements.get(statement);
+  if (cached) return cached as T;
+  const proxy = new Proxy(statement as any, {
+    get(target, property) {
+      const member = Reflect.get(target, property, target);
+      if (typeof member !== "function") return member;
+      return (...args: unknown[]) => {
+        try {
+          const result = member.apply(target, args);
+          if (property === "bind" && result && typeof result === "object") return guardD1Statement(result);
+          return result && typeof result.then === "function" ? guardD1Promise(result) : result;
+        } catch (error) {
+          noteQuotaWithoutD1(error);
+          throw error;
+        }
+      };
+    },
+  });
+  guardedStatements.set(statement, proxy);
+  return proxy as T;
+};
+const guardD1Binding = <T extends object>(database: T): T => {
+  const cached = guardedDatabases.get(database);
+  if (cached) return cached as T;
+  const proxy = new Proxy(database as any, {
+    get(target, property) {
+      const member = Reflect.get(target, property, target);
+      if (typeof member !== "function") return member;
+      return (...args: unknown[]) => {
+        try {
+          const result = member.apply(target, args);
+          if (property === "prepare" && result && typeof result === "object") return guardD1Statement(result);
+          if (property === "withSession" && result && typeof result === "object") return guardD1Binding(result);
+          return result && typeof result.then === "function" ? guardD1Promise(result) : result;
+        } catch (error) {
+          noteQuotaWithoutD1(error);
+          throw error;
+        }
+      };
+    },
+  });
+  guardedDatabases.set(database, proxy);
+  return proxy as T;
+};
+/** Wrap all D1 entry points so even route-local catches cannot hide a quota failure from the isolate guard. */
+export const withD1QuotaGuard = <T extends { DB?: unknown }>(env: T): T => {
+  const db = env.DB;
+  if (!db || typeof db !== "object") return env;
+  return { ...env, DB: guardD1Binding(db as object) };
+};
