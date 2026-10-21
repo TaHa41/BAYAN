@@ -84,7 +84,7 @@ This verifies Worker version metadata, not a direct successful read of `/.well-k
 - Latest production check is still **red** for a specific reason: `news_publication_gap`; `archiveReady=200`, `candidateCount=0`, `urlCount=0`, `eligible=0`, `rejectedCount=0`. The health preflight itself is healthy, so the smoke audit reaches and reports the publication gap. Do not mark news publication resolved.
 - GDELT topic recovery is deployed, but `news_archive.linked>0` in both languages is not yet proven. No D1 read-count measurement was run outside the requested first-hour window.
 - A one-time measurement automation was created for 2026-10-22 00:05 UTC; the scheduler returned `next_run_time=null`, so execution time is not yet confirmed.
-- Manual blockers: upload `public/og/bayan-og.png`; add the missing `GEMINI_API_KEY` Secret binding to the live Worker without exposing its value; identify the intended provider for the currently unreferenced `SEARCH_API_KEY` before wiring it; approve RSS sources before activation. Do not merge #348 or #275 without owner approval.
+- Manual blockers: upload `public/og/bayan-og.png`; the deployed Worker version has a `GEMINI_API_KEY` `secret_text` binding, but the key's validity is **not verified** (do not expose it; rotate/update it only if a safe provider probe confirms authentication failure); identify the intended provider for the `SEARCH_API_KEY` currently stored as `plain_text` before wiring or rotating it; approve RSS sources before activation. Do not merge #348 or #275 without owner approval.
 
 
 ## 2026-10-21 — AI fallback investigation (not yet production-verified)
@@ -111,3 +111,12 @@ This verifies Worker version metadata, not a direct successful read of `/.well-k
 - Corrected source-contract assertions to match the explicit `topic` / `language-fallback` query labels; the earlier CI failure was caused by stale literal expectations, not evidence that the intended fallback was absent.
 - Added a 512 KiB cap before buffering/parsing GDELT metadata, with fallback to the language query and a bounded diagnostic when a topic response exceeds the cap.
 - Added regression coverage for oversized metadata response fallback. This branch is not yet merged or production-verified; do not claim publication success until a real article passes the unchanged five-independent-publisher evidence checks.
+
+
+## 2026-10-21 — continuation checkpoint after PR #523
+
+- PR #523 merged as `1d521c63249dddb6350cb3a730946bef6eeb112b`. CI passed on all three workflows before merge; Cloudflare deployment `01cdea2d-b6c3-445b-8a0d-e15b7f19eead` reports the same `BAYAN_COMMIT_SHA`.
+- Production smoke passed, but post-deploy health remains failed: `archiveReady=200`, `eligible=0`, `newsArticleCount=0`. This is still the primary production blocker; no verified news article has been published.
+- PR #524 merged as `e121aeaceea376d55f0e1174ec54909b57386837`: the secondary manual deploy workflow now requires `allow_repair=true` before invoking self-heal. CI passed.
+- PR #525 merged as `eeea75269b0af1d3f4c3cb881e5211f8630f4450`: added a manually dispatched, one-attempt news trigger workflow with post-publication sitemap verification. It has not been manually run; do not treat it as publication evidence.
+- D1 usage/rows-read measurement is deferred to the next post-reset window. Do not run broad D1 reads before that window.
