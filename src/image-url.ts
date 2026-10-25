@@ -26,6 +26,19 @@ export function safePublicImageUrl(value: unknown): string | undefined {
 }
 
 
+/** Reject missing and generic UI artwork; article images must be topic-specific candidates. */
+export function isTopicImageUrl(value: unknown): boolean {
+  const safe = safePublicImageUrl(value);
+  if (!safe) return false;
+  try {
+    const path = new URL(safe).pathname.toLowerCase();
+    return !(/\/sections\/[a-z0-9-]+\.svg$/.test(path) ||
+      /\/(?:og-bayan|og-article|favicon|logo|placeholder|default-image)(?:[-.]|$)/i.test(path));
+  } catch {
+    return false;
+  }
+}
+
 /** Resolve Wikimedia Commons file redirects before persisting an article image. */
 export async function resolvePublishedImageUrl(value: unknown): Promise<string | undefined> {
   const safe = safePublicImageUrl(value);
