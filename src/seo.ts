@@ -37,7 +37,7 @@ async function generateSitemap(env:Env){
   }
   // Bundled article routes are served even when a matching D1 row is absent.
   // Include only reviewed, verified entries; prefer the D1 timestamp when present.
-  const bundledArticleUrls=BUNDLED_ARTICLES.filter((x)=>x.slug&&x.status==="PUBLISHED"&&x.fallbackEvidence==="verified"&&x.imageUrl&&(x.language==="ar"||x.language==="en")).map((x)=>({url:ORIGIN+"/article/"+encodeURIComponent(x.slug)+"?lang="+encodeURIComponent(x.language),lastmod:String(x.updatedAt||"")}));
+  const bundledArticleUrls=BUNDLED_ARTICLES.filter((x)=>x.slug&&x.status==="PUBLISHED"&&x.fallbackEvidence==="verified"&&(x.language==="ar"||x.language==="en")).map((x)=>({url:ORIGIN+"/article/"+encodeURIComponent(x.slug)+"?lang="+encodeURIComponent(x.language),lastmod:String(x.updatedAt||"")}));
   const mergedArticleUrls=new Map<string,{url:string;lastmod?:string}>();
   for(const item of bundledArticleUrls)mergedArticleUrls.set(item.url,item);
   for(const item of articleUrls){
