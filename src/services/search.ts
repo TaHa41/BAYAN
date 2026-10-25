@@ -1,4 +1,4 @@
-import{resolvePublishedImageUrl,safePublicImageUrl}from"../image-url";
+import{isTopicImageUrl,resolvePublishedImageUrl,safePublicImageUrl}from"../image-url";
 import{bundledSearchArticles}from"../fallback-content";
 import type {Env,Locale,SearchResponse,SearchResult,Source} from "../types";
 import {searchArticles,saveSearch,publishVerifiedResearch,publicationRejectionReason} from "../db";
@@ -1205,13 +1205,13 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
               return;
             }
             if(!usefulDraft(longDraft.answer,language)){publishReason="draft_not_useful";publishReasonDetail=("article_draft_failed_usefulness_checks;"+draftMetrics).slice(0,300);return;}
-            const sourceImage=results.find(item=>safePublicImageUrl(item.imageUrl)&&String(item.imageAlt||item.title||"").trim().length>0)?.imageUrl;
+            const sourceImage=results.find(item=>isTopicImageUrl(item.imageUrl)&&String(item.imageAlt||item.title||"").trim().length>0)?.imageUrl;
             let relatedImage:string|undefined;
             if(!sourceImage){
               try{relatedImage=await findRelatedImage(articleTitle,undefined,articleSummary,env);}
               catch(error){await recordPublicationWarning(env,publicationFailureReason(error));}
             }
-            const imageCandidate=safePublicImageUrl(sourceImage)||safePublicImageUrl(relatedImage);const imageUrl=await resolvePublishedImageUrl(imageCandidate);
+            const imageCandidate=(isTopicImageUrl(sourceImage)?safePublicImageUrl(sourceImage):undefined)||(isTopicImageUrl(relatedImage)?safePublicImageUrl(relatedImage):undefined);const imageUrl=await resolvePublishedImageUrl(imageCandidate);
             if(!imageUrl){publishReason="no_image";publishReasonDetail=("no_safe_resolvable_topic_image;"+draftMetrics).slice(0,300);return;}
             let savedSlug:string|null;
             try{
