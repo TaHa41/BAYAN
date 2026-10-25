@@ -109,6 +109,21 @@ describe("sitemap database failure handling", () => {
   });
 });
 
+describe("sitemap article coverage", () => {
+  it("includes published database articles beyond the former 1000-row cap", async () => {
+    const results = Array.from({ length: 1205 }, (_, i) => ({
+      slug: "coverage-article-" + i,
+      language: i % 2 === 0 ? "ar" : "en",
+      updated_at: "2026-10-22T08:00:00Z"
+    }));
+    const env = { DB: { prepare: () => ({ all: async () => ({ results }) }) } } as any;
+    const response = await sitemap(env);
+    const body = await response.text();
+    expect(body).toContain("/article/coverage-article-1204?lang=ar");
+    expect(body).toContain("/article/coverage-article-1203?lang=en");
+  });
+});
+
 describe("sitemap bundled article inclusion", () => {
   it("includes verified bundled article pages when D1 returns only a partial catalog", async () => {
     const env = { DB: { prepare: () => ({ all: async () => ({ results: [
