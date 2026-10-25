@@ -637,7 +637,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   // Run the first variant alone, then fan out remaining bounded variants only
   // when evidence is still sparse. This avoids unnecessary provider load while
   // keeping the worst-case recovery window short enough for the browser request.
-  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,publicationResearch?3:1);
+  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,publicationResearch?2:1);
   const labels=["Wikipedia REST Search","Google News Search","Bing Web RSS Search","Trusted Publisher RSS Search"];
   const runVariant=async(variant:string,variantIndex:number):Promise<Candidate[]>=>{
     // Publication recovery skips encyclopedia lookups and keeps only current-news providers.
