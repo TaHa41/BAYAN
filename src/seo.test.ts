@@ -109,6 +109,26 @@ describe("sitemap database failure handling", () => {
   });
 });
 
+describe("sitemap bundled article inclusion", () => {
+  it("includes verified bundled article pages when D1 returns only a partial catalog", async () => {
+    const env = { DB: { prepare: () => ({ all: async () => ({ results: [
+      { slug: "who-is-mohamed-salah-ar", language: "ar", updated_at: "2026-10-21T08:00:00Z" },
+      { slug: "database-only-article", language: "en", updated_at: "2026-10-22T08:00:00Z" }
+    ] }) }) } } as any;
+    const response = await sitemap(env);
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(body).toContain("/article/who-is-mohamed-salah-ar?lang=ar");
+    expect(body).toContain("/article/who-is-mohamed-salah-en?lang=en");
+    expect(body).toContain("/article/who-is-taha-hussein-ar?lang=ar");
+    expect(body).toContain("/article/who-is-taha-hussein-en?lang=en");
+    expect(body).toContain("/article/database-only-article?lang=en");
+    expect(body).not.toContain("/article/what-is-inflation-ar?lang=ar");
+    expect(body.match(/<loc>[^<]*\/article\/who-is-mohamed-salah-ar\?lang=ar<\/loc>/g)).toHaveLength(1);
+  });
+});
+
 describe("localized sitemap alternates", () => {
   it("adds reciprocal xhtml language links to evergreen URLs", async () => {
     const env = { DB: { prepare: () => ({ all: async () => ({ results: [] }) }) } } as any;

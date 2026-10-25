@@ -32,10 +32,19 @@ async function generateSitemap(env:Env){
       lastmod:String(x.updated_at||"")
     }));
   }catch(error){
-    // Preserve a valid sitemap from reviewed bundled articles when D1 reads are unavailable.
+    // Continue with reviewed bundled articles when D1 reads are unavailable.
     console.error("sitemap_database_query_failed", error instanceof Error ? error.message : String(error));
-    articleUrls=BUNDLED_ARTICLES.filter((x)=>x.status==="PUBLISHED"&&x.fallbackEvidence==="verified"&&x.imageUrl&& (x.language==="ar"||x.language==="en")).map((x)=>({url:ORIGIN+"/article/"+encodeURIComponent(x.slug)+"?lang="+encodeURIComponent(x.language),lastmod:String(x.updatedAt||"")}));
   }
+  // Bundled article routes are served even when a matching D1 row is absent.
+  // Include only reviewed, verified entries; prefer the D1 timestamp when present.
+  const bundledArticleUrls=BUNDLED_ARTICLES.filter((x)=>x.slug&&x.status==="PUBLISHED"&&x.fallbackEvidence==="verified"&&x.imageUrl&&(x.language==="ar"||x.language==="en")).map((x)=>({url:ORIGIN+"/article/"+encodeURIComponent(x.slug)+"?lang="+encodeURIComponent(x.language),lastmod:String(x.updatedAt||"")}));
+  const mergedArticleUrls=new Map<string,{url:string;lastmod?:string}>();
+  for(const item of bundledArticleUrls)mergedArticleUrls.set(item.url,item);
+  for(const item of articleUrls){
+    const existing=mergedArticleUrls.get(item.url);
+    mergedArticleUrls.set(item.url,{url:item.url,lastmod:item.lastmod||existing?.lastmod});
+  }
+  articleUrls=[...mergedArticleUrls.values()];
   const publicPaths=["/","/news","/about","/methodology","/privacy","/terms",...SECTIONS.map(x=>"/"+x[0])];
   const localizedUrls=publicPaths.flatMap((path)=>["ar","en"].map((language)=>({
     url:path==="/"&&language==="ar"?ORIGIN+"/":ORIGIN+path+"?lang="+language,
