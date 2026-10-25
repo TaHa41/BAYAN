@@ -28,7 +28,7 @@ const cachedXmlResponse=async(path:string,env:Env,ttlSeconds:number,build:()=>Pr
 async function generateSitemap(env:Env){
   let articleUrls:Array<{url:string;lastmod?:string}>=[];
   try{
-    const r=await env.DB.prepare("SELECT slug,language,updated_at,image_url FROM articles WHERE status='PUBLISHED' ORDER BY updated_at DESC LIMIT 5000").all<any>();
+    const r=await env.DB.prepare("SELECT slug,language,updated_at,image_url FROM articles WHERE status='PUBLISHED' AND image_url IS NOT NULL AND trim(image_url)!='' AND lower(image_url) NOT LIKE '%/sections/%' AND lower(image_url) NOT LIKE '%placeholder%' AND lower(image_url) NOT LIKE '%/logo%' AND lower(image_url) NOT LIKE '%/favicon%' ORDER BY updated_at DESC LIMIT 5000").all<any>();
     articleUrls=(r.results||[]).filter((x:any)=>x.slug&&hasTopicImage(x.image_url)&&(x.language==="ar"||x.language==="en")).map((x:any)=>({
       url:ORIGIN+"/article/"+encodeURIComponent(x.slug)+"?lang="+encodeURIComponent(x.language),
       lastmod:String(x.updated_at||"")
