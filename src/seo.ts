@@ -3,14 +3,14 @@ import {recordRuntimeEventLimited} from "./runtime-events";
 import type {Env,Locale} from "./types";
 import {text}from"./http";
 import {BUNDLED_ARTICLES} from "./fallback-content";
-import {safePublicImageUrl} from "./image-url";
+import {isTopicImageUrl} from "./image-url";
 
 export function robots(){
   // Advertise only the general sitemap. Google News sitemaps are useful only
   // while eligible, recent, full news articles exist; never advertise an empty feed.
   return text("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nDisallow: /review\nDisallow: /saved\nSitemap: "+ORIGIN+"/sitemap.xml\n");
 }
-const hasTopicImage=(value:unknown)=>{const safe=safePublicImageUrl(value);if(!safe)return false;try{const url=new URL(safe);const path=url.pathname.toLowerCase();if(/\/sections\/[a-z0-9-]+\.svg$/.test(path)||/\/(?:og-bayan|og-article|favicon|logo|placeholder|default-image)(?:[-.]|$)/i.test(path))return false;return true}catch{return false}};
+const hasTopicImage=isTopicImageUrl;
 const xml=(s:string)=>Array.from(String(s)).filter((character)=>{const code=character.codePointAt(0)!;return code===0x9||code===0xA||code===0xD||(code>=0x20&&code<=0xD7FF)||(code>=0xE000&&code<=0xFFFD)||(code>=0x10000&&code<=0x10FFFF)}).join("").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
 
 const cachedXmlResponse=async(path:string,env:Env,ttlSeconds:number,build:()=>Promise<Response>):Promise<Response>=>{
