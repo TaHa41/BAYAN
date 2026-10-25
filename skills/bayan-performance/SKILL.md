@@ -24,6 +24,14 @@ description: Diagnose and improve BAYAN Core Web Vitals, article-image delivery,
 8. Run `npm run check` and the relevant E2E checks. If the target is production, use only the existing low-rate smoke checks.
 9. Report the exact commit, workflow run/check results, deployment SHA, and observed live behavior. If any evidence is missing, state that it remains unverified.
 
+## Tool-specific checks
+- **Playwright:** run `npm run test:e2e`; confirm browser installation and save the Actions run URL.
+- **Context7:** verify the MCP endpoint connects from the intended developer environment; configuration alone is not a pass.
+- **Strix:** run only against an authorized, isolated source snapshot with an explicit scope, bounded runtime, and required secret in the secret store.
+- **ScrapeGraphAI:** keep disabled until a valid secret and spending ceiling are set; test one small non-sensitive input and inspect usage before scaling.
+- **Scrapling MCP / Agent Reach:** verify upstream source, package version, server transport, and permissions; run a bounded diagnostic without exposing credentials.
+- **Lighthouse/PageSpeed:** collect Lighthouse artifacts from a repeatable CI run. Treat PageSpeed field data and Search Console indexing as separate evidence sources.
+
 ## Completion criteria
 - The original failure is reproduced or its absence is demonstrated with a repeatable check.
 - A regression test covers the failure mode.
