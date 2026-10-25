@@ -97,9 +97,9 @@ describe("sitemap database failure handling", () => {
 
   it("does not publish articles with unsupported language or missing slugs", async () => {
     const env = { DB: { prepare: () => ({ bind(){return this;}, all: async () => ({ results: [
-      { slug: "valid-ar", language: "ar", updated_at: "2026-10-14T00:00:00Z" },
-      { slug: "invalid-lang", language: "fr", updated_at: "2026-10-14T00:00:00Z" },
-      { slug: "", language: "en", updated_at: "2026-10-14T00:00:00Z" }
+      { slug: "valid-ar", language: "ar", updated_at: "2026-10-14T00:00:00Z", image_url: "https://upload.wikimedia.org/wikipedia/commons/a/a9/Example.jpg" },
+      { slug: "invalid-lang", language: "fr", updated_at: "2026-10-14T00:00:00Z", image_url: "https://upload.wikimedia.org/wikipedia/commons/a/a9/Example.jpg" },
+      { slug: "", language: "en", updated_at: "2026-10-14T00:00:00Z", image_url: "https://upload.wikimedia.org/wikipedia/commons/a/a9/Example.jpg" }
     ] }) }) } } as any;
     const response = await sitemap(env);
     const body = await response.text();
@@ -109,11 +109,42 @@ describe("sitemap database failure handling", () => {
   });
 });
 
+describe("sitemap article coverage", () => {
+  it("includes published database articles beyond the former 1000-row cap", async () => {
+    const results = Array.from({ length: 1205 }, (_, i) => ({
+      slug: "coverage-article-" + i,
+      language: i % 2 === 0 ? "ar" : "en",
+      updated_at: "2026-10-22T08:00:00Z",
+      image_url: "https://upload.wikimedia.org/wikipedia/commons/a/a9/Example.jpg"
+    }));
+    const env = { DB: { prepare: () => ({ all: async () => ({ results }) }) } } as any;
+    const response = await sitemap(env);
+    const body = await response.text();
+    expect(body).toContain("/article/coverage-article-1204?lang=ar");
+    expect(body).toContain("/article/coverage-article-1203?lang=en");
+  });
+
+  it("excludes published database articles without a real topic image or with generic section artwork", async () => {
+    const env = { DB: { prepare: () => ({ all: async () => ({ results: [
+      { slug: "has-topic-image", language: "ar", updated_at: "2026-10-22T08:00:00Z", image_url: "https://upload.wikimedia.org/wikipedia/commons/a/a9/Example.jpg" },
+      { slug: "missing-image", language: "ar", updated_at: "2026-10-22T08:00:00Z", image_url: null },
+      { slug: "generic-section-image", language: "en", updated_at: "2026-10-22T08:00:00Z", image_url: "https://bayan.tahaomar411.workers.dev/sections/science.svg" },
+      { slug: "placeholder-image", language: "en", updated_at: "2026-10-22T08:00:00Z", image_url: "https://example.org/placeholder.png" }
+    ] }) }) } } as any;
+    const response = await sitemap(env);
+    const body = await response.text();
+    expect(body).toContain("/article/has-topic-image?lang=ar");
+    expect(body).not.toContain("/article/missing-image?lang=ar");
+    expect(body).not.toContain("/article/generic-section-image?lang=en");
+    expect(body).not.toContain("/article/placeholder-image?lang=en");
+  });
+});
+
 describe("sitemap bundled article inclusion", () => {
   it("includes verified bundled article pages when D1 returns only a partial catalog", async () => {
     const env = { DB: { prepare: () => ({ all: async () => ({ results: [
-      { slug: "who-is-mohamed-salah-ar", language: "ar", updated_at: "2026-10-21T08:00:00Z" },
-      { slug: "database-only-article", language: "en", updated_at: "2026-10-22T08:00:00Z" }
+      { slug: "who-is-mohamed-salah-ar", language: "ar", updated_at: "2026-10-21T08:00:00Z", image_url: "https://upload.wikimedia.org/wikipedia/commons/a/a9/Example.jpg" },
+      { slug: "database-only-article", language: "en", updated_at: "2026-10-22T08:00:00Z", image_url: "https://upload.wikimedia.org/wikipedia/commons/a/a9/Example.jpg" }
     ] }) }) } } as any;
     const response = await sitemap(env);
     const body = await response.text();
