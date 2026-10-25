@@ -274,7 +274,7 @@ const providerFailures=Array.isArray(r?.providerAttempted)?r.providerAttempted.f
     if(!hasFullAnalysis&&hasIndependentSources&&generatedBody.length>=900&&(generatedBody.match(/^#{1,3}\\s+.+$/gm)||[]).length>=2){
       // Useful, evidence-linked drafts may be shown to readers without pretending they
       // passed the full verification bar. They are not saved/published as verified news.
-      if(!image)image=await bounded(findRelatedImage(title,found.results[0]?.url,found.results[0]?.summary||summary,env),2500).catch(()=>undefined)||"";
+      if(!image)image=await bounded(findRelatedImage(title,found.results[0]?.url,found.results[0]?.summary||summary,env),2500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_fallback","related_image_lookup_failed",error);return undefined})||"";
       const articleSources=evidenceSources.filter((source:any)=>/^https:\/\//i.test(String(source?.url||""))).slice(0,12);
       return json({ok:true,article:{title,summary:String(found.results[0]?.summary||summary||""),body:generatedBody,sources:articleSources,image:storyImage(image)||null,status:"source_only",providerCount:new Set(articleSources.map((source:any)=>source.publisher).filter(Boolean)).size,section:editorialSectionForOpenedStory(title,found.results[0]?.summary||summary)}});
     }
