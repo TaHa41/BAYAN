@@ -5,4 +5,21 @@ export const BUNDLED_ARTICLES: BundledArticle[] = [{"slug":"who-is-naguib-mahfou
 
 export function bundledArticleBySlug(slug:string, language:string){return BUNDLED_ARTICLES.find(x=>x.slug===slug&&x.language===language)||null}
 export function bundledArticlesForSection(section:string, language:string, limit=24){return BUNDLED_ARTICLES.filter(x=>x.section===section&&x.language===language).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)).slice(0,Math.max(1,Math.min(50,limit)))}
+/** Match only an exact short title to a reviewed long-form bundled article.
+ * This deliberately avoids fuzzy entity matching so different people are never merged.
+ */
+export function bundledArticleForShortTitle(title:string, section:string, language:string){
+  const normalize=(value:string)=>String(value||"").normalize("NFKC").toLocaleLowerCase()
+    .replace(/[\u064B-\u065F\u0670\u0640]/g,"")
+    .replace(/[’‘'".,!?()\[\]{}]/g,"")
+    .replace(/\s+/g," ").trim();
+  const wanted=normalize(title);
+  if(!wanted||wanted.length<4||section!=="people")return null;
+  const candidates=BUNDLED_ARTICLES.filter(x=>x.section===section&&x.language===language&&x.status==="PUBLISHED"&&x.fallbackEvidence==="verified"&&String(x.body||"").trim().length>=1200);
+  return candidates.find(x=>{
+    const candidate=normalize(x.title);
+    if(candidate===wanted)return true;
+    return candidate.startsWith(wanted) && /^[\s:：—–-]/u.test(candidate.slice(wanted.length));
+  })||null;
+}
 export function bundledSearchArticles(query:string, language:string, limit=12){const terms=String(query||"").normalize("NFKC").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(x=>x.length>1);if(!terms.length)return[];return BUNDLED_ARTICLES.filter(x=>x.language===language).map(x=>({...x,score:terms.reduce((n,t)=>n+((x.title+" "+x.summary).normalize("NFKC").toLowerCase().includes(t)?2:0)+(x.body.normalize("NFKC").toLowerCase().includes(t)?1:0),0)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,Math.max(1,Math.min(24,limit)))}

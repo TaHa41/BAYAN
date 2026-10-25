@@ -670,6 +670,16 @@
       const article=data.article||{};
       if(!data.ok||!article.title)throw new Error("article_unavailable");
       if(article.status!=="verified"&&article.status!=="source_only")throw new Error("article_not_verified");
+      const availableBody=String(article.body||"").trim();
+      const availableHeadings=(availableBody.match(/^#{1,3}\s/gm)||[]).length;
+      if(article.status==="source_only"||availableBody.length<900||availableHeadings<2){
+        const source=Array.isArray(article.sources)?article.sources[0]:null;
+        const sourceUrl=String(source?.url||"");
+        const safeSourceUrl=/^https:\/\/[^\s"'<>]+$/i.test(sourceUrl)?sourceUrl:"";
+        output.innerHTML='<section class="article-full source-only-result"><div class="notice"><strong>'+t("لم يُعرض كمقال كامل","Not presented as a full article")+'</strong><p>'+t("المصادر المتاحة لا تكفي لإعداد مقال كامل ومنظم يمكن التحقق منه. لن نملأ النقص بمعلومات غير مؤكدة.","The available evidence is not enough for a complete, structured article. BAYAN will not fill the gaps with unverified details.")+'</p></div><h1 class="article-title">'+escapeHtml(article.title||title)+'</h1>'+(article.summary||summary?'<p class="lead">'+escapeHtml(article.summary||summary)+'</p>':"")+'<div class="sources-box"><h2>'+t("المصدر المتاح","Available source")+'</h2>'+(source?'<div class="source-line">'+escapeHtml(source.publisher||publisher||"")+' · '+escapeHtml(source.title||article.title||title)+(safeSourceUrl?' <a class="read" rel="noopener noreferrer" target="_blank" href="'+escapeHtml(safeSourceUrl)+'">'+t("فتح المصدر","Open source")+'</a>':"")+'</div>':t("لم يتوفر مصدر مستقل كافٍ.","No sufficient independent source was available."))+'</div><button class="primary" id="research-retry">'+t("إعادة المحاولة","Retry")+'</button> <a class="read" href="/search?q='+encodeURIComponent(title)+'&lang='+lang+'">'+t("العودة إلى البحث","Back to search")+' →</a></section>';
+        document.querySelector("#research-retry")?.addEventListener("click",()=>renderResearchArticle());
+        return;
+      }
       output.innerHTML='<article class="article-full">'+(article.image?heroImageHtml(article.image,article.title,article.summary||summary):"")+
         '<span class="article-source-badge">'+t("المصدر: ","Source: ")+escapeHtml(article.sources?.[0]?.publisher||publisher||t("بحث موثق","Evidence search"))+'</span><h1 class="article-title">'+escapeHtml(article.title)+'</h1>'+
         articleLeadHtml(article.summary||summary,article.body||summary)+(article.savedSlug?'<div class="notice">'+t("تمت إضافة المقال تلقائيًا إلى قسم","Automatically added to section")+' <a href="/'+encodeURIComponent(article.section||"news")+'?lang='+lang+'">'+escapeHtml((sections.find(section=>section[0]===(article.section||"news"))||[])[ar?1:2]||article.section||"news")+'</a></div>':"")+
