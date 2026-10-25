@@ -637,7 +637,7 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
   // Run the first variant alone, then fan out remaining bounded variants only
   // when evidence is still sparse. This avoids unnecessary provider load while
   // keeping the worst-case recovery window short enough for the browser request.
-  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,publicationResearch?2:1);
+  const uniqueVariants=[...new Set(variants.map(x=>x.trim()).filter(Boolean))].slice(0,publicationResearch?3:1);
   const labels=["Wikipedia REST Search","Google News Search","Bing Web RSS Search","Trusted Publisher RSS Search"];
   const runVariant=async(variant:string,variantIndex:number):Promise<Candidate[]>=>{
     // Publication recovery skips encyclopedia lookups and keeps only current-news providers.
@@ -658,20 +658,20 @@ async function expandedSearch(env:Env,q:string,language:Locale,person=false,iden
     batches.push(await runVariant(uniqueVariants[0],0));
     const recovered=batches.flat().filter(item=>relevantCandidateWithContext(item,q,publicationResearch?publicationContext:"")&&languageSafe(item,language));
     const hosts=new Set(recovered.flatMap(item=>(item.sources||[]).map(src=>{
-      try{return new URL(String(src.url||"")).hostname.toLowerCase().replace(/^www\./,"")}
+      try{return independentEvidenceHost(String(src.publisher||""),String(src.url||""))||""}
       catch{return ""}
     })).filter(host=>host&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/.test(host)));
-    if(!(recovered.length>=6&&hosts.size>=3)&&uniqueVariants.length>1){
+    if(!(recovered.length>=6&&hosts.size>=(publicationResearch?5:3))&&uniqueVariants.length>1){
       // Retry alternate phrasings sequentially to avoid multiplying simultaneous
       // outbound requests when the first pass is already resource-constrained.
       for(let index=1;index<uniqueVariants.length;index++){
         batches.push(await runVariant(uniqueVariants[index],index));
         const accumulated=batches.flat().filter(item=>relevantCandidateWithContext(item,q,publicationResearch?publicationContext:"")&&languageSafe(item,language));
         const accumulatedHosts=new Set(accumulated.flatMap(item=>(item.sources||[]).map(src=>{
-          try{return new URL(String(src.url||"")).hostname.toLowerCase().replace(/^www\./,"")}
+          try{return independentEvidenceHost(String(src.publisher||""),String(src.url||""))||""}
           catch{return ""}
         })).filter(host=>host&&!/wikipedia\.org|wikidata\.org|news\.google\.com|bing\.com|duckduckgo\.com/.test(host)));
-        if(accumulated.length>=6&&accumulatedHosts.size>=3)break;
+        if(accumulated.length>=6&&accumulatedHosts.size>=(publicationResearch?5:3))break;
       }
     }
   }
