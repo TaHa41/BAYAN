@@ -189,8 +189,9 @@ const providerFailures=Array.isArray(r?.providerAttempted)?r.providerAttempted.f
     let found:any={results:[],status:"insufficient"};
     try{found=await bounded(search(env,title,lang,{publish:false,draft:false,images:false}),11000)}catch(error){await recordRuntimeEventLimited(env,"news_article_evidence_search","evidence_search_failed",error)}
     found.results=isolateArticleSubject(title,(Array.isArray(found.results)?found.results:[]).filter((candidate:any)=>newsArticleEvidenceRelevant(title,candidate)&&!hasMixedPersonIdentities(title,String(candidate.summary||""))&&!isVideoUrl(String(candidate.url||candidate.sources?.[0]?.url||""))) as any);
-    // If the first pass only found encyclopedias, make one bounded, query-derived
-    // recovery pass to find independent reporting or primary sources. This is
+    // Whenever the first pass lacks independent evidence, make a bounded, query-derived
+    // recovery pass to find independent reporting or primary sources. A single RSS result
+    // must not end the article flow with only a headline and one-sentence summary. This is
     // generic: it uses the evidence context returned for the requested subject,
     // never a hard-coded person, club, or topic.
     const initialSources=found.results.flatMap((candidate:any)=>Array.isArray(candidate.sources)?candidate.sources:[]);
@@ -199,7 +200,7 @@ const providerFailures=Array.isArray(r?.providerAttempted)?r.providerAttempted.f
       const sources=Array.isArray(candidate.sources)?candidate.sources:[];
       return sources.every((source:any)=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(source.publisher||"")));
     });
-    if(!initialHasIndependentSources&&initialHasOnlyReferenceResults){
+    if(!initialHasIndependentSources){
       const context=String(found.results.find((candidate:any)=>String(candidate.summary||"").trim())?.summary||summary||"");
       const contextTerms=context.normalize("NFKC").replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter((word:string)=>word.length>=4&&!/^(the|this|that|with|from|about|where|which|were|their|there|من|في|على|عن|هذا|هذه|الذي|التي|كان|كانت|حيث|وهو|وهي)$/i.test(word)).slice(0,5).join(" ");
       const recoveryQuery=[title,contextTerms].filter(Boolean).join(" ").slice(0,300);
@@ -251,7 +252,7 @@ const providerFailures=Array.isArray(r?.providerAttempted)?r.providerAttempted.f
           articleEvidenceHosts.add(host);articleEvidenceUrls.push(parsed.toString());break;
         }catch(error){await recordRuntimeEventLimited(env,"article_source_url","candidate_source_url_invalid",error)}
       }
-      if(articleEvidenceUrls.length>=2)break;
+      if(articleEvidenceUrls.length>=5)break;
     }
     const articleEvidenceText=await Promise.all(articleEvidenceUrls.map(url=>bounded(sourceArticleText(url,lang),4500).catch(async error=>{await recordRuntimeEventLimited(env,"article_source_fetch","source_article_fetch_failed",error);return ""})));
     const evidenceByUrl=new Map(articleEvidenceUrls.map((url,index)=>[url,articleEvidenceText[index]]));
