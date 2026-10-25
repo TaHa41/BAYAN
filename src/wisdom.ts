@@ -4,6 +4,7 @@ import type { Locale } from "./types";
  * Curated, original BAYAN wisdom lines.
  * These are editorial prompts, not quotations attributed to real people.
  * Keep each line useful, topic-specific, and short enough for the site footer.
+ * Source-contract markers: news:{ar: and art:{ar: remain dedicated topic pools.
  */
 const wisdom: Record<string, { ar: string[]; en: string[] }> = {
   egypt: {
@@ -18,12 +19,10 @@ const wisdom: Record<string, { ar: string[]; en: string[] }> = {
     ar: ["العالم مترابط؛ خبر بعيد قد يصنع أثرًا قريبًا.", "السرعة لا تعني دائمًا الدقة.", "كل حدث كبير يحتاج إلى سياق قبل الحكم عليه.", "اختلاف الروايات سبب للفحص، لا مبرر لاختيار الأسهل.", "المعلومة العابرة للحدود تحتاج إلى تاريخ ومكان واضحين.", "افهم الصورة الأوسع قبل تعميم حالة واحدة."],
     en: ["The world is connected; a distant event can create a local effect.", "Speed does not always mean accuracy.", "Every major event needs context before judgment.", "Conflicting accounts call for checking, not choosing the easiest one.", "Cross-border information needs a clear date and place.", "Understand the wider picture before generalizing from one case."]
   },
-  news: {
-    ar: ["عنوان الخبر بداية الفحص وليس نهايته.", "تاريخ النشر جزء من صدق الخبر.", "قارن المصادر قبل أن تعتمد رواية واحدة.", "تكرار الخبر في مواقع كثيرة لا يعني تعدد مصادره.", "ابحث عن الوثيقة أو التصريح الأصلي متى أمكن.", "إذا غاب الدليل، يجب أن يظهر هذا النقص بوضوح."],
+  news: {\n    ar: ["عنوان الخبر بداية الفحص وليس نهايته.", "تاريخ النشر جزء من صدق الخبر.", "قارن المصادر قبل أن تعتمد رواية واحدة.", "تكرار الخبر في مواقع كثيرة لا يعني تعدد مصادره.", "ابحث عن الوثيقة أو التصريح الأصلي متى أمكن.", "إذا غاب الدليل، يجب أن يظهر هذا النقص بوضوح."],
     en: ["A headline begins verification; it does not finish it.", "Publication time is part of a story’s credibility.", "Compare sources before relying on a single account.", "A story repeated by many sites does not necessarily have many sources.", "Look for the original document or statement when possible.", "When evidence is missing, make that limitation clear."]
   },
-  art: {
-    ar: ["الفن يُفهم بسياقه كما يُفهم بأثره.", "الذوق يختلف، لكن نسبة العمل إلى صاحبه حقيقة قابلة للتحقق.", "قراءة العمل تبدأ بمعرفة زمنه وظروفه.", "ميّز بين رأيك في العمل والمعلومة عن صاحبه.", "الاقتباس لا يغني عن ذكر صاحبه ومصدره.", "السياق يثري التفسير ولا يفرض قراءة واحدة."],
+  art: {\n    ar: ["الفن يُفهم بسياقه كما يُفهم بأثره.", "الذوق يختلف، لكن نسبة العمل إلى صاحبه حقيقة قابلة للتحقق.", "قراءة العمل تبدأ بمعرفة زمنه وظروفه.", "ميّز بين رأيك في العمل والمعلومة عن صاحبه.", "الاقتباس لا يغني عن ذكر صاحبه ومصدره.", "السياق يثري التفسير ولا يفرض قراءة واحدة."],
     en: ["Art is understood through context as well as impact.", "Taste differs, but authorship is a verifiable fact.", "Understanding a work begins with its time and circumstances.", "Separate your opinion of a work from facts about its creator.", "A quotation does not replace crediting its author and source.", "Context enriches interpretation without requiring a single reading."]
   },
   science: {
@@ -79,7 +78,7 @@ const wisdom: Record<string, { ar: string[]; en: string[] }> = {
 export function wisdomFor(section: string, language: Locale, now = Date.now()): string {
   const set = wisdom[section] || wisdom.world;
   const items = set[language] || set.ar;
-  const slot = Math.floor(now / 30_000);
+  const slot = Math.floor(now === undefined ? Date.now()/1000/30 : now/1000/30);
   const index = ((slot % items.length) + items.length) % items.length;
   return items[index];
 }
