@@ -124,6 +124,13 @@ describe("Bing News RSS URL safety", () => {
     expect(normalizeBingNewsUrl(redirect)).toBe(target);
   });
 
+  it("decodes Bing's a1-prefixed base64url publisher target without another fetch", () => {
+    const target = "https://www.reuters.com/world/example-story";
+    const encoded = Buffer.from(target).toString("base64").replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+    const redirect = "https://www2.bing.com/ck/a?u=a1" + encoded;
+    expect(normalizeBingNewsUrl(redirect)).toBe(target);
+  });
+
   it("upgrades only Bing redirect hosts to HTTPS and rejects insecure publisher URLs", () => {
     expect(normalizeBingNewsUrl("http://www.bing.com/news/apiclick.aspx?ref=1")).toBe("https://www.bing.com/news/apiclick.aspx?ref=1");
     expect(normalizeBingNewsUrl("http://news.example.com/article")).toBeUndefined();

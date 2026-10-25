@@ -247,6 +247,17 @@ export function normalizeBingNewsUrl(raw:string):string|undefined {
             const target=new URL(candidate);
             if(target.protocol==="https:"&&!isBingAggregatorUrl(target.href)&&!target.username&&!target.password&&!/^(?:localhost|127(?:\.\d+){3}|0\.0\.0\.0|\[::1\])$/i.test(target.hostname))return target.href;
           }catch(error){void error;}
+          // Bing RSS often encodes publisher URLs as u=a1<base64url>.
+          // Decode locally rather than spending another outbound request on the aggregator.
+          if(/^a1[A-Za-z0-9_-]+$/.test(candidate)){
+            try{
+              const encoded=candidate.slice(2).replace(/-/g,"+").replace(/_/g,"/");
+              const padded=encoded+"=".repeat((4-encoded.length%4)%4);
+              const decoded=atob(padded);
+              const target=new URL(decoded);
+              if(target.protocol==="https:"&&!isBingAggregatorUrl(target.href)&&!target.username&&!target.password&&!/^(?:localhost|127(?:\.\d+){3}|0\.0\.0\.0|\[::1\])$/i.test(target.hostname))return target.href;
+            }catch(error){void error;}
+          }
           try{const decoded=decodeURIComponent(candidate);if(decoded===candidate)break;candidate=decoded}catch{break}
         }
       }
