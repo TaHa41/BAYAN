@@ -75,7 +75,7 @@ const wisdom: Record<string, { ar: string[]; en: string[] }> = {
  * Rotate every 30 seconds, with a larger topic-specific pool.
  * Optional timestamp makes the rotation deterministic and easy to test.
  */
-export function wisdomFor(section: string, language: Locale, now = Date.now()): string {
+export function wisdomFor(section: string, language: Locale, now?: number): string {
   const set = wisdom[section] || wisdom.world;
   const items = set[language] || set.ar;
   const slot = Math.floor(now === undefined ? Date.now()/1000/30 : now/1000/30);
