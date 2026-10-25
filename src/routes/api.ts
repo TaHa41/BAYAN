@@ -189,8 +189,9 @@ const providerFailures=Array.isArray(r?.providerAttempted)?r.providerAttempted.f
     let found:any={results:[],status:"insufficient"};
     try{found=await bounded(search(env,title,lang,{publish:false,draft:false,images:false}),11000)}catch(error){await recordRuntimeEventLimited(env,"news_article_evidence_search","evidence_search_failed",error)}
     found.results=isolateArticleSubject(title,(Array.isArray(found.results)?found.results:[]).filter((candidate:any)=>newsArticleEvidenceRelevant(title,candidate)&&!hasMixedPersonIdentities(title,String(candidate.summary||""))&&!isVideoUrl(String(candidate.url||candidate.sources?.[0]?.url||""))) as any);
-    // If the first pass only found encyclopedias, make one bounded, query-derived
-    // recovery pass to find independent reporting or primary sources. This is
+    // Whenever the first pass lacks independent evidence, make a bounded, query-derived
+    // recovery pass to find independent reporting or primary sources. A single RSS result
+    // must not end the article flow with only a headline and one-sentence summary. This is
     // generic: it uses the evidence context returned for the requested subject,
     // never a hard-coded person, club, or topic.
     const initialSources=found.results.flatMap((candidate:any)=>Array.isArray(candidate.sources)?candidate.sources:[]);
@@ -199,7 +200,7 @@ const providerFailures=Array.isArray(r?.providerAttempted)?r.providerAttempted.f
       const sources=Array.isArray(candidate.sources)?candidate.sources:[];
       return sources.every((source:any)=>/wikipedia|wikidata|ويكيبيديا|ويكي بيانات/i.test(String(source.publisher||"")));
     });
-    if(!initialHasIndependentSources&&initialHasOnlyReferenceResults){
+    if(!initialHasIndependentSources){
       const context=String(found.results.find((candidate:any)=>String(candidate.summary||"").trim())?.summary||summary||"");
       const contextTerms=context.normalize("NFKC").replace(/[^\p{L}\p{N}\s]/gu," ").split(/\s+/).filter((word:string)=>word.length>=4&&!/^(the|this|that|with|from|about|where|which|were|their|there|من|في|على|عن|هذا|هذه|الذي|التي|كان|كانت|حيث|وهو|وهي)$/i.test(word)).slice(0,5).join(" ");
       const recoveryQuery=[title,contextTerms].filter(Boolean).join(" ").slice(0,300);
@@ -251,7 +252,7 @@ const providerFailures=Array.isArray(r?.providerAttempted)?r.providerAttempted.f
           articleEvidenceHosts.add(host);articleEvidenceUrls.push(parsed.toString());break;
         }catch(error){await recordRuntimeEventLimited(env,"article_source_url","candidate_source_url_invalid",error)}
       }
-      if(articleEvidenceUrls.length>=2)break;
+      if(articleEvidenceUrls.length>=5)break;
     }
     const articleEvidenceText=await Promise.all(articleEvidenceUrls.map(url=>bounded(sourceArticleText(url,lang),4500).catch(async error=>{await recordRuntimeEventLimited(env,"article_source_fetch","source_article_fetch_failed",error);return ""})));
     const evidenceByUrl=new Map(articleEvidenceUrls.map((url,index)=>[url,articleEvidenceText[index]]));
@@ -269,7 +270,14 @@ const providerFailures=Array.isArray(r?.providerAttempted)?r.providerAttempted.f
     const quality=articleBodyQuality(rawGeneratedBody);
     let generatedBody=quality.body;
     let hasFullAnalysis=quality.ok&&generated.status==="verified"&&hasIndependentSources;
-    if(!hasFullAnalysis&&hasIndependentSources&&generated.status==="verified"&&!quality.ok&&generatedBody.length>0){try{const stricter=await bounded(ask(env,articlePromptForTopic(title,lang,found.results)+"\n\n"+(lang==="ar"?"مراجعة تحريرية إلزامية: احذف التكرار، تأكد من ترابط الفقرات، واستخدم أربعة عناوين فرعية على الأقل.":"Mandatory editorial pass: remove repetition, ensure logical transitions, and use at least four subheadings."),lang,found.results),6500);const retry=articleBodyQuality(String(stricter.answer||""));if(retry.ok&&stricter.status==="verified"&&hasIndependentSources){generatedBody=retry.body;hasFullAnalysis=true;generated=stricter as any;}}catch(error){await recordRuntimeEventLimited(env,"api_suppressed_failure","operation_failed",error)}}
+    if(!hasFullAnalysis&&hasIndependentSources&&generatedBody.length>0){try{const stricter=await bounded(ask(env,articlePromptForTopic(title,lang,found.results)+"\n\n"+(lang==="ar"?"مراجعة تحريرية إلزامية: اكتب مقالًا مترابطًا لا يقل عن 700 كلمة إذا كانت الأدلة تسمح، بأربعة عناوين فرعية على الأقل وخمس فقرات مختلفة. اشرح ما حدث، خلفيته، ما تؤكده المصادر، وما لا يزال غير محسوم. انسب الادعاءات للمصادر ولا تكرر الملخص ولا تخترع تفاصيل.":"Mandatory editorial pass: write a coherent 700-word article when evidence allows, with at least four subheadings and five distinct paragraphs. Explain what happened, context, what sources confirm, and what remains unresolved. Attribute claims and never invent details."),lang,found.results),6500);const retry=articleBodyQuality(String(stricter.answer||""));if(retry.ok&&hasIndependentSources){generatedBody=retry.body;hasFullAnalysis=stricter.status==="verified";generated=stricter as any;}}catch(error){await recordRuntimeEventLimited(env,"api_suppressed_failure","operation_failed",error)}}
+    if(!hasFullAnalysis&&hasIndependentSources&&generatedBody.length>=900&&(generatedBody.match(/^#{1,3}\\s+.+$/gm)||[]).length>=2){
+      // Useful, evidence-linked drafts may be shown to readers without pretending they
+      // passed the full verification bar. They are not saved/published as verified news.
+      if(!image)image=await bounded(findRelatedImage(title,found.results[0]?.url,found.results[0]?.summary||summary,env),2500).catch(async error=>{await recordRuntimeEventLimited(env,"article_image_fallback","related_image_lookup_failed",error);return undefined})||"";
+      const articleSources=evidenceSources.filter((source:any)=>/^https:\/\//i.test(String(source?.url||""))).slice(0,12);
+      return json({ok:true,article:{title,summary:String(found.results[0]?.summary||summary||""),body:generatedBody,sources:articleSources,image:storyImage(image)||null,status:"source_only",providerCount:new Set(articleSources.map((source:any)=>source.publisher).filter(Boolean)).size,section:editorialSectionForOpenedStory(title,found.results[0]?.summary||summary)}});
+    }
     if(!hasFullAnalysis){
       const referenceCandidate=(found.results as any[]).find((item:any)=>String(item.summary||"").trim().length>0&&newsArticleEvidenceRelevant(title,item));
       // Sources belong to the selected evidence item; never pool citations from unrelated search results.
