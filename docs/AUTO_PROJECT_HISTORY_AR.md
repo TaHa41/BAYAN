@@ -99,3 +99,8 @@
 - Commit: `dfe3c4f3aedf3fe812c82809ba363e7b4f2e42dc`
 - الملفات: M	scripts/production-health.mjs 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-26T22:16:53Z — News sitemap diagnostics: also emit counts as a run annotation (non-blocking) 
+- Commit: `bd52114fac41098fd6dfff9b711a716f8b2d5eb8`
+- الملفات: M	scripts/news-sitemap-diagnostics.mjs 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
