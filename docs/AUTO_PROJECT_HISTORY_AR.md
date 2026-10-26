@@ -74,3 +74,8 @@
 - Commit: `3ebb0f38397599bec5e7a71450632c73687a6581`
 - الملفات: M	package.json;A	public/app-20261026-01.js;M	public/index.html;M	public/styles.css 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-26T10:10:05+03:00 — Keep admin dashboard usable with partial endpoint failures 
+- Commit: `004bbeb0d2339b05b33d0da52920bab688bd6bf6`
+- الملفات: M	package.json;A	public/app-20261026-admin-03.js;M	public/index.html;M	scripts/source-contract-smoke.mjs 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
