@@ -64,3 +64,8 @@
 - Commit: `2768ce4bc8141d3a79542bf93a05c915f3e49fef`
 - الملفات: M	scripts/source-contract-smoke.mjs;M	src/index.ts;M	src/seo.ts;M	src/services/repair.ts;M	src/services/search.ts;M	src/types.ts;A	tests/ads-txt.test.ts;M	tests/repair-ai-readonly.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-26T10:06:31+03:00 — Improve Arabic weather geocoding 
+- Commit: `43a41e528c5674ed1ff13a591249dadac9ee4343`
+- الملفات: M	src/services/live.ts;M	tests/live-providers.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
