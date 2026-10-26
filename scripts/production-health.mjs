@@ -1,6 +1,6 @@
 import {parseNewsSitemap} from "./news-sitemap-contract.mjs";
 // Surface the exact failure reason as a GitHub annotation so it is readable without downloading job logs.
-process.on("unhandledRejection",(error)=>{
+for(const eventName of ["unhandledRejection","uncaughtException"])process.on(eventName,(error)=>{
   const message=String(error&&error.message||error).replace(/[\r\n]+/g," ").slice(0,900);
   console.log("::error title=BAYAN health check failed::"+message);
   process.exit(1);
