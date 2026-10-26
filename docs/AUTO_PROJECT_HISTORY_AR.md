@@ -104,3 +104,8 @@
 - Commit: `bd52114fac41098fd6dfff9b711a716f8b2d5eb8`
 - الملفات: M	scripts/news-sitemap-diagnostics.mjs 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-26T22:31:39Z — Serve the hero bundle: app-20261027-02.js = hero bundle (20261026-01) + article retry; fixes the shell pointing at a bundle without the hero 
+- Commit: `45bc05785d9ca4f502ca852b96c84e74b6843f0c`
+- الملفات: M	package.json;A	public/app-20261027-02.js;M	scripts/source-contract-smoke.mjs;M	src/index.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
