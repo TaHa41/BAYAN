@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fx, gold, weather } from "../src/services/live";
+import { fx, gold, prayerTimes, weather } from "../src/services/live";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -149,5 +149,64 @@ describe("weather geocoding", () => {
     expect(calls).toBe(2);
     expect(result.ok).toBe(false);
     expect(result.message).toBe("City not found");
+  });
+});
+
+
+describe("prayer-time location matching", () => {
+  const prayerPayload = {
+    code: 200,
+    data: {
+      timings: { Fajr: "04:30", Sunrise: "05:50", Dhuhr: "11:45", Asr: "15:00", Maghrib: "17:40", Isha: "19:00" },
+      date: {
+        gregorian: { date: "26-10-2026" },
+        hijri: {
+          day: "10", year: "1448",
+          month: { number: 2, en: "Safar", ar: "صفر" },
+          designation: { abbreviated: "AH" }
+        }
+      },
+      meta: { timezone: "Africa/Cairo" }
+    }
+  };
+
+  it("prefers an exact city match over another result in the requested country", async () => {
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      urls.push(url);
+      if (url.includes("geocoding-api.open-meteo.com")) {
+        return new Response(JSON.stringify({ results: [
+          { name: "New Cairo", latitude: 30.03, longitude: 31.47, country: "Egypt" },
+          { name: "Cairo", latitude: 30.04, longitude: 31.24, country: "Egypt", admin1: "Cairo" }
+        ] }), { status: 200 });
+      }
+      if (url.includes("/v1/timings?")) return new Response(JSON.stringify(prayerPayload), { status: 200 });
+      return new Response("", { status: 404 });
+    }));
+    const result: any = await prayerTimes("Cairo", "Egypt");
+    expect(result.ok).toBe(true);
+    expect(result.city).toBe("Cairo");
+    expect(urls.some(url => url.includes("latitude=30.04") && url.includes("longitude=31.24"))).toBe(true);
+  });
+
+  it("matches a governorate/region name to a result's admin1 before falling back to another city in the country", async () => {
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      urls.push(url);
+      if (url.includes("geocoding-api.open-meteo.com")) {
+        return new Response(JSON.stringify({ results: [
+          { name: "Cairo", latitude: 30.04, longitude: 31.24, country: "Egypt", admin1: "Cairo" },
+          { name: "Hurghada", latitude: 27.25, longitude: 33.81, country: "Egypt", admin1: "Red Sea" }
+        ] }), { status: 200 });
+      }
+      if (url.includes("/v1/timings?")) return new Response(JSON.stringify(prayerPayload), { status: 200 });
+      return new Response("", { status: 404 });
+    }));
+    const result: any = await prayerTimes("Red Sea Governorate", "Egypt");
+    expect(result.ok).toBe(true);
+    expect(result.city).toBe("Hurghada");
+    expect(urls.some(url => url.includes("latitude=27.25") && url.includes("longitude=33.81"))).toBe(true);
   });
 });

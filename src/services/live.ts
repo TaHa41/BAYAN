@@ -200,7 +200,7 @@ export async function prayerTimes(cityInput?:string,countryInput?:string,env?:En
    const geo=await timeout("https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(city)+"&count=10&language="+geoLanguage+"&format=json",4500);
    if(geo.ok){
     const gd=await geo.json<any>(),rows=Array.isArray(gd.results)?gd.results:[],norm=(v:string)=>String(v||"").normalize("NFKD").toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g," ").trim(),target=norm(country);
-    const place=rows.find((x:any)=>norm(x.country)===target)||rows.find((x:any)=>norm(x.country_code)===target)||rows.find((x:any)=>norm(x.name)===norm(city))||rows[0];
+    const cityTarget=norm(city),regionTarget=norm(city).replace(/\b(?:governorate|province|state|region|prefecture)\b/g,"").replace(/(?:محافظة|إقليم|اقليم|منطقة)/g,"").trim();const normRegion=(v:string)=>norm(v).replace(/\b(?:governorate|province|state|region|prefecture)\b/g,"").replace(/(?:محافظة|إقليم|اقليم|منطقة)/g,"").trim();const place=rows.find((x:any)=>norm(x.name)===cityTarget)||rows.find((x:any)=>regionTarget&&normRegion(x.admin1)===regionTarget)||rows.find((x:any)=>norm(x.country)===target)||rows.find((x:any)=>norm(x.country_code)===target)||rows[0];
     if(place&&Number.isFinite(Number(place.latitude))&&Number.isFinite(Number(place.longitude))){
      displayCity=String(place.name||city);displayCountry=String(place.country||country);
      const r=await timeout("https://api.aladhan.com/v1/timings?latitude="+encodeURIComponent(String(place.latitude))+"&longitude="+encodeURIComponent(String(place.longitude))+"&method=5",6000);
