@@ -1,6 +1,6 @@
 import type {Env} from "./types";
 
-const ANALYTICS_EXCLUDED_UA = /(?:googlebot|bingbot|yandexbot|baiduspider|duckduckbot|slurp|crawler|spider|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|slackbot|lighthouse|pagespeed|headlesschrome|puppeteer|playwright|curl\/|wget\/|python-requests|python-urllib|go-http-client|node(?:\.js)?\b|undici|bayan-production-smoke|uptime(?:robot)?|healthcheck|monitoring)/i;
+const ANALYTICS_EXCLUDED_UA = /(?:googlebot|bingbot|yandexbot|baiduspider|duckduckbot|slurp|crawler|spider|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|slackbot|lighthouse|pagespeed|headlesschrome|puppeteer|playwright|curl\/|wget\/|python-requests|python-urllib|go-http-client|node(?:\.js)?\b|undici|bayan-production-smoke|uptime(?:robot)?|healthcheck|monitoring|gptbot|chatgpt-user|oai-searchbot|claudebot|claude-user|claude-searchbot|anthropic-ai|perplexitybot|perplexity-user|ccbot|bytespider|amazonbot|applebot|google-extended|googleother|cohere-ai|meta-externalagent|diffbot|youbot|petalbot|ahrefsbot|semrushbot|mj12bot)/i;
 
 export function analyticsExcluded(request: Request) {
   const cookies = (request.headers.get("cookie") || "").split(";").map((part) => part.trim());
