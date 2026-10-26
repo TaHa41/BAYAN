@@ -14,6 +14,7 @@ try{
     eligibleCount:response.headers.get("x-bayan-news-sitemap-eligible-count"),
     rejectedCount:response.headers.get("x-bayan-news-sitemap-rejected-count"),
     rejectionReasons:response.headers.get("x-bayan-news-sitemap-rejection-reasons"),
+    archiveReasons:response.headers.get("x-bayan-news-sitemap-archive-reasons"),
     xmlBytes:new TextEncoder().encode(xml).length
   };
   console.log("NEWS_SITEMAP_DIAGNOSTICS "+JSON.stringify(diagnostics));
