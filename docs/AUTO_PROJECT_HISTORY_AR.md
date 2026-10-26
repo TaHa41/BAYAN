@@ -84,3 +84,8 @@
 - Commit: `589992adc756cde49646f86db99b0f5208cd158c`
 - الملفات: M	src/services/live.ts;M	tests/live-providers.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-26T22:04:31Z — Research article page: automatic 3-attempt retry before the failure notice (bundle app-20261027-01.js) 
+- Commit: `5bd2a142ba4fff1049a4d9d0de7c7cea11546c44`
+- الملفات: M	package.json;A	public/app-20261027-01.js;M	scripts/source-contract-smoke.mjs;M	src/index.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
