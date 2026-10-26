@@ -1,0 +1,84 @@
+name: BAYAN automatic project history
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: bayan-project-history
+  cancel-in-progress: false
+jobs:
+  append-history:
+    if: github.event_name == 'workflow_dispatch' || github.event.before != github.sha
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out complete history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Append merged commits to the Arabic project history
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p docs
+          log_file="docs/AUTO_PROJECT_HISTORY_AR.md"
+          if [ ! -f "$log_file" ]; then
+            cat > "$log_file" <<'EOF'
+          # سجل التغييرات التلقائي — BAYAN
+          
+          هذا السجل يُحدَّث آليًا عند وصول تغييرات إلى الفرع `main`. وهو سجل تقني للـcommits والملفات، وليس بديلًا عن شرح السبب والاختبارات ونتيجة الإنتاج في طلب الدمج والمرجع الرئيسي.
+          
+          - لا تُسجَّل الأسرار أو قيم المتغيرات الحساسة.
+          - تُحفظ رسالة commit وSHA والتاريخ والملفات المتغيرة فقط.
+          - يجب ألا تُعتبر أي ميزة ناجحة في الإنتاج لمجرد وجود commit.
+          
+          ## الأحداث
+          EOF
+          fi
+          tmp="$(mktemp)"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            range="$(git log -n 30 --format='%H' HEAD)"
+          elif [ -z "${BEFORE_SHA:-}" ] || [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            range="$(git log -n 30 --format='%H' "$AFTER_SHA")"
+          else
+            range="$(git rev-list --reverse --no-merges "$BEFORE_SHA..$AFTER_SHA" 2>/dev/null || true)"
+          fi
+          if [ -z "$range" ]; then
+            echo "No new commits found to record."
+            exit 0
+          fi
+          while IFS= read -r sha; do
+            [ -n "$sha" ] || continue
+            date="$(git show -s --format=%cI "$sha")"
+            subject="$(git show -s --format=%s "$sha" | tr '\r\n' '  ')"
+            short="$(git rev-parse --short "$sha")"
+            {
+              printf '\n### %s — %s\n' "$date" "$subject"
+              printf -- '- Commit: `%s`\n' "$sha"
+              printf -- '- الملفات: '
+              changed="$(git diff-tree --no-commit-id --name-status -r "$sha" | head -n 80 | tr '\n' ';' | sed 's/;$/ /')"
+              if [ -z "$changed" ]; then changed="دمج أو تغيير شجري دون قائمة ملفات مباشرة"; fi
+              printf '%s\n' "$changed"
+              printf -- '- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.\n'
+            } >> "$tmp"
+          done <<< "$range"
+          if [ ! -s "$tmp" ]; then
+            echo "No history entries generated."
+            exit 0
+          fi
+          cat "$tmp" >> "$log_file"
+          rm -f "$tmp"
+          if git diff --quiet -- "$log_file"; then
+            echo "History already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$log_file"
+          git commit -m "docs: automatically record project history"
+          git push
