@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fx, gold } from "../src/services/live";
+import { fx, gold, weather } from "../src/services/live";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -114,5 +114,40 @@ describe("live provider resilience", () => {
     expect(result.fxUpdatedAt).toBeTruthy();
     expect(maximumYahooActive).toBeLessThanOrEqual(4);
     expect(maximumActive).toBeLessThanOrEqual(5);
+  });
+});
+
+describe("weather geocoding", () => {
+  it("geocodes Arabic city names in Arabic and prefers the exact-name match", async () => {
+    const urls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      urls.push(url);
+      if (url.includes("geocoding-api.open-meteo.com")) {
+        return new Response(JSON.stringify({ results: [
+          { name: "القاهرة الجديدة", latitude: 30.03, longitude: 31.47, country: "مصر" },
+          { name: "القاهرة", latitude: 30.04, longitude: 31.24, country: "مصر", admin1: "محافظة القاهرة" }
+        ] }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ current: { temperature_2m: 27 }, timezone: "Africa/Cairo" }), { status: 200 });
+    }));
+    const result: any = await weather("القاهرة");
+    expect(urls[0]).toContain("language=ar");
+    expect(urls[0]).toContain("count=5");
+    expect(result.ok).toBe(true);
+    expect(result.city).toBe("القاهرة");
+    expect(result.latitude).toBe(30.04);
+  });
+
+  it("retries the geocoder once and reports city-not-found honestly", async () => {
+    let calls = 0;
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      calls++;
+      return calls === 1 ? new Response("", { status: 503 }) : new Response(JSON.stringify({}), { status: 200 });
+    }));
+    const result: any = await weather("Nowhereville");
+    expect(calls).toBe(2);
+    expect(result.ok).toBe(false);
+    expect(result.message).toBe("City not found");
   });
 });
