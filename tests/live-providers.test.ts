@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fx, gold } from "../src/services/live";
+import { fx, gold, prayerTimes } from "../src/services/live";
 
 afterEach(() => {
   vi.unstubAllGlobals();
