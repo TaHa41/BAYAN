@@ -4,9 +4,12 @@
 
 BAYAN v1 is a clean rebuild: Arabic/English knowledge, evidence-first search, verified news, live data, Ask BAYAN, contributions, saved content and a private manager center.
 
-## المرجع الرئيسي للمشروع
+## مرجع المشروع وسجله التاريخي
 
-- [المرجع الرئيسي الشامل بالعربية](docs/MASTER_PROJECT_REFERENCE_AR.md): أهداف المشروع، المتطلبات، حالة التنفيذ المعروفة، سجل المشكلات والحلول، أدوات الذكاء الاصطناعي المطلوبة، ضوابط الأمان، وخطة إغلاق البنود المفتوحة.
+- [المرجع الرئيسي الشامل بالعربية](docs/MASTER_PROJECT_REFERENCE_AR.md): الرؤية، المتطلبات، الحالة المعروفة، المشكلات والحلول، الأدوات المطلوبة، الضوابط، وخطة إغلاق البنود.
+- [الخط الزمني وسجل التحقق التاريخي](docs/MASTER_PROJECT_TIMELINE_AR.md): تسلسل العمل منذ التأسيس، commits حديثة ذات صلة، الحوادث، متطلبات المستخدم التي يجب حفظها، وفجوات التحقق المفتوحة.
+
+> وجود مطلب أو commit في الوثائق لا يعني أن الميزة تعمل في الإنتاج. يجب توثيق الاختبارات ونتائج CI وSHA المنشور والتحقق المباشر قبل إعلان الإنجاز.
 
 ## Principles
 - Retrieval and verification precede generation.
