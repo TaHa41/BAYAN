@@ -21,7 +21,7 @@ export async function weather(cityInput?:string,env?:Env){
     const geoLanguage=/[\u0600-\u06ff]/.test(city)?"ar":"en";
     let gd:any=null;
     for(let attempt=0;attempt<2&&!gd;attempt++){
-      try{const geo=await timeout("https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(city)+"&count=5&language="+geoLanguage+"&format=json",3500);if(geo.ok)gd=await geo.json<any>()}catch{}
+      try{const geo=await timeout("https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(city)+"&count=5&language="+geoLanguage+"&format=json",3500);if(geo.ok)gd=await geo.json<any>()}catch(error){if(env)await recordRuntimeEventLimited(env,"weather_provider","weather_geocoding_attempt_failed",error)}
     }
     if(!gd)throw new Error("weather_geocoding");
     const normName=(v:string)=>String(v||"").normalize("NFKD").toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g," ").trim();
