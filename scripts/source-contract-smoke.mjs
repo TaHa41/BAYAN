@@ -10,7 +10,7 @@ const db = read("src/db.ts");
 const ai = read("src/services/ai.ts");
 const repair = read("src/services/repair.ts");
 const wisdom = read("src/wisdom.ts");
-const app = read("public/app-20261019-01.js");
+const app = read("public/app-20261026-admin-01.js");
 const index = read("src/index.ts");
 const api = read("src/routes/api.ts");
 const schema = read("src/schema.ts");
@@ -369,6 +369,8 @@ checks.push(["research fallback rejects unrelated title/snippet pairs and sectio
 checks.push(["source-only research shows the actual excerpt without fabricated biography sections", api.includes("const bodyText=referenceSummary;") && !api.includes("const bodyText=isBiography?structuredSourceOnlyBiography(referenceTitle,referenceSummary,referenceSources,lang):referenceSummary;")]);
 
 checks.push(["search cards never expose generic section illustrations as topic images", api.includes("if(Array.isArray(r?.results))r.results=r.results.map((item:any)=>({...item,imageUrl:storyImage(item.imageUrl)") && api.includes("sources.map((source:any)=>({...source,imageUrl:storyImage(source.imageUrl)}))")]);
+
+checks.push(["admin dashboard isolates partial endpoint failures while retaining token authentication", app.includes("unauthorizedCount===protectedEndpointCount") && app.includes('h.set("x-bayan-manager-token",token())') && app.includes("Some admin sections failed to load")]);
 
 let failed = 0;
 for (const [name, ok] of checks) {
