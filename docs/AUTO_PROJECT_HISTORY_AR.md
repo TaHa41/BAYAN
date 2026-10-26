@@ -69,3 +69,8 @@
 - Commit: `43a41e528c5674ed1ff13a591249dadac9ee4343`
 - الملفات: M	src/services/live.ts;M	tests/live-providers.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-26T10:06:47+03:00 — Integrate responsive BAYAN homepage hero 
+- Commit: `3ebb0f38397599bec5e7a71450632c73687a6581`
+- الملفات: M	package.json;A	public/app-20261026-01.js;M	public/index.html;M	public/styles.css 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
