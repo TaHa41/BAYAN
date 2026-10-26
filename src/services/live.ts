@@ -16,9 +16,17 @@ async function mapWithConcurrency<T,R>(items:T[],limit:number,worker:(item:T)=>P
 export async function weather(cityInput?:string,env?:Env){
   const city=String(cityInput||"Hurghada").trim().slice(0,100)||"Hurghada";
   try{
-    const geo=await timeout("https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(city)+"&count=1&language=en&format=json",3500);
-    if(!geo.ok)throw new Error("weather_geocoding");
-    const gd=await geo.json<any>(),place=gd.results?.[0];
+    // Geocode in the language the visitor typed (Arabic names such as "القاهرة" do not resolve with language=en),
+    // ask for several matches and prefer an exact-name hit before falling back to the top result.
+    const geoLanguage=/[\u0600-\u06ff]/.test(city)?"ar":"en";
+    let gd:any=null;
+    for(let attempt=0;attempt<2&&!gd;attempt++){
+      try{const geo=await timeout("https://geocoding-api.open-meteo.com/v1/search?name="+encodeURIComponent(city)+"&count=5&language="+geoLanguage+"&format=json",3500);if(geo.ok)gd=await geo.json<any>()}catch{}
+    }
+    if(!gd)throw new Error("weather_geocoding");
+    const normName=(v:string)=>String(v||"").normalize("NFKD").toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g," ").trim();
+    const rows=Array.isArray(gd.results)?gd.results:[];
+    const place=rows.find((x:any)=>normName(x.name)===normName(city))||rows[0];
     if(!place||!Number.isFinite(Number(place.latitude))||!Number.isFinite(Number(place.longitude)))return{ok:false,provider:"Open-Meteo",stale:true,city,message:"City not found"};
     const url="https://api.open-meteo.com/v1/forecast?latitude="+encodeURIComponent(String(place.latitude))+"&longitude="+encodeURIComponent(String(place.longitude))+"&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=auto";
     const r=await timeout(url,5000);if(!r.ok)throw new Error("weather_forecast");
