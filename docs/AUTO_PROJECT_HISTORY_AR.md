@@ -79,3 +79,8 @@
 - Commit: `004bbeb0d2339b05b33d0da52920bab688bd6bf6`
 - الملفات: M	package.json;A	public/app-20261026-admin-03.js;M	public/index.html;M	scripts/source-contract-smoke.mjs 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-26T10:10:39+03:00 — Resolve prayer times by exact city and governorate 
+- Commit: `589992adc756cde49646f86db99b0f5208cd158c`
+- الملفات: M	src/services/live.ts;M	tests/live-providers.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
