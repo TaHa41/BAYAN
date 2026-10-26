@@ -109,3 +109,8 @@
 - Commit: `45bc05785d9ca4f502ca852b96c84e74b6843f0c`
 - الملفات: M	package.json;A	public/app-20261027-02.js;M	scripts/source-contract-smoke.mjs;M	src/index.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-26T22:35:18Z — News sitemap: expose aggregated archive drafting reasons in a header and in the diagnostics annotation (no extra D1 reads) 
+- Commit: `1d742fc2bcaf10cfe0729d1d008d0fc5593d1e15`
+- الملفات: M	scripts/news-sitemap-diagnostics.mjs;M	src/seo.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
