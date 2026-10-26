@@ -59,3 +59,8 @@
 - Commit: `1fec12b0284c87d8045b1cf0f760ea0209a2b7b9`
 - الملفات: M	README.md 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-26T10:05:31+03:00 — Person pages, guarded AI repair retries, and ads.txt readiness 
+- Commit: `2768ce4bc8141d3a79542bf93a05c915f3e49fef`
+- الملفات: M	scripts/source-contract-smoke.mjs;M	src/index.ts;M	src/seo.ts;M	src/services/repair.ts;M	src/services/search.ts;M	src/types.ts;A	tests/ads-txt.test.ts;M	tests/repair-ai-readonly.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
