@@ -94,3 +94,8 @@
 - Commit: `cfbeaeaa77ddee7273abfa6c0b12bb215125cf7b`
 - الملفات: M	scripts/production-health.mjs 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-26T22:13:38Z — Health check: annotation handler also covers uncaught top-level-await errors 
+- Commit: `dfe3c4f3aedf3fe812c82809ba363e7b4f2e42dc`
+- الملفات: M	scripts/production-health.mjs 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
