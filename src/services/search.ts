@@ -454,27 +454,59 @@ const personQueryName=(query:string)=>String(query||"").trim()
   .replace(/\s+(?:biography|profile|official profile|wikipedia|wiki|wikidata|سيرة ذاتية|ويكيبيديا|ويكي\s+بيانات|مصدر رسمي|official source)$/i,"").trim();
 const personEvidence=(candidate:SearchResult)=>/(footballer|football player|soccer player|athlete|politician|writer|author|actor|actress|scientist|researcher|coach|president|minister|born in|is a .*player|لاعب كرة قدم|لاعب|رياضي|سياسي|كاتب|مؤلف|ممثل|عالِم|عالم|باحث|مدرب|رئيس|وزير|وُلد|ولد)/i.test(String(candidate.title||"")+" "+String(candidate.summary||""));
 export const isSportsPersonProfile=(value:string)=>/(footballer|football player|soccer player|athlete|لاعب(?:\s+كرة قدم)?|اللاعب(?:ين|ون|ة)?|رياضي)/i.test(String(value||""));
+const WIKI_SKIP_SECTION=/^(?:مراجع|وصلات خارجية|انظر أيضا|انظر أيضًا|هوامش|ملاحظات|المصادر|قراءة إضافية|References|External links|See also|Notes|Further reading|Sources|Bibliography)$/i;
+// Splits a full plain-text Wikipedia extract (exsectionformat=wiki) into the intro and its content sections.
+const splitWikiExtract=(text:string)=>{
+  const parts=String(text||"").split(/^==+\s*(.+?)\s*==+\s*$/m);
+  const sections:{title:string;body:string}[]=[];
+  for(let i=1;i<parts.length;i+=2){
+    const title=cleanText(parts[i]),body=String(parts[i+1]||"").replace(/\n{3,}/g,"\n\n").trim();
+    if(title&&body&&!WIKI_SKIP_SECTION.test(title))sections.push({title,body:body.slice(0,8000)});
+  }
+  return{intro:String(parts[0]||"").trim(),sections:sections.slice(0,24)};
+};
+// Best-effort credit and license for the Commons file behind the page image; failure never blocks the profile.
+const wikiImageCredit=async(file:string):Promise<{credit?:string;license?:string}>=>{
+  try{
+    const r=await timeout("https://commons.wikimedia.org/w/api.php?action=query&titles="+encodeURIComponent("File:"+file)+"&prop=imageinfo&iiprop=extmetadata&format=json&formatversion=2&origin=*",2000);
+    if(!r.ok)return{};
+    const d=await r.json<any>();
+    const m=d.query?.pages?.[0]?.imageinfo?.[0]?.extmetadata;
+    const strip=(v:any)=>cleanText(String(v?.value||"")).slice(0,200);
+    return{credit:strip(m?.Artist)||undefined,license:strip(m?.LicenseShortName)||undefined};
+  }catch{return{}}
+};
 const wikipediaExactPersonPage=async(query:string,language:Locale):Promise<Candidate[]>=>{
   const title=personQueryName(query).trim();
   if(!title||title.length>100)return[];
   const code=language==="ar"?"ar":"en";
   try{
     const url="https://"+code+".wikipedia.org/w/api.php?action=query&titles="+encodeURIComponent(title)+
-      "&prop=extracts|pageimages|pageprops&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=1200&format=json&origin=*";
+      "&prop=extracts|pageimages|pageprops&explaintext=1&exsectionformat=wiki&piprop=name|thumbnail&pithumbsize=1200&format=json&origin=*";
     const response=await timeout(url,2800);
     if(!response.ok)return[];
     const data=await response.json<any>();
     const pages=Object.values(data.query?.pages||{}) as any[];
     const page=pages.find((item:any)=>!item.missing&&normalizedEntityTitle(item.title)===normalizedEntityTitle(title));
-    if(!page||page.pageprops?.disambiguation!==undefined||isDisambiguation({title:page.title,summary:page.extract} as Candidate))return[];
-    const summary=cleanText(page.extract||"").slice(0,1800);
+    if(!page||page.pageprops?.disambiguation!==undefined)return[];
+    const {intro,sections}=splitWikiExtract(String(page.extract||""));
+    // Identity checks still run on the lead paragraph only, so the stricter full-text body cannot loosen them.
+    const summary=cleanText(intro).slice(0,1800);
+    if(isDisambiguation({title:page.title,summary:page.extract} as Candidate))return[];
     if(!summary||!personEvidence({title:page.title,summary} as SearchResult))return[];
     if(mixedIdentitySummary(title,{title:page.title,summary} as Candidate))return[];
     const pageUrl="https://"+code+".wikipedia.org/wiki/"+encodeURIComponent(String(page.title).replace(/ /g,"_"));
     const imageUrl=String(page.thumbnail?.source||"");
+    const safeImage=imageUrl.startsWith("https://")?imageUrl:undefined;
+    const file=safeImage&&page.pageimage?String(page.pageimage):"";
+    const credit=file?await wikiImageCredit(file):{};
+    const body=[intro,...sections.map(section=>"## "+section.title+"\n"+section.body)].join("\n\n").slice(0,40000);
     return [{
       title:cleanText(page.title),summary,section:"people",kind:"web",evidence:"mixed",
-      imageUrl:imageUrl.startsWith("https://")?imageUrl:undefined,imageAlt:cleanText(page.title),
+      body,sections,
+      imageUrl:safeImage,imageAlt:cleanText(page.title),
+      imageCredit:credit.credit,imageLicense:credit.license,
+      imageCreditUrl:file?"https://commons.wikimedia.org/wiki/File:"+encodeURIComponent(file):undefined,
       sources:[source(cleanText(page.title),language==="ar"?"Wikipedia Arabic":"Wikipedia",pageUrl)],
       url:pageUrl,score:100,provider:"Wikipedia Exact Page"
     } as Candidate];

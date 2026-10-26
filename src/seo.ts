@@ -10,6 +10,15 @@ export function robots(){
   // while eligible, recent, full news articles exist; never advertise an empty feed.
   return text("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nDisallow: /review\nDisallow: /saved\nSitemap: "+ORIGIN+"/sitemap.xml\n");
 }
+// /ads.txt is served only when the owner sets the ADS_TXT variable (the lines the ad network provides).
+// Nothing is invented: unset means 404, and only well-formed ads.txt lines, comments and variables are emitted.
+export function adsTxt(env:Env){
+  const raw=String(env.ADS_TXT||"").replace(/\\n/g,"\n").slice(0,8000);
+  const line=/^(?:#.*|(?:contact|subdomain|ownerdomain|managerdomain|inventorypartnerdomain)\s*=\s*[\w.\-\/:@]+|[a-z0-9.\-]+\s*,\s*[\w\-]+\s*,\s*(?:DIRECT|RESELLER)(?:\s*,\s*[\w\-]+)?)\s*(?:#.*)?$/i;
+  const lines=raw.split(/\r?\n/).map((l)=>l.trim()).filter((l)=>l&&line.test(l));
+  if(!lines.some((l)=>!l.startsWith("#")))return new Response("Not found",{status:404,headers:{"content-type":"text/plain; charset=utf-8","cache-control":"no-store"}});
+  return new Response(lines.join("\n")+"\n",{status:200,headers:{"content-type":"text/plain; charset=utf-8","cache-control":"public, max-age=3600","x-content-type-options":"nosniff"}});
+}
 const hasTopicImage=isTopicImageUrl;
 const xml=(s:string)=>Array.from(String(s)).filter((character)=>{const code=character.codePointAt(0)!;return code===0x9||code===0xA||code===0xD||(code>=0x20&&code<=0xD7FF)||(code>=0xE000&&code<=0xFFFD)||(code>=0x10000&&code<=0x10FFFF)}).join("").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
 
