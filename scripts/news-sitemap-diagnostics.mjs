@@ -17,6 +17,8 @@ try{
     xmlBytes:new TextEncoder().encode(xml).length
   };
   console.log("NEWS_SITEMAP_DIAGNOSTICS "+JSON.stringify(diagnostics));
+  // Also expose the counts as a run annotation so they are readable without downloading logs (non-blocking).
+  console.log("::notice title=NEWS_SITEMAP_DIAGNOSTICS::"+JSON.stringify(diagnostics).slice(0,900));
 }catch(error){
   console.log("NEWS_SITEMAP_DIAGNOSTICS "+JSON.stringify({url,error:error instanceof Error?error.message:String(error)}));
 }
