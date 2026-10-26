@@ -11,6 +11,7 @@ const ai = read("src/services/ai.ts");
 const repair = read("src/services/repair.ts");
 const wisdom = read("src/wisdom.ts");
 const app = read("public/app-20261019-01.js");
+const adminApp = read("public/app-20261026-admin-03.js");
 const index = read("src/index.ts");
 const api = read("src/routes/api.ts");
 const schema = read("src/schema.ts");
@@ -18,6 +19,7 @@ const evidenceDiversity = read("src/services/evidence-diversity.ts");
 const recovery = read("src/services/search-recovery.ts");
 const http = read("src/http.ts");
 const checks = [
+  ["admin dashboard tolerates individual endpoint failures while retaining authentication", adminApp.includes("protectedEndpointCount") && adminApp.includes("unauthorizedCount===protectedEndpointCount") && adminApp.includes("Some admin sections failed to load")],
   ["sensitive Worker binding audit never prints binding values", (()=>{const audit=read("scripts/worker-binding-security-audit.mjs");return audit.includes("Values were intentionally not logged.") && audit.includes('binding.type !== "secret_text"') && !audit.includes("JSON.stringify(bindings)") && !audit.includes("console.log(binding.text)") && !audit.includes("console.log(data)")})()],
   ["article quality inventory is read-only and bounds detailed result sets", (()=>{const report=read("scripts/article-quality-report.sql");return !/\b(?:INSERT|UPDATE|DELETE|ALTER|DROP|CREATE)\b/i.test(report) && report.includes("ORDER BY language, section, length(body), slug\nLIMIT 100;") && report.includes("ORDER BY section, language, slug\nLIMIT 100;") && report.includes("ORDER BY a.language, a.title, a.slug\nLIMIT 100;") && report.includes("ORDER BY count DESC, language\nLIMIT 20;")})()],
   ["section smoke skips content assertions only for explicit D1 quota degradation", read("scripts/production-smoke.mjs").includes('d.degraded===true&&d.reason==="d1_quota"') && read("scripts/production-smoke.mjs").includes("needs_at_least_two_articles") && read("scripts/production-smoke.mjs").includes("SECTION_CHECKS_SKIPPED_EXPLICIT_D1_QUOTA")],
