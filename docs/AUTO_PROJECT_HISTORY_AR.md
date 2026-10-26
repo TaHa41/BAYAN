@@ -89,3 +89,8 @@
 - Commit: `5bd2a142ba4fff1049a4d9d0de7c7cea11546c44`
 - الملفات: M	package.json;A	public/app-20261027-01.js;M	scripts/source-contract-smoke.mjs;M	src/index.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-26T22:09:57Z — Health check: emit the failure reason as a GitHub annotation 
+- Commit: `cfbeaeaa77ddee7273abfa6c0b12bb215125cf7b`
+- الملفات: M	scripts/production-health.mjs 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
