@@ -742,3 +742,17 @@ p,li{line-height:1.85}
 .primary:hover,.btn:hover{transform:translateY(-2px);filter:brightness(1.07)}
 :focus-visible{outline:2px solid var(--accent2);outline-offset:3px}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+
+/* Homepage globe visual adapted from the supplied BAYAN hero, with a static fallback. */
+.bayan-hero-visual{position:relative;isolation:isolate;overflow:hidden;width:min(360px,100%);aspect-ratio:1.08;border-radius:50%;background:radial-gradient(ellipse at 50% 78%,rgba(227,185,63,.28),rgba(10,18,38,.5) 52%,transparent 74%);-webkit-mask-image:radial-gradient(ellipse at center,#000 57%,rgba(0,0,0,.78) 74%,transparent 100%);mask-image:radial-gradient(ellipse at center,#000 57%,rgba(0,0,0,.78) 74%,transparent 100%)}
+.bayan-hero-visual:before{content:"";position:absolute;inset:7%;z-index:3;border:1px solid rgba(244,217,139,.24);border-radius:50%;pointer-events:none;box-shadow:0 0 0 18px rgba(244,217,139,.025),0 0 0 38px rgba(244,217,139,.018)}
+.bayan-hero-visual:after{content:"";position:absolute;inset:0;z-index:2;background:linear-gradient(180deg,rgba(5,9,20,.08),rgba(5,9,20,.35));pointer-events:none}
+.bayan-hero-visual .bayan-hero-still,.bayan-hero-visual .bayan-hero-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center bottom}
+.bayan-hero-visual .bayan-hero-video{z-index:1;opacity:0;transition:opacity .8s ease}
+.bayan-hero-visual .bayan-hero-video.is-ready{opacity:1}
+.bayan-hero-visual-mark{position:absolute;z-index:4;inset:auto 0 14%;display:flex;flex-direction:column;align-items:center;gap:3px;color:#fff;font-size:18px;font-weight:800;letter-spacing:.16em;text-shadow:0 2px 16px rgba(0,0,0,.8)}
+.bayan-hero-visual-mark span{font-size:14px;font-weight:600;letter-spacing:0;color:#f4d98b}
+@media(max-width:900px){.bayan-hero-visual{width:min(220px,100%);grid-row:span 2;aspect-ratio:1}}
+@media(max-width:560px){.bayan-hero-visual{width:min(170px,100%)}}
+@media(prefers-reduced-motion:reduce){.bayan-hero-visual .bayan-hero-video{display:none!important}.bayan-hero-visual .bayan-hero-video.is-ready{opacity:0}}

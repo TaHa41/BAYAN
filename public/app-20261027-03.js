@@ -495,7 +495,7 @@
             </div>
           </div>
           <div class="bayan-hero-side">
-            <div class="bayan-hero-orbit" aria-hidden="true"><span class="orbit-core">B</span><i></i><i></i><i></i></div>
+            <div class="bayan-hero-visual" aria-hidden="true"><img class="bayan-hero-still" alt="" src="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/f1631235-0a76-464d-8f1d-2c4b48a997d5.jpg" loading="lazy" decoding="async" onerror="this.remove()"><video class="bayan-hero-video" muted loop playsinline preload="none" poster="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/f1631235-0a76-464d-8f1d-2c4b48a997d5.jpg" src="https://d2ol7oe51mr4n9.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/e71aea27-a808-4ae3-8231-a469d49285d4.mp4"></video><span class="bayan-hero-visual-mark">BAYAN<span>بيان</span></span></div>
             <div class="wisdom-card home-wisdom"><p id="home-wisdom-text">${t("المعرفة تبدأ بسؤال جيد، وتكتمل بدليل موثوق.","Knowledge begins with a good question and grows stronger with reliable evidence.")}</p></div>
             <div class="bayan-hero-shortcuts">
               <a href="/people?lang=${lang}"><b>✦</b>${t("سير الأشخاص","People")}</a>
@@ -513,6 +513,34 @@
         </div>
       </section>`;
     bindSearch();
+    // Load the decorative globe video only when visible and motion is allowed.
+    const heroVisual = document.querySelector(".bayan-hero-visual");
+    const heroVideo = heroVisual?.querySelector(".bayan-hero-video");
+    if (heroVideo) {
+      const motionAllowed = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (!motionAllowed) heroVideo.remove();
+      else {
+        heroVideo.addEventListener("canplay", () => {
+          heroVideo.classList.add("is-ready");
+          if (!document.hidden) heroVideo.play().catch(() => {});
+        }, { once: true });
+        heroVideo.addEventListener("error", () => heroVideo.remove(), { once: true });
+        const startVideo = () => { if (!heroVideo.dataset.loaded) { heroVideo.dataset.loaded = "1"; heroVideo.load(); } };
+        if ("IntersectionObserver" in window && heroVisual) {
+          const observer = new IntersectionObserver((entries) => {
+            if (entries.some((entry) => entry.isIntersecting)) {
+              startVideo();
+              observer.disconnect();
+            }
+          }, { rootMargin: "120px" });
+          observer.observe(heroVisual);
+        } else startVideo();
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) heroVideo.pause();
+          else if (heroVideo.classList.contains("is-ready")) heroVideo.play().catch(() => {});
+        });
+      }
+    }
     const refreshHomeWisdom = () => api("/api/wisdom?section=world&lang=" + lang, { timeoutMs: 5000 })
       .then((wd) => {
         const el = document.querySelector("#home-wisdom-text");
