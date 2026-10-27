@@ -114,3 +114,8 @@
 - Commit: `1d742fc2bcaf10cfe0729d1d008d0fc5593d1e15`
 - الملفات: M	scripts/news-sitemap-diagnostics.mjs;M	src/seo.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-27T03:07:24Z — Redesign v3: unified section names and copy, new section artwork, motion/card/article CSS layer (bundle app-20261027-03.js) 
+- Commit: `886a529b9327a4d034acde84a42818c7a1aa3c8d`
+- الملفات: M	package.json;A	public/app-20261027-03.js;M	public/sections/arab.svg;M	public/sections/art.svg;M	public/sections/economy.svg;M	public/sections/egypt.svg;M	public/sections/health.svg;M	public/sections/history.svg;M	public/sections/news.svg;M	public/sections/people.svg;M	public/sections/politics.svg;M	public/sections/prices.svg;M	public/sections/science.svg;M	public/sections/sports.svg;M	public/sections/technology.svg;M	public/sections/travel.svg;M	public/sections/trends.svg;M	public/sections/world.svg;M	public/styles.css;M	scripts/source-contract-smoke.mjs;M	src/index.ts;M	src/sections.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
