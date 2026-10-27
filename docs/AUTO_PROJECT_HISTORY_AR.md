@@ -124,3 +124,8 @@
 - Commit: `eb0dab0b2edc108c93e1d05efca91bcd6710061b`
 - الملفات: M	public/app-20261027-03.js;M	public/styles.css 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-27T08:11:19Z — Section archive: file every sourced search result / opened topic under its own section (ARCHIVE status, never PUBLISHED) 
+- Commit: `9273c386a0d3dcb362d93d394436d329dab1dba8`
+- الملفات: M	src/routes/api.ts;A	src/services/section-archive.ts;A	tests/section-archive.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
