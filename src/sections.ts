@@ -1,21 +1,21 @@
 export type Locale="ar"|"en";
 export type Section={slug:string;ar:string;en:string;descriptionAr:string;descriptionEn:string;icon:string};
 export const sections:Section[]=[
-{slug:"science",ar:"علوم وفهم",en:"Science & Understanding",descriptionAr:"علوم واكتشافات وشرح مبني على الأدلة.",descriptionEn:"Science, discoveries and evidence-based explanations.",icon:"⚗"},
-{slug:"technology",ar:"تقنية وذكاء اصطناعي",en:"Technology & AI",descriptionAr:"التقنية والذكاء الاصطناعي والابتكار.",descriptionEn:"Technology, artificial intelligence and innovation.",icon:"⌘"},
-{slug:"economy",ar:"اقتصاد ومال",en:"Economy & Money",descriptionAr:"الاقتصاد والأسواق والمال والقرارات المالية.",descriptionEn:"Economics, markets, money and financial decisions.",icon:"◈"},
-{slug:"politics",ar:"سياسة وشأن عام",en:"Politics & Public Affairs",descriptionAr:"السياسات والقرارات والشأن العام.",descriptionEn:"Politics, public policy and public affairs.",icon:"▣"},
-{slug:"health",ar:"صحة وطب",en:"Health & Medicine",descriptionAr:"الصحة والطب والمعلومات الصحية الموثقة.",descriptionEn:"Health, medicine and evidence-based health information.",icon:"+"},
-{slug:"history",ar:"تاريخ وثقافة",en:"History & Culture",descriptionAr:"التاريخ والثقافة والتراث.",descriptionEn:"History, culture and heritage.",icon:"▱"},
-{slug:"people",ar:"أشخاص وسير",en:"People & Biographies",descriptionAr:"الأشخاص والسير والقصص الموثقة.",descriptionEn:"People, biographies and sourced stories.",icon:"●"},
-{slug:"sports",ar:"رياضة وبيانات",en:"Sports & Data",descriptionAr:"الرياضة والنتائج والإحصاءات والبيانات.",descriptionEn:"Sports, results, statistics and data.",icon:"△"},
-{slug:"travel",ar:"سفر وأماكن",en:"Travel & Places",descriptionAr:"السفر والوجهات والأماكن والمعلومات العملية.",descriptionEn:"Travel, destinations, places and practical information.",icon:"✈"},
-{slug:"art",ar:"فن وترفيه",en:"Arts & Entertainment",descriptionAr:"الفن والترفيه والثقافة الشعبية.",descriptionEn:"Arts, entertainment and popular culture.",icon:"✦"},
-{slug:"news",ar:"أخبار موثقة",en:"Verified News",descriptionAr:"أخبار حديثة تُعرض بعد التحقق من مصادرها.",descriptionEn:"Current news presented after source verification.",icon:"◉"},
-{slug:"trends",ar:"اهتمام واتجاهات",en:"Interest & Trends",descriptionAr:"ما يلفت اهتمام الناس واتجاهات النقاش، مع فصلها عن الأخبار الموثقة.",descriptionEn:"What captures attention and discussion trends, kept separate from verified news.",icon:"↗"},
-{slug:"prices",ar:"أسعار وبيانات مباشرة",en:"Prices & Live Data",descriptionAr:"الأسعار والطقس والعملات والبيانات الحية.",descriptionEn:"Prices, weather, currencies and live data.",icon:"◌"},
-{slug:"egypt",ar:"حياة ومجتمعات",en:"People & Communities",descriptionAr:"قضايا الحياة اليومية والمجتمع والخدمات وتجارب الناس، بمعلومات موثقة.",descriptionEn:"Everyday life, communities, public services and human experiences, grounded in evidence.",icon:"⌂"},
-{slug:"arab",ar:"أفكار ونقاشات",en:"Ideas & Debate",descriptionAr:"وجهات نظر وحوارات وقضايا فكرية تُعرض بسياق ومصادر واضحة.",descriptionEn:"Ideas, viewpoints and public debates presented with context and clear sourcing.",icon:"☷"},
-{slug:"world",ar:"تحولات كبرى",en:"Global Shifts",descriptionAr:"التغيرات العابرة للحدود وتأثيراتها في الاقتصاد والتقنية والمجتمعات.",descriptionEn:"Cross-border changes and their impact on economies, technology and societies.",icon:"◎"}
+{slug:"science",ar:"علوم",en:"Science",descriptionAr:"اكتشافات وأبحاث وشرح مبسّط مبني على الأدلة.",descriptionEn:"Discoveries, research and clear explanations backed by evidence.",icon:"⚗"},
+{slug:"technology",ar:"تقنية",en:"Technology",descriptionAr:"الذكاء الاصطناعي والابتكار وأخبار التقنية.",descriptionEn:"AI, innovation and technology news.",icon:"⌘"},
+{slug:"economy",ar:"اقتصاد",en:"Economy",descriptionAr:"الأسواق والمال والقرارات الاقتصادية.",descriptionEn:"Markets, money and economic decisions.",icon:"◈"},
+{slug:"politics",ar:"سياسة",en:"Politics",descriptionAr:"السياسات والقرارات والشأن العام بمصادر واضحة.",descriptionEn:"Policy, decisions and public affairs with clear sourcing.",icon:"▣"},
+{slug:"health",ar:"صحة",en:"Health",descriptionAr:"معلومات صحية وطبية موثقة.",descriptionEn:"Verified health and medical information.",icon:"+"},
+{slug:"history",ar:"تاريخ",en:"History",descriptionAr:"التاريخ والتراث والثقافة.",descriptionEn:"History, heritage and culture.",icon:"▱"},
+{slug:"people",ar:"شخصيات",en:"People",descriptionAr:"سير وشخصيات موثقة المصادر.",descriptionEn:"Sourced biographies and profiles.",icon:"●"},
+{slug:"sports",ar:"رياضة",en:"Sports",descriptionAr:"النتائج والإحصاءات وأخبار الرياضة.",descriptionEn:"Results, statistics and sports news.",icon:"△"},
+{slug:"travel",ar:"سفر",en:"Travel",descriptionAr:"وجهات وأماكن ومعلومات عملية للسفر.",descriptionEn:"Destinations, places and practical travel information.",icon:"✈"},
+{slug:"art",ar:"فنون",en:"Arts",descriptionAr:"الفن والسينما والموسيقى والثقافة الشعبية.",descriptionEn:"Art, film, music and popular culture.",icon:"✦"},
+{slug:"news",ar:"الأخبار",en:"News",descriptionAr:"أخبار حديثة بعد التحقق من مصادرها.",descriptionEn:"Current news, published after source verification.",icon:"◉"},
+{slug:"trends",ar:"اتجاهات",en:"Trends",descriptionAr:"ما يشغل الناس الآن، منفصلًا عن الأخبار الموثقة.",descriptionEn:"What people are talking about, kept separate from verified news.",icon:"↗"},
+{slug:"prices",ar:"الأسواق",en:"Markets",descriptionAr:"العملات والذهب والطاقة والأسواق لحظة بلحظة.",descriptionEn:"Currencies, gold, energy and markets, live.",icon:"◌"},
+{slug:"egypt",ar:"مجتمع",en:"Society",descriptionAr:"حياة الناس والخدمات والمجتمع بمعلومات موثقة.",descriptionEn:"Everyday life, services and society, grounded in evidence.",icon:"⌂"},
+{slug:"arab",ar:"رأي",en:"Opinion",descriptionAr:"وجهات نظر ونقاشات بسياق ومصادر واضحة.",descriptionEn:"Viewpoints and debates with context and clear sources.",icon:"☷"},
+{slug:"world",ar:"العالم",en:"World",descriptionAr:"تحولات عالمية وتأثيرها على الاقتصاد والتقنية والمجتمع.",descriptionEn:"Global shifts and their impact on economy, technology and society.",icon:"◎"}
 ];
 export const sectionBySlug=(slug:string)=>sections.find(s=>s.slug===slug);
