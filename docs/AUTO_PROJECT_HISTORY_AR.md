@@ -119,3 +119,8 @@
 - Commit: `886a529b9327a4d034acde84a42818c7a1aa3c8d`
 - الملفات: M	package.json;A	public/app-20261027-03.js;M	public/sections/arab.svg;M	public/sections/art.svg;M	public/sections/economy.svg;M	public/sections/egypt.svg;M	public/sections/health.svg;M	public/sections/history.svg;M	public/sections/news.svg;M	public/sections/people.svg;M	public/sections/politics.svg;M	public/sections/prices.svg;M	public/sections/science.svg;M	public/sections/sports.svg;M	public/sections/technology.svg;M	public/sections/travel.svg;M	public/sections/trends.svg;M	public/sections/world.svg;M	public/styles.css;M	scripts/source-contract-smoke.mjs;M	src/index.ts;M	src/sections.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-27T06:28:13+03:00 — feat: integrate globe visual into BAYAN homepage hero 
+- Commit: `eb0dab0b2edc108c93e1d05efca91bcd6710061b`
+- الملفات: M	public/app-20261027-03.js;M	public/styles.css 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
