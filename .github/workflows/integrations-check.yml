@@ -1,0 +1,50 @@
+name: BAYAN Integrations Check
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integrations-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Validate MCP integration manifest
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          const cfg = JSON.parse(readFileSync('.mcp.json', 'utf8'));
+          const servers = cfg.mcpServers || {};
+          for (const name of ['context7', 'scrapling', 'scrapegraph-mcp']) {
+            if (!servers[name]) throw new Error('Missing MCP server entry: ' + name);
+          }
+          const serialized = JSON.stringify(cfg);
+          if (/sk-[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{30,}/.test(serialized)) {
+            throw new Error('Possible provider API key found in .mcp.json; use local environment secrets.');
+          }
+          console.log('MCP manifest valid; expected server entries present; no obvious provider key literal detected.');
+          NODE
+
+      - name: Run repository quality contract
+        run: npm run check
