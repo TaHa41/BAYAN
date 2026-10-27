@@ -397,5 +397,18 @@ export async function aiRepairRequest(env:Env,problem:string){
     .replace(/\bBearer\s+\S+/gi,"Bearer [redacted]")
     .slice(0,3000);
   const diagnosis=await diagnose(env,[sanitized],true);
-  return {ok:true,problemReceived:true,diagnosis,actions:[],repairPerformed:false,verification:"diagnostic_only"};
+  // Run the existing, lease-guarded self-heal up to 3 times with increasing delay.
+  // Success is reported only when a run itself ends in verified_runtime (or the system is already healthy).
+  const attempts:{attempt:number;verification:string;failures:string[]}[]=[];
+  const actions:string[]=[];
+  let last:any=null;
+  for(let attempt=1;attempt<=3;attempt++){
+    try{last=await selfHeal(env)}catch(error){last={ok:false,verification:"self_heal_threw",failures:[],actions:[],message:String(error).slice(0,200)}}
+    attempts.push({attempt,verification:String(last?.verification||"unknown"),failures:Array.isArray(last?.failures)?last.failures:[]});
+    for(const action of Array.isArray(last?.actions)?last.actions:[])actions.push(String(action).slice(0,300));
+    if(last?.verification==="verified_runtime"||last?.verification==="healthy")break;
+    if(attempt<3)await new Promise(resolve=>setTimeout(resolve,1000*2**(attempt-1)));
+  }
+  const verified=last?.verification==="verified_runtime"||last?.verification==="healthy";
+  return {ok:verified,problemReceived:true,diagnosis,actions,attempts,repairPerformed:actions.length>0,verification:String(last?.verification||"unknown"),remainingFailures:Array.isArray(last?.failures)?last.failures:[]};
 }

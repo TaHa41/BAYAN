@@ -10,6 +10,15 @@ export function robots(){
   // while eligible, recent, full news articles exist; never advertise an empty feed.
   return text("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nDisallow: /review\nDisallow: /saved\nSitemap: "+ORIGIN+"/sitemap.xml\n");
 }
+// /ads.txt is served only when the owner sets the ADS_TXT variable (the lines the ad network provides).
+// Nothing is invented: unset means 404, and only well-formed ads.txt lines, comments and variables are emitted.
+export function adsTxt(env:Env){
+  const raw=String(env.ADS_TXT||"").replace(/\\n/g,"\n").slice(0,8000);
+  const line=/^(?:#.*|(?:contact|subdomain|ownerdomain|managerdomain|inventorypartnerdomain)\s*=\s*[\w.\-\/:@]+|[a-z0-9.\-]+\s*,\s*[\w\-]+\s*,\s*(?:DIRECT|RESELLER)(?:\s*,\s*[\w\-]+)?)\s*(?:#.*)?$/i;
+  const lines=raw.split(/\r?\n/).map((l)=>l.trim()).filter((l)=>l&&line.test(l));
+  if(!lines.some((l)=>!l.startsWith("#")))return new Response("Not found",{status:404,headers:{"content-type":"text/plain; charset=utf-8","cache-control":"no-store"}});
+  return new Response(lines.join("\n")+"\n",{status:200,headers:{"content-type":"text/plain; charset=utf-8","cache-control":"public, max-age=3600","x-content-type-options":"nosniff"}});
+}
 const hasTopicImage=isTopicImageUrl;
 const xml=(s:string)=>Array.from(String(s)).filter((character)=>{const code=character.codePointAt(0)!;return code===0x9||code===0xA||code===0xD||(code>=0x20&&code<=0xD7FF)||(code>=0xE000&&code<=0xFFFD)||(code>=0x10000&&code<=0x10FFFF)}).join("").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
 
@@ -120,7 +129,7 @@ async function generateNewsSitemap(env:Env){
     return response;
   }
   try{
-    const archive=await env.DB.prepare("SELECT id,url,language,title,summary,publisher,published_at,fetched_at FROM news_archive WHERE language IN ('ar','en') AND fetched_at>=? AND fetched_at<=? AND length(summary)>=120 ORDER BY fetched_at DESC LIMIT 200").bind(recentCutoff,futureLimit).all<any>();
+    const archive=await env.DB.prepare("SELECT id,url,language,title,summary,publisher,published_at,fetched_at,article_attempts,article_last_reason FROM news_archive WHERE language IN ('ar','en') AND fetched_at>=? AND fetched_at<=? AND length(summary)>=120 ORDER BY fetched_at DESC LIMIT 200").bind(recentCutoff,futureLimit).all<any>();
     archiveRows=archive.results||[];
   }catch(error){
     // Archive diagnostics must not suppress valid full-article URLs.
@@ -140,6 +149,16 @@ async function generateNewsSitemap(env:Env){
     unique.set(key,{slug,title:String(row.title).trim(),language,publishedAt:new Date(String(row.created_at)).toISOString(),url:ORIGIN+"/article/"+encodeURIComponent(slug)+"?lang="+language});
   }
   const archiveEligibleCount=archiveRows.filter((row)=>archiveArticleCandidate(row,now)).length;
+  // Why are the ready archive rows not becoming articles? Aggregate the recorded reasons from the rows already loaded
+  // (no extra D1 reads). Only coarse reason codes and counts are exposed, never row content.
+  const archiveReasons:Record<string,number>={};
+  for(const row of archiveRows){
+    if(!archiveArticleCandidate(row,now))continue;
+    const reason=String(row.article_last_reason||"never_attempted").replace(/[^a-z0-9_:\-]/gi,"_").slice(0,48);
+    archiveReasons[reason]=(archiveReasons[reason]||0)+1;
+    const bucket="attempts_"+Math.min(2,Math.max(0,Number(row.article_attempts||0)));
+    archiveReasons[bucket]=(archiveReasons[bucket]||0)+1;
+  }
   const items=[...unique.values()];
   const response=text('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">'+items.map(item=>{
     const news='<news:news><news:publication><news:name>BAYAN</news:name><news:language>'+xml(item.language)+'</news:language></news:publication><news:publication_date>'+xml(item.publishedAt)+'</news:publication_date><news:title>'+xml(item.title)+'</news:title></news:news>';
@@ -151,6 +170,7 @@ async function generateNewsSitemap(env:Env){
   response.headers.set("x-bayan-news-sitemap-archive-candidate-count",String(archiveRows.length));
   response.headers.set("x-bayan-news-sitemap-archive-ready-for-drafting-count",String(archiveEligibleCount));
   response.headers.set("x-bayan-news-sitemap-rejection-reasons",JSON.stringify(rejectionReasons));
+  response.headers.set("x-bayan-news-sitemap-archive-reasons",JSON.stringify(archiveReasons).slice(0,500));
   console.info("news_sitemap_generation",JSON.stringify({articleCandidates:rows.length,archiveCandidates:archiveRows.length,eligible:items.length,archiveReadyForArticleDrafting:archiveEligibleCount,rejected:Math.max(0,rows.length-items.length),rejectionReasons,freshnessWindowHours:48}));
   // An empty news sitemap is valid when no recent eligible articles exist. Google
   // may show an empty-sitemap warning, but a 503 makes the sitemap unavailable and
