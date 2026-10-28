@@ -46,6 +46,11 @@ describe("v2 news page", () => {
     expect(html).toContain("/news?archive=7&amp;lang=ar"); expect(html).toContain('class="noimg"');
     expect(html).toContain("/research?title=");
   });
+  it("renders feed summaries that arrive as raw HTML as clean text (no tags, entities decoded)", async () => {
+    const html = await (await call("/news", {}, { store: () => store({ newsArchive: async () => [{ title: "هاري كين", summary: '<p class="rtejustify" dir="rtl">توج &amp; فاز بالكرة&nbsp;الذهبية</p>', publisher: "اندبندنت" }] }) })).text();
+    expect(html).toContain("توج &amp; فاز بالكرة الذهبية");
+    expect(html).not.toContain("rtejustify"); expect(html).not.toContain("&lt;p");
+  });
   it("shows an honest empty state when both sources fail and never errors", async () => {
     const res = await call("/news", {}, { liveNews: async () => { throw new Error("rss"); }, store: () => store({ newsArchive: async () => { throw new Error("d1"); } }) });
     expect(res.status).toBe(200); expect(await res.text()).toContain("لا توجد أخبار متاحة الآن");
