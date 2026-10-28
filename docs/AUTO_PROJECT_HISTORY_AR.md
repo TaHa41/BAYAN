@@ -164,3 +164,8 @@
 - Commit: `b145303ac71592fabf2d8cff2e586ae2d54786c0`
 - الملفات: M	src/v2-bridge.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-28T08:40:08Z — New pages: render feed summaries as clean text (strip raw HTML/entities from RSS) so tags never show to readers 
+- Commit: `16e564737f73d976a4b91c46b14be04c2063f0f3`
+- الملفات: M	v2/src/ui.ts;M	v2/tests/worker.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
