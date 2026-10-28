@@ -14,7 +14,8 @@ const handler = createHandler({
   providers: (lang) => [wikipediaProvider(lang)],
   store: (env) => d1Store(env.DB),
   liveNews: async (env, lang) => {
-    const live: any = await news(env as Env, lang);
+    // A slow RSS refresh must not hold the page: after 6s the page renders from the archive alone.
+    const live: any = await Promise.race([news(env as Env, lang), new Promise((_, reject) => setTimeout(() => reject(new Error("news_timeout")), 6000))]);
     return (Array.isArray(live?.items) ? live.items : []).map((st: any) => ({ title: String(st.title || ""), summary: String(st.summary || ""), publisher: String(st.publisher || ""), publishedAt: st.publishedAt ? String(st.publishedAt) : undefined, imageUrl: /^https:\/\//i.test(String(st.imageUrl || "")) ? String(st.imageUrl) : undefined, imageAlt: String(st.imageAlt || st.title || ""), url: /^https:\/\//i.test(String(st.url || "")) ? String(st.url) : undefined }));
   },
 });
