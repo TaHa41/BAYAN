@@ -129,3 +129,28 @@
 - Commit: `9273c386a0d3dcb362d93d394436d329dab1dba8`
 - الملفات: M	src/routes/api.ts;A	src/services/section-archive.ts;A	tests/section-archive.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-26T06:44:01Z — v2: clean foundation (evidence rules, resilient search core, testable worker routes) in v2/, old code untouched 
+- Commit: `a00e12bcf9f70426f2b86a653548975edf2e9d83`
+- الملفات: M	tsconfig.json;A	v2/README.md;A	v2/src/evidence.ts;A	v2/src/index.ts;A	v2/src/search.ts;A	v2/src/worker.ts;A	v2/tests/evidence.test.ts;A	v2/tests/search.test.ts;A	v2/tests/worker.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-27T08:30:08Z — v2: server-rendered site (home, 15 sections, article, search), D1 read store, Wikipedia provider, new design and copy, bayan-v2 preview config 
+- Commit: `8e54cb799e64d43148e75a8d9d7c1d3323930baa`
+- الملفات: M	v2/README.md;M	v2/src/index.ts;A	v2/src/providers/wikipedia.ts;A	v2/src/sections.ts;A	v2/src/store.ts;A	v2/src/ui.ts;M	v2/src/worker.ts;A	v2/tests/store.test.ts;M	v2/tests/worker.test.ts;A	v2/wrangler.jsonc 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-28T00:16:05Z — v2: AI engineer (Gemini + Workers AI behind typed results, fail-closed admin diagnose/ai-test, deterministic findings) 
+- Commit: `60ce0d8464d54adec21944bd27d8b82fb7d79e6f`
+- الملفات: M	v2/README.md;A	v2/src/ai.ts;A	v2/src/engineer.ts;M	v2/src/worker.ts;A	v2/tests/admin.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-28T00:25:25Z — Go-live bridge: serve home, content sections and article pages from the new server-rendered v2 inside the production Worker; news-site design, SVG icons, front page; v1 routes unchanged 
+- Commit: `cab45bfe4969aae47a672eba8ce89268e686abe8`
+- الملفات: M	src/index.ts;A	src/v2-bridge.ts;M	tests/api.test.ts;A	tests/v2-bridge.test.ts;A	v2/src/icons.ts;M	v2/src/ui.ts;M	v2/src/worker.ts;M	v2/tests/worker.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-28T00:26:03Z — e2e: replace the obsolete drawer test with checks for the new home (ribbon, search, credit, section page) 
+- Commit: `cd315ef832e3736247ef926cff7c2d6d347e9baa`
+- الملفات: M	tests/e2e/public-routes.spec.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
