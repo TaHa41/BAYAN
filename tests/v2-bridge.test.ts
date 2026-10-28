@@ -12,7 +12,7 @@ describe("v2 bridge", () => {
   it("serves the home page from v2 with hardening headers and the credit line", async () => {
     const res = await serveV2(req("/"), env());
     expect(res?.status).toBe(200);
-    expect(res?.headers.get("x-bayan-renderer")).toBe("v2"); expect(res?.headers.get("x-frame-options")).toBe("DENY");
+    expect(res?.headers.get("x-bayan-renderer")).toBe("v2"); expect(res?.headers.get("x-bayan-v2-build")).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/); expect(res?.headers.get("x-frame-options")).toBe("DENY");
     expect(await res!.text()).toContain("Created by Taha Omar");
   });
   it("returns null for routes it does not own, so v1 keeps serving them", async () => {

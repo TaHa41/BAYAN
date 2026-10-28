@@ -8,6 +8,10 @@ import { wikipediaProvider } from "../v2/src/providers/wikipedia";
 import { SECTIONS } from "../v2/src/sections";
 import { news } from "./services/news";
 
+// Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
+// It is also sent as a response header so the live build can be verified.
+export const V2_BUILD = "2026-10-28.2";
+
 // trends stays on v1 for now. /news is served by v2 using the same live news service and archive v1 used.
 const OWNED_SECTIONS = new Set(SECTIONS.map((s) => s.slug).filter((s) => s !== "trends"));
 const handler = createHandler({
@@ -40,6 +44,7 @@ export async function serveV2(request: Request, env: Env, ctx?: ExecutionContext
     out.headers.set("referrer-policy", "strict-origin-when-cross-origin");
     out.headers.set("x-frame-options", "DENY");
     out.headers.set("x-bayan-renderer", "v2");
+    out.headers.set("x-bayan-v2-build", V2_BUILD);
     if (cache && ctx && /s-maxage/.test(out.headers.get("cache-control") || "")) ctx.waitUntil(cache.put(key, out.clone()));
     return out;
   } catch (error) {
