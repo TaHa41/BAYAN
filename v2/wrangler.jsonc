@@ -1,0 +1,12 @@
+{
+  // BAYAN v2 preview Worker. Separate from production (`bayan`): it only READS the existing D1 database,
+  // has no cron, no AI binding and no secrets. Production is untouched until the cutover PR.
+  "name": "bayan-v2",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-06",
+  "workers_dev": true,
+  "d1_databases": [
+    { "binding": "DB", "database_name": "bayan-knowledge", "database_id": "7f43f467-baec-4770-a5e1-52e65abf348d" }
+  ],
+  "observability": { "enabled": true }
+}
