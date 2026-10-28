@@ -18,16 +18,13 @@ for (const route of publicRoutes) {
 }
 
 
-test("navigation drawer closes with its close button and Escape", async ({ page }) => {
+test("home shows the section ribbon, search form and credit, and a section link works", async ({ page }) => {
   await page.goto("/?lang=ar", { waitUntil: "domcontentloaded" });
-  const drawer = page.locator("#drawer");
-  await page.locator("#menu").click();
-  await expect(drawer).toHaveClass(/open/);
-  await page.locator("#closeDrawer").click();
-  await expect(drawer).not.toHaveClass(/open/);
-  await expect(page.locator("body")).not.toHaveClass(/drawer-open/);
-  await page.locator("#menu").click();
-  await expect(drawer).toHaveClass(/open/);
-  await page.keyboard.press("Escape");
-  await expect(drawer).not.toHaveClass(/open/);
+  await expect(page.locator(".ribbon a").first()).toBeVisible();
+  expect(await page.locator(".ribbon a").count()).toBeGreaterThanOrEqual(15);
+  await expect(page.locator("form.search input[name=q]").first()).toBeVisible();
+  await expect(page.locator("footer")).toContainText("Created by Taha Omar");
+  const response = await page.goto("/politics?lang=ar", { waitUntil: "domcontentloaded" });
+  expect(response!.status()).toBeLessThan(400);
+  await expect(page.locator("h1")).toContainText("سياسة");
 });
