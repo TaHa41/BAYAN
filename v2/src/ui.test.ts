@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { articleBody, layout } from "./ui";
 import { SECTIONS } from "./sections";
+import type { Article } from "./store";
 
 describe("BAYAN v2 visual consistency", () => {
   const html = layout({
@@ -33,14 +34,14 @@ describe("BAYAN v2 visual consistency", () => {
   });
 
   it("shows the independent-source threshold on article pages", () => {
-    const article = {
+    const article: Article = {
       slug: "sample", section: "science", lang: "ar", title: "عنوان", summary: "ملخص",
       body: "نص", imageUrl: "https://example.com/image.jpg", imageAlt: "صورة",
       sources: [
         { title: "one", publisher: "one", url: "https://one.example/a" },
         { title: "two", publisher: "two", url: "https://two.example/a" },
       ], updatedAt: "2026-10-29", archived: false,
-    } as const;
+    };
     const body = articleBody("ar", article);
     expect(body).toContain("لم يكتمل التحقق المستقل");
     expect(body).toContain("2/5");
