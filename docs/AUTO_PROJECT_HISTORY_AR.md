@@ -169,3 +169,8 @@
 - Commit: `16e564737f73d976a4b91c46b14be04c2063f0f3`
 - الملفات: M	v2/src/ui.ts;M	v2/tests/worker.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-28T19:47:11Z — Deploy marker: V2_BUILD constant in src/ (deploy workflow only watches src/**) + x-bayan-v2-build header 
+- Commit: `9a3ba46bcdde08122d322d43abfa4fa231668ebd`
+- الملفات: M	src/v2-bridge.ts;M	tests/v2-bridge.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
