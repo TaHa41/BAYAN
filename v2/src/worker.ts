@@ -5,10 +5,10 @@ import { SECTIONS, sectionBySlug, type Lang } from "./sections";
 import type { Store } from "./store";
 import { generate, geminiGenerate, listGeminiFlashModels, workersAiGenerate, type AiEnv } from "./ai";
 import { analyze, type Signals } from "./engineer";
-import { articleBody, homeBody, layout, notFoundBody, searchBody, SITE, sectionBody, esc } from "./ui";
+import { articleBody, homeBody, layout, newsBody, notFoundBody, searchBody, SITE, sectionBody, esc, type LiveStory } from "./ui";
 
 export interface Env extends AiEnv { DB: D1Database; ADS_TXT?: string; SITE_ORIGIN?: string; BAYAN_AI_MANAGER_TOKEN?: string }
-export interface Deps { providers: (lang: Lang) => Provider[]; store: (env: Env) => Store }
+export interface Deps { providers: (lang: Lang) => Provider[]; store: (env: Env) => Store; liveNews?: (env: Env, lang: Lang) => Promise<LiveStory[]> }
 
 const xml = (s: string) => s.replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" }[c]!));
 const text = (body: string, status = 200, cache = "public, max-age=3600") => new Response(body, { status, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": cache, "x-content-type-options": "nosniff" } });
@@ -110,6 +110,17 @@ export function createHandler(deps: Deps) {
       if (!a) return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404);
       const ld = { "@context": "https://schema.org", "@type": "Article", headline: a.title, image: [a.imageUrl], dateModified: a.updatedAt, inLanguage: lang, publisher: { "@type": "Organization", name: "BAYAN" } };
       return page({ title: `${a.title} | ${SITE.name}`, description: a.summary, body: articleBody(lang, a), path, active: a.section, image: a.imageUrl, jsonLd: ld });
+    }
+
+    if (path === "/news") {
+      // Live headlines first, then what the pipeline archived; de-duplicated by title. Either source failing only shrinks the list.
+      let live: LiveStory[] = []; let archived: LiveStory[] = [];
+      try { live = deps.liveNews ? await deps.liveNews(env, lang) : []; } catch (error) { live = []; }
+      try { archived = store.newsArchive ? await store.newsArchive(lang, 24) : []; } catch (error) { archived = []; }
+      const seen = new Set<string>(); const stories: LiveStory[] = [];
+      for (const st of [...live, ...archived]) { const key = st.title.trim().toLowerCase(); if (st.title.trim() && !seen.has(key)) { seen.add(key); stories.push(st); } }
+      const s = sectionBySlug("news")!;
+      return page({ title: `${lang === "ar" ? s.ar : s.en} | ${SITE.name}`, description: lang === "ar" ? s.descAr : s.descEn, body: newsBody(lang, stories.slice(0, 36)), path, active: "news" });
     }
 
     const section = sectionBySlug(path.slice(1));

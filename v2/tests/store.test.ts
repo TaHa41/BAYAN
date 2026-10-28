@@ -31,6 +31,16 @@ describe("d1Store", () => {
   });
 });
 
+describe("newsArchive", () => {
+  it("returns archived news with https images only and a legacy deep link", async () => {
+    const calls: string[] = [];
+    const s = d1Store(db({ PUBLISHED: [{ id: 5, title: "خبر", summary: "م", publisher: "p", published_at: "2026-10-27", image_url: "http://insecure/x.jpg", image_alt: "" }, { id: 6, title: " ", summary: "", publisher: "" }] }, calls));
+    const items = await s.newsArchive!("ar", 10);
+    expect(items).toHaveLength(1); expect(items[0].imageUrl).toBeUndefined(); expect(items[0].href).toBe("/news?archive=5&lang=ar");
+    expect(calls[0]).toContain("FROM news_archive");
+  });
+});
+
 describe("wikipediaProvider", () => {
   const fetcher = (data: any, status = 200) => (async () => new Response(JSON.stringify(data), { status })) as unknown as typeof fetch;
   it("maps pages to hits with canonical https URLs, drops thin extracts and orders by index", async () => {

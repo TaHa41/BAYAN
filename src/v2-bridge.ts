@@ -6,14 +6,24 @@ import { createHandler } from "../v2/src/worker";
 import { d1Store } from "../v2/src/store";
 import { wikipediaProvider } from "../v2/src/providers/wikipedia";
 import { SECTIONS } from "../v2/src/sections";
+import { news } from "./services/news";
 
-// news and trends stay on v1 for now: they show live RSS/trend feeds that v2 does not have yet.
-const OWNED_SECTIONS = new Set(SECTIONS.map((s) => s.slug).filter((s) => s !== "news" && s !== "trends"));
-const handler = createHandler({ providers: (lang) => [wikipediaProvider(lang)], store: (env) => d1Store(env.DB) });
+// trends stays on v1 for now. /news is served by v2 using the same live news service and archive v1 used.
+const OWNED_SECTIONS = new Set(SECTIONS.map((s) => s.slug).filter((s) => s !== "trends"));
+const handler = createHandler({
+  providers: (lang) => [wikipediaProvider(lang)],
+  store: (env) => d1Store(env.DB),
+  liveNews: async (env, lang) => {
+    const live: any = await news(env as Env, lang);
+    return (Array.isArray(live?.items) ? live.items : []).map((st: any) => ({ title: String(st.title || ""), summary: String(st.summary || ""), publisher: String(st.publisher || ""), publishedAt: st.publishedAt ? String(st.publishedAt) : undefined, imageUrl: /^https:\/\//i.test(String(st.imageUrl || "")) ? String(st.imageUrl) : undefined, imageAlt: String(st.imageAlt || st.title || ""), url: /^https:\/\//i.test(String(st.url || "")) ? String(st.url) : undefined }));
+  },
+});
 
 export function v2Owns(request: Request): boolean {
   if (request.method !== "GET") return false;
-  const path = new URL(request.url).pathname.replace(/(.)\/+$/, "$1");
+  const u = new URL(request.url);
+  if (u.searchParams.has("archive")) return false; // legacy deep link to one archived news item: v1 renders it
+  const path = u.pathname.replace(/(.)\/+$/, "$1");
   return path === "/" || OWNED_SECTIONS.has(path.slice(1)) || /^\/article\/[^/]+$/.test(path);
 }
 

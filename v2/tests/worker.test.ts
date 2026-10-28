@@ -37,6 +37,22 @@ describe("v2 infrastructure routes", () => {
   });
 });
 
+describe("v2 news page", () => {
+  const live = [{ title: "خبر حي", summary: "ملخص الخبر الحي من المصدر", publisher: "مصدر أ", publishedAt: "2026-10-28T08:00:00Z", imageUrl: "https://img.example/n.jpg", url: "https://src-a.com/n" }, { title: "خبر بلا صورة", summary: "ملخص", publisher: "مصدر ب", url: "https://src-b.com/x" }];
+  it("merges live headlines with the archive, de-duplicates by title and uses honest placeholders (no fake image)", async () => {
+    const html = await (await call("/news", {}, { liveNews: async () => live, store: () => store({ newsArchive: async () => [{ title: "خبر حي", summary: "مكرر", publisher: "x" }, { title: "من الأرشيف", summary: "ملخص", publisher: "مصدر ج", href: "/news?archive=7&lang=ar" }] }) })).text();
+    expect(html).toContain('class="lead-story"'); expect(html).toContain("https://img.example/n.jpg");
+    expect(html.match(/خبر حي/g)!.length).toBeGreaterThanOrEqual(1); expect(html).not.toContain("مكرر");
+    expect(html).toContain("/news?archive=7&amp;lang=ar"); expect(html).toContain('class="noimg"');
+    expect(html).toContain("/research?title=");
+  });
+  it("shows an honest empty state when both sources fail and never errors", async () => {
+    const res = await call("/news", {}, { liveNews: async () => { throw new Error("rss"); }, store: () => store({ newsArchive: async () => { throw new Error("d1"); } }) });
+    expect(res.status).toBe(200); expect(await res.text()).toContain("لا توجد أخبار متاحة الآن");
+  });
+  it("English copy", async () => expect(await (await call("/news?lang=en")).text()).toContain("No news is available right now"));
+});
+
 describe("v2 pages", () => {
   it("home is complete server-rendered HTML with credit, sections, wisdom, canonical and hreflang", async () => {
     const html = await (await call("/")).text();

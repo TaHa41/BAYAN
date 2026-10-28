@@ -2,6 +2,7 @@
 // Public pages read status='PUBLISHED' only. 'ARCHIVE' rows (filed searches) are listed on section pages, never as articles.
 import type { Lang } from "./sections";
 import type { Source } from "./evidence";
+import type { LiveStory } from "./ui";
 
 export interface Article { slug: string; section: string; lang: Lang; title: string; summary: string; body: string; imageUrl: string; imageAlt: string; sources: Source[]; updatedAt: string; archived: boolean }
 export interface Store {
@@ -9,6 +10,7 @@ export interface Store {
   bySection(section: string, lang: Lang, limit: number): Promise<Article[]>;
   get(slug: string, lang: Lang): Promise<Article | null>;
   sitemap(): Promise<{ slug: string; lang: Lang; updatedAt: string }[]>;
+  newsArchive?(lang: Lang, limit: number): Promise<LiveStory[]>;
 }
 
 const https = (v: unknown) => /^https:\/\//i.test(String(v || ""));
@@ -46,6 +48,11 @@ export function d1Store(db: D1Database): Store {
       if (!row) return null;
       const a = toArticle(row, false);
       return a.imageUrl ? a : null;
+    },
+    // Archived news the pipeline already collected (same table v1 reads). Only HTTPS images are kept.
+    async newsArchive(lang, limit) {
+      const r = await db.prepare("SELECT id,title,summary,publisher,published_at,image_url,image_alt FROM news_archive WHERE language=? AND section='news' ORDER BY fetched_at DESC LIMIT ?").bind(lang, limit).all<any>();
+      return (r.results || []).filter((x) => String(x.title || "").trim()).map((x) => ({ title: String(x.title), summary: String(x.summary || ""), publisher: String(x.publisher || ""), publishedAt: x.published_at ? String(x.published_at) : undefined, imageUrl: https(x.image_url) ? String(x.image_url) : undefined, imageAlt: String(x.image_alt || x.title || ""), href: `/news?archive=${encodeURIComponent(String(x.id))}&lang=${lang}` }));
     },
     async sitemap() {
       const r = await db.prepare(`SELECT slug,language,updated_at FROM articles WHERE status='PUBLISHED' AND image_url LIKE 'https://%' ORDER BY updated_at DESC LIMIT 2000`).all<any>();
