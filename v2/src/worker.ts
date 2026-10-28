@@ -3,9 +3,11 @@
 import { searchAll, type Provider } from "./search";
 import { SECTIONS, sectionBySlug, type Lang } from "./sections";
 import type { Store } from "./store";
+import { generate, geminiGenerate, listGeminiFlashModels, workersAiGenerate, type AiEnv } from "./ai";
+import { analyze, type Signals } from "./engineer";
 import { articleBody, homeBody, layout, notFoundBody, searchBody, SITE, sectionBody, esc } from "./ui";
 
-export interface Env { DB: D1Database; ADS_TXT?: string; SITE_ORIGIN?: string }
+export interface Env extends AiEnv { DB: D1Database; ADS_TXT?: string; SITE_ORIGIN?: string; BAYAN_AI_MANAGER_TOKEN?: string }
 export interface Deps { providers: (lang: Lang) => Provider[]; store: (env: Env) => Store }
 
 const xml = (s: string) => s.replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" }[c]!));
@@ -18,6 +20,20 @@ const ADS_LINE = /^(?:#.*|(?:contact|subdomain|ownerdomain|managerdomain|invento
 export function adsTxt(env: Pick<Env, "ADS_TXT">): Response {
   const lines = String(env.ADS_TXT || "").replace(/\\n/g, "\n").slice(0, 8000).split(/\r?\n/).map((l) => l.trim()).filter((l) => l && ADS_LINE.test(l));
   return lines.some((l) => !l.startsWith("#")) ? text(lines.join("\n") + "\n") : text("Not found", 404, "no-store");
+}
+
+// Constant-time comparison so the manager token cannot be probed by timing.
+function sameSecret(a: string, b: string): boolean {
+  const x = new TextEncoder().encode(a), y = new TextEncoder().encode(b);
+  let diff = x.length ^ y.length;
+  for (let i = 0; i < Math.max(x.length, y.length); i++) diff |= (x[i] ?? 0) ^ (y[i] ?? 0);
+  return diff === 0;
+}
+/** Admin endpoints fail closed: no configured token means 503, a wrong or missing bearer token means 401. */
+function adminGate(request: Request, env: Env): Response | null {
+  if (!env.BAYAN_AI_MANAGER_TOKEN) return json({ error: "admin_not_configured" }, 503);
+  const given = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+  return given && sameSecret(given, env.BAYAN_AI_MANAGER_TOKEN) ? null : json({ error: "unauthorized" }, 401);
 }
 
 export function createHandler(deps: Deps) {
@@ -33,6 +49,31 @@ export function createHandler(deps: Deps) {
     if (path === "/health") return json({ ok: true, service: "bayan-v2" });
     if (path === "/robots.txt") return text(`User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nSitemap: ${origin}/sitemap.xml\n`);
     if (path === "/ads.txt") return adsTxt(env);
+
+    if (path === "/api/admin/ai-test") {
+      const denied = adminGate(request, env); if (denied) return denied;
+      const [gemini, workersAi, flash] = await Promise.all([geminiGenerate(env, "Reply with the single word: ok"), workersAiGenerate(env, "Reply with the single word: ok"), listGeminiFlashModels(env)]);
+      return json({ gemini: { configured: !!env.GEMINI_API_KEY, model: gemini.model, result: gemini, availableFlashModels: flash }, workersAi: { configured: !!env.AI, result: workersAi } });
+    }
+
+    if (path === "/api/admin/diagnose") {
+      const denied = adminGate(request, env); if (denied) return denied;
+      const d1: Signals["d1"] = { ok: false };
+      try {
+        const rows = await env.DB.prepare("SELECT status, COUNT(*) AS n, SUM(CASE WHEN image_url IS NULL OR image_url NOT LIKE 'https://%' THEN 1 ELSE 0 END) AS noimg FROM articles GROUP BY status").all<any>();
+        const by = Object.fromEntries((rows.results || []).map((r) => [String(r.status), r]));
+        Object.assign(d1, { ok: true, published: Number(by.PUBLISHED?.n || 0), archive: Number(by.ARCHIVE?.n || 0), publishedWithoutImage: Number(by.PUBLISHED?.noimg || 0) });
+      } catch (error) { d1.error = String(error instanceof Error ? error.message : error).slice(0, 120); }
+      const [gemini, workersAi, flash, probe] = await Promise.all([geminiGenerate(env, "Reply with the single word: ok"), workersAiGenerate(env, "Reply with the single word: ok"), listGeminiFlashModels(env), searchAll("Egypt", deps.providers("en"), { retries: 0 })]);
+      const signals: Signals = { d1, gemini, workersAi, availableFlashModels: flash, search: { ok: probe.providers.some((p) => p.ok), hits: probe.hits.length } };
+      const findings = analyze(signals);
+      let narrative: string | null = null;
+      if (url.searchParams.get("narrate") === "1" && findings.length) {
+        const { result } = await generate(env, "You are BAYAN's site engineer. In 5 short bullet points, explain these findings to the owner in Arabic and say what to do first. Do not invent facts.\n" + JSON.stringify(findings));
+        narrative = result.ok ? result.text || null : null;
+      }
+      return json({ ok: findings.length === 0, findings, signals, narrative });
+    }
 
     if (path === "/sitemap.xml") {
       let articles: { slug: string; lang: Lang }[] = []; let degraded = false;
