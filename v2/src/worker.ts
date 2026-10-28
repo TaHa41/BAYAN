@@ -93,7 +93,7 @@ export function createHandler(deps: Deps) {
 
     if (path === "/") {
       let latest: Awaited<ReturnType<Store["latest"]>> = [];
-      try { latest = await store.latest(lang, 6); } catch (error) { latest = []; }
+      try { latest = await store.latest(lang, 9); } catch (error) { latest = []; }
       return page({ title: SITE.name + (lang === "ar" ? " — المعلومة أولًا" : " — Information first"), description: lang === "ar" ? "بحث موثّق من الإنترنت كله، وكل معلومة معها مصدرها." : "Verified search across the web, with a source for every claim.", body: homeBody(lang, latest), path: "/" });
     }
 

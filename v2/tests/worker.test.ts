@@ -46,6 +46,13 @@ describe("v2 pages", () => {
     expect((html.match(/class="card sec-card"/g) || []).length).toBe(15);
     expect(html).not.toContain("<script>x");
   });
+  it("home with articles shows a lead story, side stories and the section ribbon with icons", async () => {
+    const items = [art({ slug: "l", title: "الخبر الرئيسي" }), art({ slug: "s1", title: "جانبي ١" }), art({ slug: "s2", title: "جانبي ٢" })];
+    const html = await (await call("/", {}, { store: () => store({ latest: async () => items }) })).text();
+    expect(html).toContain('class="lead-story"'); expect(html).toContain("الخبر الرئيسي"); expect(html).toContain('class="side"');
+    expect((html.match(/<svg viewBox="0 0 24 24"/g) || []).length).toBeGreaterThanOrEqual(30);
+    expect(html).not.toContain('class="hero"');
+  });
   it("English home switches direction and copy", async () => {
     const html = await (await call("/?lang=en")).text();
     expect(html).toContain('dir="ltr"'); expect(html).toContain("Every fact comes with its proof");

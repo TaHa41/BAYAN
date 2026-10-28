@@ -1,5 +1,5 @@
 import{isD1IndependentApiPath,isD1QuotaTolerantApiPath}from"./services/d1-independent-routes";import{safePublicImageUrl}from"./image-url";import{d1Blocked,d1BlockedPersisted,isD1QuotaError,logD1QuotaOncePerHour,persistD1Block,withD1QuotaGuard}from"./services/d1-guard";import{recordRuntimeEventLimited}from"./runtime-events";
-import type{Env}from"./types";import{api}from"./routes/api";import{robots,sitemap,newsSitemap,adsTxt}from"./seo";import{selfHeal}from"./services/repair";import{news}from"./services/news";import{publishNextArchivedNewsArticle}from"./services/news-article-publisher";import{track}from"./db";import{analyticsExcluded,manager,visitorId}from"./security";import{ensureSchema}from"./schema";import{ORIGIN,SECTIONS}from"./config";import{notify}from"./services/telegram";import{bundledArticleBySlug,bundledArticlesForSection}from"./fallback-content";
+import type{Env}from"./types";import{api}from"./routes/api";import{robots,sitemap,newsSitemap,adsTxt}from"./seo";import{serveV2}from"./v2-bridge";import{selfHeal}from"./services/repair";import{news}from"./services/news";import{publishNextArchivedNewsArticle}from"./services/news-article-publisher";import{track}from"./db";import{analyticsExcluded,manager,visitorId}from"./security";import{ensureSchema}from"./schema";import{ORIGIN,SECTIONS}from"./config";import{notify}from"./services/telegram";import{bundledArticleBySlug,bundledArticlesForSection}from"./fallback-content";
 const BUILD="2026.10.21.05";
 const COMMIT_SHA="0000000000000000000000000000000000000000";
 let lastManualNewsTriggerAt=0;
@@ -333,6 +333,7 @@ const d1QuotaFallback=(url:URL)=>{
 export default{async fetch(request:Request,env:Env,ctx?:ExecutionContext){env=withD1QuotaGuard(env);const u=new URL(request.url);
 if(u.pathname==="/.well-known/build.json"){return new Response(JSON.stringify({service:"BAYAN",commit:COMMIT_SHA,build:BUILD}),{status:200,headers:{"content-type":"application/json;charset=utf-8","cache-control":"no-store, max-age=0","cdn-cache-control":"no-store","x-bayan-commit":COMMIT_SHA,"x-bayan-build":BUILD,"x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY"}})}
 await d1BlockedPersisted();
+{const v2=await serveV2(request,env,ctx);if(v2)return v2}
 if(u.pathname==="/api/internal/trigger-news-pipeline"){
  const headers={"content-type":"application/json; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff","referrer-policy":"strict-origin-when-cross-origin","x-frame-options":"DENY"};
  const respond=(status:number,data:Record<string,unknown>)=>new Response(JSON.stringify(data),{status,headers});
