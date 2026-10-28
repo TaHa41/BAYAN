@@ -154,3 +154,13 @@
 - Commit: `cd315ef832e3736247ef926cff7c2d6d347e9baa`
 - الملفات: M	tests/e2e/public-routes.spec.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-28T08:35:56Z — News page in the new design: live headlines + archive merged and de-duplicated, honest placeholders and empty state; bridge serves /news (archive deep links stay on v1) 
+- Commit: `6ea356f959114c671eb3da8b74257b1a84e1aef7`
+- الملفات: M	src/v2-bridge.ts;M	tests/v2-bridge.test.ts;M	v2/src/store.ts;M	v2/src/ui.ts;M	v2/src/worker.ts;M	v2/tests/store.test.ts;M	v2/tests/worker.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-28T08:36:25Z — Bridge: 6s cap on the live news refresh so the page falls back to the archive 
+- Commit: `b145303ac71592fabf2d8cff2e586ae2d54786c0`
+- الملفات: M	src/v2-bridge.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
