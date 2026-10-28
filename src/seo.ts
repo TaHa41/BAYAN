@@ -4,6 +4,7 @@ import type {Env,Locale} from "./types";
 import {text}from"./http";
 import {BUNDLED_ARTICLES} from "./fallback-content";
 import {isTopicImageUrl} from "./image-url";
+import {independentEvidenceHost,hasIndependentEvidenceDiversity} from "./services/evidence-diversity";
 
 export function robots(){
   // Advertise only the general sitemap. Google News sitemaps are useful only
@@ -87,17 +88,18 @@ const newsSitemapEligibility=async(row:any,now:number,env:Env)=>{
   if(body.length<500)return reject("body_too_short");
   let sources:any[]=[];
   try{const parsed=JSON.parse(String(row?.sources_json||"[]"));sources=Array.isArray(parsed)?parsed:[]}catch(error){await recordRuntimeEventLimited(env,"news_sitemap_sources_parse","news_sitemap_sources_json_invalid",error)}
+  const publishers=new Set<string>();
   const hosts=new Set<string>();
   for(const source of sources){
-    try{
-      const url=new URL(String(source?.url||""));
-      if(url.protocol!=="https:"||url.username||url.password)continue;
-      const host=url.hostname.toLowerCase().replace(/^www\./,"").replace(/\.$/,"");
-      if(!host||host==="localhost"||host.endsWith(".localhost"))continue;
-      hosts.add(host);
-    }catch(error){await recordRuntimeEventLimited(env,"news_sitemap_source_url","news_sitemap_source_url_invalid",error)}
+    const publisher=String(source?.publisher||"").trim();
+    const independentHost=independentEvidenceHost(publisher,String(source?.url||""));
+    if(!independentHost)continue;
+    hosts.add(independentHost);
+    // When a source omits its publisher label, use its registrable host as the
+    // label. The same publisher cannot satisfy the threshold with several URLs.
+    publishers.add((publisher||independentHost).toLowerCase().replace(/^www\./,""));
   }
-  if(hosts.size<2)return reject("fewer_than_two_https_source_hosts");
+  if(!hasIndependentEvidenceDiversity(publishers.size,hosts.size,5))return reject("fewer_than_five_independent_publishers");
   return {eligible:true,reason:""};
 };
 const archiveArticleCandidate=(row:any,now:number)=>{

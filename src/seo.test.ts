@@ -58,9 +58,10 @@ describe("newsSitemap database failure handling", () => {
     const recent = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const old = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
     const env = { DB: { prepare: () => ({ bind(){return this;}, all: async () => ({ results: [
-      { slug: "recent-ar-news", title: "عنوان خبر عربي حديث", language: "ar", created_at: recent, body: "محتوى خبر حديث موثق. ".repeat(35), sources_json: JSON.stringify([{ url: "https://news.example.com/a" }, { url: "https://wire.example.org/a" }]) },
+      { slug: "recent-ar-news", title: "عنوان خبر عربي حديث", language: "ar", created_at: recent, body: "محتوى خبر حديث موثق. ".repeat(35), sources_json: JSON.stringify([{ publisher: "News Example", url: "https://news.example.com/a" }, { publisher: "Wire Example", url: "https://wire.example.org/a" }, { publisher: "Daily Example", url: "https://daily.example.net/a" }, { publisher: "World Example", url: "https://world.example.co/a" }, { publisher: "Report Example", url: "https://report.example.info/a" }]) },
       { slug: "old-news", title: "Older news article", language: "en", created_at: old, body: "Older article body. ".repeat(100), sources_json: JSON.stringify([{ url: "https://news.example.com/a" }, { url: "https://wire.example.org/a" }]) },
       { slug: "duplicate-hosts", title: "Repeated source host", language: "en", created_at: recent, body: "A verified article body. ".repeat(35), sources_json: JSON.stringify([{ url: "https://news.example.com/a" }, { url: "https://www.news.example.com/b" }]) },
+      { slug: "same-publisher-five-hosts", title: "One publisher across several hosts", language: "en", created_at: recent, body: "A verified article body. ".repeat(35), sources_json: JSON.stringify([{ publisher: "Same Publisher", url: "https://one.example.com/a" }, { publisher: "Same Publisher", url: "https://two.example.org/a" }, { publisher: "Same Publisher", url: "https://three.example.net/a" }, { publisher: "Same Publisher", url: "https://four.example.info/a" }, { publisher: "Same Publisher", url: "https://five.example.co/a" }]) },
       { slug: "insecure-source", title: "Insecure source article", language: "en", created_at: recent, body: "A verified article body. ".repeat(35), sources_json: JSON.stringify([{ url: "http://news.example.com/a" }, { url: "https://wire.example.org/a" }]) }
     ] }) }) } } as any;
     const response = await newsSitemap(env);
@@ -72,6 +73,8 @@ describe("newsSitemap database failure handling", () => {
     expect(body).not.toContain("<news:title>Older news article</news:title>");
     expect(body).not.toContain("/article/duplicate-hosts?lang=en");
     expect(body).not.toContain("<news:title>Repeated source host</news:title>");
+    expect(body).not.toContain("/article/same-publisher-five-hosts?lang=en");
+    expect(body).not.toContain("<news:title>One publisher across several hosts</news:title>");
     expect(body).not.toContain("/article/insecure-source?lang=en");
     expect(body).not.toContain("<news:title>Insecure source article</news:title>");
   });
