@@ -7,7 +7,7 @@ const row = { slug: "a1", section: "science", language: "ar", title: "عنوان
 const env = (rows: any[] = [row]) => ({ DB: { prepare: () => ({ all: async () => ({ results: rows }), first: async () => rows[0] || null, bind: () => ({ all: async () => ({ results: rows }), first: async () => rows[0] || null }) }) } }) as unknown as Env;
 
 describe("v2 bridge", () => {
-  it.each([["/", true], ["/science", true], ["/people", true], ["/article/x", true], ["/news", false], ["/trends", false], ["/search", false], ["/admin", false], ["/api/search", false], ["/prices", false], ["/article/a/b", false]])("v2Owns(%s)=%s", (p, owned) => expect(v2Owns(req(p))).toBe(owned));
+  it.each([["/", true], ["/science", true], ["/people", true], ["/article/x", true], ["/news", true], ["/news?archive=12", false], ["/news?lang=en", true], ["/trends", false], ["/search", false], ["/admin", false], ["/api/search", false], ["/prices", false], ["/article/a/b", false]])("v2Owns(%s)=%s", (p, owned) => expect(v2Owns(req(p))).toBe(owned));
   it("never takes non-GET requests", () => expect(v2Owns(req("/", "POST"))).toBe(false));
   it("serves the home page from v2 with hardening headers and the credit line", async () => {
     const res = await serveV2(req("/"), env());
@@ -16,7 +16,7 @@ describe("v2 bridge", () => {
     expect(await res!.text()).toContain("Created by Taha Omar");
   });
   it("returns null for routes it does not own, so v1 keeps serving them", async () => {
-    for (const p of ["/search", "/admin", "/news", "/api/health"]) expect(await serveV2(req(p), env())).toBeNull();
+    for (const p of ["/search", "/admin", "/trends", "/api/health"]) expect(await serveV2(req(p), env())).toBeNull();
   });
   it("falls back to v1 when an article is unknown to v2 (404) or has no image", async () => {
     expect(await serveV2(req("/article/missing"), env([]))).toBeNull();
