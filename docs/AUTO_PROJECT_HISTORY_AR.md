@@ -174,3 +174,8 @@
 - Commit: `9a3ba46bcdde08122d322d43abfa4fa231668ebd`
 - الملفات: M	src/v2-bridge.ts;M	tests/v2-bridge.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-30T04:51:00Z — Quality + structure: stub articles no longer shown as articles (quality gate), news-first front page, news filed into sections by transparent rules, grouped section pages, honest stub pages (noindex) 
+- Commit: `2b1a012b1cac2d9a7d2bd7b1768c323a6d6f96fb`
+- الملفات: M	src/v2-bridge.ts;A	v2/src/classify.ts;A	v2/src/quality.ts;M	v2/src/store.ts;M	v2/src/ui.ts;M	v2/src/worker.ts;A	v2/tests/classify-quality.test.ts;M	v2/tests/store.test.ts;M	v2/tests/worker.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
