@@ -8,7 +8,9 @@ function db(rowsByStatus: Record<string, any[]>, calls: string[] = []) {
     first: async () => { calls.push(sql); return (rowsByStatus.PUBLISHED || [])[0] || null; },
   }) }) } as unknown as D1Database;
 }
-const row = (o: any = {}) => ({ slug: "s", section: "people", language: "ar", title: "ت", summary: "م", body: "ب", sources_json: JSON.stringify([{ title: "t", publisher: "p", url: "https://bbc.com/a" }, { title: "x", publisher: "p", url: "http://insecure.com" }]), image_url: "https://img.example/x.jpg", image_alt: "", updated_at: "2026", ...o });
+const longBody = "نص تفصيلي موثق عن الموضوع. ".repeat(80);
+const row = (o: any = {}) => ({ slug: "s", section: "people", language: "ar", title: "ت", summary: "م", body: "م\n" + longBody, sources_json: JSON.stringify([{ title: "t", publisher: "p", url: "https://bbc.com/a" }, { title: "u", publisher: "q", url: "https://reuters.com/b" }, { title: "x", publisher: "p", url: "http://insecure.com" }]), image_url: "https://img.example/photos/topic-2026.jpg", image_alt: "", updated_at: "2026", ...o });
+const stub = (o: any = {}) => row({ slug: "stub", title: "هيكل", body: "م", sources_json: JSON.stringify([{ title: "Reference", publisher: "BAYAN reference", url: "https://www.nationalacademies.org/" }]), image_url: "https://www.nationalacademies.org/cover.jpg", ...o });
 
 describe("d1Store", () => {
   it("public queries are PUBLISHED-only and image-gated; archive is a separate status", async () => {
@@ -23,11 +25,29 @@ describe("d1Store", () => {
   it("keeps only https sources and de-duplicates titles across published/archive", async () => {
     const s = d1Store(db({ PUBLISHED: [row()], ARCHIVE: [row({ slug: "arch-2" })] }));
     const list = await s.bySection("people", "ar", 10);
-    expect(list).toHaveLength(1); expect(list[0].sources).toHaveLength(1);
+    expect(list).toHaveLength(1); expect(list[0].sources).toHaveLength(2);
   });
   it("get() refuses an article without an HTTPS image", async () => {
     expect(await d1Store(db({ PUBLISHED: [row({ image_url: "" })] })).get("s", "ar")).toBeNull();
-    expect((await d1Store(db({ PUBLISHED: [row()] })).get("s", "ar"))?.imageUrl).toBe("https://img.example/x.jpg");
+    expect((await d1Store(db({ PUBLISHED: [row()] })).get("s", "ar"))?.imageUrl).toBe("https://img.example/photos/topic-2026.jpg");
+  });
+});
+
+describe("quality gate in the store", () => {
+  it("lists only complete articles: stubs (summary-only body, placeholder source, generic cover) never appear", async () => {
+    const s = d1Store(db({ PUBLISHED: [stub(), row()], ARCHIVE: [] }));
+    expect((await s.latest("ar", 10)).map((a) => a.slug)).toEqual(["s"]);
+    expect((await s.bySection("people", "ar", 10)).map((a) => a.slug)).toEqual(["s"]);
+  });
+  it("keeps stubs out of the sitemap but still serves the page (flagged incomplete) for old links", async () => {
+    const s = d1Store(db({ PUBLISHED: [stub(), row()] }));
+    expect((await s.sitemap()).map((x) => x.slug)).toEqual(["s"]);
+    const a = await s.get("stub", "ar");
+    expect(a?.complete).toBe(false);
+  });
+  it("never marks archive entries as complete articles", async () => {
+    const list = await d1Store(db({ PUBLISHED: [], ARCHIVE: [row({ slug: "arch-1" })] })).bySection("people", "ar", 10);
+    expect(list[0]).toMatchObject({ archived: true, complete: false });
   });
 });
 

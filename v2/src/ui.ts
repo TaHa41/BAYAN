@@ -5,6 +5,7 @@ import type { Article } from "./store";
 import { independentPublishers, verdictFor } from "./evidence";
 import type { SearchOutcome } from "./search";
 import { icon } from "./icons";
+import { isGenericImage } from "./quality";
 
 export const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 export const SITE = { name: "بيان | BAYAN", credit: "Created by Taha Omar" };
@@ -96,26 +97,47 @@ export function articleCard(a: Article, lang: Lang, i = 0): string {
   return `<a class="card art-card" style="animation-delay:${i * 40}ms" href="/article/${encodeURIComponent(a.slug)}?lang=${lang}"><img src="${esc(a.imageUrl)}" alt="${esc(a.imageAlt)}" loading="lazy" decoding="async" width="640" height="400"><div class="in"><span class="kicker">${esc(label)}</span><h3>${esc(a.title)}</h3><p>${esc(plain(a.summary))}</p></div></a>`;
 }
 
-export function homeBody(lang: Lang, latest: Article[], now = Date.now()): string {
-  const [lead, ...rest] = latest;
-  const label = (a: Article) => { const x = sectionBySlug(a.section); return x ? (lang === "ar" ? x.ar : x.en) : ""; };
-  const form = `<form class="search" action="/search" method="get" role="search"><input type="hidden" name="lang" value="${lang}"><input name="q" type="search" required maxlength="200" placeholder="${T(lang, "اسأل بيان: شخص، خبر، موضوع…", "Ask BAYAN: a person, story, topic…")}" aria-label="${T(lang, "بحث", "Search")}"><button type="submit">${T(lang, "ابحث", "Search")}</button></form>`;
+interface FrontItem { title: string; summary: string; imageUrl: string; imageAlt: string; kicker: string; href: string }
+const secLabel = (slug: string | null | undefined, lang: Lang) => { const x = slug ? sectionBySlug(slug) : undefined; return x ? (lang === "ar" ? x.ar : x.en) : ""; };
+const fromStory = (st: LiveStory, lang: Lang, section?: string | null): FrontItem => ({ title: plain(st.title), summary: plain(st.summary), imageUrl: st.imageUrl || "", imageAlt: st.imageAlt || st.title, kicker: [secLabel(section, lang), st.publisher].filter(Boolean).join(" · "), href: storyHref(st, lang) });
+const fromArticle = (a: Article, lang: Lang): FrontItem => ({ title: a.title, summary: plain(a.summary), imageUrl: a.imageUrl, imageAlt: a.imageAlt, kicker: secLabel(a.section, lang), href: `/article/${encodeURIComponent(a.slug)}?lang=${lang}` });
+export type ClassifiedStory = LiveStory & { section?: string | null };
+const hasPhoto = (st: LiveStory) => !!st.imageUrl && !isGenericImage(st.imageUrl);
+const wisdomBlock = (lang: Lang, now: number) => `<div class="wisdom"><small>${T(lang, "حكمة الساعة", "Wisdom of the hour")}</small>${esc(wisdomOf(lang, now))}</div>`;
+const searchForm = (lang: Lang, extra = "") => `<form class="search" action="/search" method="get" role="search"${extra}><input type="hidden" name="lang" value="${lang}"><input name="q" type="search" required maxlength="200" placeholder="${T(lang, "اسأل بيان: شخص، خبر، موضوع…", "Ask BAYAN: a person, story, topic…")}" aria-label="${T(lang, "بحث", "Search")}"><button type="submit">${T(lang, "ابحث", "Search")}</button></form>`;
+
+export function homeBody(lang: Lang, d: { stories: ClassifiedStory[]; articles: Article[] }, now = Date.now()): string {
+  // Front page = fresh reporting first (stories with a real photo), then complete articles. Nothing is invented to fill space.
+  const photoStories = d.stories.filter(hasPhoto).slice(0, 5);
+  const used = new Set(photoStories);
+  const picks: FrontItem[] = photoStories.map((st) => fromStory(st, lang, st.section));
+  for (const a of d.articles) if (picks.length < 5) picks.push(fromArticle(a, lang));
+  const [lead, ...side] = picks;
   const hero = `<section class="hero"><span class="tag"><b>◆</b> ${T(lang, "المعلومة أولًا، والدليل قبل الادعاء", "Information first. Evidence before claims.")}</span>
 <h1 class="hero-title">${T(lang, "ابحث في الإنترنت كله، <em>وكل معلومة معها دليلها</em>", "Search the whole web. <em>Every fact comes with its proof.</em>")}</h1>
-<p class="lead">${T(lang, "بيان يجمع المعلومة من عدة مصادر، يتحقق منها، ويعرضها منظمة بمصادرها وصورها، من الأخبار إلى السير والعلوم.", "BAYAN gathers information from several sources, checks it, and presents it in an organised way with sources and images, from news to biographies and science.")}</p>${form}
+<p class="lead">${T(lang, "بيان يجمع المعلومة من عدة مصادر، يتحقق منها، ويعرضها منظمة بمصادرها وصورها، من الأخبار إلى السير والعلوم.", "BAYAN gathers information from several sources, checks it, and presents it in an organised way with sources and images, from news to biographies and science.")}</p>${searchForm(lang)}
 <p class="note">${T(lang, "لا تُعرض معلومة بلا مصدر، وعند نقص الأدلة نقول ذلك صراحة.", "No claim is shown without a source; when evidence is thin we say so.")}</p></section>`;
-  const front = lead ? `<div style="margin-top:26px">${form}</div><div class="front"><a class="lead-story" href="/article/${encodeURIComponent(lead.slug)}?lang=${lang}"><img src="${esc(lead.imageUrl)}" alt="${esc(lead.imageAlt)}" width="1200" height="675" fetchpriority="high"><div class="tx"><span class="kicker" style="color:var(--gold2)">${esc(label(lead))}</span><h2>${esc(lead.title)}</h2><p>${esc(lead.summary)}</p></div></a>
-<div class="side">${rest.slice(0, 4).map((a, i) => `<a href="/article/${encodeURIComponent(a.slug)}?lang=${lang}" style="animation-delay:${(i + 1) * 70}ms"><img src="${esc(a.imageUrl)}" alt="${esc(a.imageAlt)}" loading="lazy" width="224" height="168"><div><span class="kicker">${esc(label(a))}</span><h3>${esc(a.title)}</h3></div></a>`).join("")}</div></div>` : hero;
-  const more = rest.slice(4);
-  return `${front}${more.length ? `<h2 class="sec-title">${T(lang, "أحدث المقالات", "Latest articles")}</h2><div class="grid">${more.map((a, i) => articleCard(a, lang, i)).join("")}</div>` : ""}
+  const front = lead ? `<div style="margin-top:26px">${searchForm(lang)}</div><div class="front"><a class="lead-story" href="${esc(lead.href)}"><img src="${esc(lead.imageUrl)}" alt="${esc(lead.imageAlt)}" width="1200" height="675" fetchpriority="high"><div class="tx"><span class="kicker" style="color:var(--gold2)">${esc(lead.kicker)}</span><h2>${esc(lead.title)}</h2><p>${esc(lead.summary)}</p></div></a>
+<div class="side">${side.slice(0, 4).map((x, i) => `<a href="${esc(x.href)}" style="animation-delay:${(i + 1) * 70}ms"><img src="${esc(x.imageUrl)}" alt="${esc(x.imageAlt)}" loading="lazy" width="224" height="168"><div><span class="kicker">${esc(x.kicker)}</span><h3>${esc(x.title)}</h3></div></a>`).join("")}</div></div>` : hero;
+  const more = d.stories.filter((st) => !used.has(st)).slice(0, 9);
+  const shownArticles = new Set(picks.map((x) => x.href));
+  const articles = d.articles.filter((a) => !shownArticles.has(fromArticle(a, lang).href)).slice(0, 6);
+  return `${front}${more.length ? `<h2 class="sec-title">${T(lang, "آخر الأخبار", "Latest news")}</h2><div class="grid">${more.map((st, i) => storyCard(st, lang, i, st.section)).join("")}</div><p style="margin-top:14px"><a class="kicker" href="/news?lang=${lang}">${T(lang, "كل الأخبار ←", "All news →")}</a></p>` : ""}
+${articles.length ? `<h2 class="sec-title">${T(lang, "مقالات معرفية", "Explainers")}</h2><div class="grid">${articles.map((a, i) => articleCard(a, lang, i)).join("")}</div>` : ""}
 <h2 class="sec-title" id="sections">${T(lang, "الأقسام", "Sections")}</h2><div class="grid">${SECTIONS.map((x, i) => sectionCard(x, lang, i)).join("")}</div>
-<div class="wisdom"><small>${T(lang, "حكمة الساعة", "Wisdom of the hour")}</small>${esc(wisdomOf(lang, now))}</div>`;
+${wisdomBlock(lang, now)}`;
 }
 
-export function sectionBody(lang: Lang, s: Section, items: Article[], now = Date.now()): string {
+export function sectionBody(lang: Lang, s: Section, d: { stories: ClassifiedStory[]; articles: Article[]; archive: Article[] }, now = Date.now()): string {
+  const group = (title: string, html: string) => html ? `<h2 class="sec-title">${title}</h2><div class="grid">${html}</div>` : "";
+  const stories = d.stories.map((st, i) => storyCard(st, lang, i)).join("");
+  const arts = d.articles.map((a, i) => articleCard(a, lang, i)).join("");
+  const arch = d.archive.map((a, i) => articleCard(a, lang, i)).join("");
+  const empty = !stories && !arts && !arch;
   return `<div class="page-head"><h1>${esc(lang === "ar" ? s.ar : s.en)}</h1><p>${esc(lang === "ar" ? s.descAr : s.descEn)}</p></div>
-${items.length ? `<div class="grid">${items.map((a, i) => articleCard(a, lang, i)).join("")}</div>` : `<p class="verdict">${T(lang, "لا توجد مواد في هذا القسم بعد. ابحث عن أي موضوع وسيُحفظ هنا تلقائيًا عند توفر مصدر موثق.", "Nothing in this section yet. Search any topic and it is filed here automatically once a sourced result exists.")}</p>`}
-<div class="wisdom"><small>${T(lang, "حكمة الساعة", "Wisdom of the hour")}</small>${esc(wisdomOf(lang, now))}</div>`;
+${empty ? `<p class="verdict">${T(lang, "لا توجد مواد في هذا القسم بعد. ابحث عن أي موضوع وسيُحفظ هنا تلقائيًا عند توفر مصدر موثق.", "Nothing in this section yet. Search any topic and it is filed here automatically once a sourced result exists.")}</p>` : ""}
+${group(T(lang, "آخر الأخبار في القسم", "Latest in this section"), stories)}${group(T(lang, "مقالات", "Articles"), arts)}${group(T(lang, "من الأرشيف", "From the archive"), arch)}
+${wisdomBlock(lang, now)}`;
 }
 
 function renderBody(body: string): string {
@@ -131,7 +153,9 @@ function renderBody(body: string): string {
 }
 export function articleBody(lang: Lang, a: Article): string {
   const sec = sectionBySlug(a.section);
-  return `<article class="full"><img class="hero-img" src="${esc(a.imageUrl)}" alt="${esc(a.imageAlt)}" width="1200" height="675"><p class="meta" style="margin-top:14px">${sec ? `<a href="/${sec.slug}?lang=${lang}" class="kicker">${esc(lang === "ar" ? sec.ar : sec.en)}</a> · ` : ""}${esc(a.updatedAt.slice(0, 10))}</p><h1>${esc(a.title)}</h1><p class="lead" style="margin-inline:0;color:var(--mut)">${esc(a.summary)}</p>${renderBody(a.body)}
+  const stub = a.complete ? "" : `<p class="verdict">${T(lang, "مادة مختصرة: تحتوي ملخصًا فقط حاليًا ولا تُعدّ مقالًا مكتملًا. سنوسّعها عند توفر مصادر وتفاصيل كافية.", "Short entry: currently a summary only, not a full article. It will be expanded once enough sources and detail are available.")}</p>`;
+  const photo = isGenericImage(a.imageUrl) ? "" : `<img class="hero-img" src="${esc(a.imageUrl)}" alt="${esc(a.imageAlt)}" width="1200" height="675">`;
+  return `<article class="full">${photo}<p class="meta" style="margin-top:14px">${sec ? `<a href="/${sec.slug}?lang=${lang}" class="kicker">${esc(lang === "ar" ? sec.ar : sec.en)}</a> · ` : ""}${esc(a.updatedAt.slice(0, 10))}</p><h1>${esc(a.title)}</h1>${stub}<p class="lead" style="margin-inline:0;color:var(--mut)">${esc(plain(a.summary))}</p>${a.body.replace(/\s+/g, " ").trim() === a.summary.replace(/\s+/g, " ").trim() ? "" : renderBody(a.body)}
 <script>fetch("/api/article?slug="+encodeURIComponent(${JSON.stringify(a.slug).replace(/</g, "\\u003c")})+"&lang=${lang}",{keepalive:true,credentials:"same-origin"}).catch(function(){})</script>
 ${a.sources.length ? `<div class="sources"><h2>${T(lang, "المصادر", "Sources")}</h2><ul>${a.sources.map((s) => `<li><a href="${esc(s.url)}" rel="noopener nofollow" target="_blank">${esc(s.title || s.publisher || s.url)}</a>${s.publisher ? ` — ${esc(s.publisher)}` : ""}</li>`).join("")}</ul></div>` : ""}</article>`;
 }
@@ -146,7 +170,7 @@ export function searchBody(lang: Lang, q: string, outcome: SearchOutcome | null)
 }
 export interface LiveStory { title: string; summary: string; publisher: string; publishedAt?: string; imageUrl?: string; imageAlt?: string; url?: string; href?: string }
 const storyHref = (st: LiveStory, lang: Lang) => st.href || (st.url ? `/research?title=${encodeURIComponent(plain(st.title))}&summary=${encodeURIComponent(plain(st.summary))}&publisher=${encodeURIComponent(st.publisher)}&url=${encodeURIComponent(st.url)}&image=${encodeURIComponent(st.imageUrl || "")}&lang=${lang}` : `/search?q=${encodeURIComponent(st.title)}&lang=${lang}`);
-const storyCard = (st: LiveStory, lang: Lang, i: number) => `<a class="card art-card" style="animation-delay:${i * 40}ms" href="${esc(storyHref(st, lang))}">${st.imageUrl ? `<img src="${esc(st.imageUrl)}" alt="${esc(st.imageAlt || st.title)}" loading="lazy" decoding="async" width="640" height="400">` : `<div class="noimg" aria-hidden="true">${icon("news")}</div>`}<div class="in"><span class="kicker">${esc(st.publisher)}${st.publishedAt ? " · " + esc(st.publishedAt.slice(0, 10)) : ""}</span><h3>${esc(plain(st.title))}</h3><p>${esc(plain(st.summary))}</p></div></a>`;
+const storyCard = (st: LiveStory, lang: Lang, i: number, section?: string | null) => `<a class="card art-card" style="animation-delay:${i * 40}ms" href="${esc(storyHref(st, lang))}">${st.imageUrl ? `<img src="${esc(st.imageUrl)}" alt="${esc(st.imageAlt || st.title)}" loading="lazy" decoding="async" width="640" height="400">` : `<div class="noimg" aria-hidden="true">${icon("news")}</div>`}<div class="in"><span class="kicker">${section ? esc(secLabel(section, lang)) + " · " : ""}${esc(st.publisher)}${st.publishedAt ? " · " + esc(st.publishedAt.slice(0, 10)) : ""}</span><h3>${esc(plain(st.title))}</h3><p>${esc(plain(st.summary))}</p></div></a>`;
 export function newsBody(lang: Lang, stories: LiveStory[], now = Date.now()): string {
   const s = sectionBySlug("news")!;
   const first = stories.find((x) => x.imageUrl);

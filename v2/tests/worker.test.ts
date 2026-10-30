@@ -3,7 +3,7 @@ import { createHandler, type Deps, type Env } from "../src/worker";
 import type { Article, Store } from "../src/store";
 import type { Provider } from "../src/search";
 
-const art = (o: Partial<Article> = {}): Article => ({ slug: "a1", section: "science", lang: "ar", title: "اكتشاف <b>جديد</b>", summary: "خلاصة موثقة عن الاكتشاف.", body: "فقرة أولى\n## عنوان فرعي\n- نقطة\nفقرة <script>x</script>", imageUrl: "https://img.example/a.jpg", imageAlt: "صورة", sources: [{ title: "BBC", publisher: "BBC", url: "https://bbc.com/a" }], updatedAt: "2026-10-27T10:00:00Z", archived: false, ...o });
+const art = (o: Partial<Article> = {}): Article => ({ slug: "a1", section: "science", lang: "ar", title: "اكتشاف <b>جديد</b>", summary: "خلاصة موثقة عن الاكتشاف.", body: "فقرة أولى\n## عنوان فرعي\n- نقطة\nفقرة <script>x</script>", imageUrl: "https://img.example/a.jpg", imageAlt: "صورة", sources: [{ title: "BBC", publisher: "BBC", url: "https://bbc.com/a" }], updatedAt: "2026-10-27T10:00:00Z", archived: false, complete: true, ...o });
 const store = (o: Partial<Store> = {}): Store => ({ latest: async () => [], bySection: async () => [], get: async () => null, sitemap: async () => [], ...o });
 const call = (path: string, env: Partial<Env> = {}, deps: Partial<Deps> = {}) =>
   createHandler({ providers: () => [], store: () => store(), ...deps })(new Request("https://bayan.test" + path), { DB: {} as D1Database, ...env });
@@ -34,6 +34,37 @@ describe("v2 infrastructure routes", () => {
     expect((await call("/api/search")).status).toBe(400);
     const body: any = await (await call("/api/search?q=x")).json();
     expect(body.verdict).toBe("insufficient"); expect(body.message).toMatch(/nothing is shown/);
+  });
+});
+
+describe("v2 front page and sections (news-first)", () => {
+  const photo = (title: string, extra: any = {}) => ({ title, summary: "ملخص الخبر " + title, publisher: "مصدر", publishedAt: "2026-10-29T08:00:00Z", imageUrl: "https://img.example/photos/" + encodeURIComponent(title) + ".jpg", url: "https://src.example/" + title, ...extra });
+  const stories = [photo("الانتخابات الإسرائيلية تحدد الحكومة"), photo("دويتشه بنك يرفع أرباحه"), photo("هاري كين يتوج بالكرة الذهبية"), { title: "خبر عام بلا صورة", summary: "ملخص", publisher: "م", url: "https://src.example/x" }];
+  it("leads with the freshest story that has a real photo, files each story under its section, and shows no stub as an article", async () => {
+    const html = await (await call("/", {}, { liveNews: async () => stories })).text();
+    expect(html).toContain('class="lead-story"'); expect(html).toContain("الانتخابات الإسرائيلية تحدد الحكومة");
+    expect(html).toContain("سياسة · مصدر"); expect(html).toContain("اقتصاد · مصدر");
+    expect(html).toContain("آخر الأخبار"); expect(html).not.toContain("مقالات معرفية");
+  });
+  it("with no photo stories, the single complete article becomes the lead (nothing else is invented)", async () => {
+    const html = await (await call("/", {}, { liveNews: async () => [], store: () => store({ latest: async () => [art({ slug: "full", title: "مقال مكتمل" })] }) })).text();
+    expect(html).toContain('class="lead-story"'); expect(html).toContain("مقال مكتمل"); expect(html).not.toContain("مقالات معرفية");
+  });
+  it("shows complete articles under 'Explainers' once five photo stories fill the front page", async () => {
+    const five = Array.from({ length: 5 }, (_, i) => photo("خبر مصور رقم " + (i + 1)));
+    const html = await (await call("/", {}, { liveNews: async () => five, store: () => store({ latest: async () => [art({ slug: "full", title: "مقال مكتمل" })] }) })).text();
+    expect(html).toContain("مقالات معرفية"); expect(html).toContain("/article/full?lang=ar");
+  });
+  it("a section lists its own live stories, then articles, then archive, each under its own heading", async () => {
+    const html = await (await call("/politics", {}, { liveNews: async () => stories, store: () => store({ bySection: async () => [art({ slug: "p1", section: "politics", title: "مقال سياسي" }), art({ slug: "", section: "politics", title: "من الأرشيف السياسي", archived: true, complete: false })] }) })).text();
+    const i1 = html.indexOf("آخر الأخبار في القسم"), i2 = html.indexOf(">مقالات<"), i3 = html.indexOf("من الأرشيف</h2>");
+    expect(i1).toBeGreaterThan(-1); expect(i2).toBeGreaterThan(i1); expect(i3).toBeGreaterThan(i2);
+    expect(html).toContain("الانتخابات الإسرائيلية تحدد الحكومة"); expect(html).not.toContain("دويتشه بنك يرفع أرباحه");
+  });
+  it("a stub article page is flagged: noindex, notice, no generic cover image, no JSON-LD", async () => {
+    const html = await (await call("/article/a1", {}, { store: () => store({ get: async () => art({ complete: false, imageUrl: "https://www.nationalacademies.org/cover.jpg", body: "خلاصة موثقة عن الاكتشاف." }) }) })).text();
+    expect(html).toContain("noindex"); expect(html).toContain("مادة مختصرة");
+    expect(html).not.toContain("nationalacademies.org/cover.jpg"); expect(html).not.toContain("application/ld+json");
   });
 });
 
