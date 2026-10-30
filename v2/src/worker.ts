@@ -5,7 +5,8 @@ import { SECTIONS, sectionBySlug, type Lang } from "./sections";
 import type { Store } from "./store";
 import { generate, geminiGenerate, listGeminiFlashModels, workersAiGenerate, type AiEnv } from "./ai";
 import { analyze, type Signals } from "./engineer";
-import { articleBody, homeBody, layout, newsBody, notFoundBody, searchBody, SITE, sectionBody, esc, type LiveStory } from "./ui";
+import { classifyStory } from "./classify";
+import { articleBody, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, esc, type ClassifiedStory, type LiveStory } from "./ui";
 
 export interface Env extends AiEnv { DB: D1Database; ADS_TXT?: string; SITE_ORIGIN?: string; BAYAN_AI_MANAGER_TOKEN?: string }
 export interface Deps { providers: (lang: Lang) => Provider[]; store: (env: Env) => Store; liveNews?: (env: Env, lang: Lang) => Promise<LiveStory[]> }
@@ -43,6 +44,16 @@ export function createHandler(deps: Deps) {
     const lang: Lang = url.searchParams.get("lang") === "en" ? "en" : "ar";
     const path = url.pathname.replace(/(.)\/+$/, "$1");
     const store = deps.store(env);
+    // Live headlines first, then the archive the pipeline collected; de-duplicated by title and filed into sections.
+    // Either source failing only shrinks the list; the classifier never guesses beyond the title and summary.
+    const loadNews = async (): Promise<ClassifiedStory[]> => {
+      let live: LiveStory[] = []; let archived: LiveStory[] = [];
+      try { live = deps.liveNews ? await deps.liveNews(env, lang) : []; } catch (error) { live = []; }
+      try { archived = store.newsArchive ? await store.newsArchive(lang, 24) : []; } catch (error) { archived = []; }
+      const seen = new Set<string>(); const out: ClassifiedStory[] = [];
+      for (const st of [...live, ...archived]) { const key = plain(st.title).toLowerCase(); if (key && !seen.has(key)) { seen.add(key); out.push({ ...st, section: classifyStory(plain(st.title), plain(st.summary)) }); } }
+      return out;
+    };
     const page = (o: { title: string; description: string; body: string; path: string; active?: string; image?: string; jsonLd?: unknown; noindex?: boolean }, status = 200) =>
       html(layout({ lang, origin, ...o }), status);
 
@@ -92,9 +103,8 @@ export function createHandler(deps: Deps) {
     }
 
     if (path === "/") {
-      let latest: Awaited<ReturnType<Store["latest"]>> = [];
-      try { latest = await store.latest(lang, 9); } catch (error) { latest = []; }
-      return page({ title: SITE.name + (lang === "ar" ? " — المعلومة أولًا" : " — Information first"), description: lang === "ar" ? "بحث موثّق من الإنترنت كله، وكل معلومة معها مصدرها." : "Verified search across the web, with a source for every claim.", body: homeBody(lang, latest), path: "/" });
+      const [stories, articles] = await Promise.all([loadNews(), store.latest(lang, 6).catch(() => [])]);
+      return page({ title: SITE.name + (lang === "ar" ? " — المعلومة أولًا" : " — Information first"), description: lang === "ar" ? "أخبار ومقالات وسير موثقة، وبحث في الإنترنت كله بمصادر حقيقية." : "Verified news, articles and biographies, and search across the web with real sources.", body: homeBody(lang, { stories: stories.slice(0, 24), articles }), path: "/" });
     }
 
     if (path === "/search") {
@@ -109,25 +119,20 @@ export function createHandler(deps: Deps) {
       let a = null; try { a = await store.get(decodeURIComponent(art[1]), lang); } catch (error) { a = null; }
       if (!a) return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404);
       const ld = { "@context": "https://schema.org", "@type": "Article", headline: a.title, image: [a.imageUrl], dateModified: a.updatedAt, inLanguage: lang, publisher: { "@type": "Organization", name: "BAYAN" } };
-      return page({ title: `${a.title} | ${SITE.name}`, description: a.summary, body: articleBody(lang, a), path, active: a.section, image: a.imageUrl, jsonLd: ld });
+      return page({ title: `${a.title} | ${SITE.name}`, description: plain(a.summary), body: articleBody(lang, a), path, active: a.section, image: a.complete ? a.imageUrl : undefined, jsonLd: a.complete ? ld : undefined, noindex: !a.complete });
     }
 
     if (path === "/news") {
-      // Live headlines first, then what the pipeline archived; de-duplicated by title. Either source failing only shrinks the list.
-      let live: LiveStory[] = []; let archived: LiveStory[] = [];
-      try { live = deps.liveNews ? await deps.liveNews(env, lang) : []; } catch (error) { live = []; }
-      try { archived = store.newsArchive ? await store.newsArchive(lang, 24) : []; } catch (error) { archived = []; }
-      const seen = new Set<string>(); const stories: LiveStory[] = [];
-      for (const st of [...live, ...archived]) { const key = st.title.trim().toLowerCase(); if (st.title.trim() && !seen.has(key)) { seen.add(key); stories.push(st); } }
+      const stories = await loadNews();
       const s = sectionBySlug("news")!;
       return page({ title: `${lang === "ar" ? s.ar : s.en} | ${SITE.name}`, description: lang === "ar" ? s.descAr : s.descEn, body: newsBody(lang, stories.slice(0, 36)), path, active: "news" });
     }
 
     const section = sectionBySlug(path.slice(1));
     if (section) {
-      let items: Awaited<ReturnType<Store["bySection"]>> = [];
-      try { items = await store.bySection(section.slug, lang, 24); } catch (error) { items = []; }
-      return page({ title: `${lang === "ar" ? section.ar : section.en} | ${SITE.name}`, description: lang === "ar" ? section.descAr : section.descEn, body: sectionBody(lang, section, items), path, active: section.slug });
+      const [stories, items] = await Promise.all([loadNews(), store.bySection(section.slug, lang, 12).catch(() => [])]);
+      const inSection = stories.filter((st) => st.section === section.slug).slice(0, 12);
+      return page({ title: `${lang === "ar" ? section.ar : section.en} | ${SITE.name}`, description: lang === "ar" ? section.descAr : section.descEn, body: sectionBody(lang, section, { stories: inSection, articles: items.filter((a) => !a.archived), archive: items.filter((a) => a.archived) }), path, active: section.slug });
     }
 
     return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404);
