@@ -51,7 +51,8 @@ function orderedPages(data: any, titles: string[]): any[] {
   return out;
 }
 
-export function wikiApi(fetcher: Fetcher = fetch): WikiApi {
+// The default resolves global fetch at call time, so tests can stub it and nothing binds the network at import.
+export function wikiApi(fetcher: Fetcher = ((...args: Parameters<Fetcher>) => fetch(...args)) as Fetcher): WikiApi {
   const pageUrl = (lang: Lang, title: string) => `https://${lang}.wikipedia.org/wiki/${enc(title.replace(/ /g, "_"))}`;
   return {
     async cards(lang, titles) {

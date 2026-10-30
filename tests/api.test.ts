@@ -1,7 +1,10 @@
-import {describe,it,expect} from "vitest";
+import {describe,it,expect,vi,beforeEach,afterEach} from "vitest";
 import worker from "../src/index";
 import {body,json,text} from "../src/http";
 const env={ASSETS:{fetch:async()=>new Response("asset")},DB:{prepare:(sql:string)=>({bind:()=>({all:async()=>({results:[]}),first:async()=>null,run:async()=>({})}),all:async()=>({results:[]}),first:async()=>sql.trim().startsWith("SELECT 1 AS ready")?{ready:1}:null,run:async()=>({})}),batch:async()=>[]}} as any;
+// No test may reach the network: external sources (news feeds, Wikipedia) must degrade, not hang.
+beforeEach(()=>{vi.stubGlobal("fetch",async()=>{throw new Error("offline in tests")})});
+afterEach(()=>{vi.unstubAllGlobals()});
 describe("BAYAN public page routing",()=>{
   it("renders the public homepage instead of returning no response",async()=>{
     const r=await worker.fetch(new Request("https://bayan.test/"),env);

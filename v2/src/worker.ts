@@ -39,6 +39,9 @@ function adminGate(request: Request, env: Env): Response | null {
   return given && sameSecret(given, env.BAYAN_AI_MANAGER_TOKEN) ? null : json({ error: "unauthorized" }, 401);
 }
 
+/** Never let a slow optional source hold a page: after `ms` the fallback is used. */
+const soft = <T>(p: Promise<T>, ms: number, fallback: T): Promise<T> => Promise.race([p.catch(() => fallback), new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
+
 export function createHandler(deps: Deps) {
   return async (request: Request, env: Env): Promise<Response> => {
     const url = new URL(request.url);
@@ -105,7 +108,7 @@ export function createHandler(deps: Deps) {
     }
 
     if (path === "/") {
-      const [stories, articles, mostRead] = await Promise.all([loadNews(), store.latest(lang, 6).catch(() => []), deps.wiki ? deps.wiki.mostRead(lang).catch(() => []) : Promise.resolve([])]);
+      const [stories, articles, mostRead] = await Promise.all([loadNews(), store.latest(lang, 6).catch(() => []), deps.wiki ? soft(deps.wiki.mostRead(lang), 3000, []) : Promise.resolve([])]);
       return page({ title: SITE.name + (lang === "ar" ? " — المعلومة أولًا" : " — Information first"), description: lang === "ar" ? "أخبار ومقالات وسير موثقة، وبحث في الإنترنت كله بمصادر حقيقية." : "Verified news, articles and biographies, and search across the web with real sources.", body: homeBody(lang, { stories: stories.slice(0, 24), articles, mostRead }), path: "/" });
     }
 
@@ -142,7 +145,7 @@ export function createHandler(deps: Deps) {
     const section = sectionBySlug(path.slice(1));
     if (section) {
       // Encyclopedia cards: seed topics for this section, Arabic titles resolved through interlanguage links. Failure just hides the group.
-      const wikiCards = async () => { const seeds = topicsFor(section.slug).slice(0, 12); if (!seeds.length || !deps.wiki) return []; try { return await deps.wiki.cards(lang, lang === "ar" ? await deps.wiki.arabicTitles(seeds) : seeds); } catch (error) { return []; } };
+      const wikiCards = () => soft((async () => { const seeds = topicsFor(section.slug).slice(0, 12); if (!seeds.length || !deps.wiki) return []; try { return await deps.wiki.cards(lang, lang === "ar" ? await deps.wiki.arabicTitles(seeds) : seeds); } catch (error) { return []; } })(), 3500, []);
       const [stories, items, wiki] = await Promise.all([loadNews(), store.bySection(section.slug, lang, 12).catch(() => []), wikiCards()]);
       const inSection = stories.filter((st) => st.section === section.slug).slice(0, 12);
       return page({ title: `${lang === "ar" ? section.ar : section.en} | ${SITE.name}`, description: lang === "ar" ? section.descAr : section.descEn, body: sectionBody(lang, section, { stories: inSection, articles: items.filter((a) => !a.archived), archive: items.filter((a) => a.archived), wiki }), path, active: section.slug });
