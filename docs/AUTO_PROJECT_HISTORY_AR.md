@@ -189,3 +189,8 @@
 - Commit: `7b92c5ffe57ff8d2867d36270b005758382c1075`
 - الملفات: M	tests/api.test.ts;M	tests/v2-bridge.test.ts;M	v2/src/wiki.ts;M	v2/src/worker.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-30T21:39:39Z — Encyclopedia entries: keep lead paragraphs, heading levels (h2/h3) with main-sections-only contents, strip formula remnants 
+- Commit: `5e3684a37262fe94e770f07c6df10b25edb86a31`
+- الملفات: M	src/v2-bridge.ts;M	v2/src/ui.ts;M	v2/src/wiki.ts;M	v2/tests/wiki.test.ts;M	v2/tests/worker.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
