@@ -11,7 +11,7 @@ import { news } from "./services/news";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-10-30.1";
+export const V2_BUILD = "2026-10-30.2";
 
 // trends stays on v1 for now. /news is served by v2 using the same live news service and archive v1 used.
 const OWNED_SECTIONS = new Set(SECTIONS.map((s) => s.slug).filter((s) => s !== "trends"));

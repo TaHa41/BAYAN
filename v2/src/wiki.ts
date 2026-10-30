@@ -3,7 +3,7 @@
 import type { Lang } from "./sections";
 
 export interface WikiCard { title: string; extract: string; imageUrl?: string; url: string; views?: number }
-export interface WikiSection { title: string; body: string }
+export interface WikiSection { title: string; body: string; level: 2 | 3 }
 export interface WikiEntry { title: string; lang: Lang; summary: string; sections: WikiSection[]; imageUrl?: string; imageCredit?: string; imageLicense?: string; imageCreditUrl?: string; url: string; historyUrl: string }
 export interface WikiApi {
   cards(lang: Lang, titles: string[]): Promise<WikiCard[]>;
@@ -26,15 +26,22 @@ async function getJson(url: string, fetcher: Fetcher): Promise<any> {
 const api = (lang: Lang, params: string) => `https://${lang}.wikipedia.org/w/api.php?format=json&formatversion=2&origin=*&${params}`;
 const enc = encodeURIComponent;
 
-/** Splits a plain-text extract (exsectionformat=wiki) into the lead and its content sections. */
+/** Removes what plain-text extracts leave behind for formulas: LaTeX remnants and one-character lines (split math symbols). */
+export function cleanText(text: string): string {
+  return String(text || "").split(/\n/).map((l) => l.trim())
+    .filter((l) => !/\{\\(?:displaystyle|textstyle|mathrm|tfrac|frac)|\\(?:displaystyle|mathrm|tfrac|frac|begin)\b/.test(l) && (l === "" || l.length > 2))
+    .join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/** Splits a plain-text extract (exsectionformat=wiki) into the lead and its content sections, keeping heading levels (== h2, === and deeper h3). */
 export function parseSections(text: string): { summary: string; sections: WikiSection[] } {
-  const parts = String(text || "").split(/^==+\s*(.+?)\s*==+\s*$/m);
+  const parts = String(text || "").split(/^(==+)\s*(.+?)\s*==+\s*$/m);
   const sections: WikiSection[] = [];
-  for (let i = 1; i < parts.length; i += 2) {
-    const title = parts[i].trim(), body = String(parts[i + 1] || "").replace(/\n{3,}/g, "\n\n").trim();
-    if (title && body && !SKIP_SECTION.test(title)) sections.push({ title, body: body.slice(0, 6000) });
+  for (let i = 1; i < parts.length; i += 3) {
+    const level: 2 | 3 = parts[i].length > 2 ? 3 : 2, title = parts[i + 1].trim(), body = cleanText(parts[i + 2] || "");
+    if (title && body && !SKIP_SECTION.test(title)) sections.push({ title, body: body.slice(0, 6000), level });
   }
-  return { summary: String(parts[0] || "").trim(), sections: sections.slice(0, 24) };
+  return { summary: cleanText(parts[0] || ""), sections: sections.slice(0, 40) };
 }
 
 /** Resolves redirects/normalisation so results keep the caller's order. */

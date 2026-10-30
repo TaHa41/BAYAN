@@ -92,10 +92,11 @@ describe("v2 encyclopedia", () => {
     expect(sec.status).toBe(200);
   });
   it("an entry page shows sections, image credit, mandatory CC BY-SA attribution and source links, and is noindex", async () => {
-    const entry = { title: "دستور", lang: "ar" as const, summary: "الدستور هو القانون الأعلى في الدولة وينظم السلطات.", sections: [{ title: "التاريخ", body: "نص التاريخ.\nفقرة ثانية." }, { title: "الأنواع", body: "نص الأنواع." }], imageUrl: "https://upload.wikimedia.org/c.jpg", imageCredit: "Jane Doe", imageLicense: "CC BY-SA 4.0", imageCreditUrl: "https://commons.wikimedia.org/wiki/File:C.jpg", url: "https://ar.wikipedia.org/wiki/دستور", historyUrl: "https://ar.wikipedia.org/w/index.php?title=x&action=history" };
+    const entry = { title: "دستور", lang: "ar" as const, summary: "الدستور هو القانون الأعلى في الدولة وينظم السلطات.", sections: [{ title: "التاريخ", body: "نص التاريخ.\nفقرة ثانية.", level: 2 as const }, { title: "فرع التاريخ", body: "نص الفرع.", level: 3 as const }, { title: "الأنواع", body: "نص الأنواع.", level: 2 as const }], imageUrl: "https://upload.wikimedia.org/c.jpg", imageCredit: "Jane Doe", imageLicense: "CC BY-SA 4.0", imageCreditUrl: "https://commons.wikimedia.org/wiki/File:C.jpg", url: "https://ar.wikipedia.org/wiki/دستور", historyUrl: "https://ar.wikipedia.org/w/index.php?title=x&action=history" };
     const res = await call("/wiki/%D8%AF%D8%B3%D8%AA%D9%88%D8%B1?s=politics", {}, { wiki: wikiStub({ entry: async () => entry }) });
     const html = await res.text();
-    expect(res.status).toBe(200); expect(html).toContain("noindex"); expect(html).toContain('id="s1"');
+    expect(res.status).toBe(200); expect(html).toContain("noindex"); expect(html).toContain('<h3 id="s1">فرع التاريخ</h3>'); expect(html).toContain('<h2 id="s2">الأنواع</h2>');
+    expect(html).not.toContain('<li><a href="#s1">'); expect(html.match(/<p>الدستور هو/g)!.length).toBe(1);
     expect(html).toContain("CC BY-SA 4.0"); expect(html).toContain("سجل التعديلات والمساهمون"); expect(html).toContain("Jane Doe");
     expect(html).toContain("/politics?lang=ar");
   });

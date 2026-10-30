@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSections, wikiApi } from "../src/wiki";
+import { cleanText, parseSections, wikiApi } from "../src/wiki";
 import { TOPICS, topicsFor } from "../src/topics";
 import { SECTIONS } from "../src/sections";
 
@@ -16,7 +16,19 @@ describe("parseSections", () => {
     const r = parseSections("مقدمة طويلة بما يكفي.\n\n== التاريخ ==\nنص التاريخ.\n\n=== فرع ===\nنص الفرع.\n\n== مراجع ==\nمرجع 1\n\n== فارغ ==\n\n");
     expect(r.summary).toBe("مقدمة طويلة بما يكفي.");
     expect(r.sections.map((s) => s.title)).toEqual(["التاريخ", "فرع"]);
+    expect(r.sections.map((s) => s.level)).toEqual([2, 3]);
   });
+  it("keeps the lead's paragraph breaks", () => {
+    expect(parseSections("فقرة أولى.\nفقرة ثانية.\n\n== قسم ==\nنص.").summary).toBe("فقرة أولى.\nفقرة ثانية.");
+  });
+});
+
+describe("cleanText (formula remnants seen on a live entry)", () => {
+  it("drops LaTeX remnants and one-character fragments but keeps real lines", () => {
+    const raw = "في وحدات بلانك يجب اتباع القاعدة\n\nQ\n\n2\n\n+\n\n(\n\nJ\n\n{\\displaystyle Q^{2}+\\left({\\tfrac {J}{M}}\\right)^{2}\\leq M^{2}\\,}\n\nوذلك ضمن ثقب أسود له كتلة بمقدار M.";
+    expect(cleanText(raw)).toBe("في وحدات بلانك يجب اتباع القاعدة\n\nوذلك ضمن ثقب أسود له كتلة بمقدار M.");
+  });
+  it("leaves ordinary text untouched", () => { expect(cleanText("سطر عادي.\nسطر آخر.")).toBe("سطر عادي.\nسطر آخر."); });
 });
 
 describe("wikiApi", () => {
