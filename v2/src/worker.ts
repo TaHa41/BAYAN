@@ -6,10 +6,12 @@ import type { Store } from "./store";
 import { generate, geminiGenerate, listGeminiFlashModels, workersAiGenerate, type AiEnv } from "./ai";
 import { analyze, type Signals } from "./engineer";
 import { classifyStory } from "./classify";
-import { articleBody, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, esc, type ClassifiedStory, type LiveStory } from "./ui";
+import { topicsFor } from "./topics";
+import type { WikiApi } from "./wiki";
+import { articleBody, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, wikiEntryBody, esc, type ClassifiedStory, type LiveStory } from "./ui";
 
 export interface Env extends AiEnv { DB: D1Database; ADS_TXT?: string; SITE_ORIGIN?: string; BAYAN_AI_MANAGER_TOKEN?: string }
-export interface Deps { providers: (lang: Lang) => Provider[]; store: (env: Env) => Store; liveNews?: (env: Env, lang: Lang) => Promise<LiveStory[]> }
+export interface Deps { providers: (lang: Lang) => Provider[]; store: (env: Env) => Store; liveNews?: (env: Env, lang: Lang) => Promise<LiveStory[]>; wiki?: WikiApi }
 
 const xml = (s: string) => s.replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" }[c]!));
 const text = (body: string, status = 200, cache = "public, max-age=3600") => new Response(body, { status, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": cache, "x-content-type-options": "nosniff" } });
@@ -36,6 +38,9 @@ function adminGate(request: Request, env: Env): Response | null {
   const given = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
   return given && sameSecret(given, env.BAYAN_AI_MANAGER_TOKEN) ? null : json({ error: "unauthorized" }, 401);
 }
+
+/** Never let a slow optional source hold a page: after `ms` the fallback is used. */
+const soft = <T>(p: Promise<T>, ms: number, fallback: T): Promise<T> => Promise.race([p.catch(() => fallback), new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
 
 export function createHandler(deps: Deps) {
   return async (request: Request, env: Env): Promise<Response> => {
@@ -103,8 +108,8 @@ export function createHandler(deps: Deps) {
     }
 
     if (path === "/") {
-      const [stories, articles] = await Promise.all([loadNews(), store.latest(lang, 6).catch(() => [])]);
-      return page({ title: SITE.name + (lang === "ar" ? " — المعلومة أولًا" : " — Information first"), description: lang === "ar" ? "أخبار ومقالات وسير موثقة، وبحث في الإنترنت كله بمصادر حقيقية." : "Verified news, articles and biographies, and search across the web with real sources.", body: homeBody(lang, { stories: stories.slice(0, 24), articles }), path: "/" });
+      const [stories, articles, mostRead] = await Promise.all([loadNews(), store.latest(lang, 6).catch(() => []), deps.wiki ? soft(deps.wiki.mostRead(lang), 3000, []) : Promise.resolve([])]);
+      return page({ title: SITE.name + (lang === "ar" ? " — المعلومة أولًا" : " — Information first"), description: lang === "ar" ? "أخبار ومقالات وسير موثقة، وبحث في الإنترنت كله بمصادر حقيقية." : "Verified news, articles and biographies, and search across the web with real sources.", body: homeBody(lang, { stories: stories.slice(0, 24), articles, mostRead }), path: "/" });
     }
 
     if (path === "/search") {
@@ -122,6 +127,15 @@ export function createHandler(deps: Deps) {
       return page({ title: `${a.title} | ${SITE.name}`, description: plain(a.summary), body: articleBody(lang, a), path, active: a.section, image: a.complete ? a.imageUrl : undefined, jsonLd: a.complete ? ld : undefined, noindex: !a.complete });
     }
 
+    const wk = path.match(/^\/wiki\/([^/]+)$/);
+    if (wk) {
+      let entry = null; try { entry = deps.wiki ? await deps.wiki.entry(lang, decodeURIComponent(wk[1])) : null; } catch (error) { entry = null; }
+      if (!entry) return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404);
+      const from = sectionBySlug(url.searchParams.get("s") || "")?.slug;
+      // Live mirror of Wikipedia text: kept out of the index (duplicate content) but followed; the sitemap does not list it.
+      return page({ title: `${entry.title} | ${lang === "ar" ? "موسوعة بيان" : "BAYAN encyclopedia"}`, description: plain(entry.summary), body: wikiEntryBody(lang, entry, from), path: `/wiki/${wk[1]}`, active: from, image: entry.imageUrl, noindex: true });
+    }
+
     if (path === "/news") {
       const stories = await loadNews();
       const s = sectionBySlug("news")!;
@@ -130,9 +144,11 @@ export function createHandler(deps: Deps) {
 
     const section = sectionBySlug(path.slice(1));
     if (section) {
-      const [stories, items] = await Promise.all([loadNews(), store.bySection(section.slug, lang, 12).catch(() => [])]);
+      // Encyclopedia cards: seed topics for this section, Arabic titles resolved through interlanguage links. Failure just hides the group.
+      const wikiCards = () => soft((async () => { const seeds = topicsFor(section.slug).slice(0, 12); if (!seeds.length || !deps.wiki) return []; try { return await deps.wiki.cards(lang, lang === "ar" ? await deps.wiki.arabicTitles(seeds) : seeds); } catch (error) { return []; } })(), 3500, []);
+      const [stories, items, wiki] = await Promise.all([loadNews(), store.bySection(section.slug, lang, 12).catch(() => []), wikiCards()]);
       const inSection = stories.filter((st) => st.section === section.slug).slice(0, 12);
-      return page({ title: `${lang === "ar" ? section.ar : section.en} | ${SITE.name}`, description: lang === "ar" ? section.descAr : section.descEn, body: sectionBody(lang, section, { stories: inSection, articles: items.filter((a) => !a.archived), archive: items.filter((a) => a.archived) }), path, active: section.slug });
+      return page({ title: `${lang === "ar" ? section.ar : section.en} | ${SITE.name}`, description: lang === "ar" ? section.descAr : section.descEn, body: sectionBody(lang, section, { stories: inSection, articles: items.filter((a) => !a.archived), archive: items.filter((a) => a.archived), wiki }), path, active: section.slug });
     }
 
     return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404);
