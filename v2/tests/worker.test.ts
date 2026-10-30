@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createHandler, type Deps, type Env } from "../src/worker";
 import type { Article, Store } from "../src/store";
 import type { Provider } from "../src/search";
+import type { WikiApi } from "../src/wiki";
 
 const art = (o: Partial<Article> = {}): Article => ({ slug: "a1", section: "science", lang: "ar", title: "اكتشاف <b>جديد</b>", summary: "خلاصة موثقة عن الاكتشاف.", body: "فقرة أولى\n## عنوان فرعي\n- نقطة\nفقرة <script>x</script>", imageUrl: "https://img.example/a.jpg", imageAlt: "صورة", sources: [{ title: "BBC", publisher: "BBC", url: "https://bbc.com/a" }], updatedAt: "2026-10-27T10:00:00Z", archived: false, complete: true, ...o });
 const store = (o: Partial<Store> = {}): Store => ({ latest: async () => [], bySection: async () => [], get: async () => null, sitemap: async () => [], ...o });
@@ -65,6 +66,42 @@ describe("v2 front page and sections (news-first)", () => {
     const html = await (await call("/article/a1", {}, { store: () => store({ get: async () => art({ complete: false, imageUrl: "https://www.nationalacademies.org/cover.jpg", body: "خلاصة موثقة عن الاكتشاف." }) }) })).text();
     expect(html).toContain("noindex"); expect(html).toContain("مادة مختصرة");
     expect(html).not.toContain("nationalacademies.org/cover.jpg"); expect(html).not.toContain("application/ld+json");
+  });
+});
+
+const wikiStub = (o: Partial<WikiApi> = {}): WikiApi => ({
+  cards: async (_l, titles) => titles.map((t) => ({ title: t, extract: "ملخص موسوعي طويل بما يكفي لعرضه في البطاقة هنا.", url: "https://ar.wikipedia.org/wiki/" + t, imageUrl: "https://upload.wikimedia.org/" + t + ".jpg" })),
+  arabicTitles: async (en) => en.map((t) => "عربي " + t), entry: async () => null, mostRead: async () => [], ...o });
+
+describe("v2 encyclopedia", () => {
+  it("a section shows the encyclopedia group with Arabic titles resolved, linking to /wiki entries that remember the section", async () => {
+    const html = await (await call("/science", {}, { wiki: wikiStub() })).text();
+    expect(html).toContain("موسوعة بيان"); expect((html.match(/class="card art-card"/g) || []).length).toBeGreaterThanOrEqual(12);
+    expect(html).toContain("/wiki/%D8%B9%D8%B1%D8%A8%D9%8A_Scientific_method?lang=ar&amp;s=science");
+  });
+  it("English sections use the English titles directly", async () => {
+    const html = await (await call("/economy?lang=en", {}, { wiki: wikiStub({ arabicTitles: async () => { throw new Error("must not be called"); } }) })).text();
+    expect(html).toContain("/wiki/Inflation?lang=en&amp;s=economy");
+  });
+  it("the home page shows the daily most-read block when available and survives wiki failures", async () => {
+    const withBlock = await (await call("/", {}, { wiki: wikiStub({ mostRead: async () => [{ title: "محمد صلاح", extract: "لاعب كرة قدم مصري يلعب في ليفربول وله إنجازات كثيرة.", url: "https://ar.wikipedia.org/wiki/x", views: 4200 }] }) })).text();
+    expect(withBlock).toContain("الأكثر قراءة اليوم في الموسوعة"); expect(withBlock).toContain("قراءة أمس");
+    const broken = await call("/", {}, { wiki: wikiStub({ mostRead: async () => { throw new Error("down"); } }) });
+    expect(broken.status).toBe(200); expect(await broken.text()).not.toContain("الأكثر قراءة اليوم");
+    const sec = await call("/health", {}, { wiki: wikiStub({ cards: async () => { throw new Error("down"); } }) });
+    expect(sec.status).toBe(200);
+  });
+  it("an entry page shows sections, image credit, mandatory CC BY-SA attribution and source links, and is noindex", async () => {
+    const entry = { title: "دستور", lang: "ar" as const, summary: "الدستور هو القانون الأعلى في الدولة وينظم السلطات.", sections: [{ title: "التاريخ", body: "نص التاريخ.\nفقرة ثانية." }, { title: "الأنواع", body: "نص الأنواع." }], imageUrl: "https://upload.wikimedia.org/c.jpg", imageCredit: "Jane Doe", imageLicense: "CC BY-SA 4.0", imageCreditUrl: "https://commons.wikimedia.org/wiki/File:C.jpg", url: "https://ar.wikipedia.org/wiki/دستور", historyUrl: "https://ar.wikipedia.org/w/index.php?title=x&action=history" };
+    const res = await call("/wiki/%D8%AF%D8%B3%D8%AA%D9%88%D8%B1?s=politics", {}, { wiki: wikiStub({ entry: async () => entry }) });
+    const html = await res.text();
+    expect(res.status).toBe(200); expect(html).toContain("noindex"); expect(html).toContain('id="s1"');
+    expect(html).toContain("CC BY-SA 4.0"); expect(html).toContain("سجل التعديلات والمساهمون"); expect(html).toContain("Jane Doe");
+    expect(html).toContain("/politics?lang=ar");
+  });
+  it("unknown entries are 404, unsafe titles are rejected by the wiki layer", async () => {
+    expect((await call("/wiki/Nothing_here", {}, { wiki: wikiStub() })).status).toBe(404);
+    expect((await call("/wiki/x")).status).toBe(404);
   });
 });
 

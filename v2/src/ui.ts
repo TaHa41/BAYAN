@@ -6,6 +6,7 @@ import { independentPublishers, verdictFor } from "./evidence";
 import type { SearchOutcome } from "./search";
 import { icon } from "./icons";
 import { isGenericImage } from "./quality";
+import type { WikiCard, WikiEntry } from "./wiki";
 
 export const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 export const SITE = { name: "بيان | BAYAN", credit: "Created by Taha Omar" };
@@ -106,7 +107,10 @@ const hasPhoto = (st: LiveStory) => !!st.imageUrl && !isGenericImage(st.imageUrl
 const wisdomBlock = (lang: Lang, now: number) => `<div class="wisdom"><small>${T(lang, "حكمة الساعة", "Wisdom of the hour")}</small>${esc(wisdomOf(lang, now))}</div>`;
 const searchForm = (lang: Lang, extra = "") => `<form class="search" action="/search" method="get" role="search"${extra}><input type="hidden" name="lang" value="${lang}"><input name="q" type="search" required maxlength="200" placeholder="${T(lang, "اسأل بيان: شخص، خبر، موضوع…", "Ask BAYAN: a person, story, topic…")}" aria-label="${T(lang, "بحث", "Search")}"><button type="submit">${T(lang, "ابحث", "Search")}</button></form>`;
 
-export function homeBody(lang: Lang, d: { stories: ClassifiedStory[]; articles: Article[] }, now = Date.now()): string {
+const wikiHref = (c: WikiCard, lang: Lang, section?: string) => `/wiki/${encodeURIComponent(c.title.replace(/ /g, "_"))}?lang=${lang}${section ? "&s=" + section : ""}`;
+export const wikiCard = (c: WikiCard, lang: Lang, i = 0, section?: string) => `<a class="card art-card" style="animation-delay:${i * 40}ms" href="${esc(wikiHref(c, lang, section))}">${c.imageUrl ? `<img src="${esc(c.imageUrl)}" alt="${esc(c.title)}" loading="lazy" decoding="async" width="480" height="300">` : `<div class="noimg" aria-hidden="true">${icon("history")}</div>`}<div class="in"><span class="kicker">${T(lang, "موسوعة بيان", "BAYAN encyclopedia")}${c.views ? " · " + T(lang, `${c.views.toLocaleString("ar-EG")} قراءة أمس`, `${c.views.toLocaleString("en")} reads yesterday`) : ""}</span><h3>${esc(c.title)}</h3><p>${esc(plain(c.extract))}</p></div></a>`;
+
+export function homeBody(lang: Lang, d: { stories: ClassifiedStory[]; articles: Article[]; mostRead?: WikiCard[] }, now = Date.now()): string {
   // Front page = fresh reporting first (stories with a real photo), then complete articles. Nothing is invented to fill space.
   const photoStories = d.stories.filter(hasPhoto).slice(0, 5);
   const used = new Set(photoStories);
@@ -123,20 +127,22 @@ export function homeBody(lang: Lang, d: { stories: ClassifiedStory[]; articles: 
   const shownArticles = new Set(picks.map((x) => x.href));
   const articles = d.articles.filter((a) => !shownArticles.has(fromArticle(a, lang).href)).slice(0, 6);
   return `${front}${more.length ? `<h2 class="sec-title">${T(lang, "آخر الأخبار", "Latest news")}</h2><div class="grid">${more.map((st, i) => storyCard(st, lang, i, st.section)).join("")}</div><p style="margin-top:14px"><a class="kicker" href="/news?lang=${lang}">${T(lang, "كل الأخبار ←", "All news →")}</a></p>` : ""}
+${d.mostRead?.length ? `<h2 class="sec-title">${T(lang, "الأكثر قراءة اليوم في الموسوعة", "Most read today in the encyclopedia")}</h2><div class="grid">${d.mostRead.slice(0, 8).map((c, i) => wikiCard(c, lang, i)).join("")}</div>` : ""}
 ${articles.length ? `<h2 class="sec-title">${T(lang, "مقالات معرفية", "Explainers")}</h2><div class="grid">${articles.map((a, i) => articleCard(a, lang, i)).join("")}</div>` : ""}
 <h2 class="sec-title" id="sections">${T(lang, "الأقسام", "Sections")}</h2><div class="grid">${SECTIONS.map((x, i) => sectionCard(x, lang, i)).join("")}</div>
 ${wisdomBlock(lang, now)}`;
 }
 
-export function sectionBody(lang: Lang, s: Section, d: { stories: ClassifiedStory[]; articles: Article[]; archive: Article[] }, now = Date.now()): string {
+export function sectionBody(lang: Lang, s: Section, d: { stories: ClassifiedStory[]; articles: Article[]; archive: Article[]; wiki?: WikiCard[] }, now = Date.now()): string {
   const group = (title: string, html: string) => html ? `<h2 class="sec-title">${title}</h2><div class="grid">${html}</div>` : "";
   const stories = d.stories.map((st, i) => storyCard(st, lang, i)).join("");
   const arts = d.articles.map((a, i) => articleCard(a, lang, i)).join("");
   const arch = d.archive.map((a, i) => articleCard(a, lang, i)).join("");
-  const empty = !stories && !arts && !arch;
+  const wiki = (d.wiki || []).map((c, i) => wikiCard(c, lang, i, s.slug)).join("");
+  const empty = !stories && !arts && !arch && !wiki;
   return `<div class="page-head"><h1>${esc(lang === "ar" ? s.ar : s.en)}</h1><p>${esc(lang === "ar" ? s.descAr : s.descEn)}</p></div>
 ${empty ? `<p class="verdict">${T(lang, "لا توجد مواد في هذا القسم بعد. ابحث عن أي موضوع وسيُحفظ هنا تلقائيًا عند توفر مصدر موثق.", "Nothing in this section yet. Search any topic and it is filed here automatically once a sourced result exists.")}</p>` : ""}
-${group(T(lang, "آخر الأخبار في القسم", "Latest in this section"), stories)}${group(T(lang, "مقالات", "Articles"), arts)}${group(T(lang, "من الأرشيف", "From the archive"), arch)}
+${group(T(lang, "آخر الأخبار في القسم", "Latest in this section"), stories)}${group(T(lang, "موسوعة بيان", "BAYAN encyclopedia"), wiki)}${group(T(lang, "مقالات", "Articles"), arts)}${group(T(lang, "من الأرشيف", "From the archive"), arch)}
 ${wisdomBlock(lang, now)}`;
 }
 
@@ -178,6 +184,17 @@ export function newsBody(lang: Lang, stories: LiveStory[], now = Date.now()): st
   return `<div class="page-head"><h1>${esc(lang === "ar" ? s.ar : s.en)}</h1><p>${esc(lang === "ar" ? s.descAr : s.descEn)}</p></div>
 ${stories.length ? `${first ? `<a class="lead-story" style="margin-top:18px" href="${esc(storyHref(first, lang))}"><img src="${esc(first.imageUrl!)}" alt="${esc(first.imageAlt || first.title)}" width="1200" height="675" fetchpriority="high"><div class="tx"><span class="kicker" style="color:var(--gold2)">${esc(first.publisher)}${first.publishedAt ? " · " + esc(first.publishedAt.slice(0, 10)) : ""}</span><h2>${esc(plain(first.title))}</h2><p>${esc(plain(first.summary))}</p></div></a>` : ""}<div class="grid" style="margin-top:20px">${rest.map((x, i) => storyCard(x, lang, i)).join("")}</div>` : `<p class="verdict">${T(lang, "لا توجد أخبار متاحة الآن. نحدّث المصادر باستمرار، وسنعرض هنا ما له مصدر حقيقي فقط.", "No news is available right now. Sources are refreshed continuously, and only items with a real source are shown here.")}</p>`}
 <div class="wisdom"><small>${T(lang, "حكمة الساعة", "Wisdom of the hour")}</small>${esc(wisdomOf(lang, now))}</div>`;
+}
+export function wikiEntryBody(lang: Lang, e: WikiEntry, sectionSlug?: string): string {
+  const sec = sectionSlug ? sectionBySlug(sectionSlug) : undefined;
+  const paras = (t: string) => t.split(/\n+/).map((x) => x.trim()).filter(Boolean).map((x) => `<p>${esc(x)}</p>`).join("");
+  const toc = e.sections.length > 1 ? `<nav class="sources" aria-label="${T(lang, "المحتويات", "Contents")}"><h2>${T(lang, "المحتويات", "Contents")}</h2><ul>${e.sections.map((x, i) => `<li><a href="#s${i}">${esc(x.title)}</a></li>`).join("")}</ul></nav>` : "";
+  const credit = e.imageUrl ? `<p class="meta" style="margin-top:8px;font-size:12.5px">${T(lang, "الصورة", "Image")}: ${esc(e.imageCredit || "Wikimedia Commons")}${e.imageLicense ? " · " + esc(e.imageLicense) : ""}${e.imageCreditUrl ? ` · <a class="kicker" href="${esc(e.imageCreditUrl)}" rel="noopener nofollow" target="_blank">Commons</a>` : ""}</p>` : "";
+  return `<article class="full">${e.imageUrl ? `<img class="hero-img" src="${esc(e.imageUrl)}" alt="${esc(e.title)}" width="1200" height="675">${credit}` : ""}
+<p class="meta" style="margin-top:14px">${sec ? `<a href="/${sec.slug}?lang=${lang}" class="kicker">${esc(lang === "ar" ? sec.ar : sec.en)}</a> · ` : ""}<span class="kicker">${T(lang, "موسوعة بيان", "BAYAN encyclopedia")}</span></p><h1>${esc(e.title)}</h1>
+<p class="lead" style="margin-inline:0;color:var(--mut)">${esc(plain(e.summary))}</p>${toc}
+${e.sections.map((x, i) => `<h2 id="s${i}">${esc(x.title)}</h2>${paras(x.body)}`).join("")}
+<div class="sources"><h2>${T(lang, "المصدر والترخيص", "Source and license")}</h2><p style="font-size:14.5px;color:var(--mut)">${T(lang, "النص مأخوذ من ويكيبيديا ومرخّص بموجب CC BY-SA 4.0، ويتجدد تلقائيًا من المصدر.", "Text from Wikipedia, licensed under CC BY-SA 4.0, refreshed automatically from the source.")}</p><ul><li><a href="${esc(e.url)}" rel="noopener nofollow" target="_blank">${T(lang, "المقال الأصلي على ويكيبيديا", "Original article on Wikipedia")}</a></li><li><a href="${esc(e.historyUrl)}" rel="noopener nofollow" target="_blank">${T(lang, "سجل التعديلات والمساهمون", "Edit history and contributors")}</a></li><li><a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener nofollow" target="_blank">CC BY-SA 4.0</a></li></ul></div></article>`;
 }
 export const notFoundBody = (lang: Lang) => `<div class="page-head"><h1>${T(lang, "الصفحة غير موجودة", "Page not found")}</h1><p><a class="kicker" href="/?lang=${lang}">${T(lang, "العودة إلى الرئيسية", "Back to home")}</a></p></div>`;
 export { verdictFor };
