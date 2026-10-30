@@ -179,3 +179,13 @@
 - Commit: `2b1a012b1cac2d9a7d2bd7b1768c323a6d6f96fb`
 - الملفات: M	src/v2-bridge.ts;A	v2/src/classify.ts;A	v2/src/quality.ts;M	v2/src/store.ts;M	v2/src/ui.ts;M	v2/src/worker.ts;A	v2/tests/classify-quality.test.ts;M	v2/tests/store.test.ts;M	v2/tests/worker.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-30T10:18:36Z — BAYAN encyclopedia: live Wikipedia/Commons entries (sourced, licensed, auto-renewing) in every section, daily most-read block on the home page, full entry pages with sections, image credit and CC BY-SA attribution 
+- Commit: `9c466d380d5ce58f349fbd76e322478fc31330dd`
+- الملفات: M	src/v2-bridge.ts;M	tests/v2-bridge.test.ts;A	v2/src/topics.ts;M	v2/src/ui.ts;A	v2/src/wiki.ts;M	v2/src/worker.ts;A	v2/tests/wiki.test.ts;M	v2/tests/worker.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-30T10:24:00Z — Isolate tests from the network (stub fetch), lazy global fetch in wikiApi, 3s soft limits for optional encyclopedia blocks so pages never wait on Wikipedia 
+- Commit: `7b92c5ffe57ff8d2867d36270b005758382c1075`
+- الملفات: M	tests/api.test.ts;M	tests/v2-bridge.test.ts;M	v2/src/wiki.ts;M	v2/src/worker.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
