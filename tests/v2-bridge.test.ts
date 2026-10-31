@@ -10,7 +10,7 @@ beforeEach(() => { vi.stubGlobal("fetch", async () => { throw new Error("offline
 afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("v2 bridge", () => {
-  it.each([["/", true], ["/science", true], ["/people", true], ["/article/x", true], ["/wiki/Cairo", true], ["/wiki/a/b", false], ["/news", true], ["/news?archive=12", false], ["/news?lang=en", true], ["/trends", false], ["/search", false], ["/admin", false], ["/api/search", false], ["/prices", false], ["/article/a/b", false]])("v2Owns(%s)=%s", (p, owned) => expect(v2Owns(req(p))).toBe(owned));
+  it.each([["/", true], ["/science", true], ["/people", true], ["/article/x", true], ["/wiki/Cairo", true], ["/prices", true], ["/weather?city=Dubai", true], ["/prayer", true], ["/wiki/a/b", false], ["/news", true], ["/news?archive=12", false], ["/news?lang=en", true], ["/trends", false], ["/search", false], ["/admin", false], ["/api/search", false], ["/article/a/b", false]])("v2Owns(%s)=%s", (p, owned) => expect(v2Owns(req(p))).toBe(owned));
   it("never takes non-GET requests", () => expect(v2Owns(req("/", "POST"))).toBe(false));
   it("serves the home page from v2 with hardening headers and the credit line", async () => {
     const res = await serveV2(req("/"), env());

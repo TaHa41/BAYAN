@@ -18,3 +18,6 @@ export const ICONS: Record<string, string> = {
  "world": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 3v18M3 12h18\"/><path d=\"m6 6 12 12m0-12L6 18\"/>"
 };
 export const icon = (slug: string) => `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[slug] || ICONS.news}</svg>`;
+
+ICONS.weather = "M12 2v2M4.9 4.9l1.4 1.4M2 12h2M19.1 4.9l-1.4 1.4M16 12a4 4 0 0 0-7.7-1.5A3.5 3.5 0 0 0 9 17.5h7a2.75 2.75 0 0 0 0-5.5Z";
+ICONS.prayer = "M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5ZM17 3.5l.7 1.6 1.6.7-1.6.7-.7 1.6-.7-1.6-1.6-.7 1.6-.7Z";

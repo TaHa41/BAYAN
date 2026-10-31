@@ -3,6 +3,7 @@ import { createHandler, type Deps, type Env } from "../src/worker";
 import type { Article, Store } from "../src/store";
 import type { Provider } from "../src/search";
 import type { WikiApi } from "../src/wiki";
+import type { LiveApi } from "../src/worker";
 
 const art = (o: Partial<Article> = {}): Article => ({ slug: "a1", section: "science", lang: "ar", title: "اكتشاف <b>جديد</b>", summary: "خلاصة موثقة عن الاكتشاف.", body: "فقرة أولى\n## عنوان فرعي\n- نقطة\nفقرة <script>x</script>", imageUrl: "https://img.example/a.jpg", imageAlt: "صورة", sources: [{ title: "BBC", publisher: "BBC", url: "https://bbc.com/a" }], updatedAt: "2026-10-27T10:00:00Z", archived: false, complete: true, ...o });
 const store = (o: Partial<Store> = {}): Store => ({ latest: async () => [], bySection: async () => [], get: async () => null, sitemap: async () => [], ...o });
@@ -60,7 +61,8 @@ describe("v2 front page and sections (news-first)", () => {
     const html = await (await call("/politics", {}, { liveNews: async () => stories, store: () => store({ bySection: async () => [art({ slug: "p1", section: "politics", title: "مقال سياسي" }), art({ slug: "", section: "politics", title: "من الأرشيف السياسي", archived: true, complete: false })] }) })).text();
     const i1 = html.indexOf("آخر الأخبار في القسم"), i2 = html.indexOf(">مقالات<"), i3 = html.indexOf("من الأرشيف</h2>");
     expect(i1).toBeGreaterThan(-1); expect(i2).toBeGreaterThan(i1); expect(i3).toBeGreaterThan(i2);
-    expect(html).toContain("الانتخابات الإسرائيلية تحدد الحكومة"); expect(html).not.toContain("دويتشه بنك يرفع أرباحه");
+    const content = html.split('class="page-head"')[1];
+    expect(content).toContain("الانتخابات الإسرائيلية تحدد الحكومة"); expect(content).not.toContain("دويتشه بنك يرفع أرباحه");
   });
   it("a stub article page is flagged: noindex, notice, no generic cover image, no JSON-LD", async () => {
     const html = await (await call("/article/a1", {}, { store: () => store({ get: async () => art({ complete: false, imageUrl: "https://www.nationalacademies.org/cover.jpg", body: "خلاصة موثقة عن الاكتشاف." }) }) })).text();
@@ -103,6 +105,55 @@ describe("v2 encyclopedia", () => {
   it("unknown entries are 404, unsafe titles are rejected by the wiki layer", async () => {
     expect((await call("/wiki/Nothing_here", {}, { wiki: wikiStub() })).status).toBe(404);
     expect((await call("/wiki/x")).status).toBe(404);
+  });
+});
+
+const liveStub = (o: Partial<LiveApi> = {}): LiveApi => ({
+  fx: async () => ({ ok: true, provider: "Frankfurter", rates: { USD: 1, EGP: 50, EUR: 0.9, SAR: 3.75 }, updatedAt: "2026-10-31T10:00:00Z" }),
+  gold: async () => ({ ok: true, provider: "gold+fx", price: 5000, usdPerOunce: 2400, updatedAt: "2026-10-31T10:00:00Z" }),
+  weather: async () => ({ ok: true, provider: "Open-Meteo", city: "Cairo", region: "Cairo Governorate", country: "Egypt", current: { temperature_2m: 27.4, relative_humidity_2m: 41, weather_code: 0, wind_speed_10m: 12.2 }, updatedAt: "2026-10-31T10:00:00Z" }),
+  prayer: async () => ({ ok: true, provider: "AlAdhan", city: "Cairo", country: "Egypt", timezone: "Africa/Cairo", gregorian: { date: "31-10-2026" }, hijri: { day: "19", month: "Rabi al-Thani", monthAr: "ربيع الآخر", year: "1448" }, timings: { Fajr: "04:41 (EET)", Sunrise: "06:05 (EET)", Dhuhr: "11:43 (EET)", Asr: "14:49 (EET)", Maghrib: "17:21 (EET)", Isha: "18:42 (EET)" } }), ...o });
+
+describe("v2 live tools (prices, weather, prayer)", () => {
+  it("prices: currencies against EGP and gold by karat, with source and update time, computed from the provider data", async () => {
+    const html = await (await call("/prices?lang=en", {}, { live: liveStub() })).text();
+    expect(html).toContain("50.00"); expect(html).toContain("55.56"); expect(html).toContain("13.33");
+    expect(html).toContain("5,000.00"); expect(html).toContain("4,375.00"); expect(html).toContain("35,000.00"); expect(html).toContain("Frankfurter"); expect(html).toContain("2026-10-31 10:00 UTC");
+  });
+  it("prices: provider failure shows an honest notice and no invented numbers", async () => {
+    const html = await (await call("/prices?lang=en", {}, { live: liveStub({ fx: async () => ({ ok: false }), gold: async () => { throw new Error("down"); } }) })).text();
+    expect(html).toContain("no estimated figures"); expect(html).not.toContain("50.00");
+  });
+  it("weather: shows temperature, label, humidity, wind and place; offers city chips and a search form", async () => {
+    const html = await (await call("/weather?city=Cairo&lang=en", {}, { live: liveStub() })).text();
+    expect(html).toContain("27°C"); expect(html).toContain("Clear"); expect(html).toContain("41%"); expect(html).toContain("Cairo, Cairo Governorate, Egypt");
+    expect(html).toContain('name="city"'); expect(html).toContain("/weather?city=Dubai&amp;lang=en");
+  });
+  it("weather: unknown city and provider failure are different honest messages", async () => {
+    expect(await (await call("/weather?city=zzz&lang=en", {}, { live: liveStub({ weather: async () => ({ ok: false, message: "City not found" }) }) })).text()).toContain("City not found");
+    expect(await (await call("/weather?lang=en", {}, { live: liveStub({ weather: async () => ({ ok: false, message: "down" }) }) })).text()).toContain("no estimated figures");
+  });
+  it("prayer: six times (zone suffix removed), Gregorian and Hijri date, city and country form", async () => {
+    const html = await (await call("/prayer?city=Cairo&country=Egypt&lang=ar", {}, { live: liveStub() })).text();
+    for (const t of ["04:41", "06:05", "11:43", "14:49", "17:21", "18:42"]) expect(html).toContain(">" + t + "<");
+    expect(html).not.toContain("(EET)"); expect(html).toContain("19 ربيع الآخر 1448"); expect(html).toContain('name="country"');
+  });
+  it("tools pages stay 200 with a notice when no live source is configured or it times out", async () => {
+    for (const p of ["/prices", "/weather", "/prayer"]) { const r = await call(p + "?lang=en"); expect(r.status).toBe(200); expect(await r.text()).toContain("no estimated figures"); }
+  });
+});
+
+describe("v2 motion and navigation", () => {
+  it("the ribbon lists sections and the three tools; a news ticker with the latest headlines scrolls on the home page", async () => {
+    const stories = [{ title: "خبر عاجل أول", summary: "ملخص", publisher: "م", url: "https://s.example/1" }, { title: "خبر ثان", summary: "ملخص", publisher: "م", url: "https://s.example/2" }];
+    const html = await (await call("/", {}, { liveNews: async () => stories })).text();
+    for (const slug of ["prices", "weather", "prayer"]) expect(html).toContain(`href="/${slug}?lang=ar"`);
+    expect(html).toContain('class="ticker"'); expect(html).toContain("خبر عاجل أول"); expect(html).toContain('aria-hidden="true" class="ticker-copy"');
+    expect(html).toContain("animation-timeline:view()");
+  });
+  it("articles and encyclopedia entries get the reading-progress bar; motion is disabled for reduced-motion users", async () => {
+    const html = await (await call("/article/a1", {}, { store: () => store({ get: async () => art() }) })).text();
+    expect(html).toContain('class="progress"'); expect(html).toContain("prefers-reduced-motion:reduce");
   });
 });
 
