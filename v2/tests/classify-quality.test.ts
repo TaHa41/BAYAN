@@ -13,6 +13,13 @@ describe("classifyStory", () => {
     ["Fed expected to hold interest rates", "economy"],
     ["New vaccine approved by regulators", "health"],
   ])("%s -> %s", (title, expected) => expect(classifyStory(title)).toBe(expected));
+  it("title decides: a war story whose summary mentions a Telegram app stays out of technology (seen live)", () => {
+    expect(classifyStory("مباشر: وفد إيراني في الدوحة لإجراء محادثات مع الوسطاء القطريين لإنهاء الحرب", "وفق بيان نُشر على حسابه الرسمي على تطبيق تيليغرام")).toBe("world");
+  });
+  it("a single stray keyword in the summary is not enough, two are", () => {
+    expect(classifyStory("عنوان بلا كلمات مفتاحية", "تم إطلاق تطبيق جديد")).toBeNull();
+    expect(classifyStory("عنوان بلا كلمات مفتاحية", "الذكاء الاصطناعي يدخل كل تطبيق وتقنية جديدة")).toBe("technology");
+  });
   it("returns null when nothing matches (story stays in News only)", () => expect(classifyStory("عنوان عام بلا كلمات مفتاحية")).toBeNull());
 });
 

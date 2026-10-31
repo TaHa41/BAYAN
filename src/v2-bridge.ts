@@ -12,7 +12,7 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-10-31.1";
+export const V2_BUILD = "2026-10-31.2";
 
 // trends stays on v1 for now. /news is served by v2 using the same live news service and archive v1 used.
 const OWNED_SECTIONS = new Set(SECTIONS.map((s) => s.slug).filter((s) => s !== "trends"));
