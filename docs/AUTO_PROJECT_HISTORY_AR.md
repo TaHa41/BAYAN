@@ -194,3 +194,8 @@
 - Commit: `5e3684a37262fe94e770f07c6df10b25edb86a31`
 - الملفات: M	src/v2-bridge.ts;M	v2/src/ui.ts;M	v2/src/wiki.ts;M	v2/tests/wiki.test.ts;M	v2/tests/worker.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-31T16:59:05Z — Live tools in the new design (prices, weather any city, prayer times any city/country), news ticker, scroll-driven animations, reading progress bar 
+- Commit: `b5d06cffa162d34d83e9fb5b1dd19305918fca15`
+- الملفات: M	src/v2-bridge.ts;M	tests/v2-bridge.test.ts;M	v2/src/icons.ts;M	v2/src/sections.ts;M	v2/src/ui.ts;M	v2/src/worker.ts;M	v2/tests/worker.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
