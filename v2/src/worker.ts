@@ -1,17 +1,18 @@
 // BAYAN v2 request handler: pure routing over injected dependencies, so every route is unit-testable without
 // Cloudflare bindings. Failures degrade (a section with no items, an empty sitemap) instead of returning errors.
 import { searchAll, type Provider } from "./search";
-import { SECTIONS, sectionBySlug, type Lang } from "./sections";
+import { SECTIONS, TOOLS, sectionBySlug, type Lang } from "./sections";
 import type { Store } from "./store";
 import { generate, geminiGenerate, listGeminiFlashModels, workersAiGenerate, type AiEnv } from "./ai";
 import { analyze, type Signals } from "./engineer";
 import { classifyStory } from "./classify";
 import { topicsFor } from "./topics";
 import type { WikiApi } from "./wiki";
-import { articleBody, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, wikiEntryBody, esc, type ClassifiedStory, type LiveStory } from "./ui";
+import { articleBody, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, wikiEntryBody, pricesBody, weatherBody, prayerBody, tickerItems, esc, type ClassifiedStory, type LiveStory, type TickerItem } from "./ui";
 
 export interface Env extends AiEnv { DB: D1Database; ADS_TXT?: string; SITE_ORIGIN?: string; BAYAN_AI_MANAGER_TOKEN?: string }
-export interface Deps { providers: (lang: Lang) => Provider[]; store: (env: Env) => Store; liveNews?: (env: Env, lang: Lang) => Promise<LiveStory[]>; wiki?: WikiApi }
+export interface Deps { providers: (lang: Lang) => Provider[]; store: (env: Env) => Store; liveNews?: (env: Env, lang: Lang) => Promise<LiveStory[]>; wiki?: WikiApi; live?: LiveApi }
+export interface LiveApi { fx(env: Env): Promise<any>; gold(env: Env): Promise<any>; weather(env: Env, city?: string): Promise<any>; prayer(env: Env, city?: string, country?: string): Promise<any> }
 
 const xml = (s: string) => s.replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" }[c]!));
 const text = (body: string, status = 200, cache = "public, max-age=3600") => new Response(body, { status, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": cache, "x-content-type-options": "nosniff" } });
@@ -59,8 +60,8 @@ export function createHandler(deps: Deps) {
       for (const st of [...live, ...archived]) { const key = plain(st.title).toLowerCase(); if (key && !seen.has(key)) { seen.add(key); out.push({ ...st, section: classifyStory(plain(st.title), plain(st.summary)) }); } }
       return out;
     };
-    const page = (o: { title: string; description: string; body: string; path: string; active?: string; image?: string; jsonLd?: unknown; noindex?: boolean }, status = 200) =>
-      html(layout({ lang, origin, ...o }), status);
+    const page = (o: { title: string; description: string; body: string; path: string; active?: string; image?: string; jsonLd?: unknown; noindex?: boolean; ticker?: TickerItem[]; progress?: boolean }, status = 200, cache?: string) =>
+      html(layout({ lang, origin, ...o }), status, cache);
 
     if (path === "/health") return json({ ok: true, service: "bayan-v2" });
     if (path === "/robots.txt") return text(`User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nSitemap: ${origin}/sitemap.xml\n`);
@@ -109,7 +110,7 @@ export function createHandler(deps: Deps) {
 
     if (path === "/") {
       const [stories, articles, mostRead] = await Promise.all([loadNews(), store.latest(lang, 6).catch(() => []), deps.wiki ? soft(deps.wiki.mostRead(lang), 3000, []) : Promise.resolve([])]);
-      return page({ title: SITE.name + (lang === "ar" ? " — المعلومة أولًا" : " — Information first"), description: lang === "ar" ? "أخبار ومقالات وسير موثقة، وبحث في الإنترنت كله بمصادر حقيقية." : "Verified news, articles and biographies, and search across the web with real sources.", body: homeBody(lang, { stories: stories.slice(0, 24), articles, mostRead }), path: "/" });
+      return page({ title: SITE.name + (lang === "ar" ? " — المعلومة أولًا" : " — Information first"), description: lang === "ar" ? "أخبار ومقالات وسير موثقة، وبحث في الإنترنت كله بمصادر حقيقية." : "Verified news, articles and biographies, and search across the web with real sources.", body: homeBody(lang, { stories: stories.slice(0, 24), articles, mostRead }), path: "/", ticker: tickerItems(stories, lang) });
     }
 
     if (path === "/search") {
@@ -124,7 +125,26 @@ export function createHandler(deps: Deps) {
       let a = null; try { a = await store.get(decodeURIComponent(art[1]), lang); } catch (error) { a = null; }
       if (!a) return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404);
       const ld = { "@context": "https://schema.org", "@type": "Article", headline: a.title, image: [a.imageUrl], dateModified: a.updatedAt, inLanguage: lang, publisher: { "@type": "Organization", name: "BAYAN" } };
-      return page({ title: `${a.title} | ${SITE.name}`, description: plain(a.summary), body: articleBody(lang, a), path, active: a.section, image: a.complete ? a.imageUrl : undefined, jsonLd: a.complete ? ld : undefined, noindex: !a.complete });
+      return page({ title: `${a.title} | ${SITE.name}`, description: plain(a.summary), body: articleBody(lang, a), path, active: a.section, image: a.complete ? a.imageUrl : undefined, jsonLd: a.complete ? ld : undefined, noindex: !a.complete, progress: true });
+    }
+
+    // Live tools: server-rendered from the same services v1 used (Frankfurter/ExchangeRate, gold, Open-Meteo, AlAdhan).
+    // A failing provider shows an honest notice, never estimated figures. Short cache keeps prices fresh.
+    const FRESH = "public, max-age=30, s-maxage=60";
+    const toolTitle = (slug: "prices" | "weather" | "prayer") => { const t = TOOLS.find((x) => x.slug === slug)!; return `${lang === "ar" ? t.ar : t.en} | ${SITE.name}`; };
+    if (path === "/prices") {
+      const [fx, gold] = await Promise.all([deps.live ? soft(deps.live.fx(env), 6000, null) : Promise.resolve(null), deps.live ? soft(deps.live.gold(env), 6000, null) : Promise.resolve(null)]);
+      return page({ title: toolTitle("prices"), description: TOOLS[0][lang === "ar" ? "descAr" : "descEn"], body: pricesBody(lang, { fx, gold }), path, active: "prices" }, 200, FRESH);
+    }
+    if (path === "/weather") {
+      const city = (url.searchParams.get("city") || "").trim().slice(0, 80);
+      const r = deps.live ? await soft(deps.live.weather(env, city || undefined), 7000, null) : null;
+      return page({ title: toolTitle("weather"), description: TOOLS[1][lang === "ar" ? "descAr" : "descEn"], body: weatherBody(lang, city || (lang === "ar" ? "القاهرة" : "Cairo"), r), path, active: "weather" }, 200, FRESH);
+    }
+    if (path === "/prayer") {
+      const city = (url.searchParams.get("city") || "").trim().slice(0, 80), country = (url.searchParams.get("country") || "").trim().slice(0, 80);
+      const r = deps.live ? await soft(deps.live.prayer(env, city || undefined, country || undefined), 8000, null) : null;
+      return page({ title: toolTitle("prayer"), description: TOOLS[2][lang === "ar" ? "descAr" : "descEn"], body: prayerBody(lang, city || (lang === "ar" ? "القاهرة" : "Cairo"), country, r), path, active: "prayer" }, 200, FRESH);
     }
 
     const wk = path.match(/^\/wiki\/([^/]+)$/);
@@ -133,13 +153,13 @@ export function createHandler(deps: Deps) {
       if (!entry) return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404);
       const from = sectionBySlug(url.searchParams.get("s") || "")?.slug;
       // Live mirror of Wikipedia text: kept out of the index (duplicate content) but followed; the sitemap does not list it.
-      return page({ title: `${entry.title} | ${lang === "ar" ? "موسوعة بيان" : "BAYAN encyclopedia"}`, description: plain(entry.summary), body: wikiEntryBody(lang, entry, from), path: `/wiki/${wk[1]}`, active: from, image: entry.imageUrl, noindex: true });
+      return page({ title: `${entry.title} | ${lang === "ar" ? "موسوعة بيان" : "BAYAN encyclopedia"}`, description: plain(entry.summary), body: wikiEntryBody(lang, entry, from), path: `/wiki/${wk[1]}`, active: from, image: entry.imageUrl, noindex: true, progress: true });
     }
 
     if (path === "/news") {
       const stories = await loadNews();
       const s = sectionBySlug("news")!;
-      return page({ title: `${lang === "ar" ? s.ar : s.en} | ${SITE.name}`, description: lang === "ar" ? s.descAr : s.descEn, body: newsBody(lang, stories.slice(0, 36)), path, active: "news" });
+      return page({ title: `${lang === "ar" ? s.ar : s.en} | ${SITE.name}`, description: lang === "ar" ? s.descAr : s.descEn, body: newsBody(lang, stories.slice(0, 36)), path, active: "news", ticker: tickerItems(stories, lang) });
     }
 
     const section = sectionBySlug(path.slice(1));
@@ -148,7 +168,7 @@ export function createHandler(deps: Deps) {
       const wikiCards = () => soft((async () => { const seeds = topicsFor(section.slug).slice(0, 12); if (!seeds.length || !deps.wiki) return []; try { return await deps.wiki.cards(lang, lang === "ar" ? await deps.wiki.arabicTitles(seeds) : seeds); } catch (error) { return []; } })(), 3500, []);
       const [stories, items, wiki] = await Promise.all([loadNews(), store.bySection(section.slug, lang, 12).catch(() => []), wikiCards()]);
       const inSection = stories.filter((st) => st.section === section.slug).slice(0, 12);
-      return page({ title: `${lang === "ar" ? section.ar : section.en} | ${SITE.name}`, description: lang === "ar" ? section.descAr : section.descEn, body: sectionBody(lang, section, { stories: inSection, articles: items.filter((a) => !a.archived), archive: items.filter((a) => a.archived), wiki }), path, active: section.slug });
+      return page({ title: `${lang === "ar" ? section.ar : section.en} | ${SITE.name}`, description: lang === "ar" ? section.descAr : section.descEn, body: sectionBody(lang, section, { stories: inSection, articles: items.filter((a) => !a.archived), archive: items.filter((a) => a.archived), wiki }), path, active: section.slug, ticker: tickerItems(stories, lang) });
     }
 
     return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404);

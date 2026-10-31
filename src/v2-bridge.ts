@@ -8,10 +8,11 @@ import { wikipediaProvider } from "../v2/src/providers/wikipedia";
 import { SECTIONS } from "../v2/src/sections";
 import { wikiApi } from "../v2/src/wiki";
 import { news } from "./services/news";
+import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-10-30.2";
+export const V2_BUILD = "2026-10-31.1";
 
 // trends stays on v1 for now. /news is served by v2 using the same live news service and archive v1 used.
 const OWNED_SECTIONS = new Set(SECTIONS.map((s) => s.slug).filter((s) => s !== "trends"));
@@ -19,6 +20,7 @@ const handler = createHandler({
   providers: (lang) => [wikipediaProvider(lang)],
   store: (env) => d1Store(env.DB),
   wiki: wikiApi(),
+  live: { fx: (env) => fx(env as Env), gold: (env) => gold(env as Env), weather: (env, city) => weather(city, env as Env), prayer: (env, city, country) => prayerTimes(city, country, env as Env) },
   liveNews: async (env, lang) => {
     // A slow RSS refresh must not hold the page: after 6s the page renders from the archive alone.
     const live: any = await Promise.race([news(env as Env, lang), new Promise((_, reject) => setTimeout(() => reject(new Error("news_timeout")), 6000))]);
@@ -31,7 +33,7 @@ export function v2Owns(request: Request): boolean {
   const u = new URL(request.url);
   if (u.searchParams.has("archive")) return false; // legacy deep link to one archived news item: v1 renders it
   const path = u.pathname.replace(/(.)\/+$/, "$1");
-  return path === "/" || OWNED_SECTIONS.has(path.slice(1)) || /^\/article\/[^/]+$/.test(path) || /^\/wiki\/[^/]+$/.test(path);
+  return path === "/" || OWNED_SECTIONS.has(path.slice(1)) || /^\/article\/[^/]+$/.test(path) || /^\/wiki\/[^/]+$/.test(path) || path === "/prices" || path === "/weather" || path === "/prayer";
 }
 
 export async function serveV2(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response | null> {

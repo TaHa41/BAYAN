@@ -20,3 +20,11 @@ export const SECTIONS: Section[] = [
   { slug: "trends", ar: "اتجاهات", en: "Trends", descAr: "ما يشغل الناس الآن، منفصلًا عن الأخبار الموثقة.", descEn: "What people are talking about, kept separate from verified news.", glyph: "↗", hue: 12 },
 ];
 export const sectionBySlug = (slug: string): Section | undefined => SECTIONS.find((s) => s.slug === slug);
+
+// Live tools (data pages, not content sections): shown in the ribbon after the sections.
+export interface Tool { slug: "prices" | "weather" | "prayer"; ar: string; en: string; descAr: string; descEn: string; hue: number }
+export const TOOLS: Tool[] = [
+  { slug: "prices", ar: "الأسواق", en: "Markets", descAr: "أسعار العملات والذهب مقابل الجنيه المصري، بتوقيت آخر تحديث ومصدره.", descEn: "Currency and gold prices against the Egyptian pound, with update time and source.", hue: 150 },
+  { slug: "weather", ar: "الطقس", en: "Weather", descAr: "حالة الطقس الحالية لأي مدينة في العالم.", descEn: "Current weather for any city in the world.", hue: 200 },
+  { slug: "prayer", ar: "مواقيت الصلاة", en: "Prayer times", descAr: "مواقيت الصلاة والتاريخ الهجري لأي مدينة ودولة.", descEn: "Prayer times and the Hijri date for any city and country.", hue: 40 },
+];

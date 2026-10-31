@@ -1,6 +1,6 @@
 // Server-rendered pages. No client framework: every page is complete HTML from the Worker, so there is no
 // browser-side bundle that can fail. One tiny inline script handles the mobile menu only.
-import { SECTIONS, sectionBySlug, type Lang, type Section } from "./sections";
+import { SECTIONS, TOOLS, sectionBySlug, type Lang, type Section } from "./sections";
 import type { Article } from "./store";
 import { independentPublishers, verdictFor } from "./evidence";
 import type { SearchOutcome } from "./search";
@@ -72,13 +72,45 @@ article.full .lead-text p{font-size:18px;color:var(--ink)}article.full h3{margin
 .verdict{margin:18px 0;padding:14px 18px;border-radius:14px;border:1px solid var(--line);background:var(--card);font-size:14.5px}
 footer{margin-top:72px;padding:34px 0 40px;background:var(--navy);color:#b9c6e0;font-size:14px;text-align:center}footer nav{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}footer a:hover{color:#fff}footer b{color:#fff;font-weight:500}
 @media(max-width:860px){.front{grid-template-columns:1fr}.lead-story{min-height:340px}.date{display:none}.logo{font-size:24px}.pill.out{display:none}.bar{margin-inline-start:0}}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}`;
 
-export interface LayoutOpts { lang: Lang; origin: string; path: string; title: string; description: string; body: string; image?: string; jsonLd?: unknown; noindex?: boolean; active?: string }
+.ticker{display:flex;align-items:center;gap:12px;border-top:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.18);font-size:13px;height:38px}
+.ticker-label{flex:none;margin-inline-start:max(16px,calc((100vw - 1180px)/2));padding:2px 12px;border-radius:12px;background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1a1305;font-weight:600;font-size:12px}
+.ticker-view{overflow:hidden;flex:1;mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
+.ticker-track{display:inline-flex;gap:46px;white-space:nowrap;padding-inline-end:46px;animation:tick 70s linear infinite;--to:-50%}
+[dir=rtl] .ticker-track{--to:50%}
+.ticker-copy{display:inline-flex;gap:46px}.ticker a{color:#dbe4f6;transition:color .25s}.ticker a:hover{color:var(--gold2)}.ticker-track:hover{animation-play-state:paused}
+@keyframes tick{to{transform:translateX(var(--to))}}
+@keyframes rev{from{opacity:0;transform:translateY(28px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.progress{display:none}
+/* Scroll-driven motion (progressive enhancement: browsers without it keep the load animations above) */
+@supports (animation-timeline:view()){
+  .card,.side a,h2.sec-title,.wisdom{animation:rev linear both;animation-timeline:view();animation-range:entry 0% cover 30%}
+  .progress{display:block;position:fixed;top:0;inset-inline:0;height:3px;z-index:80;background:linear-gradient(90deg,var(--gold),var(--gold2));transform-origin:0 50%;animation:grow linear both;animation-timeline:scroll(root)}
+  [dir=rtl] .progress{transform-origin:100% 50%}
+}
+.art-card img,.lead-story img,.side img{transition:transform .9s var(--ease)}.art-card:hover img,.side a:hover img{transform:scale(1.06)}
+.sec-card i{transition:transform .5s var(--ease)}.sec-card:hover i{transform:rotate(-8deg) scale(1.1)}
+.sec-card::after{content:"";position:absolute;inset:0;background:radial-gradient(120px 120px at var(--mx,80%) var(--my,0%),rgba(255,255,255,.18),transparent 70%);opacity:0;transition:opacity .4s}.sec-card:hover::after{opacity:1}
+.tool-form{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 10px}.tool-form input{flex:1;min-width:150px;height:50px;border-radius:25px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:15px;padding:0 20px}.tool-form input:focus{outline:none;border-color:var(--gold)}.tool-form button{height:50px;padding:0 26px;border:0;border-radius:25px;background:var(--navy);color:#fff;font:inherit;font-weight:500;cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 18px}.chips a{padding:6px 14px;border-radius:18px;border:1px solid var(--line);background:var(--card);font-size:13.5px;transition:border-color .25s,transform .25s}.chips a:hover{border-color:var(--gold);transform:translateY(-2px)}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-top:8px}
+.stat{padding:18px 20px;border-radius:18px;border:1px solid var(--line);background:var(--card);animation:rise .8s var(--ease) both}.stat small{display:block;color:var(--mut);font-size:13px}.stat b{display:block;margin-top:2px;font-family:var(--serif);font-size:30px;line-height:1.3}.stat span{font-size:13px;color:var(--mut)}
+.stat.big{grid-column:1/-1;background:linear-gradient(150deg,var(--navy2),var(--navy));color:#fff;border:0}.stat.big small,.stat.big span{color:#b9c6e0}.stat.big b{font-size:clamp(40px,8vw,64px);color:var(--gold2)}
+.times{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:8px}.times .stat b{font-size:28px;direction:ltr;display:block}
+.updated{margin-top:14px;font-size:13px;color:var(--mut)}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.progress{display:none!important}}`;
+
+export interface TickerItem { text: string; href: string }
+export interface LayoutOpts { lang: Lang; origin: string; path: string; title: string; description: string; body: string; image?: string; jsonLd?: unknown; noindex?: boolean; active?: string; ticker?: TickerItem[]; progress?: boolean }
 export function layout(o: LayoutOpts): string {
   const { lang } = o, other: Lang = lang === "ar" ? "en" : "ar";
   const href = (l: Lang, p = o.path) => `${p}${p.includes("?") ? "&" : "?"}lang=${l}`;
-  const ribbon = SECTIONS.map((x) => `<a href="/${x.slug}?lang=${lang}"${o.active === x.slug ? " aria-current=page" : ""}>${icon(x.slug)}${esc(lang === "ar" ? x.ar : x.en)}</a>`).join("");
+  const ribbon = [...SECTIONS, ...TOOLS].map((x) => `<a href="/${x.slug}?lang=${lang}"${o.active === x.slug ? " aria-current=page" : ""}>${icon(x.slug)}${esc(lang === "ar" ? x.ar : x.en)}</a>`).join("");
+  // News ticker: the same items twice so the CSS marquee can loop without a gap; the copy is hidden from assistive tech.
+  const tick = (o.ticker || []).slice(0, 8).map((t) => `<a href="${esc(t.href)}">${esc(t.text)}</a>`).join("");
+  const ticker = tick ? `<div class="ticker" aria-label="${T(lang, "آخر العناوين", "Latest headlines")}"><span class="ticker-label">${T(lang, "الآن", "Now")}</span><div class="ticker-view"><div class="ticker-track">${tick}<span aria-hidden="true" class="ticker-copy">${tick}</span></div></div></div>` : "";
   const today = new Date().toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   return `<!doctype html><html lang="${lang}" dir="${lang === "ar" ? "rtl" : "ltr"}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(o.title)}</title><meta name="description" content="${esc(o.description.slice(0, 200))}">${o.noindex ? '<meta name="robots" content="noindex,follow">' : ""}
@@ -86,7 +118,7 @@ export function layout(o: LayoutOpts): string {
 <meta property="og:title" content="${esc(o.title)}"><meta property="og:description" content="${esc(o.description.slice(0, 200))}"><meta property="og:type" content="website">${o.image ? `<meta property="og:image" content="${esc(o.image)}">` : ""}<meta name="theme-color" content="#050914">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600&family=Noto+Naskh+Arabic:wght@500;600;700&display=swap" rel="stylesheet">
 ${o.jsonLd ? `<script type="application/ld+json">${JSON.stringify(o.jsonLd).replace(/</g, "\\u003c")}</script>` : ""}<style>${CSS}</style></head><body><div class="aurora" aria-hidden="true"></div>
-<header class="top" id="top"><div class="wrap"><div class="bar"><a class="logo" href="/?lang=${lang}">بيان<b>.</b><small>BAYAN</small></a><span class="date">${esc(today)}</span><a class="pill out" href="${esc(href(other))}">${other === "ar" ? "العربية" : "EN"}</a><a class="pill gold" href="/search?lang=${lang}">${T(lang, "ابحث", "Search")}</a></div></div><nav class="ribbon" aria-label="${T(lang, "الأقسام", "Sections")}"><div class="wrap in">${ribbon}</div></nav></header>
+<header class="top" id="top"><div class="wrap"><div class="bar"><a class="logo" href="/?lang=${lang}">بيان<b>.</b><small>BAYAN</small></a><span class="date">${esc(today)}</span><a class="pill out" href="${esc(href(other))}">${other === "ar" ? "العربية" : "EN"}</a><a class="pill gold" href="/search?lang=${lang}">${T(lang, "ابحث", "Search")}</a></div></div><nav class="ribbon" aria-label="${T(lang, "الأقسام", "Sections")}"><div class="wrap in">${ribbon}</div></nav>${ticker}</header>${o.progress ? '<div class="progress" aria-hidden="true"></div>' : ""}
 <main class="wrap">${o.body}</main>
 <footer><div class="wrap"><nav>${SECTIONS.slice(0, 8).map((s) => `<a href="/${s.slug}?lang=${lang}">${esc(lang === "ar" ? s.ar : s.en)}</a>`).join("")}</nav><p>${T(lang, "المعلومة أولًا، والدليل قبل الادعاء.", "Information first. Evidence before claims.")}</p><p><b>${SITE.credit}</b></p></div></footer></body></html>`;
 }
@@ -196,6 +228,44 @@ export function wikiEntryBody(lang: Lang, e: WikiEntry, sectionSlug?: string): s
 <div class="lead-text">${paras(e.summary)}</div>${toc}
 ${e.sections.map((x, i) => `<h${x.level} id="s${i}">${esc(x.title)}</h${x.level}>${paras(x.body)}`).join("")}
 <div class="sources"><h2>${T(lang, "المصدر والترخيص", "Source and license")}</h2><p style="font-size:14.5px;color:var(--mut)">${T(lang, "النص مأخوذ من ويكيبيديا ومرخّص بموجب CC BY-SA 4.0، ويتجدد تلقائيًا من المصدر.", "Text from Wikipedia, licensed under CC BY-SA 4.0, refreshed automatically from the source.")}</p><ul><li><a href="${esc(e.url)}" rel="noopener nofollow" target="_blank">${T(lang, "المقال الأصلي على ويكيبيديا", "Original article on Wikipedia")}</a></li><li><a href="${esc(e.historyUrl)}" rel="noopener nofollow" target="_blank">${T(lang, "سجل التعديلات والمساهمون", "Edit history and contributors")}</a></li><li><a href="https://creativecommons.org/licenses/by-sa/4.0/" rel="noopener nofollow" target="_blank">CC BY-SA 4.0</a></li></ul></div></article>`;
+}
+
+export const tickerItems = (stories: (LiveStory & { section?: string | null })[], lang: Lang): TickerItem[] => stories.slice(0, 8).map((st) => ({ text: plain(st.title), href: storyHref(st, lang) })).filter((x) => x.text);
+const fmtTime = (iso?: string) => (iso ? String(iso).slice(0, 16).replace("T", " ") + " UTC" : "");
+const unavailable = (lang: Lang, what: string) => `<p class="verdict">${T(lang, `تعذر جلب ${what} الآن من المصدر، ولم نعرض أرقامًا تقديرية. حاول بعد قليل.`, `Could not fetch ${what} from the source right now, and no estimated figures are shown. Please try again shortly.`)}</p>`;
+const toolHead = (lang: Lang, slug: "prices" | "weather" | "prayer") => { const t = TOOLS.find((x) => x.slug === slug)!; return `<div class="page-head"><h1>${esc(lang === "ar" ? t.ar : t.en)}</h1><p>${esc(lang === "ar" ? t.descAr : t.descEn)}</p></div>`; };
+
+const CURRENCIES: [string, string, string][] = [["USD", "الدولار الأمريكي", "US dollar"], ["EUR", "اليورو", "Euro"], ["GBP", "الجنيه الإسترليني", "Pound sterling"], ["SAR", "الريال السعودي", "Saudi riyal"], ["AED", "الدرهم الإماراتي", "UAE dirham"], ["KWD", "الدينار الكويتي", "Kuwaiti dinar"], ["TRY", "الليرة التركية", "Turkish lira"], ["CNY", "اليوان الصيني", "Chinese yuan"]];
+export function pricesBody(lang: Lang, d: { fx: any | null; gold: any | null }): string {
+  const rates = d.fx?.ok ? d.fx.rates || {} : null, egp = rates ? Number(rates.EGP) : NaN;
+  const money = (n: number, dig = 2) => n.toLocaleString(lang === "ar" ? "ar-EG" : "en-US", { minimumFractionDigits: dig, maximumFractionDigits: dig });
+  const cur = rates && Number.isFinite(egp) ? `<div class="stat-grid">${CURRENCIES.filter(([c]) => c === "USD" || Number.isFinite(Number(rates[c]))).map(([c, ar, en], i) => { const per = egp / (c === "USD" ? 1 : Number(rates[c])); return `<div class="stat" style="animation-delay:${i * 50}ms"><small>${esc(lang === "ar" ? ar : en)} · ${c}</small><b>${money(per, per < 1 ? 4 : 2)}</b><span>${T(lang, "جنيه مصري", "EGP")}</span></div>`; }).join("")}</div><p class="updated">${T(lang, "المصدر", "Source")}: ${esc(d.fx.provider || "")} · ${esc(fmtTime(d.fx.updatedAt))}</p>` : unavailable(lang, T(lang, "أسعار العملات", "currency rates"));
+  const g = d.gold?.ok && Number.isFinite(Number(d.gold.price)) ? d.gold : null;
+  const gold = g ? `<div class="stat-grid"><div class="stat big"><small>${T(lang, "ذهب عيار 24 · الجرام", "24K gold · per gram")}</small><b>${money(Number(g.price))}</b><span>${T(lang, "جنيه مصري", "EGP")}${Number.isFinite(Number(g.usdPerOunce)) ? " · " + money(Number(g.usdPerOunce)) + T(lang, " دولار للأوقية", " USD per ounce") : ""}</span></div>${[21, 18].map((k) => `<div class="stat"><small>${T(lang, `عيار ${k} · الجرام`, `${k}K · per gram`)}</small><b>${money(Number(g.price) * k / 24)}</b><span>${T(lang, "جنيه مصري", "EGP")}</span></div>`).join("")}<div class="stat"><small>${T(lang, "الجنيه الذهب (8 جم عيار 21)", "Gold pound (8 g, 21K)")}</small><b>${money(Number(g.price) * 21 / 24 * 8)}</b><span>${T(lang, "جنيه مصري", "EGP")}</span></div></div><p class="updated">${T(lang, "السعر مرجعي محسوب من سعر الأوقية وسعر الصرف، وقد يختلف عن أسعار محلات الصاغة.", "A reference price computed from the ounce price and the exchange rate; jewellers' prices may differ.")} · ${esc(g.provider || "")} · ${esc(fmtTime(g.updatedAt))}</p>` : unavailable(lang, T(lang, "سعر الذهب", "the gold price"));
+  return `${toolHead(lang, "prices")}<h2 class="sec-title">${T(lang, "العملات مقابل الجنيه", "Currencies against the pound")}</h2>${cur}<h2 class="sec-title">${T(lang, "الذهب", "Gold")}</h2>${gold}`;
+}
+
+const WMO: [number[], string, string][] = [[[0], "صافٍ", "Clear"], [[1, 2], "غائم جزئيًا", "Partly cloudy"], [[3], "غائم", "Overcast"], [[45, 48], "ضباب", "Fog"], [[51, 53, 55, 56, 57], "رذاذ", "Drizzle"], [[61, 63, 65, 66, 67], "أمطار", "Rain"], [[71, 73, 75, 77], "ثلوج", "Snow"], [[80, 81, 82], "زخات مطر", "Showers"], [[95, 96, 99], "عاصفة رعدية", "Thunderstorm"]];
+export const weatherLabel = (code: number, lang: Lang) => { const m = WMO.find(([codes]) => codes.includes(code)); return m ? (lang === "ar" ? m[1] : m[2]) : ""; };
+const CITY_CHIPS: [string, string][] = [["القاهرة", "Cairo"], ["الإسكندرية", "Alexandria"], ["الغردقة", "Hurghada"], ["أسوان", "Aswan"], ["الرياض", "Riyadh"], ["دبي", "Dubai"], ["لندن", "London"], ["نيويورك", "New York"]];
+const cityForm = (lang: Lang, action: string, city: string, extra = "") => `<form class="tool-form" action="${action}" method="get" role="search"><input type="hidden" name="lang" value="${lang}"><input name="city" value="${esc(city)}" required maxlength="80" placeholder="${T(lang, "اكتب اسم المدينة…", "Type a city name…")}" aria-label="${T(lang, "المدينة", "City")}">${extra}<button type="submit">${T(lang, "اعرض", "Show")}</button></form><div class="chips">${CITY_CHIPS.map(([ar, en]) => `<a href="${esc(`${action}?city=${encodeURIComponent(lang === "ar" ? ar : en)}&lang=${lang}`)}">${lang === "ar" ? ar : en}</a>`).join("")}</div>`;
+export function weatherBody(lang: Lang, city: string, r: any | null): string {
+  const c = r?.ok ? r.current || {} : null;
+  const where = r?.ok ? [r.city, r.region, r.country].filter(Boolean).join(lang === "ar" ? "، " : ", ") : "";
+  const card = c && Number.isFinite(Number(c.temperature_2m)) ? `<div class="stat-grid"><div class="stat big"><small>${esc(where)}</small><b>${Math.round(Number(c.temperature_2m))}°C</b><span>${esc(weatherLabel(Number(c.weather_code), lang))}</span></div><div class="stat"><small>${T(lang, "الرطوبة", "Humidity")}</small><b>${Math.round(Number(c.relative_humidity_2m))}%</b></div><div class="stat"><small>${T(lang, "سرعة الرياح", "Wind")}</small><b>${Math.round(Number(c.wind_speed_10m))}</b><span>${T(lang, "كم/ساعة", "km/h")}</span></div></div><p class="updated">${T(lang, "المصدر", "Source")}: ${esc(r.provider || "Open-Meteo")} · ${esc(fmtTime(r.updatedAt))}</p>`
+    : r && r.message === "City not found" ? `<p class="verdict">${T(lang, "لم نجد هذه المدينة. جرّب كتابة الاسم بشكل مختلف أو بالإنجليزية.", "City not found. Try another spelling or the English name.")}</p>` : unavailable(lang, T(lang, "حالة الطقس", "the weather"));
+  return `${toolHead(lang, "weather")}${cityForm(lang, "/weather", city)}${card}`;
+}
+
+const PRAYERS: [string, string, string][] = [["Fajr", "الفجر", "Fajr"], ["Sunrise", "الشروق", "Sunrise"], ["Dhuhr", "الظهر", "Dhuhr"], ["Asr", "العصر", "Asr"], ["Maghrib", "المغرب", "Maghrib"], ["Isha", "العشاء", "Isha"]];
+export function prayerBody(lang: Lang, city: string, country: string, r: any | null): string {
+  const t = r?.ok ? r.timings || {} : null;
+  const where = r?.ok ? [r.city, r.country].filter(Boolean).join(lang === "ar" ? "، " : ", ") : "";
+  const date = r?.ok ? [r.gregorian?.date, r.hijri ? `${r.hijri.day} ${lang === "ar" ? r.hijri.monthAr : r.hijri.month} ${r.hijri.year}` : ""].filter(Boolean).join(" · ") : "";
+  const grid = t && PRAYERS.some(([k]) => t[k]) ? `<p class="updated" style="margin:0 0 6px">${esc(where)}${date ? " · " + esc(date) : ""}</p><div class="times">${PRAYERS.filter(([k]) => t[k]).map(([k, ar, en], i) => `<div class="stat" style="animation-delay:${i * 60}ms"><small>${lang === "ar" ? ar : en}</small><b>${esc(String(t[k]).slice(0, 5))}</b></div>`).join("")}</div><p class="updated">${T(lang, "المصدر", "Source")}: ${esc(r.provider || "AlAdhan")}${r.timezone ? " · " + esc(r.timezone) : ""}</p>`
+    : unavailable(lang, T(lang, "مواقيت الصلاة", "prayer times"));
+  const countryField = `<input name="country" value="${esc(country)}" maxlength="80" placeholder="${T(lang, "الدولة (اختياري)", "Country (optional)")}" aria-label="${T(lang, "الدولة", "Country")}">`;
+  return `${toolHead(lang, "prayer")}${cityForm(lang, "/prayer", city, countryField)}${grid}`;
 }
 export const notFoundBody = (lang: Lang) => `<div class="page-head"><h1>${T(lang, "الصفحة غير موجودة", "Page not found")}</h1><p><a class="kicker" href="/?lang=${lang}">${T(lang, "العودة إلى الرئيسية", "Back to home")}</a></p></div>`;
 export { verdictFor };
