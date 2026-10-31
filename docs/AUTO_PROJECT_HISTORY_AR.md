@@ -199,3 +199,8 @@
 - Commit: `b5d06cffa162d34d83e9fb5b1dd19305918fca15`
 - الملفات: M	src/v2-bridge.ts;M	tests/v2-bridge.test.ts;M	v2/src/icons.ts;M	v2/src/sections.ts;M	v2/src/ui.ts;M	v2/src/worker.ts;M	v2/tests/worker.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-10-31T23:29:19Z — Classifier: title decides, summary needs two keyword hits (fixes a war story filed under technology because of a Telegram app mention) 
+- Commit: `e50f6bf3b64570f4def11b7d1439d47166a65633`
+- الملفات: M	src/v2-bridge.ts;M	v2/src/classify.ts;M	v2/tests/classify-quality.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
