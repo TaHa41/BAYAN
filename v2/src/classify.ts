@@ -12,8 +12,14 @@ const RULES: [string, RegExp][] = [
   ["world", /(حرب|غزة|إيران|أوكرانيا|الأمم المتحدة|مجلس الأمن|هجوم|قصف|غارات|صواريخ|war\b|gaza|iran|ukraine|united nations|security council|airstrikes?|missiles?)/i],
 ];
 
+/** Title decides first (first matching rule wins). The summary is only consulted when the title matches nothing, and then a
+ *  section needs at least two keyword hits there: one stray word ("a Telegram app" in a war story) must not move a story. */
 export function classifyStory(title: string, summary = ""): string | null {
-  const text = `${title} ${summary}`;
-  for (const [section, re] of RULES) if (re.test(text)) return section;
-  return null;
+  for (const [section, re] of RULES) if (re.test(title)) return section;
+  let best: [string, number] | null = null;
+  for (const [section, re] of RULES) {
+    const hits = (summary.match(new RegExp(re.source, "gi")) || []).length;
+    if (hits >= 2 && (!best || hits > best[1])) best = [section, hits];
+  }
+  return best ? best[0] : null;
 }
