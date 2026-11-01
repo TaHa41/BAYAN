@@ -7,11 +7,12 @@ import { generate, geminiGenerate, listGeminiFlashModels, workersAiGenerate, typ
 import { analyze, type Signals } from "./engineer";
 import { classifyStory } from "./classify";
 import { topicsFor } from "./topics";
+import { STATIC_SLUGS, staticPage, type StaticSlug } from "./pages";
 import type { WikiApi } from "./wiki";
-import { articleBody, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, wikiEntryBody, pricesBody, weatherBody, prayerBody, tickerItems, esc, type ClassifiedStory, type LiveStory, type TickerItem } from "./ui";
+import { articleBody, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, wikiEntryBody, staticBody, searchResultsBody, type SearchItem, pricesBody, weatherBody, prayerBody, tickerItems, esc, type ClassifiedStory, type LiveStory, type TickerItem } from "./ui";
 
 export interface Env extends AiEnv { DB: D1Database; ADS_TXT?: string; SITE_ORIGIN?: string; BAYAN_AI_MANAGER_TOKEN?: string }
-export interface Deps { providers: (lang: Lang) => Provider[]; store: (env: Env) => Store; liveNews?: (env: Env, lang: Lang) => Promise<LiveStory[]>; wiki?: WikiApi; live?: LiveApi }
+export interface Deps { providers: (lang: Lang) => Provider[]; store: (env: Env) => Store; liveNews?: (env: Env, lang: Lang) => Promise<LiveStory[]>; wiki?: WikiApi; live?: LiveApi; search?: (env: Env, q: string, lang: Lang, request: Request) => Promise<{ items: SearchItem[]; notice?: string } | null> }
 export interface LiveApi { fx(env: Env): Promise<any>; gold(env: Env): Promise<any>; weather(env: Env, city?: string): Promise<any>; prayer(env: Env, city?: string, country?: string): Promise<any> }
 
 const xml = (s: string) => s.replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" }[c]!));
@@ -116,6 +117,9 @@ export function createHandler(deps: Deps) {
     if (path === "/search") {
       const q = (url.searchParams.get("q") || "").trim().slice(0, 200);
       if (!q) return page({ title: (lang === "ar" ? "البحث | " : "Search | ") + SITE.name, description: "BAYAN search", body: searchBody(lang, "", null), path: "/search", noindex: true });
+      // Full BAYAN search (all providers, rate limits, archive filing) when available; Wikipedia alone is the safety net.
+      const full = deps.search ? await soft(deps.search(env, q, lang, request), 25000, null) : null;
+      if (full) return html(layout({ lang, origin, path: `/search?q=${encodeURIComponent(q)}`, title: `${q} | ${SITE.name}`, description: full.items[0]?.summary ? plain(full.items[0].summary) : q, body: searchResultsBody(lang, q, full.items, full.notice), noindex: true }), 200, "no-store");
       const outcome = await searchAll(q, deps.providers(lang));
       return html(layout({ lang, origin, path: `/search?q=${encodeURIComponent(q)}`, title: `${q} | ${SITE.name}`, description: outcome.hits[0]?.summary || q, body: searchBody(lang, q, outcome), noindex: true }), 200, "no-store");
     }
@@ -145,6 +149,12 @@ export function createHandler(deps: Deps) {
       const city = (url.searchParams.get("city") || "").trim().slice(0, 80), country = (url.searchParams.get("country") || "").trim().slice(0, 80);
       const r = deps.live ? await soft(deps.live.prayer(env, city || undefined, country || undefined), 8000, null) : null;
       return page({ title: toolTitle("prayer"), description: TOOLS[2][lang === "ar" ? "descAr" : "descEn"], body: prayerBody(lang, city || (lang === "ar" ? "القاهرة" : "Cairo"), country, r), path, active: "prayer" }, 200, FRESH);
+    }
+
+    const staticSlug = path.slice(1) as StaticSlug;
+    if (STATIC_SLUGS.includes(staticSlug)) {
+      const sp = staticPage(staticSlug, lang);
+      return page({ title: `${sp.title} | ${SITE.name}`, description: sp.description, body: staticBody(sp), path }, 200, "public, max-age=300, s-maxage=3600");
     }
 
     const wk = path.match(/^\/wiki\/([^/]+)$/);

@@ -7,6 +7,7 @@ import type { SearchOutcome } from "./search";
 import { icon } from "./icons";
 import { isGenericImage } from "./quality";
 import type { WikiCard, WikiEntry } from "./wiki";
+import type { StaticPage } from "./pages";
 
 export const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 export const SITE = { name: "بيان | BAYAN", credit: "Created by Taha Omar" };
@@ -66,7 +67,7 @@ h2.sec-title{display:flex;align-items:center;gap:12px;margin:48px 0 16px;font-fa
 .wisdom{margin:44px 0 0;padding:20px 24px;border-radius:18px;border:1px solid var(--line);border-inline-start:5px solid var(--gold);background:var(--card);font-family:var(--serif);font-size:19px}.wisdom small{display:block;color:var(--gold);font:600 12px 'Readex Pro',sans-serif;margin-bottom:4px}
 article.full{max-width:46rem;margin:34px auto 0}article.full img.hero-img{width:100%;border-radius:18px;aspect-ratio:16/9;object-fit:cover}
 article.full h1{margin:18px 0 10px;font-family:var(--serif);font-weight:700;font-size:clamp(28px,4.6vw,42px);line-height:1.5}article.full .meta{color:var(--mut);font-size:14px}
-article.full .lead-text p{font-size:18px;color:var(--ink)}article.full h3{margin:22px 0 6px;font-family:var(--serif);font-weight:700;font-size:21px}article.full h2{margin:30px 0 8px;font-family:var(--serif);font-weight:700;font-size:26px;padding-inline-start:12px;border-inline-start:4px solid var(--gold)}article.full p{margin:0 0 16px}article.full ul{margin:0 0 18px;padding-inline-start:24px}
+article.full .lead-text p{font-size:18px;color:var(--ink)}article.full h3{margin:22px 0 6px;font-family:var(--serif);font-weight:700;font-size:21px}footer .legal{margin-bottom:8px}footer .legal a{padding:0 6px}article.full h2{margin:30px 0 8px;font-family:var(--serif);font-weight:700;font-size:26px;padding-inline-start:12px;border-inline-start:4px solid var(--gold)}article.full p{margin:0 0 16px}article.full ul{margin:0 0 18px;padding-inline-start:24px}
 .sources{margin-top:30px;padding:18px 20px;border-radius:16px;border:1px solid var(--line);background:var(--card)}.sources h2{margin:0 0 8px!important;font-size:18px!important;border:0!important;padding:0!important}.sources li{margin:6px 0}.sources a{color:var(--gold);text-decoration:underline;text-underline-offset:3px}
 .result{padding:20px 22px;margin-bottom:14px}.result h3{font-family:var(--serif);font-size:19px;font-weight:600}.result p{margin:6px 0;color:var(--mut);font-size:15px}.result a.ext{color:var(--gold)}
 .verdict{margin:18px 0;padding:14px 18px;border-radius:14px;border:1px solid var(--line);background:var(--card);font-size:14.5px}
@@ -121,7 +122,7 @@ export function layout(o: LayoutOpts): string {
 ${o.jsonLd ? `<script type="application/ld+json">${JSON.stringify(o.jsonLd).replace(/</g, "\\u003c")}</script>` : ""}<style>${CSS}</style></head><body><div class="aurora" aria-hidden="true"></div>
 <header class="top" id="top"><div class="wrap"><div class="bar"><a class="logo" href="/?lang=${lang}">بيان<b>.</b><small>BAYAN</small></a><span class="date">${esc(today)}</span><a class="pill out" href="${esc(href(other))}">${other === "ar" ? "العربية" : "EN"}</a><a class="pill gold" href="/search?lang=${lang}">${T(lang, "ابحث", "Search")}</a></div></div><nav class="ribbon" aria-label="${T(lang, "الأقسام", "Sections")}"><div class="wrap in">${ribbon}</div></nav>${ticker}</header>${o.progress ? '<div class="progress" aria-hidden="true"></div>' : ""}
 <main class="wrap">${o.body}</main>
-<footer><div class="wrap"><nav>${SECTIONS.slice(0, 8).map((s) => `<a href="/${s.slug}?lang=${lang}">${esc(lang === "ar" ? s.ar : s.en)}</a>`).join("")}</nav><p>${T(lang, "المعلومة أولًا، والدليل قبل الادعاء.", "Information first. Evidence before claims.")}</p><p><b>${SITE.credit}</b></p></div></footer></body></html>`;
+<footer><div class="wrap"><nav>${SECTIONS.slice(0, 8).map((s) => `<a href="/${s.slug}?lang=${lang}">${esc(lang === "ar" ? s.ar : s.en)}</a>`).join("")}</nav><p class="legal">${[["about", T(lang, "عن بيان", "About")], ["methodology", T(lang, "المنهجية", "Methodology")], ["privacy", T(lang, "الخصوصية", "Privacy")], ["terms", T(lang, "الشروط", "Terms")]].map(([s, n]) => `<a href="/${s}?lang=${lang}">${n}</a>`).join(" · ")}</p><p>${T(lang, "المعلومة أولًا، والدليل قبل الادعاء.", "Information first. Evidence before claims.")}</p><p><b>${SITE.credit}</b></p></div></footer></body></html>`;
 }
 
 const sectionCard = (s: Section, lang: Lang, i: number) => `<a class="card sec-card" style="--h:${s.hue};animation-delay:${i * 40}ms" href="/${s.slug}?lang=${lang}"><i aria-hidden="true">${icon(s.slug)}</i><h3>${esc(lang === "ar" ? s.ar : s.en)}</h3><p>${esc(lang === "ar" ? s.descAr : s.descEn)}</p></a>`;
@@ -267,6 +268,19 @@ export function prayerBody(lang: Lang, city: string, country: string, r: any | n
     : unavailable(lang, T(lang, "مواقيت الصلاة", "prayer times"));
   const countryField = `<input name="country" value="${esc(country)}" maxlength="80" placeholder="${T(lang, "الدولة (اختياري)", "Country (optional)")}" aria-label="${T(lang, "الدولة", "Country")}">`;
   return `${toolHead(lang, "prayer")}${cityForm(lang, "/prayer", city, countryField)}${grid}`;
+}
+export const staticBody = (p: StaticPage) => `<div class="page-head"><h1>${esc(p.title)}</h1></div><article class="full" style="margin-top:12px">${p.blocks.map((b) => `${b.h ? `<h2>${esc(b.h)}</h2>` : ""}${b.p ? `<p>${esc(b.p)}</p>` : ""}${b.ul ? `<ul>${b.ul.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}`).join("")}</article>`;
+
+export interface SearchItem { title: string; summary: string; section?: string; publisher?: string; url?: string; slug?: string; imageUrl?: string; evidence?: string; sourceCount: number }
+const evidenceLabel = (e: string | undefined, lang: Lang) => e === "verified" ? T(lang, "موثّق", "Verified") : e === "mixed" ? T(lang, "متعدد المصادر", "Several sources") : T(lang, "مرجعي", "Reference");
+export function searchResultsBody(lang: Lang, q: string, items: SearchItem[], notice = ""): string {
+  const cards = items.map((it, i) => {
+    const href = it.slug ? `/article/${encodeURIComponent(it.slug)}?lang=${lang}` : storyHref({ title: it.title, summary: it.summary, publisher: it.publisher || "", url: it.url, imageUrl: it.imageUrl }, lang);
+    const img = it.imageUrl && !isGenericImage(it.imageUrl) ? `<img src="${esc(it.imageUrl)}" alt="${esc(it.title)}" loading="lazy" decoding="async" width="640" height="400">` : `<div class="noimg" aria-hidden="true">${icon(it.section && sectionBySlug(it.section) ? it.section : "news")}</div>`;
+    const ext = it.url && /^https:\/\//i.test(it.url) ? `<span class="badge">${esc(it.publisher || "")} ↗</span>` : "";
+    return `<a class="card art-card" style="animation-delay:${i * 40}ms" href="${esc(href)}">${img}<div class="in"><span class="kicker">${[secLabel(it.section, lang), evidenceLabel(it.evidence, lang)].filter(Boolean).join(" · ")}</span><h3>${esc(plain(it.title))}</h3><p>${esc(plain(it.summary))}</p>${ext}<span class="badge">${T(lang, `${it.sourceCount} مصدر`, `${it.sourceCount} source(s)`)}</span></div></a>`;
+  }).join("");
+  return `<div class="page-head"><h1>${esc(q)}</h1></div>${searchForm(lang)}${notice ? `<p class="verdict">${esc(notice)}</p>` : ""}${cards ? `<div class="grid" style="margin-top:18px">${cards}</div>` : `<p class="verdict">${T(lang, "لم نعثر على نتائج لها مصدر حقيقي في هذه المحاولة، ولم نعرض شيئًا بدلًا من التخمين. جرّب صياغة أخرى.", "No results with a real source were found this time, and nothing was shown instead of guessing. Try another phrasing.")}</p>`}`;
 }
 export const notFoundBody = (lang: Lang) => `<div class="page-head"><h1>${T(lang, "الصفحة غير موجودة", "Page not found")}</h1><p><a class="kicker" href="/?lang=${lang}">${T(lang, "العودة إلى الرئيسية", "Back to home")}</a></p></div>`;
 export { verdictFor };

@@ -143,6 +143,39 @@ describe("v2 live tools (prices, weather, prayer)", () => {
   });
 });
 
+describe("v2 static pages and full search", () => {
+  it.each(["about", "methodology", "privacy", "terms"])("/%s renders in both languages with structured sections and the shared layout", async (slug) => {
+    for (const lang of ["ar", "en"]) {
+      const res = await call(`/${slug}?lang=${lang}`); const html = await res.text();
+      expect(res.status).toBe(200); expect(html).toContain("<h2>"); expect(html).toContain('class="ribbon"'); expect(html).toContain("Created by Taha Omar");
+      expect(html).not.toContain("noindex");
+    }
+  });
+  it("claims stay truthful: five independent publishers, no estimated figures, no ads today, Wikipedia CC BY-SA", async () => {
+    const m = await (await call("/methodology?lang=en")).text(), p = await (await call("/privacy?lang=en")).text(), t = await (await call("/terms?lang=en")).text(), a = await (await call("/about?lang=en")).text();
+    expect(m).toContain("five independent publishers"); expect(a).toContain("estimated figures"); expect(p).toContain("does not show ads at present"); expect(t).toContain("CC BY-SA 4.0");
+  });
+  it("the footer links all four legal pages", async () => {
+    const html = await (await call("/")).text();
+    for (const s of ["about", "methodology", "privacy", "terms"]) expect(html).toContain(`href="/${s}?lang=ar"`);
+  });
+  const full = async () => ({ items: [
+    { title: "نتيجة موثقة", summary: "ملخص نتيجة موثقة من عدة مصادر", section: "politics", publisher: "BBC", url: "https://bbc.com/a", imageUrl: "https://img.example/photos/p-2026.jpg", evidence: "verified", sourceCount: 5 },
+    { title: "نتيجة مرجعية", summary: "ملخص مرجعي", publisher: "ويكيبيديا", url: "https://ar.wikipedia.org/wiki/x", evidence: "source_only", sourceCount: 1 },
+    { title: "مقال داخلي", summary: "ملخص", section: "science", slug: "science-x-ar", evidence: "mixed", sourceCount: 2 }] });
+  it("search uses the full service: evidence labels, section, source counts, internal slug links, research links for external results, honest placeholder without image", async () => {
+    const html = await (await call("/search?q=مصر", {}, { search: full })).text();
+    expect(html).toContain("سياسة · موثّق"); expect(html).toContain("مرجعي"); expect(html).toContain("متعدد المصادر"); expect(html).toContain("5 مصدر");
+    expect(html).toContain("/article/science-x-ar?lang=ar"); expect(html).toContain("/research?title="); expect(html).toContain('class="noimg"'); expect(html).toContain("noindex");
+  });
+  it("search with no results shows the service's own notice; a failing or timed-out service falls back to Wikipedia results", async () => {
+    const empty = await (await call("/search?q=zzz", {}, { search: async () => ({ items: [], notice: "تعذر إكمال البحث الآن" }) })).text();
+    expect(empty).toContain("تعذر إكمال البحث الآن");
+    const fallback = await (await call("/search?q=مصر", {}, { search: async () => { throw new Error("down"); }, providers: () => [ok] })).text();
+    expect(fallback).toContain("https://ar.wikipedia.org/wiki/x");
+  });
+});
+
 describe("v2 motion and navigation", () => {
   it("the ribbon lists sections and the three tools; a news ticker with the latest headlines scrolls on the home page", async () => {
     const stories = [{ title: "خبر عاجل أول", summary: "ملخص", publisher: "م", url: "https://s.example/1" }, { title: "خبر ثان", summary: "ملخص", publisher: "م", url: "https://s.example/2" }];

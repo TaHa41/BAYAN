@@ -8,11 +8,12 @@ import { wikipediaProvider } from "../v2/src/providers/wikipedia";
 import { SECTIONS } from "../v2/src/sections";
 import { wikiApi } from "../v2/src/wiki";
 import { news } from "./services/news";
+import { api } from "./routes/api";
 import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-10-31.3";
+export const V2_BUILD = "2026-11-01.1";
 
 // trends stays on v1 for now. /news is served by v2 using the same live news service and archive v1 used.
 const OWNED_SECTIONS = new Set(SECTIONS.map((s) => s.slug).filter((s) => s !== "trends"));
@@ -20,6 +21,16 @@ const handler = createHandler({
   providers: (lang) => [wikipediaProvider(lang)],
   store: (env) => d1Store(env.DB),
   wiki: wikiApi(),
+  // The same search the site always had (all providers, rate limits, section filing), rendered in the new design.
+  // The original request headers are forwarded so per-visitor limits and analytics exclusions keep working.
+  search: async (env, q, lang, request) => {
+    const u = new URL(request.url);
+    const res = await api(new Request(`${u.origin}/api/search?q=${encodeURIComponent(q)}&lang=${lang}`, { headers: request.headers }), env as Env);
+    if (!res.ok) return null;
+    const data: any = await res.json();
+    const items = (Array.isArray(data?.results) ? data.results : []).slice(0, 12).map((r: any) => ({ title: String(r.title || ""), summary: String(r.summary || ""), section: r.section ? String(r.section) : undefined, publisher: String(r.publisher || r.sources?.[0]?.publisher || ""), url: /^https:\/\//i.test(String(r.url || r.sources?.[0]?.url || "")) ? String(r.url || r.sources[0].url) : undefined, slug: r.slug ? String(r.slug) : undefined, imageUrl: /^https:\/\//i.test(String(r.imageUrl || "")) ? String(r.imageUrl) : undefined, evidence: r.evidence ? String(r.evidence) : undefined, sourceCount: Array.isArray(r.sources) ? r.sources.length : (r.url ? 1 : 0) })).filter((r: any) => r.title);
+    return { items, notice: items.length ? "" : String(data?.message || "") };
+  },
   live: { fx: (env) => fx(env as Env), gold: (env) => gold(env as Env), weather: (env, city) => weather(city, env as Env), prayer: (env, city, country) => prayerTimes(city, country, env as Env) },
   liveNews: async (env, lang) => {
     // A slow RSS refresh must not hold the page: after 6s the page renders from the archive alone.
@@ -33,7 +44,7 @@ export function v2Owns(request: Request): boolean {
   const u = new URL(request.url);
   if (u.searchParams.has("archive")) return false; // legacy deep link to one archived news item: v1 renders it
   const path = u.pathname.replace(/(.)\/+$/, "$1");
-  return path === "/" || OWNED_SECTIONS.has(path.slice(1)) || /^\/article\/[^/]+$/.test(path) || /^\/wiki\/[^/]+$/.test(path) || path === "/prices" || path === "/weather" || path === "/prayer";
+  return path === "/" || OWNED_SECTIONS.has(path.slice(1)) || /^\/article\/[^/]+$/.test(path) || /^\/wiki\/[^/]+$/.test(path) || path === "/prices" || path === "/weather" || path === "/prayer" || path === "/search" || ["/about", "/methodology", "/privacy", "/terms"].includes(path);
 }
 
 export async function serveV2(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response | null> {
