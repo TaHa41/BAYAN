@@ -209,3 +209,8 @@
 - Commit: `273ea15b2f4532dba26c704ac4f4d42f02aebb88`
 - الملفات: M	src/seo.test.ts;M	src/seo.ts;M	src/v2-bridge.ts;A	tests/sitemap-quality.test.ts;M	v2/src/ui.ts;M	v2/tests/worker.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-01T15:03:54Z — Static pages rewritten (about, methodology, privacy, terms) and BAYAN search rendered in the new design using the existing full search service; footer legal links 
+- Commit: `ac496d49d62996024bc41a60868118fe6c489a4d`
+- الملفات: M	src/v2-bridge.ts;M	tests/v2-bridge.test.ts;A	v2/src/pages.ts;M	v2/src/ui.ts;M	v2/src/worker.ts;M	v2/tests/worker.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
