@@ -204,3 +204,8 @@
 - Commit: `e50f6bf3b64570f4def11b7d1439d47166a65633`
 - الملفات: M	src/v2-bridge.ts;M	v2/src/classify.ts;M	v2/tests/classify-quality.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-01T07:29:32Z — SEO: sitemap lists only complete articles (quality gate), Arabic home canonical matches the sitemap 
+- Commit: `273ea15b2f4532dba26c704ac4f4d42f02aebb88`
+- الملفات: M	src/seo.test.ts;M	src/seo.ts;M	src/v2-bridge.ts;A	tests/sitemap-quality.test.ts;M	v2/src/ui.ts;M	v2/tests/worker.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
