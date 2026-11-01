@@ -194,6 +194,12 @@ describe("v2 pages", () => {
     expect((html.match(/<svg viewBox="0 0 24 24"/g) || []).length).toBeGreaterThanOrEqual(30);
     expect(html).not.toContain('class="hero"');
   });
+  it("canonical matches the sitemap: Arabic home is the clean root, every other page keeps ?lang=", async () => {
+    const ar = await (await call("/")).text(), en = await (await call("/?lang=en")).text(), sec = await (await call("/politics")).text();
+    expect(ar).toContain('rel="canonical" href="https://bayan.test/"'); expect(ar).toContain('hreflang="en" href="https://bayan.test/?lang=en"');
+    expect(en).toContain('rel="canonical" href="https://bayan.test/?lang=en"'); expect(en).toContain('hreflang="ar" href="https://bayan.test/"');
+    expect(sec).toContain('rel="canonical" href="https://bayan.test/politics?lang=ar"');
+  });
   it("English home switches direction and copy", async () => {
     const html = await (await call("/?lang=en")).text();
     expect(html).toContain('dir="ltr"'); expect(html).toContain("Every fact comes with its proof");

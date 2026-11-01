@@ -106,7 +106,8 @@ export interface TickerItem { text: string; href: string }
 export interface LayoutOpts { lang: Lang; origin: string; path: string; title: string; description: string; body: string; image?: string; jsonLd?: unknown; noindex?: boolean; active?: string; ticker?: TickerItem[]; progress?: boolean }
 export function layout(o: LayoutOpts): string {
   const { lang } = o, other: Lang = lang === "ar" ? "en" : "ar";
-  const href = (l: Lang, p = o.path) => `${p}${p.includes("?") ? "&" : "?"}lang=${l}`;
+  // The Arabic home page is the clean root URL (same as the sitemap); every other URL carries ?lang=.
+  const href = (l: Lang, p = o.path) => (p === "/" && l === "ar" ? "/" : `${p}${p.includes("?") ? "&" : "?"}lang=${l}`);
   const ribbon = [...SECTIONS, ...TOOLS].map((x) => `<a href="/${x.slug}?lang=${lang}"${o.active === x.slug ? " aria-current=page" : ""}>${icon(x.slug)}${esc(lang === "ar" ? x.ar : x.en)}</a>`).join("");
   // News ticker: the same items twice so the CSS marquee can loop without a gap; the copy is hidden from assistive tech.
   const tick = (o.ticker || []).slice(0, 8).map((t) => `<a href="${esc(t.href)}">${esc(t.text)}</a>`).join("");
