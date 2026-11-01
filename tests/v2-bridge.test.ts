@@ -10,7 +10,7 @@ beforeEach(() => { vi.stubGlobal("fetch", async () => { throw new Error("offline
 afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("v2 bridge", () => {
-  it.each([["/", true], ["/science", true], ["/people", true], ["/article/x", true], ["/wiki/Cairo", true], ["/prices", true], ["/weather?city=Dubai", true], ["/prayer", true], ["/wiki/a/b", false], ["/news", true], ["/news?archive=12", false], ["/news?lang=en", true], ["/trends", false], ["/search", false], ["/admin", false], ["/api/search", false], ["/article/a/b", false]])("v2Owns(%s)=%s", (p, owned) => expect(v2Owns(req(p))).toBe(owned));
+  it.each([["/", true], ["/science", true], ["/people", true], ["/article/x", true], ["/wiki/Cairo", true], ["/prices", true], ["/weather?city=Dubai", true], ["/prayer", true], ["/wiki/a/b", false], ["/news", true], ["/news?archive=12", false], ["/news?lang=en", true], ["/trends", false], ["/search?q=x", true], ["/about", true], ["/methodology", true], ["/privacy", true], ["/terms", true], ["/contribute", false], ["/research", false], ["/admin", false], ["/api/search", false], ["/article/a/b", false]])("v2Owns(%s)=%s", (p, owned) => expect(v2Owns(req(p))).toBe(owned));
   it("never takes non-GET requests", () => expect(v2Owns(req("/", "POST"))).toBe(false));
   it("serves the home page from v2 with hardening headers and the credit line", async () => {
     const res = await serveV2(req("/"), env());
@@ -19,7 +19,7 @@ describe("v2 bridge", () => {
     expect(await res!.text()).toContain("Created by Taha Omar");
   });
   it("returns null for routes it does not own, so v1 keeps serving them", async () => {
-    for (const p of ["/search", "/admin", "/trends", "/api/health"]) expect(await serveV2(req(p), env())).toBeNull();
+    for (const p of ["/contribute", "/admin", "/trends", "/api/health"]) expect(await serveV2(req(p), env())).toBeNull();
   });
   it("falls back to v1 when an article is unknown to v2 (404) or has no image", async () => {
     expect(await serveV2(req("/article/missing"), env([]))).toBeNull();
