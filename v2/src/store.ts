@@ -12,6 +12,7 @@ export interface Store {
   get(slug: string, lang: Lang): Promise<Article | null>;
   sitemap(): Promise<{ slug: string; lang: Lang; updatedAt: string }[]>;
   newsArchive?(lang: Lang, limit: number): Promise<LiveStory[]>;
+  newsArchiveItem?(id: string, lang: Lang): Promise<LiveStory | null>;
 }
 
 const https = (v: unknown) => /^https:\/\//i.test(String(v || ""));
@@ -57,6 +58,11 @@ export function d1Store(db: D1Database): Store {
     async newsArchive(lang, limit) {
       const r = await db.prepare("SELECT id,title,summary,publisher,published_at,image_url,image_alt FROM news_archive WHERE language=? AND section='news' ORDER BY fetched_at DESC LIMIT ?").bind(lang, limit).all<any>();
       return (r.results || []).filter((x) => String(x.title || "").trim()).map((x) => ({ title: String(x.title), summary: String(x.summary || ""), publisher: String(x.publisher || ""), publishedAt: x.published_at ? String(x.published_at) : undefined, imageUrl: https(x.image_url) ? String(x.image_url) : undefined, imageAlt: String(x.image_alt || x.title || ""), href: `/news?archive=${encodeURIComponent(String(x.id))}&lang=${lang}` }));
+    },
+    async newsArchiveItem(id, lang) {
+      const x = await db.prepare("SELECT id,url,title,summary,publisher,published_at,image_url,image_alt FROM news_archive WHERE id=? AND language=? LIMIT 1").bind(id, lang).first<any>();
+      if (!x || !String(x.title || "").trim()) return null;
+      return { title: String(x.title), summary: String(x.summary || ""), publisher: String(x.publisher || ""), publishedAt: x.published_at ? String(x.published_at) : undefined, imageUrl: https(x.image_url) ? String(x.image_url) : undefined, imageAlt: String(x.image_alt || x.title || ""), url: https(x.url) ? String(x.url) : undefined };
     },
     async sitemap() {
       const r = await db.prepare(`SELECT ${cols} FROM articles WHERE status='PUBLISHED' AND image_url LIKE 'https://%' ORDER BY updated_at DESC LIMIT 2000`).all<any>();

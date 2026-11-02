@@ -13,14 +13,29 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-01.1";
+export const V2_BUILD = "2026-11-02.1";
 
-// trends stays on v1 for now. /news is served by v2 using the same live news service and archive v1 used.
-const OWNED_SECTIONS = new Set(SECTIONS.map((s) => s.slug).filter((s) => s !== "trends"));
+// Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
+const OWNED_SECTIONS = new Set(SECTIONS.map((s) => s.slug));
 const handler = createHandler({
   providers: (lang) => [wikipediaProvider(lang)],
   store: (env) => d1Store(env.DB),
   wiki: wikiApi(),
+  // Detailed article for one story: the same builder the site always used (multi-source, evidence-gated), rendered in the new layout.
+  research: async (env, story, lang, request) => {
+    const u = new URL(request.url);
+    const qs = new URLSearchParams({ title: story.title, summary: story.summary, url: story.url || "", publisher: story.publisher, image: story.imageUrl || "", lang });
+    const res = await api(new Request(`${u.origin}/api/news/article?${qs}`, { headers: request.headers }), env as Env);
+    if (!res.ok) return null;
+    const d: any = await res.json(); const a = d?.article;
+    return d?.ok && a?.title ? { title: String(a.title), summary: String(a.summary || ""), body: String(a.body || ""), sources: (Array.isArray(a.sources) ? a.sources : []).map((s: any) => ({ title: String(s.title || ""), publisher: String(s.publisher || ""), url: String(s.url || "") })), image: a.image ? String(a.image) : null, status: a.status ? String(a.status) : undefined, section: a.section ? String(a.section) : undefined } : null;
+  },
+  // Contribution form posts here; the existing API validates, stores for review and notifies the owner.
+  contribute: async (env, data, lang, request) => {
+    const u = new URL(request.url); const headers = new Headers(request.headers); headers.set("content-type", "application/json"); headers.delete("content-length");
+    const res = await api(new Request(`${u.origin}/api/contribute?lang=${lang}`, { method: "POST", headers, body: JSON.stringify(data) }), env as Env);
+    return { ok: res.ok };
+  },
   // The same search the site always had (all providers, rate limits, section filing), rendered in the new design.
   // The original request headers are forwarded so per-visitor limits and analytics exclusions keep working.
   search: async (env, q, lang, request) => {
@@ -39,12 +54,13 @@ const handler = createHandler({
   },
 });
 
+const ADMIN_AI = new Set(["/api/admin/ai-test", "/api/admin/diagnose"]);
 export function v2Owns(request: Request): boolean {
-  if (request.method !== "GET") return false;
   const u = new URL(request.url);
-  if (u.searchParams.has("archive")) return false; // legacy deep link to one archived news item: v1 renders it
   const path = u.pathname.replace(/(.)\/+$/, "$1");
-  return path === "/" || OWNED_SECTIONS.has(path.slice(1)) || /^\/article\/[^/]+$/.test(path) || /^\/wiki\/[^/]+$/.test(path) || path === "/prices" || path === "/weather" || path === "/prayer" || path === "/search" || ["/about", "/methodology", "/privacy", "/terms"].includes(path);
+  if (request.method === "POST") return path === "/contribute";
+  if (request.method !== "GET") return false;
+  return path === "/" || OWNED_SECTIONS.has(path.slice(1)) || /^\/article\/[^/]+$/.test(path) || /^\/wiki\/[^/]+$/.test(path) || path === "/prices" || path === "/weather" || path === "/prayer" || path === "/search" || ["/about", "/methodology", "/privacy", "/terms", "/research", "/contribute"].includes(path) || ADMIN_AI.has(path);
 }
 
 export async function serveV2(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response | null> {
@@ -52,9 +68,9 @@ export async function serveV2(request: Request, env: Env, ctx?: ExecutionContext
   const cache = typeof caches !== "undefined" ? (caches as unknown as { default: Cache }).default : null;
   const key = new Request(request.url, { method: "GET" });
   try {
-    if (cache) { const hit = await cache.match(key); if (hit) return hit; }
+    if (cache && request.method === "GET") { const hit = await cache.match(key); if (hit) return hit; }
     const res = await handler(request, env as never);
-    if (res.status !== 200) return null; // unknown article / anything else: v1 decides
+    if (res.status !== 200 && !(request.method === "POST" && res.status < 500) && !ADMIN_AI.has(new URL(request.url).pathname)) return null; // unknown article / anything else: v1 decides
     const out = new Response(res.body, res);
     out.headers.set("referrer-policy", "strict-origin-when-cross-origin");
     out.headers.set("x-frame-options", "DENY");

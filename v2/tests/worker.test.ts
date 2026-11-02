@@ -143,6 +143,52 @@ describe("v2 live tools (prices, weather, prayer)", () => {
   });
 });
 
+const post = (path: string, form: Record<string, string>, deps: Partial<Deps> = {}) =>
+  createHandler({ providers: () => [], store: () => store(), ...deps })(new Request("https://bayan.test" + path, { method: "POST", body: new URLSearchParams(form) }), { DB: {} as D1Database });
+
+describe("v2 research, archive items, trends and contribution (no link leaves the new site)", () => {
+  const research = async () => ({ title: "عنوان معالج", summary: "ملخص المعالجة", body: "ملخص المعالجة\n## تفاصيل\nنص المعالجة المفصلة هنا.", sources: [{ title: "BBC", publisher: "BBC", url: "https://bbc.com/a" }, { title: "http", publisher: "x", url: "http://insecure.com" }], image: "https://img.example/photos/r-2026.jpg", status: "verified", section: "politics" });
+  const q = "/research?title=" + encodeURIComponent("خبر") + "&summary=" + encodeURIComponent("ملخص") + "&publisher=BBC&url=" + encodeURIComponent("https://bbc.com/a");
+  it("/research shows the multi-source write-up with sections, https sources only and an image, in the shared layout", async () => {
+    const html = await (await call(q, {}, { research })).text();
+    expect(html).toContain("<h2>تفاصيل</h2>"); expect(html).toContain("https://bbc.com/a"); expect(html).not.toContain("insecure.com"); expect(html).toContain("https://img.example/photos/r-2026.jpg");
+    expect(html).toContain('class="ribbon"'); expect(html).toContain('class="progress"'); expect(html).not.toContain("ملخص من المصدر");
+  });
+  it("/research is honest when the builder returns only a summary or fails: notice, source link, retry link, no invented detail", async () => {
+    const summaryOnly = await (await call(q, {}, { research: async () => ({ title: "خبر", summary: "ملخص", body: "ملخص", sources: [], status: "source_only" }) })).text();
+    expect(summaryOnly).toContain("ملخص من المصدر"); expect(summaryOnly).toContain("https://bbc.com/a");
+    const failed = await (await call(q, {}, { research: async () => { throw new Error("ai down"); } })).text();
+    expect(failed).toContain("تعذر تحضير معالجة مفصلة"); expect(failed).toContain("حاول مرة أخرى"); expect(failed).toContain("/research?");
+  });
+  it("/research without a title is a 404 and the result is never indexed", async () => {
+    expect((await call("/research")).status).toBe(404);
+    expect(await (await call(q, {}, { research })).text()).toContain("noindex");
+  });
+  it("/news?archive=ID opens the archived item through the same research flow; unknown ids are 404", async () => {
+    const item = { title: "خبر من الأرشيف", summary: "ملخص", publisher: "الجزيرة", url: "https://aljazeera.net/x" };
+    const ok = await call("/news?archive=7", {}, { research, store: () => store({ newsArchiveItem: async (id: string) => (id === "7" ? item : null) }) });
+    expect(ok.status).toBe(200); expect(await ok.text()).toContain("عنوان معالج");
+    expect((await call("/news?archive=99", {}, { store: () => store({ newsArchiveItem: async () => null }) })).status).toBe(404);
+  });
+  it("/trends combines the encyclopedia's most-read list with current headlines and has an honest empty state", async () => {
+    const html = await (await call("/trends", {}, { wiki: wikiStub({ mostRead: async () => [{ title: "محمد صلاح", extract: "لاعب كرة قدم مصري يلعب في ليفربول وله إنجازات كثيرة.", url: "https://ar.wikipedia.org/wiki/x", views: 9000 }] }), liveNews: async () => [{ title: "خبر عاجل", summary: "ملخص", publisher: "م", url: "https://s.example/1" }] })).text();
+    expect(html).toContain("ما يقرؤه الناس الآن"); expect(html).toContain("عناوين متداولة"); expect(html).toContain("/wiki/");
+    expect(await (await call("/trends")).text()).toContain("لا توجد اتجاهات متاحة الآن");
+  });
+  it("contribute: GET shows the form; valid POST is sent for review; invalid POST is rejected before the service; honeypot is silently accepted", async () => {
+    expect(await (await call("/contribute")).text()).toContain('name="website"');
+    const sent: any[] = []; const contribute = async (_e: any, d: any) => { sent.push(d); return { ok: true }; };
+    const good = await (await post("/contribute?lang=ar", { title: "عنوان مساهمة", body: "معلومة مفصلة تزيد عن عشرين حرفًا بالتأكيد.", source: "https://s.example", section: "science", website: "" }, { contribute })).text();
+    expect(good).toContain("استلمنا مساهمتك"); expect(sent).toHaveLength(1); expect(sent[0].section).toBe("science");
+    const bad = await (await post("/contribute?lang=ar", { title: "ع", body: "قصير", section: "news" }, { contribute })).text();
+    expect(bad).toContain("تحقق من الحقول"); expect(sent).toHaveLength(1);
+    const bot = await (await post("/contribute?lang=ar", { title: "عنوان مساهمة", body: "معلومة مفصلة تزيد عن عشرين حرفًا بالتأكيد.", section: "science", website: "http://spam" }, { contribute })).text();
+    expect(bot).toContain("استلمنا"); expect(sent).toHaveLength(1);
+    const down = await (await post("/contribute?lang=ar", { title: "عنوان مساهمة", body: "معلومة مفصلة تزيد عن عشرين حرفًا بالتأكيد.", section: "science" }, { contribute: async () => { throw new Error("x"); } })).text();
+    expect(down).toContain("تعذر إرسال المساهمة");
+  });
+});
+
 describe("v2 static pages and full search", () => {
   it.each(["about", "methodology", "privacy", "terms"])("/%s renders in both languages with structured sections and the shared layout", async (slug) => {
     for (const lang of ["ar", "en"]) {
