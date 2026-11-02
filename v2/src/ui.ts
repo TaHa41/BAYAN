@@ -100,6 +100,7 @@ footer{margin-top:72px;padding:34px 0 40px;background:var(--navy);color:#b9c6e0;
 .stat{padding:18px 20px;border-radius:18px;border:1px solid var(--line);background:var(--card);animation:rise .8s var(--ease) both}.stat small{display:block;color:var(--mut);font-size:13px}.stat b{display:block;margin-top:2px;font-family:var(--serif);font-size:30px;line-height:1.3}.stat span{font-size:13px;color:var(--mut)}
 .stat.big{grid-column:1/-1;background:linear-gradient(150deg,var(--navy2),var(--navy));color:#fff;border:0}.stat.big small,.stat.big span{color:#b9c6e0}.stat.big b{font-size:clamp(40px,8vw,64px);color:var(--gold2)}
 .times{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:8px}.times .stat b{font-size:28px;direction:ltr;display:block}
+form.contribute{display:grid;gap:14px;max-width:46rem;margin-top:18px}form.contribute label{display:grid;gap:6px;font-size:14px;color:var(--mut)}form.contribute input,form.contribute select,form.contribute textarea{border-radius:14px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:15px;padding:12px 16px}form.contribute input:focus,form.contribute select:focus,form.contribute textarea:focus{outline:none;border-color:var(--gold)}form.contribute button{justify-self:start;height:50px;padding:0 28px;border:0;border-radius:25px;background:var(--navy);color:#fff;font:inherit;font-weight:500;cursor:pointer}
 .updated{margin-top:14px;font-size:13px;color:var(--mut)}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.progress{display:none!important}}`;
 
@@ -281,6 +282,40 @@ export function searchResultsBody(lang: Lang, q: string, items: SearchItem[], no
     return `<a class="card art-card" style="animation-delay:${i * 40}ms" href="${esc(href)}">${img}<div class="in"><span class="kicker">${[secLabel(it.section, lang), evidenceLabel(it.evidence, lang)].filter(Boolean).join(" · ")}</span><h3>${esc(plain(it.title))}</h3><p>${esc(plain(it.summary))}</p>${ext}<span class="badge">${T(lang, `${it.sourceCount} مصدر`, `${it.sourceCount} source(s)`)}</span></div></a>`;
   }).join("");
   return `<div class="page-head"><h1>${esc(q)}</h1></div>${searchForm(lang)}${notice ? `<p class="verdict">${esc(notice)}</p>` : ""}${cards ? `<div class="grid" style="margin-top:18px">${cards}</div>` : `<p class="verdict">${T(lang, "لم نعثر على نتائج لها مصدر حقيقي في هذه المحاولة، ولم نعرض شيئًا بدلًا من التخمين. جرّب صياغة أخرى.", "No results with a real source were found this time, and nothing was shown instead of guessing. Try another phrasing.")}</p>`}`;
+}
+export interface ResearchArticle { title: string; summary: string; body: string; sources: { title: string; publisher: string; url: string }[]; image?: string | null; status?: string; section?: string }
+/** Detailed article built by the existing research service from several sources, in the new layout. Honest about its status. */
+export function researchBody(lang: Lang, story: LiveStory, a: ResearchArticle | null, retryHref: string): string {
+  const title = plain(a?.title || story.title), summary = plain(a?.summary || story.summary);
+  const imgUrl = [a?.image, story.imageUrl].find((u) => u && /^https:\/\//i.test(String(u)) && !isGenericImage(String(u))) as string | undefined;
+  const hasDetail = !!a && a.body.replace(/\s+/g, " ").trim() !== a.summary.replace(/\s+/g, " ").trim() && a.status !== "source_only";
+  const notice = !a ? `<p class="verdict">${T(lang, "تعذر تحضير معالجة مفصلة لهذا الخبر الآن، وهذا ملخص المصدر فقط.", "A detailed write-up could not be prepared right now; this is the source summary only.")} <a class="kicker" href="${esc(retryHref)}">${T(lang, "حاول مرة أخرى", "Try again")}</a></p>`
+    : hasDetail ? "" : `<p class="verdict">${T(lang, "ملخص من المصدر: لم تتوفر مصادر مستقلة كافية لمعالجة مفصلة، ولم نضف أي معلومة من خارجها.", "Source summary: not enough independent sources were available for a detailed write-up, and nothing beyond them was added.")}</p>`;
+  const sources = (a?.sources?.length ? a.sources : story.url ? [{ title: story.publisher, publisher: story.publisher, url: story.url }] : []).filter((s) => /^https:\/\//i.test(s.url));
+  return `<article class="full">${imgUrl ? `<img class="hero-img" src="${esc(imgUrl)}" alt="${esc(title)}" width="1200" height="675">` : ""}
+<p class="meta" style="margin-top:14px"><span class="kicker">${esc([secLabel(a?.section, lang), story.publisher].filter(Boolean).join(" · "))}</span>${story.publishedAt ? " · " + esc(story.publishedAt.slice(0, 10)) : ""}</p><h1>${esc(title)}</h1>${notice}
+<p class="lead" style="margin-inline:0;color:var(--mut)">${esc(summary)}</p>${hasDetail ? renderBody(a!.body) : ""}
+${sources.length ? `<div class="sources"><h2>${T(lang, "المصادر", "Sources")}</h2><ul>${sources.map((s) => `<li><a href="${esc(s.url)}" rel="noopener nofollow" target="_blank">${esc(s.title || s.publisher || s.url)}</a>${s.publisher && s.title ? ` — ${esc(s.publisher)}` : ""}</li>`).join("")}</ul></div>` : ""}</article>`;
+}
+
+export function trendsBody(lang: Lang, d: { mostRead: WikiCard[]; stories: ClassifiedStory[] }, now = Date.now()): string {
+  const s = sectionBySlug("trends")!;
+  const read = d.mostRead.length ? `<h2 class="sec-title">${T(lang, "ما يقرؤه الناس الآن", "What people are reading now")}</h2><div class="grid">${d.mostRead.map((c, i) => wikiCard(c, lang, i, "trends")).join("")}</div>` : "";
+  const news = d.stories.length ? `<h2 class="sec-title">${T(lang, "عناوين متداولة", "Headlines in circulation")}</h2><div class="grid">${d.stories.slice(0, 12).map((st, i) => storyCard(st, lang, i, st.section)).join("")}</div>` : "";
+  return `<div class="page-head"><h1>${esc(lang === "ar" ? s.ar : s.en)}</h1><p>${esc(lang === "ar" ? s.descAr : s.descEn)}</p></div>${read}${news}${!read && !news ? `<p class="verdict">${T(lang, "لا توجد اتجاهات متاحة الآن، وسنعرضها هنا فور توفرها من المصادر.", "No trends are available right now; they will appear here as soon as the sources provide them.")}</p>` : ""}${wisdomBlock(lang, now)}`;
+}
+
+export interface ContributeValues { title?: string; body?: string; source?: string; section?: string }
+export function contributeBody(lang: Lang, msg?: { ok: boolean; text: string }, v: ContributeValues = {}): string {
+  const opts = SECTIONS.filter((x) => x.slug !== "news").map((x) => `<option value="${x.slug}"${v.section === x.slug ? " selected" : ""}>${esc(lang === "ar" ? x.ar : x.en)}</option>`).join("");
+  return `<div class="page-head"><h1>${T(lang, "ساهم بمعلومة", "Contribute")}</h1><p>${T(lang, "أرسل معلومة أو تصحيحًا مع مصدرها. تُراجع كل مساهمة قبل أي نشر.", "Send information or a correction with its source. Every contribution is reviewed before anything is published.")}</p></div>
+${msg ? `<p class="verdict" role="status"${msg.ok ? "" : ' style="border-color:#c0392b"'}>${esc(msg.text)}</p>` : ""}
+<form class="contribute" action="/contribute?lang=${lang}" method="post"><input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;height:0;width:0;opacity:0">
+<label>${T(lang, "العنوان", "Title")}<input name="title" required minlength="4" maxlength="300" value="${esc(v.title || "")}"></label>
+<label>${T(lang, "القسم", "Section")}<select name="section">${opts}</select></label>
+<label>${T(lang, "المعلومة", "Information")}<textarea name="body" required minlength="20" maxlength="12000" rows="8">${esc(v.body || "")}</textarea></label>
+<label>${T(lang, "رابط المصدر (يفضَّل)", "Source link (preferred)")}<input name="source" type="url" maxlength="1000" placeholder="https://" value="${esc(v.source || "")}"></label>
+<button type="submit">${T(lang, "إرسال للمراجعة", "Send for review")}</button></form>`;
 }
 export const notFoundBody = (lang: Lang) => `<div class="page-head"><h1>${T(lang, "الصفحة غير موجودة", "Page not found")}</h1><p><a class="kicker" href="/?lang=${lang}">${T(lang, "العودة إلى الرئيسية", "Back to home")}</a></p></div>`;
 export { verdictFor };

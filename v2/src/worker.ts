@@ -9,10 +9,10 @@ import { classifyStory } from "./classify";
 import { topicsFor } from "./topics";
 import { STATIC_SLUGS, staticPage, type StaticSlug } from "./pages";
 import type { WikiApi } from "./wiki";
-import { articleBody, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, wikiEntryBody, staticBody, searchResultsBody, type SearchItem, pricesBody, weatherBody, prayerBody, tickerItems, esc, type ClassifiedStory, type LiveStory, type TickerItem } from "./ui";
+import { articleBody, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, wikiEntryBody, staticBody, searchResultsBody, researchBody, trendsBody, contributeBody, type ResearchArticle, type ContributeValues, type SearchItem, pricesBody, weatherBody, prayerBody, tickerItems, esc, type ClassifiedStory, type LiveStory, type TickerItem } from "./ui";
 
 export interface Env extends AiEnv { DB: D1Database; ADS_TXT?: string; SITE_ORIGIN?: string; BAYAN_AI_MANAGER_TOKEN?: string }
-export interface Deps { providers: (lang: Lang) => Provider[]; store: (env: Env) => Store; liveNews?: (env: Env, lang: Lang) => Promise<LiveStory[]>; wiki?: WikiApi; live?: LiveApi; search?: (env: Env, q: string, lang: Lang, request: Request) => Promise<{ items: SearchItem[]; notice?: string } | null> }
+export interface Deps { providers: (lang: Lang) => Provider[]; store: (env: Env) => Store; liveNews?: (env: Env, lang: Lang) => Promise<LiveStory[]>; wiki?: WikiApi; live?: LiveApi; search?: (env: Env, q: string, lang: Lang, request: Request) => Promise<{ items: SearchItem[]; notice?: string } | null>; research?: (env: Env, story: LiveStory, lang: Lang, request: Request) => Promise<ResearchArticle | null>; contribute?: (env: Env, data: { title: string; body: string; source: string; section: string }, lang: Lang, request: Request) => Promise<{ ok: boolean }> }
 export interface LiveApi { fx(env: Env): Promise<any>; gold(env: Env): Promise<any>; weather(env: Env, city?: string): Promise<any>; prayer(env: Env, city?: string, country?: string): Promise<any> }
 
 const xml = (s: string) => s.replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" }[c]!));
@@ -164,6 +164,42 @@ export function createHandler(deps: Deps) {
       const from = sectionBySlug(url.searchParams.get("s") || "")?.slug;
       // Live mirror of Wikipedia text: kept out of the index (duplicate content) but followed; the sitemap does not list it.
       return page({ title: `${entry.title} | ${lang === "ar" ? "موسوعة بيان" : "BAYAN encyclopedia"}`, description: plain(entry.summary), body: wikiEntryBody(lang, entry, from), path: `/wiki/${wk[1]}`, active: from, image: entry.imageUrl, noindex: true, progress: true });
+    }
+
+    // Detailed article for one story, built by the research service from several sources (never an invented text).
+    const researchPage = async (story: LiveStory, retryHref: string) => {
+      const a = deps.research ? await soft(deps.research(env, story, lang, request), 45000, null) : null;
+      return html(layout({ lang, origin, path, title: `${plain(a?.title || story.title)} | ${SITE.name}`, description: plain(a?.summary || story.summary), body: researchBody(lang, story, a, retryHref), noindex: true, progress: true, image: a?.image || story.imageUrl }), 200, "no-store");
+    };
+    if (path === "/research") {
+      const title = (url.searchParams.get("title") || "").trim().slice(0, 300);
+      if (!title) return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404);
+      const img = url.searchParams.get("image") || "", src = url.searchParams.get("url") || "";
+      return researchPage({ title, summary: (url.searchParams.get("summary") || "").slice(0, 1500), publisher: (url.searchParams.get("publisher") || "").slice(0, 120), imageUrl: /^https:\/\//i.test(img) ? img : undefined, url: /^https:\/\//i.test(src) ? src : undefined }, url.pathname + url.search);
+    }
+    if (path === "/news" && url.searchParams.get("archive")) {
+      let item = null; try { item = store.newsArchiveItem ? await store.newsArchiveItem(String(url.searchParams.get("archive")).slice(0, 40), lang) : null; } catch (error) { item = null; }
+      if (!item) return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404);
+      return researchPage(item, url.pathname + url.search);
+    }
+    if (path === "/trends") {
+      const [stories, mostRead] = await Promise.all([loadNews(), deps.wiki ? soft(deps.wiki.mostRead(lang), 3500, []) : Promise.resolve([])]);
+      const s = sectionBySlug("trends")!;
+      return page({ title: `${lang === "ar" ? s.ar : s.en} | ${SITE.name}`, description: lang === "ar" ? s.descAr : s.descEn, body: trendsBody(lang, { mostRead, stories }), path, active: "trends", ticker: tickerItems(stories, lang) }, 200, "public, max-age=60, s-maxage=300");
+    }
+    if (path === "/contribute") {
+      let msg: { ok: boolean; text: string } | undefined; let vals: ContributeValues = {};
+      if (request.method === "POST") {
+        const f = await request.formData().catch(() => null);
+        const g = (k: string, n: number) => String(f?.get(k) || "").trim().slice(0, n);
+        vals = { title: g("title", 300), body: g("body", 12000), source: g("source", 1000), section: g("section", 80) };
+        if (g("website", 50)) msg = { ok: true, text: lang === "ar" ? "شكرًا، استلمنا مساهمتك." : "Thank you, we received your contribution." };
+        else if (vals.title!.length < 4 || vals.body!.length < 20 || !sectionBySlug(vals.section || "") || vals.section === "news") msg = { ok: false, text: lang === "ar" ? "تحقق من الحقول: العنوان 4 أحرف على الأقل والمعلومة 20 حرفًا على الأقل." : "Check the fields: the title needs 4+ characters and the information 20+." };
+        else { const r = deps.contribute ? await soft(deps.contribute(env, vals as { title: string; body: string; source: string; section: string }, lang, request).catch(() => ({ ok: false })), 15000, { ok: false }) : { ok: false };
+          if (r.ok) { msg = { ok: true, text: lang === "ar" ? "شكرًا، استلمنا مساهمتك وستُراجع قبل أي نشر." : "Thank you. Your contribution was received and will be reviewed before anything is published." }; vals = {}; }
+          else msg = { ok: false, text: lang === "ar" ? "تعذر إرسال المساهمة الآن، حاول مرة أخرى بعد قليل." : "Could not send your contribution right now; please try again shortly." }; }
+      }
+      return html(layout({ lang, origin, path, title: `${lang === "ar" ? "ساهم بمعلومة" : "Contribute"} | ${SITE.name}`, description: lang === "ar" ? "أرسل معلومة أو تصحيحًا مع مصدره." : "Send information or a correction with its source.", body: contributeBody(lang, msg, vals), noindex: request.method === "POST" }), 200, "no-store");
     }
 
     if (path === "/news") {

@@ -11,6 +11,7 @@ export type GeminiOptions = {
   maxOutputTokens?: number;
   timeoutMs?: number;
   fetchImpl?: typeof fetch;
+  noDiscovery?: boolean;
 };
 
 export const DEFAULT_GEMINI_MODEL = "gemini-3.8-flash";
@@ -19,6 +20,24 @@ export const resolveGeminiModel = (raw: unknown): string => {
   const model = String(raw ?? "").trim();
   return !model || !MODEL_PATTERN.test(model) || /-latest$/i.test(model) ? DEFAULT_GEMINI_MODEL : model;
 };
+// Self-healing model choice: when the configured/default model does not exist (HTTP 404), ask the API which Flash models this key can
+// use, pick the newest stable one and remember it for the life of the isolate, so one wrong model name can no longer stop every AI task.
+const DISCOVERED = new Map<string, string>();
+export const resetGeminiDiscovery = () => DISCOVERED.clear();
+export function pickFlashModel(models: unknown): string | null {
+  const ranked = (Array.isArray(models) ? models : [])
+    .filter((m: any) => /flash/i.test(String(m?.name)) && (m?.supportedGenerationMethods || []).includes("generateContent") && !/(image|tts|live|audio|native|exp|embedding|robotics|computer|thinking)/i.test(String(m.name)))
+    .map((m: any) => { const name = String(m.name).replace(/^models\//, ""); const v = /gemini-(\d+(?:\.\d+)?)-flash/.exec(name); return { name, version: v ? Number(v[1]) : 0, preview: /preview/i.test(name) }; })
+    .sort((a, b) => b.version - a.version || Number(a.preview) - Number(b.preview) || a.name.length - b.name.length);
+  return ranked[0]?.name ?? null;
+}
+async function discoverFlashModel(key: string, doFetch: typeof fetch): Promise<string | null> {
+  try {
+    const res = await doFetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key }, signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    return pickFlashModel((await res.json() as any)?.models);
+  } catch { return null; }
+}
 const redact = (value: string, key: string): string => {
   let out = String(value ?? "").replace(/\s+/g, " ").slice(0, 300);
   if (key) out = out.split(key).join("[redacted]");
@@ -30,7 +49,8 @@ export async function callGemini(env: GeminiEnv, prompt: string, options: Gemini
   if (!key) return { ok: false, kind: "no_key", detail: "GEMINI_API_KEY is not configured" };
   const text = String(prompt ?? "").trim();
   if (!text) return { ok: false, kind: "bad_response", detail: "empty prompt" };
-  const model = resolveGeminiModel(env.GEMINI_MODEL);
+  const requested = resolveGeminiModel(env.GEMINI_MODEL);
+  const model = DISCOVERED.get(requested) ?? requested;
   const body: Record<string, unknown> = {
     contents: [{ role: "user", parts: [{ text }] }],
     generationConfig: {
@@ -62,6 +82,10 @@ export async function callGemini(env: GeminiEnv, prompt: string, options: Gemini
       if (response.status === 429 || apiStatus === "RESOURCE_EXHAUSTED") {
         const quota = /quota|per day|daily|billing/i.test(apiMessage);
         return { ok: false, kind: quota ? "quota" : "rate_limited", status: response.status, detail: redact(apiMessage, key) };
+      }
+      if (response.status === 404 && !options.noDiscovery && /not found|not supported/i.test(apiMessage)) {
+        const alt = await discoverFlashModel(key, doFetch);
+        if (alt && alt !== model) { DISCOVERED.set(requested, alt); return callGemini({ ...env, GEMINI_MODEL: alt }, prompt, { ...options, noDiscovery: true }); }
       }
       return { ok: false, kind: "http", status: response.status, detail: redact(apiMessage, key) };
     }
