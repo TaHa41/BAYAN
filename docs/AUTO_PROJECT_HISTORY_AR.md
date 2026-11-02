@@ -214,3 +214,8 @@
 - Commit: `ac496d49d62996024bc41a60868118fe6c489a4d`
 - الملفات: M	src/v2-bridge.ts;M	tests/v2-bridge.test.ts;A	v2/src/pages.ts;M	v2/src/ui.ts;M	v2/src/worker.ts;M	v2/tests/worker.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-02T23:51:53Z — Everything on the new site: research, archive items, trends, contribution form; Gemini model self-healing; AI engineer endpoints live 
+- Commit: `ae1b974e07d3732475ff76ed5c9a0680d14e90e7`
+- الملفات: M	src/services/gemini.ts;M	src/v2-bridge.ts;M	tests/gemini.test.ts;M	tests/v2-bridge.test.ts;M	v2/src/store.ts;M	v2/src/ui.ts;M	v2/src/worker.ts;M	v2/tests/worker.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
