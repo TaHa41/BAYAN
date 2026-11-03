@@ -123,7 +123,7 @@ export function createHandler(deps: Deps) {
       if (!q) return page({ title: (lang === "ar" ? "البحث | " : "Search | ") + SITE.name, description: "BAYAN search", body: searchBody(lang, "", null), path: "/search", noindex: true });
       // Full BAYAN search (all providers, rate limits, archive filing) when available; Wikipedia alone is the safety net.
       const full = deps.search ? await soft(deps.search(env, q, lang, request), 25000, null) : null;
-      if (full) return html(layout({ lang, origin, path: `/search?q=${encodeURIComponent(q)}`, title: `${q} | ${SITE.name}`, description: full.items[0]?.summary ? plain(full.items[0].summary) : q, body: searchResultsBody(lang, q, full.items, full.notice), noindex: true }), 200, "no-store");
+      if (full) { const safeItems = full.items.filter(item => !isBlockedAdultContent(item.title, item.summary, item.url, item.publisher)); return html(layout({ lang, origin, path: `/search?q=${encodeURIComponent(q)}`, title: `${q} | ${SITE.name}`, description: safeItems[0]?.summary ? plain(safeItems[0].summary) : q, body: searchResultsBody(lang, q, safeItems, full.notice), noindex: true }), 200, "no-store"); }
       const outcome = await searchAll(q, deps.providers(lang));
       return html(layout({ lang, origin, path: `/search?q=${encodeURIComponent(q)}`, title: `${q} | ${SITE.name}`, description: outcome.hits[0]?.summary || q, body: searchBody(lang, q, outcome), noindex: true }), 200, "no-store");
     }
