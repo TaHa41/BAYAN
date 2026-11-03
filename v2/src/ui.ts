@@ -94,6 +94,16 @@ footer{margin-top:72px;padding:34px 0 40px;background:var(--navy);color:#b9c6e0;
 .art-card img,.lead-story img,.side img{transition:transform .9s var(--ease)}.art-card:hover img,.side a:hover img{transform:scale(1.06)}
 .sec-card i{transition:transform .5s var(--ease)}.sec-card:hover i{transform:rotate(-8deg) scale(1.1)}
 .sec-card::after{content:"";position:absolute;inset:0;background:radial-gradient(120px 120px at var(--mx,80%) var(--my,0%),rgba(255,255,255,.18),transparent 70%);opacity:0;transition:opacity .4s}.sec-card:hover::after{opacity:1}
+.grp{margin-top:22px}.grp-title{display:flex;align-items:center;gap:12px;font:600 13px 'Readex Pro',sans-serif;letter-spacing:.06em;color:var(--mut);margin-bottom:12px}.grp-title::after{content:"";flex:1;height:1px;background:var(--line)}
+.sec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+@media(min-width:900px){.sec-card[data-size=wide]{grid-column:span 2}.sec-card[data-size=wide] h3{font-size:27px}}
+.sec-card{display:flex;flex-direction:column;min-height:172px}
+.sec-card .top,.sec-card h3,.sec-card p{position:relative}
+.sec-card .top{display:flex;align-items:center;justify-content:space-between}
+.sec-card .wm{position:absolute;inset-inline-end:-16px;bottom:-24px;opacity:.13;transform:rotate(-12deg);transition:transform .7s var(--ease),opacity .4s;pointer-events:none}.sec-card .wm svg{width:150px;height:150px;stroke-width:1.1}
+.sec-card:hover .wm{transform:rotate(-4deg) scale(1.12);opacity:.22}
+.sec-card .go{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.4);font-weight:400;opacity:0;transform:translateX(8px);transition:opacity .35s var(--ease),transform .35s var(--ease)}[dir=rtl] .sec-card .go{transform:translateX(-8px)}.sec-card:hover .go,.sec-card:focus-visible .go{opacity:1;transform:none}
+.sec-card h3{margin-top:auto;padding-top:14px}.sec-card p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .tool-form{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 10px}.tool-form input{flex:1;min-width:150px;height:50px;border-radius:25px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:15px;padding:0 20px}.tool-form input:focus{outline:none;border-color:var(--gold)}.tool-form button{height:50px;padding:0 26px;border:0;border-radius:25px;background:var(--navy);color:#fff;font:inherit;font-weight:500;cursor:pointer}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 18px}.chips a{padding:6px 14px;border-radius:18px;border:1px solid var(--line);background:var(--card);font-size:13.5px;transition:border-color .25s,transform .25s}.chips a:hover{border-color:var(--gold);transform:translateY(-2px)}
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-top:8px}
@@ -126,7 +136,14 @@ ${o.jsonLd ? `<script type="application/ld+json">${JSON.stringify(o.jsonLd).repl
 <footer><div class="wrap"><nav>${SECTIONS.slice(0, 8).map((s) => `<a href="/${s.slug}?lang=${lang}">${esc(lang === "ar" ? s.ar : s.en)}</a>`).join("")}</nav><p class="legal">${[["about", T(lang, "عن بيان", "About")], ["methodology", T(lang, "المنهجية", "Methodology")], ["privacy", T(lang, "الخصوصية", "Privacy")], ["terms", T(lang, "الشروط", "Terms")], ["contribute", T(lang, "ساهم بمعلومة", "Contribute")]].map(([s, n]) => `<a href="/${s}?lang=${lang}">${n}</a>`).join(" · ")}</p><p>${T(lang, "المعلومة أولًا، والدليل قبل الادعاء.", "Information first. Evidence before claims.")}</p><p><b>${SITE.credit}</b></p></div></footer></body></html>`;
 }
 
-const sectionCard = (s: Section, lang: Lang, i: number) => `<a class="card sec-card" style="--h:${s.hue};animation-delay:${i * 40}ms" href="/${s.slug}?lang=${lang}"><i aria-hidden="true">${icon(s.slug)}</i><h3>${esc(lang === "ar" ? s.ar : s.en)}</h3><p>${esc(lang === "ar" ? s.descAr : s.descEn)}</p></a>`;
+const sectionCard = (s: Section, lang: Lang, i: number, wide = false) => `<a class="card sec-card" ${wide ? 'data-size="wide" ' : ""}style="--h:${s.hue};animation-delay:${i * 40}ms" href="/${s.slug}?lang=${lang}"><span class="wm" aria-hidden="true">${icon(s.slug)}</span><div class="top"><i aria-hidden="true">${icon(s.slug)}</i><b class="go" aria-hidden="true">${lang === "ar" ? "←" : "→"}</b></div><h3>${esc(lang === "ar" ? s.ar : s.en)}</h3><p>${esc(lang === "ar" ? s.descAr : s.descEn)}</p></a>`;
+// Sections are grouped by what the reader wants, with the first card of each group larger, instead of one flat grid of 15.
+const SECTION_GROUPS: { ar: string; en: string; slugs: string[] }[] = [
+  { ar: "أخبار وتحليل", en: "News and analysis", slugs: ["news", "politics", "economy", "world", "arab", "trends"] },
+  { ar: "معرفة وعلوم", en: "Knowledge and science", slugs: ["science", "technology", "health", "history"] },
+  { ar: "ناس وثقافة", en: "People and culture", slugs: ["people", "art", "sports", "travel", "egypt"] },
+];
+const sectionsBlock = (lang: Lang) => SECTION_GROUPS.map((g, gi) => `<div class="grp"><h3 class="grp-title">${esc(lang === "ar" ? g.ar : g.en)}</h3><div class="sec-grid">${g.slugs.map((slug, i) => sectionCard(sectionBySlug(slug)!, lang, gi * 6 + i, i === 0)).join("")}</div></div>`).join("");
 export function articleCard(a: Article, lang: Lang, i = 0): string {
   const sec = sectionBySlug(a.section), label = sec ? (lang === "ar" ? sec.ar : sec.en) : "";
   if (a.archived) return `<a class="card ref-card" style="animation-delay:${i * 40}ms" href="/search?q=${encodeURIComponent(a.title)}&lang=${lang}"><span class="kicker">${esc(label)}</span><h3>${esc(a.title)}</h3><p>${esc(plain(a.summary))}</p><span class="badge">${T(lang, "من الأرشيف · مرجع", "From the archive · reference")}</span></a>`;
@@ -164,7 +181,7 @@ export function homeBody(lang: Lang, d: { stories: ClassifiedStory[]; articles: 
   return `${front}${more.length ? `<h2 class="sec-title">${T(lang, "آخر الأخبار", "Latest news")}</h2><div class="grid">${more.map((st, i) => storyCard(st, lang, i, st.section)).join("")}</div><p style="margin-top:14px"><a class="kicker" href="/news?lang=${lang}">${T(lang, "كل الأخبار ←", "All news →")}</a></p>` : ""}
 ${d.mostRead?.length ? `<h2 class="sec-title">${T(lang, "الأكثر قراءة اليوم في الموسوعة", "Most read today in the encyclopedia")}</h2><div class="grid">${d.mostRead.slice(0, 8).map((c, i) => wikiCard(c, lang, i)).join("")}</div>` : ""}
 ${articles.length ? `<h2 class="sec-title">${T(lang, "مقالات معرفية", "Explainers")}</h2><div class="grid">${articles.map((a, i) => articleCard(a, lang, i)).join("")}</div>` : ""}
-<h2 class="sec-title" id="sections">${T(lang, "الأقسام", "Sections")}</h2><div class="grid">${SECTIONS.map((x, i) => sectionCard(x, lang, i)).join("")}</div>
+<h2 class="sec-title" id="sections">${T(lang, "الأقسام", "Sections")}</h2>${sectionsBlock(lang)}
 ${wisdomBlock(lang, now)}`;
 }
 

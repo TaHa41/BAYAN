@@ -1,5 +1,7 @@
 # Claude project instructions — BAYAN
 
+> **Start here:** read `docs/START_HERE_AR.md` first. It holds the current architecture (v1 + the v2 strangler bridge), the full history of problems and fixes, what is done, what is blocked on the owner, the owner's requirements, and the next steps. Update it at the end of every session.
+
 Read `README.md` and `AGENTS.md` before making changes. Follow both files; when instructions conflict, preserve the stricter safety rule.
 
 ## Project purpose
