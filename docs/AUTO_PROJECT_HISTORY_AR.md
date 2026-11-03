@@ -244,3 +244,8 @@
 - Commit: `e2c20e7fd555db477a504663fa307865ddab95d1`
 - الملفات: M	src/v2-bridge.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-03T20:28:22Z — Sections block redesigned (grouped, wide first cards, watermark icons, hover arrow) + docs/START_HERE_AR.md as the single current-state reference for new sessions 
+- Commit: `f89826b4eaca2f7e0768e1ecce9185738c07ac5e`
+- الملفات: M	CLAUDE.md;A	docs/START_HERE_AR.md;M	v2/src/ui.ts;M	v2/tests/worker.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
