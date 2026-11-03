@@ -172,7 +172,9 @@ export function createHandler(deps: Deps) {
 
     // Detailed article for one story, built by the research service from several sources (never an invented text).
     const researchPage = async (story: LiveStory, retryHref: string) => {
+      if (isBlockedAdultContent(story.title, story.summary, story.publisher, story.url)) return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404, "no-store");
       const a = deps.research ? await soft(deps.research(env, story, lang, request), 45000, null) : null;
+      if (a && isBlockedAdultContent(a.title, a.summary, a.body)) return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404, "no-store");
       return html(layout({ lang, origin, path, title: `${plain(a?.title || story.title)} | ${SITE.name}`, description: plain(a?.summary || story.summary), body: researchBody(lang, story, a, retryHref), noindex: true, progress: true, image: a?.image || story.imageUrl }), 200, "no-store");
     };
     if (path === "/research") {
