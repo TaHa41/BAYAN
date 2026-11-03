@@ -6,6 +6,8 @@ for(const eventName of ["unhandledRejection","uncaughtException"])process.on(eve
   process.exit(1);
 });
 const origin=(process.env.BAYAN_ORIGIN||"https://bayan.tahaomar411.workers.dev").replace(/\/$/,"");
+// Non-blocking: show whether the AI provider works (no secrets involved) in the run annotations.
+try{const ai=await fetch(origin+"/api/health/ai",{signal:AbortSignal.timeout(20000)});console.log("::notice title=BAYAN AI status::"+(await ai.text()).replace(/\s+/g," ").slice(0,700))}catch(error){console.log("::notice title=BAYAN AI status::unavailable")}
 const response=await fetch(origin+"/api/health",{headers:{accept:"application/json"},signal:AbortSignal.timeout(10000)});
 const raw=await response.text();
 if(!response.ok)throw new Error("health endpoint returned HTTP "+response.status+": "+raw.slice(0,250));

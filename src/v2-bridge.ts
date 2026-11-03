@@ -9,11 +9,12 @@ import { SECTIONS } from "../v2/src/sections";
 import { wikiApi } from "../v2/src/wiki";
 import { news } from "./services/news";
 import { api } from "./routes/api";
+import { callGemini, resolveGeminiModel } from "./services/gemini";
 import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-02.1";
+export const V2_BUILD = "2026-11-03.1";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 const OWNED_SECTIONS = new Set(SECTIONS.map((s) => s.slug));
@@ -21,6 +22,7 @@ const handler = createHandler({
   providers: (lang) => [wikipediaProvider(lang)],
   store: (env) => d1Store(env.DB),
   wiki: wikiApi(),
+  aiStatus: (env) => aiStatus(env as Env),
   // Detailed article for one story: the same builder the site always used (multi-source, evidence-gated), rendered in the new layout.
   research: async (env, story, lang, request) => {
     const u = new URL(request.url);
@@ -54,13 +56,23 @@ const handler = createHandler({
   },
 });
 
+let aiStatusCache: { at: number; value: unknown } | null = null;
+/** Probes Gemini through the exact client the news pipeline uses (including model self-healing). Never returns keys or API messages. */
+export async function aiStatus(env: Env, now = Date.now()): Promise<unknown> {
+  if (aiStatusCache && now - aiStatusCache.at < 10 * 60 * 1000) return aiStatusCache.value;
+  const r: any = env.GEMINI_API_KEY ? await callGemini(env as never, "Reply with the single word: ok") : { ok: false, kind: "missing_key" };
+  const value = { checkedAt: new Date(now).toISOString(), gemini: { configured: !!env.GEMINI_API_KEY, ok: !!r.ok, model: r.ok ? r.model : resolveGeminiModel((env as any).GEMINI_MODEL), error: r.ok ? undefined : String(r.kind || "unknown"), status: r.ok ? undefined : r.status }, workersAi: { configured: !!(env as any).AI } };
+  aiStatusCache = { at: now, value };
+  return value;
+}
+export const resetAiStatusCache = () => { aiStatusCache = null; };
 const ADMIN_AI = new Set(["/api/admin/ai-test", "/api/admin/diagnose"]);
 export function v2Owns(request: Request): boolean {
   const u = new URL(request.url);
   const path = u.pathname.replace(/(.)\/+$/, "$1");
   if (request.method === "POST") return path === "/contribute";
   if (request.method !== "GET") return false;
-  return path === "/" || OWNED_SECTIONS.has(path.slice(1)) || /^\/article\/[^/]+$/.test(path) || /^\/wiki\/[^/]+$/.test(path) || path === "/prices" || path === "/weather" || path === "/prayer" || path === "/search" || ["/about", "/methodology", "/privacy", "/terms", "/research", "/contribute"].includes(path) || ADMIN_AI.has(path);
+  return path === "/" || OWNED_SECTIONS.has(path.slice(1)) || /^\/article\/[^/]+$/.test(path) || /^\/wiki\/[^/]+$/.test(path) || path === "/prices" || path === "/weather" || path === "/prayer" || path === "/search" || ["/about", "/methodology", "/privacy", "/terms", "/research", "/contribute"].includes(path) || path === "/api/health/ai" || ADMIN_AI.has(path);
 }
 
 export async function serveV2(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response | null> {
@@ -70,7 +82,7 @@ export async function serveV2(request: Request, env: Env, ctx?: ExecutionContext
   try {
     if (cache && request.method === "GET") { const hit = await cache.match(key); if (hit) return hit; }
     const res = await handler(request, env as never);
-    if (res.status !== 200 && !(request.method === "POST" && res.status < 500) && !ADMIN_AI.has(new URL(request.url).pathname)) return null; // unknown article / anything else: v1 decides
+    if (res.status !== 200 && !(request.method === "POST" && res.status < 500) && !ADMIN_AI.has(new URL(request.url).pathname) && new URL(request.url).pathname !== "/api/health/ai") return null; // unknown article / anything else: v1 decides
     const out = new Response(res.body, res);
     out.headers.set("referrer-policy", "strict-origin-when-cross-origin");
     out.headers.set("x-frame-options", "DENY");
