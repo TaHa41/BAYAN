@@ -12,7 +12,7 @@ import type { WikiApi } from "./wiki";
 import { articleBody, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, wikiEntryBody, staticBody, searchResultsBody, researchBody, trendsBody, contributeBody, type ResearchArticle, type ContributeValues, type SearchItem, pricesBody, weatherBody, prayerBody, tickerItems, esc, type ClassifiedStory, type LiveStory, type TickerItem } from "./ui";
 
 export interface Env extends AiEnv { DB: D1Database; ADS_TXT?: string; SITE_ORIGIN?: string; BAYAN_AI_MANAGER_TOKEN?: string }
-export interface Deps { providers: (lang: Lang) => Provider[]; store: (env: Env) => Store; liveNews?: (env: Env, lang: Lang) => Promise<LiveStory[]>; wiki?: WikiApi; live?: LiveApi; search?: (env: Env, q: string, lang: Lang, request: Request) => Promise<{ items: SearchItem[]; notice?: string } | null>; research?: (env: Env, story: LiveStory, lang: Lang, request: Request) => Promise<ResearchArticle | null>; contribute?: (env: Env, data: { title: string; body: string; source: string; section: string }, lang: Lang, request: Request) => Promise<{ ok: boolean }> }
+export interface Deps { providers: (lang: Lang) => Provider[]; store: (env: Env) => Store; liveNews?: (env: Env, lang: Lang) => Promise<LiveStory[]>; wiki?: WikiApi; live?: LiveApi; aiStatus?: (env: Env) => Promise<unknown>; search?: (env: Env, q: string, lang: Lang, request: Request) => Promise<{ items: SearchItem[]; notice?: string } | null>; research?: (env: Env, story: LiveStory, lang: Lang, request: Request) => Promise<ResearchArticle | null>; contribute?: (env: Env, data: { title: string; body: string; source: string; section: string }, lang: Lang, request: Request) => Promise<{ ok: boolean }> }
 export interface LiveApi { fx(env: Env): Promise<any>; gold(env: Env): Promise<any>; weather(env: Env, city?: string): Promise<any>; prayer(env: Env, city?: string, country?: string): Promise<any> }
 
 const xml = (s: string) => s.replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" }[c]!));
@@ -101,6 +101,9 @@ export function createHandler(deps: Deps) {
       const body = `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.map((u) => `<url><loc>${xml(u)}</loc></url>`).join("")}</urlset>`;
       return new Response(body, { status: 200, headers: { "content-type": "application/xml; charset=utf-8", "cache-control": degraded ? "no-store" : "public, max-age=600", ...(degraded ? { "x-bayan-degraded": "storage" } : {}) } });
     }
+
+    // Public, secret-free AI status so a failing provider is visible in every health run without the admin token.
+    if (path === "/api/health/ai") return json(deps.aiStatus ? await soft(deps.aiStatus(env), 15000, { error: "status_unavailable" }) : { error: "status_unavailable" });
 
     if (path === "/api/search") {
       const q = (url.searchParams.get("q") || "").trim();
