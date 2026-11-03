@@ -78,7 +78,8 @@ export function v2Owns(request: Request): boolean {
 export async function serveV2(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response | null> {
   if (!v2Owns(request)) return null;
   const cache = typeof caches !== "undefined" ? (caches as unknown as { default: Cache }).default : null;
-  const key = new Request(request.url, { method: "GET" });
+  const cacheUrl = new URL(request.url); cacheUrl.searchParams.set("__bayan_build", V2_BUILD);
+  const key = new Request(cacheUrl.toString(), { method: "GET" });
   try {
     if (cache && request.method === "GET") { const hit = await cache.match(key); if (hit) return hit; }
     const res = await handler(request, env as never);
