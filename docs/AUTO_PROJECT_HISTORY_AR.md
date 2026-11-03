@@ -219,3 +219,8 @@
 - Commit: `ae1b974e07d3732475ff76ed5c9a0680d14e90e7`
 - الملفات: M	src/services/gemini.ts;M	src/v2-bridge.ts;M	tests/gemini.test.ts;M	tests/v2-bridge.test.ts;M	v2/src/store.ts;M	v2/src/ui.ts;M	v2/src/worker.ts;M	v2/tests/worker.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-03T05:54:44Z — Public secret-free AI status (/api/health/ai) via the real Gemini client, printed in every health run; footer link to contribute 
+- Commit: `665a56aef1c1d0b20fca6e7fcdaf39f39292acfd`
+- الملفات: M	scripts/production-health.mjs;M	src/v2-bridge.ts;A	tests/ai-status.test.ts;M	v2/src/ui.ts;M	v2/src/worker.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
