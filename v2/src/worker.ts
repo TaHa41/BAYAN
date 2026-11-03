@@ -1,3 +1,4 @@
+import { isBlockedAdultContent } from "./adult-content";
 // BAYAN v2 request handler: pure routing over injected dependencies, so every route is unit-testable without
 // Cloudflare bindings. Failures degrade (a section with no items, an empty sitemap) instead of returning errors.
 import { searchAll, type Provider } from "./search";
@@ -58,7 +59,7 @@ export function createHandler(deps: Deps) {
       try { live = deps.liveNews ? await deps.liveNews(env, lang) : []; } catch (error) { live = []; }
       try { archived = store.newsArchive ? await store.newsArchive(lang, 24) : []; } catch (error) { archived = []; }
       const seen = new Set<string>(); const out: ClassifiedStory[] = [];
-      for (const st of [...live, ...archived]) { const key = plain(st.title).toLowerCase(); if (key && !seen.has(key)) { seen.add(key); out.push({ ...st, section: classifyStory(plain(st.title), plain(st.summary)) }); } }
+      for (const st of [...live, ...archived]) { if (isBlockedAdultContent(st.title, st.summary, st.publisher, st.href, st.url)) continue; const key = plain(st.title).toLowerCase(); if (key && !seen.has(key)) { seen.add(key); out.push({ ...st, section: classifyStory(plain(st.title), plain(st.summary)) }); } }
       return out;
     };
     const page = (o: { title: string; description: string; body: string; path: string; active?: string; image?: string; jsonLd?: unknown; noindex?: boolean; ticker?: TickerItem[]; progress?: boolean }, status = 200, cache?: string) =>
@@ -163,7 +164,7 @@ export function createHandler(deps: Deps) {
     const wk = path.match(/^\/wiki\/([^/]+)$/);
     if (wk) {
       let entry = null; try { entry = deps.wiki ? await deps.wiki.entry(lang, decodeURIComponent(wk[1])) : null; } catch (error) { entry = null; }
-      if (!entry) return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404);
+      if (!entry || isBlockedAdultContent(entry.title, entry.summary, ...entry.sections.map(x => x.body))) return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404);
       const from = sectionBySlug(url.searchParams.get("s") || "")?.slug;
       // Live mirror of Wikipedia text: kept out of the index (duplicate content) but followed; the sitemap does not list it.
       return page({ title: `${entry.title} | ${lang === "ar" ? "موسوعة بيان" : "BAYAN encyclopedia"}`, description: plain(entry.summary), body: wikiEntryBody(lang, entry, from), path: `/wiki/${wk[1]}`, active: from, image: entry.imageUrl, noindex: true, progress: true });
