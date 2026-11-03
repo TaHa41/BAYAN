@@ -239,3 +239,8 @@
 - Commit: `b70ac6c211856519ac5ebc68919d1741baa4d5d4`
 - الملفات: M	v2/src/ui.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-03T08:15:43+02:00 — chore: deploy homepage heading fix with v2 build bump 
+- Commit: `e2c20e7fd555db477a504663fa307865ddab95d1`
+- الملفات: M	src/v2-bridge.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
