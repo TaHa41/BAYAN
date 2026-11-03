@@ -54,7 +54,7 @@ form.search button{border:0;margin:6px;padding:0 24px;border-radius:22px;backgro
 .side{display:flex;flex-direction:column;gap:14px}.side a{display:flex;gap:14px;align-items:center;padding:12px;border-radius:16px;background:var(--card);border:1px solid var(--line);transition:transform .35s var(--ease),border-color .3s;animation:rise .8s var(--ease) both}.side a:hover{transform:translateX(-4px);border-color:var(--gold)}
 .side img{width:112px;height:84px;object-fit:cover;border-radius:12px;flex:none}.side h3{font-family:var(--serif);font-size:17px;line-height:1.6;font-weight:600}
 .kicker{font-size:12px;letter-spacing:.05em;color:var(--gold);font-weight:600}
-h2.sec-title{display:flex;align-items:center;gap:12px;margin:48px 0 16px;font-family:var(--serif);font-weight:700;font-size:clamp(22px,3vw,30px)}h2.sec-title::before{content:"";width:6px;height:28px;border-radius:3px;background:linear-gradient(var(--gold2),var(--gold))}
+h1.sec-title,h2.sec-title{display:flex;align-items:center;gap:12px;margin:48px 0 16px;font-family:var(--serif);font-weight:700;font-size:clamp(22px,3vw,30px)}h1.sec-title::before,h2.sec-title::before{content:"";width:6px;height:28px;border-radius:3px;background:linear-gradient(var(--gold2),var(--gold))}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:18px}
 .card{position:relative;display:block;overflow:hidden;border-radius:18px;border:1px solid var(--line);background:var(--card);transition:transform .4s var(--ease),box-shadow .4s var(--ease),border-color .3s;animation:rise .8s var(--ease) both}
 .card:hover{transform:translateY(-5px);box-shadow:0 20px 44px -22px rgba(10,22,48,.45);border-color:var(--gold)}
