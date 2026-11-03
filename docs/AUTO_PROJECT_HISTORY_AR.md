@@ -224,3 +224,8 @@
 - Commit: `665a56aef1c1d0b20fca6e7fcdaf39f39292acfd`
 - الملفات: M	scripts/production-health.mjs;M	src/v2-bridge.ts;A	tests/ai-status.test.ts;M	v2/src/ui.ts;M	v2/src/worker.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-03T08:12:04+02:00 — Deploy encyclopedia block and invalidate old v2 page cache 
+- Commit: `6694d0471667e28fcb40dc9d3b777e90d102d771`
+- الملفات: M	src/v2-bridge.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
