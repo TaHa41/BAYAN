@@ -16,6 +16,9 @@ type Fetcher = typeof fetch;
 const UA = { "user-agent": "BAYAN/2 (https://bayan.tahaomar411.workers.dev; encyclopedia reader)" };
 const SKIP_SECTION = /^(?:مراجع|وصلات خارجية|انظر أيضا|انظر أيضًا|هوامش|ملاحظات|المصادر|قراءة إضافية|ببليوغرافيا|References|External links|See also|Notes|Further reading|Sources|Bibliography|Footnotes)$/i;
 const SPECIAL = /^(?:special|wikipedia|file|help|category|portal|template|main[_ ]page|خاص|ويكيبيديا|ملف|مساعدة|تصنيف|بوابة|قالب|الصفحة[_ ]الرئيسية)\b/i;
+// Owner-requested hard block: this biography is not part of BAYAN's public encyclopedia.
+const BLOCKED_WIKI_TITLE = /^(?:mia[ _]+khalifa|ميا[ _]+خليفة)$/i;
+const blockedWikiTitle = (value: unknown) => BLOCKED_WIKI_TITLE.test(String(value || "").replace(/_/g, " ").trim());
 const https = (v: unknown) => /^https:\/\//i.test(String(v || ""));
 
 async function getJson(url: string, fetcher: Fetcher): Promise<any> {
@@ -65,7 +68,7 @@ export function wikiApi(fetcher: Fetcher = ((...args: Parameters<Fetcher>) => fe
     async cards(lang, titles) {
       if (!titles.length) return [];
       const data = await getJson(api(lang, `action=query&redirects=1&titles=${enc(titles.slice(0, 50).join("|"))}&prop=extracts|pageimages|pageprops&exintro=1&explaintext=1&exchars=240&exlimit=max&piprop=thumbnail&pithumbsize=480`), fetcher);
-      return orderedPages(data, titles.slice(0, 50)).filter((p) => String(p.extract || "").trim().length >= 40 && p.pageprops?.disambiguation === undefined)
+      return orderedPages(data, titles.slice(0, 50)).filter((p) => !blockedWikiTitle(p.title) && String(p.extract || "").trim().length >= 40 && p.pageprops?.disambiguation === undefined)
         .map((p) => ({ title: String(p.title), extract: String(p.extract).replace(/\s+/g, " ").trim(), imageUrl: https(p.thumbnail?.source) ? String(p.thumbnail.source) : undefined, url: pageUrl(lang, p.title) }));
     },
     async arabicTitles(enTitles) {
@@ -75,10 +78,10 @@ export function wikiApi(fetcher: Fetcher = ((...args: Parameters<Fetcher>) => fe
     },
     async entry(lang, title) {
       const clean = title.replace(/_/g, " ").trim().slice(0, 150);
-      if (!clean || SPECIAL.test(clean)) return null;
+      if (!clean || SPECIAL.test(clean) || blockedWikiTitle(clean)) return null;
       const data = await getJson(api(lang, `action=query&redirects=1&titles=${enc(clean)}&prop=extracts|pageimages|pageprops&explaintext=1&exsectionformat=wiki&piprop=name|thumbnail&pithumbsize=1200`), fetcher);
       const p = (data?.query?.pages || [])[0];
-      if (!p || p.missing || !p.extract || p.pageprops?.disambiguation !== undefined) return null;
+      if (!p || p.missing || blockedWikiTitle(p.title) || !p.extract || p.pageprops?.disambiguation !== undefined) return null;
       const { summary, sections } = parseSections(String(p.extract));
       if (summary.length < 40) return null;
       let credit: { credit?: string; license?: string } = {};
@@ -98,7 +101,7 @@ export function wikiApi(fetcher: Fetcher = ((...args: Parameters<Fetcher>) => fe
     async mostRead(lang, now = Date.now()) {
       const d = new Date(now - 24 * 3600 * 1000), p2 = (n: number) => String(n).padStart(2, "0");
       const data = await getJson(`https://api.wikimedia.org/feed/v1/wikipedia/${lang}/featured/${d.getUTCFullYear()}/${p2(d.getUTCMonth() + 1)}/${p2(d.getUTCDate())}`, fetcher);
-      return (data?.mostread?.articles || []).filter((a: any) => a?.title && !SPECIAL.test(String(a.title)) && String(a.extract || "").length >= 40).slice(0, 8)
+      return (data?.mostread?.articles || []).filter((a: any) => a?.title && !SPECIAL.test(String(a.title)) && !blockedWikiTitle(a.title) && String(a.extract || "").length >= 40).slice(0, 8)
         .map((a: any): WikiCard => ({ title: String(a.normalizedtitle || a.title).replace(/_/g, " "), extract: String(a.extract).replace(/\s+/g, " ").trim().slice(0, 240), imageUrl: https(a.thumbnail?.source) ? String(a.thumbnail.source) : undefined, url: pageUrl(lang, String(a.title)), views: Number(a.views || 0) }));
     },
   };
