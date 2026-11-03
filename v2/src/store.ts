@@ -1,3 +1,4 @@
+import { isBlockedAdultContent } from "./adult-content";
 // Read-only access to the existing D1 `articles` table (same database, no migration).
 // Public pages read status='PUBLISHED' only. 'ARCHIVE' rows (filed searches) are listed on section pages, never as articles.
 import type { Lang } from "./sections";
@@ -44,7 +45,7 @@ export function d1Store(db: D1Database): Store {
       const seen = new Set<string>();
       const out: Article[] = [];
       for (const [rows, archived] of [[pub.results || [], false], [arc.results || [], true]] as const) {
-        for (const row of rows) { const a = toArticle(row, archived); if (!archived && !a.complete) continue; const key = a.title.trim().toLowerCase(); if (!seen.has(key)) { seen.add(key); out.push(a); } }
+        for (const row of rows) { const a = toArticle(row, archived); if (isBlockedAdultContent(a.title, a.summary, a.body, a.slug) || (!archived && !a.complete)) continue; const key = a.title.trim().toLowerCase(); if (!seen.has(key)) { seen.add(key); out.push(a); } }
       }
       return out;
     },
@@ -52,7 +53,7 @@ export function d1Store(db: D1Database): Store {
       const row = await db.prepare(`SELECT ${cols} FROM articles WHERE slug=? AND language=? AND status='PUBLISHED' LIMIT 1`).bind(slug, lang).first<any>();
       if (!row) return null;
       const a = toArticle(row, false);
-      return a.imageUrl ? a : null;
+      return a.imageUrl && a.complete && !isBlockedAdultContent(a.title, a.summary, a.body, a.slug) ? a : null;
     },
     // Archived news the pipeline already collected (same table v1 reads). Only HTTPS images are kept.
     async newsArchive(lang, limit) {

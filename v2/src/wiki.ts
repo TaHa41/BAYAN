@@ -1,3 +1,4 @@
+import { isBlockedAdultContent } from "./adult-content";
 // Encyclopedia layer: live, real content from Wikipedia (text, CC BY-SA 4.0) and Wikimedia Commons (images with credit).
 // Nothing is generated. Every request is cached at the edge for 6 hours, so entries renew themselves when Wikipedia changes.
 import type { Lang } from "./sections";
@@ -65,7 +66,7 @@ export function wikiApi(fetcher: Fetcher = ((...args: Parameters<Fetcher>) => fe
     async cards(lang, titles) {
       if (!titles.length) return [];
       const data = await getJson(api(lang, `action=query&redirects=1&titles=${enc(titles.slice(0, 50).join("|"))}&prop=extracts|pageimages|pageprops&exintro=1&explaintext=1&exchars=240&exlimit=max&piprop=thumbnail&pithumbsize=480`), fetcher);
-      return orderedPages(data, titles.slice(0, 50)).filter((p) => String(p.extract || "").trim().length >= 40 && p.pageprops?.disambiguation === undefined)
+      return orderedPages(data, titles.slice(0, 50)).filter((p) => String(p.extract || "").trim().length >= 40 && p.pageprops?.disambiguation === undefined && !isBlockedAdultContent(p.title, p.extract))
         .map((p) => ({ title: String(p.title), extract: String(p.extract).replace(/\s+/g, " ").trim(), imageUrl: https(p.thumbnail?.source) ? String(p.thumbnail.source) : undefined, url: pageUrl(lang, p.title) }));
     },
     async arabicTitles(enTitles) {
@@ -75,10 +76,10 @@ export function wikiApi(fetcher: Fetcher = ((...args: Parameters<Fetcher>) => fe
     },
     async entry(lang, title) {
       const clean = title.replace(/_/g, " ").trim().slice(0, 150);
-      if (!clean || SPECIAL.test(clean)) return null;
+      if (!clean || SPECIAL.test(clean) || isBlockedAdultContent(clean)) return null;
       const data = await getJson(api(lang, `action=query&redirects=1&titles=${enc(clean)}&prop=extracts|pageimages|pageprops&explaintext=1&exsectionformat=wiki&piprop=name|thumbnail&pithumbsize=1200`), fetcher);
       const p = (data?.query?.pages || [])[0];
-      if (!p || p.missing || !p.extract || p.pageprops?.disambiguation !== undefined) return null;
+      if (!p || p.missing || !p.extract || p.pageprops?.disambiguation !== undefined || isBlockedAdultContent(p.title, p.extract)) return null;
       const { summary, sections } = parseSections(String(p.extract));
       if (summary.length < 40) return null;
       let credit: { credit?: string; license?: string } = {};
@@ -98,7 +99,7 @@ export function wikiApi(fetcher: Fetcher = ((...args: Parameters<Fetcher>) => fe
     async mostRead(lang, now = Date.now()) {
       const d = new Date(now - 24 * 3600 * 1000), p2 = (n: number) => String(n).padStart(2, "0");
       const data = await getJson(`https://api.wikimedia.org/feed/v1/wikipedia/${lang}/featured/${d.getUTCFullYear()}/${p2(d.getUTCMonth() + 1)}/${p2(d.getUTCDate())}`, fetcher);
-      return (data?.mostread?.articles || []).filter((a: any) => a?.title && !SPECIAL.test(String(a.title)) && String(a.extract || "").length >= 40).slice(0, 8)
+      return (data?.mostread?.articles || []).filter((a: any) => a?.title && !SPECIAL.test(String(a.title)) && String(a.extract || "").length >= 40 && !isBlockedAdultContent(a.title, a.extract)).slice(0, 8)
         .map((a: any): WikiCard => ({ title: String(a.normalizedtitle || a.title).replace(/_/g, " "), extract: String(a.extract).replace(/\s+/g, " ").trim().slice(0, 240), imageUrl: https(a.thumbnail?.source) ? String(a.thumbnail.source) : undefined, url: pageUrl(lang, String(a.title)), views: Number(a.views || 0) }));
     },
   };

@@ -1,3 +1,4 @@
+import { isBlockedAdultContent } from "./adult-content";
 // BAYAN v2 request handler: pure routing over injected dependencies, so every route is unit-testable without
 // Cloudflare bindings. Failures degrade (a section with no items, an empty sitemap) instead of returning errors.
 import { searchAll, type Provider } from "./search";
@@ -58,7 +59,7 @@ export function createHandler(deps: Deps) {
       try { live = deps.liveNews ? await deps.liveNews(env, lang) : []; } catch (error) { live = []; }
       try { archived = store.newsArchive ? await store.newsArchive(lang, 24) : []; } catch (error) { archived = []; }
       const seen = new Set<string>(); const out: ClassifiedStory[] = [];
-      for (const st of [...live, ...archived]) { const key = plain(st.title).toLowerCase(); if (key && !seen.has(key)) { seen.add(key); out.push({ ...st, section: classifyStory(plain(st.title), plain(st.summary)) }); } }
+      for (const st of [...live, ...archived]) { if (isBlockedAdultContent(st.title, st.summary, st.publisher, st.href, st.url)) continue; const key = plain(st.title).toLowerCase(); if (key && !seen.has(key)) { seen.add(key); out.push({ ...st, section: classifyStory(plain(st.title), plain(st.summary)) }); } }
       return out;
     };
     const page = (o: { title: string; description: string; body: string; path: string; active?: string; image?: string; jsonLd?: unknown; noindex?: boolean; ticker?: TickerItem[]; progress?: boolean }, status = 200, cache?: string) =>
@@ -122,7 +123,7 @@ export function createHandler(deps: Deps) {
       if (!q) return page({ title: (lang === "ar" ? "البحث | " : "Search | ") + SITE.name, description: "BAYAN search", body: searchBody(lang, "", null), path: "/search", noindex: true });
       // Full BAYAN search (all providers, rate limits, archive filing) when available; Wikipedia alone is the safety net.
       const full = deps.search ? await soft(deps.search(env, q, lang, request), 25000, null) : null;
-      if (full) return html(layout({ lang, origin, path: `/search?q=${encodeURIComponent(q)}`, title: `${q} | ${SITE.name}`, description: full.items[0]?.summary ? plain(full.items[0].summary) : q, body: searchResultsBody(lang, q, full.items, full.notice), noindex: true }), 200, "no-store");
+      if (full) { const safeItems = full.items.filter(item => !isBlockedAdultContent(item.title, item.summary, item.url, item.publisher)); return html(layout({ lang, origin, path: `/search?q=${encodeURIComponent(q)}`, title: `${q} | ${SITE.name}`, description: safeItems[0]?.summary ? plain(safeItems[0].summary) : q, body: searchResultsBody(lang, q, safeItems, full.notice), noindex: true }), 200, "no-store"); }
       const outcome = await searchAll(q, deps.providers(lang));
       return html(layout({ lang, origin, path: `/search?q=${encodeURIComponent(q)}`, title: `${q} | ${SITE.name}`, description: outcome.hits[0]?.summary || q, body: searchBody(lang, q, outcome), noindex: true }), 200, "no-store");
     }
@@ -163,7 +164,7 @@ export function createHandler(deps: Deps) {
     const wk = path.match(/^\/wiki\/([^/]+)$/);
     if (wk) {
       let entry = null; try { entry = deps.wiki ? await deps.wiki.entry(lang, decodeURIComponent(wk[1])) : null; } catch (error) { entry = null; }
-      if (!entry) return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404);
+      if (!entry || isBlockedAdultContent(entry.title, entry.summary, ...entry.sections.map(x => x.body))) return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404);
       const from = sectionBySlug(url.searchParams.get("s") || "")?.slug;
       // Live mirror of Wikipedia text: kept out of the index (duplicate content) but followed; the sitemap does not list it.
       return page({ title: `${entry.title} | ${lang === "ar" ? "موسوعة بيان" : "BAYAN encyclopedia"}`, description: plain(entry.summary), body: wikiEntryBody(lang, entry, from), path: `/wiki/${wk[1]}`, active: from, image: entry.imageUrl, noindex: true, progress: true });
@@ -171,7 +172,9 @@ export function createHandler(deps: Deps) {
 
     // Detailed article for one story, built by the research service from several sources (never an invented text).
     const researchPage = async (story: LiveStory, retryHref: string) => {
+      if (isBlockedAdultContent(story.title, story.summary, story.publisher, story.url)) return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404, "no-store");
       const a = deps.research ? await soft(deps.research(env, story, lang, request), 45000, null) : null;
+      if (a && isBlockedAdultContent(a.title, a.summary, a.body)) return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404, "no-store");
       return html(layout({ lang, origin, path, title: `${plain(a?.title || story.title)} | ${SITE.name}`, description: plain(a?.summary || story.summary), body: researchBody(lang, story, a, retryHref), noindex: true, progress: true, image: a?.image || story.imageUrl }), 200, "no-store");
     };
     if (path === "/research") {

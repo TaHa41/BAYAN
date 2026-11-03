@@ -14,7 +14,7 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-03.1";
+export const V2_BUILD = "2026-11-03.2";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 const OWNED_SECTIONS = new Set(SECTIONS.map((s) => s.slug));
@@ -78,7 +78,8 @@ export function v2Owns(request: Request): boolean {
 export async function serveV2(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response | null> {
   if (!v2Owns(request)) return null;
   const cache = typeof caches !== "undefined" ? (caches as unknown as { default: Cache }).default : null;
-  const key = new Request(request.url, { method: "GET" });
+  const cacheUrl = new URL(request.url); cacheUrl.searchParams.set("__bayan_build", V2_BUILD);
+  const key = new Request(cacheUrl.toString(), { method: "GET" });
   try {
     if (cache && request.method === "GET") { const hit = await cache.match(key); if (hit) return hit; }
     const res = await handler(request, env as never);

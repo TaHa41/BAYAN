@@ -1,3 +1,4 @@
+import { isBlockedAdultContent } from "./adult-content";
 // Quality gate for published articles. A row only counts as a real article when it has a body that adds
 // something beyond its summary, at least two independent sources, and an image that belongs to the topic.
 // Everything else is a stub: never featured, never listed, never put in the sitemap, and marked noindex.
@@ -10,6 +11,7 @@ export const isGenericImage = (url: string) => !/^https:\/\//i.test(url) || GENE
 export interface QualityInput { summary: string; body: string; imageUrl: string; sources: Source[] }
 export function articleQuality(a: QualityInput): { complete: boolean; reasons: string[] } {
   const reasons: string[] = [];
+  if (isBlockedAdultContent(a.summary, a.body)) reasons.push("blocked_adult_content");
   const extra = a.body.replace(a.summary, "").replace(/\s+/g, " ").trim();
   if (extra.length < MIN_BODY_CHARS) reasons.push("body_too_short");
   if (independentPublishers(a.sources).length < 2) reasons.push("fewer_than_2_independent_sources");
