@@ -1,3 +1,4 @@
+import { isBlockedAdultContent } from "./adult-content";
 // Provider-agnostic search: every provider is isolated (timeout + retry), one failure never fails the
 // search, and when nothing is found we say so with per-provider reasons instead of inventing results.
 import { independentPublishers, verdictFor, type Verdict } from "./evidence";
@@ -29,7 +30,7 @@ async function runProvider(provider: Provider, query: string, o: Required<Search
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), o.timeoutMs);
     try {
-      const hits = (await provider.run(query, controller.signal)).filter((h) => h && h.title && h.url);
+      const hits = (await provider.run(query, controller.signal)).filter((h) => h && h.title && h.url && !isBlockedAdultContent(h.title, h.summary, h.url));
       return { hits, report: { name: provider.name, ok: true, count: hits.length, ms: Date.now() - started, attempts: attempt } };
     } catch (error) {
       lastError = controller.signal.aborted ? "timeout" : String(error instanceof Error ? error.message : error).slice(0, 160);
