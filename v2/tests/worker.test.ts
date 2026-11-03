@@ -279,6 +279,19 @@ describe("v2 pages", () => {
     expect(en).toContain('rel="canonical" href="https://bayan.test/?lang=en"'); expect(en).toContain('hreflang="ar" href="https://bayan.test/"');
     expect(sec).toContain('rel="canonical" href="https://bayan.test/politics?lang=ar"');
   });
+  it("sections are grouped (news and analysis / knowledge / people and culture), the first card of each group is wide, every card has a watermark icon and an arrow, and none is lost", async () => {
+    const html = await (await call("/")).text();
+    for (const g of ["أخبار وتحليل", "معرفة وعلوم", "ناس وثقافة"]) expect(html).toContain(`<h3 class="grp-title">${g}</h3>`);
+    expect((html.match(/data-size="wide"/g) || []).length).toBe(3);
+    expect((html.match(/class="card sec-card"/g) || []).length).toBe(15);
+    expect((html.match(/class="wm"/g) || []).length).toBe(15); expect((html.match(/class="go"/g) || []).length).toBe(15);
+    for (const s of ["news", "politics", "economy", "world", "arab", "trends", "science", "technology", "health", "history", "people", "art", "sports", "travel", "egypt"]) expect(html).toContain(`href="/${s}?lang=ar"`);
+    expect(html).toContain("sections");
+  });
+  it("English sections use the English group names and a left-to-right arrow", async () => {
+    const html = await (await call("/?lang=en")).text();
+    expect(html).toContain('<h3 class="grp-title">News and analysis</h3>'); expect(html).toContain(">→<");
+  });
   it("English home switches direction and copy", async () => {
     const html = await (await call("/?lang=en")).text();
     expect(html).toContain('dir="ltr"'); expect(html).toContain("Every fact comes with its proof");
