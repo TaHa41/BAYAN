@@ -14,7 +14,7 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-03.3";
+export const V2_BUILD = "2026-11-03.4";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 const OWNED_SECTIONS = new Set(SECTIONS.map((s) => s.slug));
