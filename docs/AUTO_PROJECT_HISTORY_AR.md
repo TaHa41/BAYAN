@@ -254,3 +254,8 @@
 - Commit: `757956b1a840cc735ac4cf947d1be11f02bd00d8`
 - الملفات: M	docs/START_HERE_AR.md 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-04T20:10:20Z — Bump V2_BUILD so the merged sections design (and docs) actually deploys; the deploy workflow only watches src/** 
+- Commit: `cd91a69a1d3bb4dc6fcfe40ce90ca5b2bff7f397`
+- الملفات: M	src/v2-bridge.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
