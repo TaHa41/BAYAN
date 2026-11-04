@@ -249,3 +249,8 @@
 - Commit: `f89826b4eaca2f7e0768e1ecce9185738c07ac5e`
 - الملفات: M	CLAUDE.md;A	docs/START_HERE_AR.md;M	v2/src/ui.ts;M	v2/tests/worker.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-04T04:10:38Z — docs: START_HERE part 2 (code map, variable names, how to add a v2 page, PR log, decisions, open questions) 
+- Commit: `757956b1a840cc735ac4cf947d1be11f02bd00d8`
+- الملفات: M	docs/START_HERE_AR.md 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
