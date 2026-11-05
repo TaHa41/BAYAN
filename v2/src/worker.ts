@@ -9,7 +9,7 @@ import { classifyStory } from "./classify";
 import { topicsFor } from "./topics";
 import { STATIC_SLUGS, staticPage, type StaticSlug } from "./pages";
 import type { WikiApi } from "./wiki";
-import { articleBody, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, wikiEntryBody, staticBody, searchResultsBody, researchBody, trendsBody, contributeBody, type ResearchArticle, type ContributeValues, type SearchItem, pricesBody, weatherBody, prayerBody, tickerItems, esc, type ClassifiedStory, type LiveStory, type TickerItem } from "./ui";
+import { articleBody, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, wikiEntryBody, siteJsonLd, sectionJsonLd, staticBody, searchResultsBody, researchBody, trendsBody, contributeBody, type ResearchArticle, type ContributeValues, type SearchItem, pricesBody, weatherBody, prayerBody, tickerItems, esc, type ClassifiedStory, type LiveStory, type TickerItem } from "./ui";
 
 export interface Env extends AiEnv { DB: D1Database; ADS_TXT?: string; SITE_ORIGIN?: string; BAYAN_AI_MANAGER_TOKEN?: string }
 export interface Deps { providers: (lang: Lang) => Provider[]; store: (env: Env) => Store; liveNews?: (env: Env, lang: Lang) => Promise<LiveStory[]>; wiki?: WikiApi; live?: LiveApi; aiStatus?: (env: Env) => Promise<unknown>; search?: (env: Env, q: string, lang: Lang, request: Request) => Promise<{ items: SearchItem[]; notice?: string } | null>; research?: (env: Env, story: LiveStory, lang: Lang, request: Request) => Promise<ResearchArticle | null>; contribute?: (env: Env, data: { title: string; body: string; source: string; section: string }, lang: Lang, request: Request) => Promise<{ ok: boolean }> }
@@ -114,7 +114,7 @@ export function createHandler(deps: Deps) {
 
     if (path === "/") {
       const [stories, articles, mostRead] = await Promise.all([loadNews(), store.latest(lang, 6).catch(() => []), deps.wiki ? soft(deps.wiki.mostRead(lang), 3000, []) : Promise.resolve([])]);
-      return page({ title: SITE.name + (lang === "ar" ? " — المعلومة أولًا" : " — Information first"), description: lang === "ar" ? "أخبار ومقالات وسير موثقة، وبحث في الإنترنت كله بمصادر حقيقية." : "Verified news, articles and biographies, and search across the web with real sources.", body: homeBody(lang, { stories: stories.slice(0, 24), articles, mostRead }), path: "/", ticker: tickerItems(stories, lang) });
+      return page({ title: SITE.name + (lang === "ar" ? " — المعلومة أولًا" : " — Information first"), description: lang === "ar" ? "أخبار ومقالات وسير موثقة، وبحث في الإنترنت كله بمصادر حقيقية." : "Verified news, articles and biographies, and search across the web with real sources.", body: homeBody(lang, { stories: stories.slice(0, 24), articles, mostRead }), path: "/", ticker: tickerItems(stories, lang), jsonLd: siteJsonLd(origin, lang) });
     }
 
     if (path === "/search") {
@@ -217,7 +217,7 @@ export function createHandler(deps: Deps) {
       const wikiCards = () => soft((async () => { const seeds = topicsFor(section.slug).slice(0, 12); if (!seeds.length || !deps.wiki) return []; try { return await deps.wiki.cards(lang, lang === "ar" ? await deps.wiki.arabicTitles(seeds) : seeds); } catch (error) { return []; } })(), 3500, []);
       const [stories, items, wiki] = await Promise.all([loadNews(), store.bySection(section.slug, lang, 12).catch(() => []), wikiCards()]);
       const inSection = stories.filter((st) => st.section === section.slug).slice(0, 12);
-      return page({ title: `${lang === "ar" ? section.ar : section.en} | ${SITE.name}`, description: lang === "ar" ? section.descAr : section.descEn, body: sectionBody(lang, section, { stories: inSection, articles: items.filter((a) => !a.archived), archive: items.filter((a) => a.archived), wiki }), path, active: section.slug, ticker: tickerItems(stories, lang) });
+      return page({ title: `${lang === "ar" ? section.ar : section.en} | ${SITE.name}`, description: lang === "ar" ? section.descAr : section.descEn, body: sectionBody(lang, section, { stories: inSection, articles: items.filter((a) => !a.archived), archive: items.filter((a) => a.archived), wiki }), path, active: section.slug, ticker: tickerItems(stories, lang), jsonLd: sectionJsonLd(origin, lang, section) });
     }
 
     return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404);

@@ -334,5 +334,11 @@ ${msg ? `<p class="verdict" role="status"${msg.ok ? "" : ' style="border-color:#
 <label>${T(lang, "رابط المصدر (يفضَّل)", "Source link (preferred)")}<input name="source" type="url" maxlength="1000" placeholder="https://" value="${esc(v.source || "")}"></label>
 <button type="submit">${T(lang, "إرسال للمراجعة", "Send for review")}</button></form>`;
 }
+export const siteJsonLd = (origin: string, lang: Lang) => ({ "@context": "https://schema.org", "@graph": [
+  { "@type": "WebSite", "@id": origin + "/#website", name: SITE.name, url: origin + "/", inLanguage: ["ar", "en"], potentialAction: { "@type": "SearchAction", target: { "@type": "EntryPoint", urlTemplate: `${origin}/search?q={search_term_string}&lang=${lang}` }, "query-input": "required name=search_term_string" } },
+  { "@type": "Organization", "@id": origin + "/#org", name: "BAYAN", url: origin + "/" }] });
+export const sectionJsonLd = (origin: string, lang: Lang, s: Section) => { const url = `${origin}/${s.slug}?lang=${lang}`, name = lang === "ar" ? s.ar : s.en; return { "@context": "https://schema.org", "@graph": [
+  { "@type": "CollectionPage", name, url, inLanguage: lang, description: lang === "ar" ? s.descAr : s.descEn },
+  { "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, name: "BAYAN", item: origin + "/" }, { "@type": "ListItem", position: 2, name, item: url }] }] }; };
 export const notFoundBody = (lang: Lang) => `<div class="page-head"><h1>${T(lang, "الصفحة غير موجودة", "Page not found")}</h1><p><a class="kicker" href="/?lang=${lang}">${T(lang, "العودة إلى الرئيسية", "Back to home")}</a></p></div>`;
 export { verdictFor };

@@ -14,7 +14,7 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-04.1";
+export const V2_BUILD = "2026-11-04.2";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 const OWNED_SECTIONS = new Set(SECTIONS.map((s) => s.slug));
@@ -75,21 +75,61 @@ export function v2Owns(request: Request): boolean {
   return path === "/" || OWNED_SECTIONS.has(path.slice(1)) || /^\/article\/[^/]+$/.test(path) || /^\/wiki\/[^/]+$/.test(path) || path === "/prices" || path === "/weather" || path === "/prayer" || path === "/search" || ["/about", "/methodology", "/privacy", "/terms", "/research", "/contribute"].includes(path) || path === "/api/health/ai" || ADMIN_AI.has(path);
 }
 
+const REFRESHING = new Set<string>();
+const sMaxAge = (res: Response) => Number(/s-maxage=(\d+)/.exec(res.headers.get("cache-control") || "")?.[1] || 0);
+const tag = (res: Response, state: string) => { const out = new Response(res.body, res); out.headers.set("x-bayan-cache", state); return out; };
+
+/** Renders one page through v2 (null = let v1 decide). Adds hardening headers. */
+async function render(request: Request, env: Env): Promise<Response | null> {
+  const res = await handler(request, env as never);
+  const path = new URL(request.url).pathname;
+  if (res.status !== 200 && !(request.method === "POST" && res.status < 500) && !ADMIN_AI.has(path) && path !== "/api/health/ai") return null; // unknown article / anything else: v1 decides
+  const out = new Response(res.body, res);
+  out.headers.set("referrer-policy", "strict-origin-when-cross-origin");
+  out.headers.set("x-frame-options", "DENY");
+  out.headers.set("x-bayan-renderer", "v2");
+  out.headers.set("x-bayan-v2-build", V2_BUILD);
+  return out;
+}
+
+/** Stores a copy that stays in the edge cache for 6x its freshness window, remembering when it was built. */
+async function remember(cache: Cache, key: Request, out: Response): Promise<void> {
+  const smax = sMaxAge(out);
+  if (!smax) return;
+  const h = new Headers(out.headers);
+  h.set("x-bayan-cached-at", String(Date.now())); h.set("x-bayan-smax", String(smax)); h.set("cache-control", `public, max-age=${6 * smax}`);
+  await cache.put(key, new Response(out.clone().body, { status: 200, headers: h }));
+}
+
+/**
+ * Speed matters for crawling and readers: a cached page is served at once. Within its freshness window it is a HIT; after that, up to
+ * 6x the window, it is still served immediately (STALE) while a background refresh rebuilds it; only older or missing pages (MISS)
+ * wait for a rebuild. Search engines and readers therefore almost never wait on news feeds or encyclopedia calls.
+ */
 export async function serveV2(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response | null> {
   if (!v2Owns(request)) return null;
   const cache = typeof caches !== "undefined" ? (caches as unknown as { default: Cache }).default : null;
-  const cacheUrl = new URL(request.url); cacheUrl.searchParams.set("__bayan_v2_build", V2_BUILD);
-  const key = new Request(cacheUrl.toString(), { method: "GET" });
+  const key = new Request(request.url, { method: "GET" });
   try {
-    if (cache && request.method === "GET") { const hit = await cache.match(key); if (hit) return hit; }
-    const res = await handler(request, env as never);
-    if (res.status !== 200 && !(request.method === "POST" && res.status < 500) && !ADMIN_AI.has(new URL(request.url).pathname) && new URL(request.url).pathname !== "/api/health/ai") return null; // unknown article / anything else: v1 decides
-    const out = new Response(res.body, res);
-    out.headers.set("referrer-policy", "strict-origin-when-cross-origin");
-    out.headers.set("x-frame-options", "DENY");
-    out.headers.set("x-bayan-renderer", "v2");
-    out.headers.set("x-bayan-v2-build", V2_BUILD);
-    if (cache && ctx && /s-maxage/.test(out.headers.get("cache-control") || "")) ctx.waitUntil(cache.put(key, out.clone()));
+    if (cache && request.method === "GET") {
+      const hit = await cache.match(key);
+      const at = Number(hit?.headers.get("x-bayan-cached-at") || 0), smax = Number(hit?.headers.get("x-bayan-smax") || 0);
+      if (hit && at && smax) {
+        const age = (Date.now() - at) / 1000;
+        if (age < smax) return tag(hit, "HIT");
+        if (age < 6 * smax) {
+          if (ctx && !REFRESHING.has(key.url)) {
+            REFRESHING.add(key.url);
+            ctx.waitUntil(render(request, env).then((fresh) => (fresh ? remember(cache, key, fresh) : undefined)).catch(() => undefined).finally(() => REFRESHING.delete(key.url)));
+          }
+          return tag(hit, "STALE");
+        }
+      }
+    }
+    const out = await render(request, env);
+    if (!out) return null;
+    out.headers.set("x-bayan-cache", "MISS");
+    if (cache && ctx && request.method === "GET") ctx.waitUntil(remember(cache, key, out.clone()).catch(() => undefined));
     return out;
   } catch (error) {
     console.warn("BAYAN_V2_FALLBACK", String(error instanceof Error ? error.message : error).slice(0, 160));
