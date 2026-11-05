@@ -14,7 +14,7 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-04.2";
+export const V2_BUILD = "2026-11-05.1";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 const OWNED_SECTIONS = new Set(SECTIONS.map((s) => s.slug));
@@ -77,7 +77,15 @@ export function v2Owns(request: Request): boolean {
 
 const REFRESHING = new Set<string>();
 const sMaxAge = (res: Response) => Number(/s-maxage=(\d+)/.exec(res.headers.get("cache-control") || "")?.[1] || 0);
-const tag = (res: Response, state: string) => { const out = new Response(res.body, res); out.headers.set("x-bayan-cache", state); return out; };
+/** Serves a stored copy: restores the page's own cache-control (the stored one is only the edge TTL) and drops internal bookkeeping headers. */
+const tag = (res: Response, state: string) => {
+  const out = new Response(res.body, res);
+  const own = res.headers.get("x-bayan-cc");
+  if (own) out.headers.set("cache-control", own);
+  for (const h of ["x-bayan-cc", "x-bayan-cached-at", "x-bayan-smax", "x-bayan-cached-build"]) out.headers.delete(h);
+  out.headers.set("x-bayan-cache", state);
+  return out;
+};
 
 /** Renders one page through v2 (null = let v1 decide). Adds hardening headers. */
 async function render(request: Request, env: Env): Promise<Response | null> {
@@ -97,7 +105,8 @@ async function remember(cache: Cache, key: Request, out: Response): Promise<void
   const smax = sMaxAge(out);
   if (!smax) return;
   const h = new Headers(out.headers);
-  h.set("x-bayan-cached-at", String(Date.now())); h.set("x-bayan-smax", String(smax)); h.set("cache-control", `public, max-age=${6 * smax}`);
+  h.set("x-bayan-cached-at", String(Date.now())); h.set("x-bayan-smax", String(smax)); h.set("x-bayan-cached-build", V2_BUILD);
+  h.set("x-bayan-cc", out.headers.get("cache-control") || ""); h.set("cache-control", `public, max-age=${6 * smax}`);
   await cache.put(key, new Response(out.clone().body, { status: 200, headers: h }));
 }
 
@@ -114,7 +123,8 @@ export async function serveV2(request: Request, env: Env, ctx?: ExecutionContext
     if (cache && request.method === "GET") {
       const hit = await cache.match(key);
       const at = Number(hit?.headers.get("x-bayan-cached-at") || 0), smax = Number(hit?.headers.get("x-bayan-smax") || 0);
-      if (hit && at && smax) {
+      // A copy built by an older deploy is never served, so a new design/build shows up immediately after release.
+      if (hit && at && smax && hit.headers.get("x-bayan-cached-build") === V2_BUILD) {
         const age = (Date.now() - at) / 1000;
         if (age < smax) return tag(hit, "HIT");
         if (age < 6 * smax) {

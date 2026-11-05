@@ -320,3 +320,29 @@ describe("v2 pages", () => {
     expect(empty).toContain("لم نعثر على نتائج");
   });
 });
+
+describe("structured data for search engines", () => {
+  const ld = (html: string) => JSON.parse(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(html)![1]) as { "@graph": any[] };
+  it("home page carries WebSite + SearchAction and Organization, in both languages", async () => {
+    for (const lang of ["ar", "en"]) {
+      const graph = ld(await (await call("/?lang=" + lang)).text())["@graph"];
+      const site = graph.find((n) => n["@type"] === "WebSite");
+      expect(site.url).toBe("https://bayan.test/"); expect(site.potentialAction["@type"]).toBe("SearchAction");
+      expect(site.potentialAction.target.urlTemplate).toBe(`https://bayan.test/search?q={search_term_string}&lang=${lang}`);
+      expect(graph.some((n) => n["@type"] === "Organization" && n.name === "BAYAN")).toBe(true);
+    }
+  });
+  it("section pages carry CollectionPage + a two-level BreadcrumbList pointing at the section", async () => {
+    const graph = ld(await (await call("/politics?lang=en")).text())["@graph"];
+    const page = graph.find((n) => n["@type"] === "CollectionPage");
+    expect(page.url).toBe("https://bayan.test/politics?lang=en"); expect(page.inLanguage).toBe("en"); expect(page.name).toBe("Politics");
+    const crumbs = graph.find((n) => n["@type"] === "BreadcrumbList").itemListElement;
+    expect(crumbs.map((c: any) => c.position)).toEqual([1, 2]); expect(crumbs[1].item).toBe(page.url);
+    const ar = ld(await (await call("/politics?lang=ar")).text())["@graph"].find((n) => n["@type"] === "CollectionPage");
+    expect(ar.inLanguage).toBe("ar"); expect(ar.name).toBe("سياسة");
+  });
+  it("escapes '<' inside the JSON-LD block so page text cannot close the script tag", async () => {
+    const html = await (await call("/?lang=en")).text();
+    expect(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(html)![1]).not.toContain("<");
+  });
+});
