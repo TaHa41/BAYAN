@@ -294,3 +294,13 @@
 - Commit: `b7b2ea99cd21f45340059dd1a6102441e12c37e9`
 - الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/index.ts;M	src/routes/api.ts;M	src/services/news.ts;M	src/v2-bridge.ts;A	tests/news-cache-only.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-06T11:22:10Z — Gemini: fall back to other models on quota/503; tests; docs 
+- Commit: `0e3152b14b5a8b14ccf32820394e85cdd35315f9`
+- الملفات: M	docs/START_HERE_AR.md;M	src/services/gemini.ts;A	tests/gemini-fallback.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-06T11:23:06Z — Gemini: fall back to other models on quota/503; tests; docs 
+- Commit: `257b30e89019f4ec313952b6e478877f14b4217d`
+- الملفات: M	docs/START_HERE_AR.md 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
