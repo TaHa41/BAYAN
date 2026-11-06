@@ -274,3 +274,8 @@
 - Commit: `ba5ec36628bda97654fb06d08b381670ac5e949c`
 - الملفات: M	docs/START_HERE_AR.md;M	src/v2-bridge.ts;M	tests/sitemap-quality.test.ts;A	tests/v2-swr.test.ts;M	v2/tests/worker.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-06T01:14:35Z — AI status: report keyState (absent/empty/set), build and deployed commit; trim-aware key check; never cache a missing key; bump V2_BUILD 
+- Commit: `70b929002478c3073ce00f8959723e86589bbd4b`
+- الملفات: M	docs/START_HERE_AR.md;M	src/v2-bridge.ts;M	tests/ai-status.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
