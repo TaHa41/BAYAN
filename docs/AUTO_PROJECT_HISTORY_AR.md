@@ -264,3 +264,13 @@
 - Commit: `445b4ace53a940131749d23e11e0858f6f388aa6`
 - الملفات: M	docs/START_HERE_AR.md 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-05T19:52:46Z — WIP (not merged): stale-while-revalidate page cache in the bridge, /weather and /prayer in the sitemap, quality gate for bundled articles in the sitemap, JSON-LD for home and sections; tests still to write 
+- Commit: `08b6be9873d41ccce3a7297c34d3034ec9c8b09e`
+- الملفات: M	src/seo.ts;M	src/v2-bridge.ts;M	v2/src/ui.ts;M	v2/src/worker.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-05T19:54:19Z — Finish feat/seo-speed: SWR cache (own cache-control, build-aware), sitemap /weather+/prayer, JSON-LD; tests; bump V2_BUILD; update START_HERE 
+- Commit: `ba5ec36628bda97654fb06d08b381670ac5e949c`
+- الملفات: M	docs/START_HERE_AR.md;M	src/v2-bridge.ts;M	tests/sitemap-quality.test.ts;A	tests/v2-swr.test.ts;M	v2/tests/worker.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
