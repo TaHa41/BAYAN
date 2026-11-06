@@ -14,7 +14,7 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-06.3";
+export const V2_BUILD = "2026-11-06.4";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 
@@ -41,7 +41,7 @@ export async function swr<T>(key: string, freshMs: number, staleMs: number, load
   try { return await Promise.race([refresh(), new Promise<T>((_, reject) => { timer = setTimeout(() => reject(new Error("swr_timeout")), maxWaitMs); })]); } finally { if (timer) clearTimeout(timer); }
 }
 const fetchLive = async (env: Env, lang: Lang): Promise<any[]> => {
-  const live: any = await news(env, lang);
+  const live: any = await news(env, lang, { cacheOnly: true });
   return (Array.isArray(live?.items) ? live.items : []).map((st: any) => ({ title: String(st.title || ""), summary: String(st.summary || ""), publisher: String(st.publisher || ""), publishedAt: st.publishedAt ? String(st.publishedAt) : undefined, imageUrl: /^https:\/\//i.test(String(st.imageUrl || "")) ? String(st.imageUrl) : undefined, imageAlt: String(st.imageAlt || st.title || ""), url: /^https:\/\//i.test(String(st.url || "")) ? String(st.url) : undefined }));
 };
 /** Encyclopedia calls change slowly: 30 minutes fresh, 6 hours stale, never cached when empty. */

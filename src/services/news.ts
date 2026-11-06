@@ -768,7 +768,7 @@ const aiSearchNews = async (env: Env, lang: Locale): Promise<Story[]> => {
   } catch { return []; }
 };
 
-export async function news(env: Env, lang: Locale, options: {forceRefresh?:boolean} = {}) {
+export async function news(env: Env, lang: Locale, options: {forceRefresh?:boolean; cacheOnly?:boolean} = {}) {
   const cachedAtStart = await readNewsCache(env, lang);
   const cacheAge = cachedAtStart?.updatedAt ? Date.now() - Date.parse(cachedAtStart.updatedAt) : Number.POSITIVE_INFINITY;
   const cachedItems = (cachedAtStart?.items || []).filter((story) => {
@@ -782,7 +782,8 @@ export async function news(env: Env, lang: Locale, options: {forceRefresh?:boole
   // Public reads must not re-run every RSS parser and image lookup. The scheduled
   // refresh and self-heal paths explicitly opt into live refresh; visitors receive
   // recent verified cache entries and avoid exhausting the Free-plan CPU budget.
-  if (!options.forceRefresh && cachedItems.length >= 3) {
+  // cacheOnly is what visitors get: never fall through to the live RSS/search path (it is the scheduled job's work and can exceed the CPU limit).
+  if (!options.forceRefresh && (cachedItems.length >= 3 || options.cacheOnly)) {
     return {
       ok: true,
       stale: !Number.isFinite(cacheAge) || cacheAge > 35 * 60 * 1000,
