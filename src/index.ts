@@ -214,7 +214,7 @@ if(path==="/"||path==="/index.html"){
 }
 if(path==="/news"&&!u.searchParams.has("story")){
   let liveStories:any[]=[];
-  try{const feed=await news(env,lang);liveStories=Array.isArray(feed.items)?feed.items.slice(0,8):[]}catch(error){await recordRuntimeEventLimited(env,"worker_operation","news_landing_seo_failed",error)}
+  try{const feed=await news(env,lang,{cacheOnly:true});liveStories=Array.isArray(feed.items)?feed.items.slice(0,8):[]}catch(error){await recordRuntimeEventLimited(env,"worker_operation","news_landing_seo_failed",error)}
   const cards=liveStories.map((item:any)=>{
     const storyTitle=String(item.title||"").trim();if(!storyTitle)return "";
     const verifiedImage=safePublicImageUrl(item.imageUrl);

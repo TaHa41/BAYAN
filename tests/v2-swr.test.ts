@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../src/types";
-import { serveV2, V2_BUILD } from "../src/v2-bridge";
+import { serveV2, swr, resetSwr, V2_BUILD } from "../src/v2-bridge";
 
 // /about is a static page (no network, no database): s-maxage=3600, so HIT < 1h, STALE < 6h, MISS after.
 const HOUR = 3600_000;
@@ -16,6 +16,7 @@ const settle = async () => { await Promise.all(pending.splice(0)); };
 const at = (ms: number) => vi.setSystemTime(new Date("2026-11-05T00:00:00Z").getTime() + ms);
 
 beforeEach(() => {
+  resetSwr();
   store = new Map(); puts = 0; pending = [];
   vi.useFakeTimers({ toFake: ["Date"] }); at(0);
   vi.stubGlobal("caches", { default: {
@@ -63,6 +64,7 @@ describe("stale-while-revalidate page cache", () => {
     const [url, res] = [...store.entries()][0];
     const h = new Headers(res.headers); h.set("x-bayan-cached-build", "2020-01-01.1");
     store.set(url, new Response(await res.clone().text(), { status: 200, headers: h }));
+    resetSwr(); // drop the in-isolate copy so the tampered edge copy is the one consulted
     at(60_000);
     expect((await serveV2(get(), env, ctx))?.headers.get("x-bayan-cache")).toBe("MISS");
   });
@@ -80,5 +82,39 @@ describe("stale-while-revalidate page cache", () => {
     const a = await serveV2(get(), env, ctx); const b = await serveV2(get(), env, ctx);
     expect(a?.headers.get("x-bayan-cache")).toBe("STALE"); expect(b?.headers.get("x-bayan-cache")).toBe("STALE");
     await settle(); expect(puts).toBe(2); // 1 initial + exactly 1 refresh
+  });
+});
+
+describe("on *.workers.dev the edge Cache API does nothing, so pages are cached in the isolate", () => {
+  it("MISS then HIT even when the edge cache never stores or returns anything", async () => {
+    vi.stubGlobal("caches", { default: { match: async () => undefined, put: async () => undefined } });
+    expect((await serveV2(get(), env, ctx))?.headers.get("x-bayan-cache")).toBe("MISS"); await settle();
+    at(60_000);
+    const hit = await serveV2(get(), env, ctx);
+    expect(hit?.headers.get("x-bayan-cache")).toBe("HIT"); expect(await hit!.text()).toContain("Created by Taha Omar");
+  });
+  it("also works with no Cache API at all", async () => {
+    vi.stubGlobal("caches", undefined);
+    await serveV2(get(), env, ctx); await settle(); at(60_000);
+    expect((await serveV2(get(), env, ctx))?.headers.get("x-bayan-cache")).toBe("HIT");
+  });
+});
+
+describe("swr helper for slow upstream calls", () => {
+  it("loads once while fresh, serves stale at once while refreshing, and never caches empties", async () => {
+    let n = 0; const load = async () => [++n];
+    expect(await swr("k", 1000, 10_000, load)).toEqual([1]); expect(await swr("k", 1000, 10_000, load)).toEqual([1]); expect(n).toBe(1);
+    at(5000); expect(await swr("k", 1000, 10_000, load)).toEqual([1]); // stale: instant
+    await settle(); await Promise.resolve(); expect(n).toBe(2);
+    at(5000 + 500); expect(await swr("k", 1000, 10_000, load)).toEqual([2]); expect(n).toBe(2);
+    let m = 0; const empty = async () => { m++; return [] as number[]; };
+    await swr("e", 1000, 10_000, empty, undefined, (v) => v.length > 0); await swr("e", 1000, 10_000, empty, undefined, (v) => v.length > 0); expect(m).toBe(2);
+  });
+  it("a cold call gives up after maxWait, but the load still completes for the next request", async () => {
+    vi.useRealTimers();
+    const slow = () => new Promise<number[]>((r) => setTimeout(() => r([7]), 60));
+    await expect(swr("slow", 1000, 10_000, slow, 10)).rejects.toThrow("swr_timeout");
+    await new Promise((r) => setTimeout(r, 120));
+    expect(await swr("slow", 1000, 10_000, async () => [9], 10)).toEqual([7]);
   });
 });
