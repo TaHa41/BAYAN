@@ -4,7 +4,7 @@ export type GeminiFailureKind = "no_key" | "auth" | "rate_limited" | "quota" | "
 export type GeminiResult =
   | { ok: true; text: string; model: string; finishReason?: string }
   | { ok: false; kind: GeminiFailureKind; status?: number; detail: string };
-export type GeminiOptions = {
+export type GeminiOptions = { triedModels?: string[];
   system?: string;
   json?: boolean;
   temperature?: number;
@@ -38,6 +38,10 @@ async function discoverFlashModel(key: string, doFetch: typeof fetch): Promise<s
     return pickFlashModel((await res.json() as any)?.models);
   } catch { return null; }
 }
+/** Free-tier quotas are per model, so when one model is exhausted or overloaded another may still answer. */
+const FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
+const PREFERRED = new Map<string, { model: string; until: number }>(); // requested -> working fallback, for a few minutes only
+export const resetGeminiFallbacks = () => PREFERRED.clear();
 const redact = (value: string, key: string): string => {
   let out = String(value ?? "").replace(/\s+/g, " ").slice(0, 300);
   if (key) out = out.split(key).join("[redacted]");
@@ -50,7 +54,8 @@ export async function callGemini(env: GeminiEnv, prompt: string, options: Gemini
   const text = String(prompt ?? "").trim();
   if (!text) return { ok: false, kind: "bad_response", detail: "empty prompt" };
   const requested = resolveGeminiModel(env.GEMINI_MODEL);
-  const model = DISCOVERED.get(requested) ?? requested;
+  const pref = PREFERRED.get(requested);
+  const model = (pref && pref.until > Date.now() ? pref.model : undefined) ?? DISCOVERED.get(requested) ?? requested;
   const body: Record<string, unknown> = {
     contents: [{ role: "user", parts: [{ text }] }],
     generationConfig: {
@@ -79,9 +84,16 @@ export async function callGemini(env: GeminiEnv, prompt: string, options: Gemini
       if (response.status === 401 || response.status === 403 || /API_KEY_INVALID|PERMISSION_DENIED|UNAUTHENTICATED/i.test(apiStatus + " " + apiMessage)) {
         return { ok: false, kind: "auth", status: response.status, detail: redact(apiMessage, key) };
       }
-      if (response.status === 429 || apiStatus === "RESOURCE_EXHAUSTED") {
+      if (response.status === 429 || response.status === 503 || apiStatus === "RESOURCE_EXHAUSTED") {
         const quota = /quota|per day|daily|billing/i.test(apiMessage);
-        return { ok: false, kind: quota ? "quota" : "rate_limited", status: response.status, detail: redact(apiMessage, key) };
+        const failure: GeminiResult = response.status === 503 ? { ok: false, kind: "http", status: 503, detail: redact(apiMessage, key) } : { ok: false, kind: quota ? "quota" : "rate_limited", status: response.status, detail: redact(apiMessage, key) };
+        const tried = [...(options.triedModels ?? []), model];
+        const next = FALLBACK_MODELS.find((m) => !tried.includes(m));
+        if (next) {
+          const alt = await callGemini({ ...env, GEMINI_MODEL: next }, prompt, { ...options, noDiscovery: true, triedModels: tried });
+          if (alt.ok) { PREFERRED.set(requested, { model: next, until: Date.now() + 10 * 60_000 }); return alt; }
+        }
+        return failure;
       }
       if (response.status === 404 && !options.noDiscovery && /not found|not supported/i.test(apiMessage)) {
         const alt = await discoverFlashModel(key, doFetch);
