@@ -14,7 +14,7 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-06.4";
+export const V2_BUILD = "2026-11-06.5";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 
@@ -86,20 +86,19 @@ const handler = createHandler({
   liveNews: (env, lang) => swr(`news:${lang}`, 120_000, 20 * 60_000, () => fetchLive(env as Env, lang), 2500, (v) => v.length > 0),
 });
 
-let aiStatusCache: { at: number; value: unknown } | null = null;
-/** Probes Gemini through the exact client the news pipeline uses (including model self-healing). Never returns keys or API messages. */
+/**
+ * Public AI configuration status. It deliberately makes NO call to Gemini: the free tier allows only ~20 requests per day per model,
+ * and a probe on every health check or new isolate used up the quota the news pipeline needs. Use the owner-only /api/admin/ai-test for a live test.
+ * Never returns keys or provider messages.
+ */
 export async function aiStatus(env: Env, now = Date.now()): Promise<unknown> {
-  if (aiStatusCache && now - aiStatusCache.at < 10 * 60 * 1000) return aiStatusCache.value;
-  const hasKey = String((env as any).GEMINI_API_KEY ?? "").trim() !== ""; // same trimming rule as the Gemini client
-  const r: any = hasKey ? await callGemini(env as never, "Reply with the single word: ok") : { ok: false, kind: "missing_key" };
   const raw = (env as any).GEMINI_API_KEY;
+  const hasKey = String(raw ?? "").trim() !== ""; // same trimming rule as the Gemini client
   // keyState tells "binding missing" from "binding present but empty" without revealing anything about the value.
   const keyState = raw === undefined || raw === null ? "absent" : String(raw).trim() === "" ? "empty" : "set";
-  const value = { checkedAt: new Date(now).toISOString(), build: V2_BUILD, deployedCommit: String((env as any).BAYAN_COMMIT_SHA || "").slice(0, 12) || undefined, gemini: { configured: hasKey, keyState, ok: !!r.ok, model: r.ok ? r.model : resolveGeminiModel((env as any).GEMINI_MODEL), error: r.ok ? undefined : String(r.kind || "unknown"), status: r.ok ? undefined : r.status }, workersAi: { configured: !!(env as any).AI } };
-  if (hasKey) aiStatusCache = { at: now, value }; // a missing key is never cached, so a fix shows up on the next request
-  return value;
+  return { checkedAt: new Date(now).toISOString(), build: V2_BUILD, deployedCommit: String((env as any).BAYAN_COMMIT_SHA || "").slice(0, 12) || undefined, probe: "off", gemini: { configured: hasKey, keyState, model: resolveGeminiModel((env as any).GEMINI_MODEL), error: hasKey ? undefined : "missing_key" }, workersAi: { configured: !!(env as any).AI } };
 }
-export const resetAiStatusCache = () => { aiStatusCache = null; };
+export const resetAiStatusCache = () => undefined; // kept for callers/tests; there is no cache any more
 const ADMIN_AI = new Set(["/api/admin/ai-test", "/api/admin/diagnose"]);
 export function v2Owns(request: Request): boolean {
   const u = new URL(request.url);
