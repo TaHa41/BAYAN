@@ -51,7 +51,7 @@ async function generateSitemap(env:Env){
   }
   // Bundled article routes are served even when a matching D1 row is absent.
   // Include only reviewed, verified entries; prefer the D1 timestamp when present.
-  const bundledArticleUrls=BUNDLED_ARTICLES.filter((x)=>x.slug&&x.status==="PUBLISHED"&&x.fallbackEvidence==="verified"&&hasTopicImage(x.imageUrl)&&(x.language==="ar"||x.language==="en")).map((x)=>({url:ORIGIN+"/article/"+encodeURIComponent(x.slug)+"?lang="+encodeURIComponent(x.language),lastmod:String(x.updatedAt||"")}));
+  const bundledArticleUrls=BUNDLED_ARTICLES.filter((x)=>x.slug&&x.status==="PUBLISHED"&&x.fallbackEvidence==="verified"&&hasTopicImage(x.imageUrl)&&(x.language==="ar"||x.language==="en")&&articleQuality({summary:String(x.summary||""),body:String(x.body||""),imageUrl:String(x.imageUrl||""),sources:Array.isArray((x as any).sources)?(x as any).sources:[]}).complete).map((x)=>({url:ORIGIN+"/article/"+encodeURIComponent(x.slug)+"?lang="+encodeURIComponent(x.language),lastmod:String(x.updatedAt||"")}));
   const mergedArticleUrls=new Map<string,{url:string;lastmod?:string}>();
   for(const item of bundledArticleUrls)mergedArticleUrls.set(item.url,item);
   for(const item of articleUrls){
@@ -59,7 +59,7 @@ async function generateSitemap(env:Env){
     mergedArticleUrls.set(item.url,{url:item.url,lastmod:item.lastmod||existing?.lastmod});
   }
   articleUrls=[...mergedArticleUrls.values()];
-  const publicPaths=["/","/news","/about","/methodology","/privacy","/terms",...SECTIONS.map(x=>"/"+x[0])];
+  const publicPaths=["/","/news","/about","/methodology","/privacy","/terms","/weather","/prayer",...SECTIONS.map(x=>"/"+x[0])];
   const localizedUrls=publicPaths.flatMap((path)=>["ar","en"].map((language)=>({
     url:path==="/"&&language==="ar"?ORIGIN+"/":ORIGIN+path+"?lang="+language,
     alternateUrl:path==="/"&&language==="ar"?ORIGIN+"/?lang=en":path==="/"&&language==="en"?ORIGIN+"/":ORIGIN+path+"?lang="+(language==="ar"?"en":"ar")
