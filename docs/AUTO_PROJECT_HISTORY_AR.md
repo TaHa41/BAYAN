@@ -284,3 +284,13 @@
 - Commit: `d2a1dc3a711c288db002ce93db23127b1e55b1d3`
 - الملفات: M	docs/START_HERE_AR.md;M	src/seo.ts;M	src/v2-bridge.ts;M	tests/sitemap-quality.test.ts;M	tests/v2-bridge.test.ts;M	v2/src/ui.ts;M	v2/src/worker.ts;M	v2/tests/worker.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-06T01:34:30Z — Perf: in-isolate page cache and SWR for headlines and encyclopedia (edge Cache API is a no-op on workers.dev); tests; V2_BUILD 2026-11-06.3 
+- Commit: `8e082083b3bcb60a5d595a9234d5b6f626417eed`
+- الملفات: M	docs/START_HERE_AR.md;M	src/v2-bridge.ts;M	tests/v2-swr.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-06T11:03:11Z — Perf: visitors never run live news fetch (cacheOnly), in-isolate page cache and swr for news/wiki; tests; V2_BUILD 2026-11-06.4; docs 
+- Commit: `b7b2ea99cd21f45340059dd1a6102441e12c37e9`
+- الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/index.ts;M	src/routes/api.ts;M	src/services/news.ts;M	src/v2-bridge.ts;A	tests/news-cache-only.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
