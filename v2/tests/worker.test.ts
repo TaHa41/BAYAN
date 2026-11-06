@@ -4,6 +4,8 @@ import type { Article, Store } from "../src/store";
 import type { Provider } from "../src/search";
 import type { WikiApi } from "../src/wiki";
 import type { LiveApi } from "../src/worker";
+import { SECTION_GROUPS } from "../src/ui";
+import { SECTIONS, TOOLS } from "../src/sections";
 
 const art = (o: Partial<Article> = {}): Article => ({ slug: "a1", section: "science", lang: "ar", title: "اكتشاف <b>جديد</b>", summary: "خلاصة موثقة عن الاكتشاف.", body: "فقرة أولى\n## عنوان فرعي\n- نقطة\nفقرة <script>x</script>", imageUrl: "https://img.example/a.jpg", imageAlt: "صورة", sources: [{ title: "BBC", publisher: "BBC", url: "https://bbc.com/a" }], updatedAt: "2026-10-27T10:00:00Z", archived: false, complete: true, ...o });
 const store = (o: Partial<Store> = {}): Store => ({ latest: async () => [], bySection: async () => [], get: async () => null, sitemap: async () => [], ...o });
@@ -279,10 +281,10 @@ describe("v2 pages", () => {
     expect(en).toContain('rel="canonical" href="https://bayan.test/?lang=en"'); expect(en).toContain('hreflang="ar" href="https://bayan.test/"');
     expect(sec).toContain('rel="canonical" href="https://bayan.test/politics?lang=ar"');
   });
-  it("sections are grouped (news and analysis / knowledge / people and culture), the first card of each group is wide, every card has a watermark icon and an arrow, and none is lost", async () => {
+  it("sections are shown in four groups with a numbered header, every card has a watermark icon, an arrow and a call to action, and none is lost", async () => {
     const html = await (await call("/")).text();
-    for (const g of ["أخبار وتحليل", "معرفة وعلوم", "ناس وثقافة"]) expect(html).toContain(`<h3 class="grp-title">${g}</h3>`);
-    expect((html.match(/data-size="wide"/g) || []).length).toBe(3);
+    for (const g of ["أخبار وتحليل", "معرفة وعلوم", "ناس وثقافة", "مجتمع ورأي"]) expect(html).toContain(`<h3>${g}</h3>`);
+    expect((html.match(/class="grp-head"/g) || []).length).toBe(4); expect((html.match(/class="cta"/g) || []).length).toBe(15);
     expect((html.match(/class="card sec-card"/g) || []).length).toBe(15);
     expect((html.match(/class="wm"/g) || []).length).toBe(15); expect((html.match(/class="go"/g) || []).length).toBe(15);
     for (const s of ["news", "politics", "economy", "world", "arab", "trends", "science", "technology", "health", "history", "people", "art", "sports", "travel", "egypt"]) expect(html).toContain(`href="/${s}?lang=ar"`);
@@ -290,7 +292,7 @@ describe("v2 pages", () => {
   });
   it("English sections use the English group names and a left-to-right arrow", async () => {
     const html = await (await call("/?lang=en")).text();
-    expect(html).toContain('<h3 class="grp-title">News and analysis</h3>'); expect(html).toContain(">→<");
+    expect(html).toContain("<h3>News and analysis</h3>"); expect(html).toContain("<h3>Society and opinion</h3>"); expect(html).toContain(">→<");
   });
   it("English home switches direction and copy", async () => {
     const html = await (await call("/?lang=en")).text();
@@ -345,4 +347,21 @@ describe("structured data for search engines", () => {
     const html = await (await call("/?lang=en")).text();
     expect(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(html)![1]).not.toContain("<");
   });
+});
+
+describe("sections hub", () => {
+  it("every section belongs to exactly one group, and every group slug is a real section", () => {
+    const grouped = SECTION_GROUPS.flatMap((g) => g.slugs);
+    expect([...grouped].sort()).toEqual(SECTIONS.map((x) => x.slug).sort());
+    expect(new Set(grouped).size).toBe(grouped.length);
+  });
+  it.each(["ar", "en"])("/sections (%s) lists all sections, the tools, jump links and structured data", async (lang) => {
+    const res = await call("/sections?lang=" + lang); const html = await res.text();
+    expect(res.status).toBe(200); expect(res.headers.get("cache-control")).toContain("s-maxage");
+    expect((html.match(/class="card sec-card"/g) || []).length).toBe(SECTIONS.length);
+    for (const g of SECTION_GROUPS) expect(html).toContain(`href="#g-${g.id}"`);
+    for (const t of TOOLS) expect(html).toContain(`href="/${t.slug}?lang=${lang}"`);
+    expect(html).toContain('"@type":"ItemList"'); expect(html).toContain(lang === "ar" ? 'dir="rtl"' : 'dir="ltr"');
+  });
+  it("the home page links to the hub", async () => { expect(await (await call("/?lang=en")).text()).toContain('href="/sections?lang=en"'); });
 });

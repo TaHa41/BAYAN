@@ -59,7 +59,7 @@ async function generateSitemap(env:Env){
     mergedArticleUrls.set(item.url,{url:item.url,lastmod:item.lastmod||existing?.lastmod});
   }
   articleUrls=[...mergedArticleUrls.values()];
-  const publicPaths=["/","/news","/about","/methodology","/privacy","/terms","/weather","/prayer",...SECTIONS.map(x=>"/"+x[0])];
+  const publicPaths=["/","/news","/about","/methodology","/privacy","/terms","/sections","/weather","/prayer",...SECTIONS.map(x=>"/"+x[0])];
   const localizedUrls=publicPaths.flatMap((path)=>["ar","en"].map((language)=>({
     url:path==="/"&&language==="ar"?ORIGIN+"/":ORIGIN+path+"?lang="+language,
     alternateUrl:path==="/"&&language==="ar"?ORIGIN+"/?lang=en":path==="/"&&language==="en"?ORIGIN+"/":ORIGIN+path+"?lang="+(language==="ar"?"en":"ar")

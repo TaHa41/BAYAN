@@ -9,7 +9,7 @@ import { classifyStory } from "./classify";
 import { topicsFor } from "./topics";
 import { STATIC_SLUGS, staticPage, type StaticSlug } from "./pages";
 import type { WikiApi } from "./wiki";
-import { articleBody, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, wikiEntryBody, siteJsonLd, sectionJsonLd, staticBody, searchResultsBody, researchBody, trendsBody, contributeBody, type ResearchArticle, type ContributeValues, type SearchItem, pricesBody, weatherBody, prayerBody, tickerItems, esc, type ClassifiedStory, type LiveStory, type TickerItem } from "./ui";
+import { articleBody, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, wikiEntryBody, siteJsonLd, sectionJsonLd, sectionsHubBody, sectionsJsonLd, staticBody, searchResultsBody, researchBody, trendsBody, contributeBody, type ResearchArticle, type ContributeValues, type SearchItem, pricesBody, weatherBody, prayerBody, tickerItems, esc, type ClassifiedStory, type LiveStory, type TickerItem } from "./ui";
 
 export interface Env extends AiEnv { DB: D1Database; ADS_TXT?: string; SITE_ORIGIN?: string; BAYAN_AI_MANAGER_TOKEN?: string }
 export interface Deps { providers: (lang: Lang) => Provider[]; store: (env: Env) => Store; liveNews?: (env: Env, lang: Lang) => Promise<LiveStory[]>; wiki?: WikiApi; live?: LiveApi; aiStatus?: (env: Env) => Promise<unknown>; search?: (env: Env, q: string, lang: Lang, request: Request) => Promise<{ items: SearchItem[]; notice?: string } | null>; research?: (env: Env, story: LiveStory, lang: Lang, request: Request) => Promise<ResearchArticle | null>; contribute?: (env: Env, data: { title: string; body: string; source: string; section: string }, lang: Lang, request: Request) => Promise<{ ok: boolean }> }
@@ -185,6 +185,11 @@ export function createHandler(deps: Deps) {
       if (!item) return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404);
       return researchPage(item, url.pathname + url.search);
     }
+    if (path === "/sections") {
+      const hub = lang === "ar" ? "كل الأقسام" : "All sections";
+      return page({ title: `${hub} | ${SITE.name}`, description: lang === "ar" ? "كل أقسام بيان في صفحة واحدة: الأخبار والعلوم والثقافة والمجتمع والرأي، مع أدوات الأسعار والطقس والمواقيت." : "Every BAYAN section on one page: news, science, culture, society and opinion, plus the markets, weather and prayer-time tools.", body: sectionsHubBody(lang), path, jsonLd: sectionsJsonLd(origin, lang) }, 200, "public, max-age=300, s-maxage=3600");
+    }
+
     if (path === "/trends") {
       const [stories, mostRead] = await Promise.all([loadNews(), deps.wiki ? soft(deps.wiki.mostRead(lang), 3500, []) : Promise.resolve([])]);
       const s = sectionBySlug("trends")!;
