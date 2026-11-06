@@ -304,3 +304,8 @@
 - Commit: `257b30e89019f4ec313952b6e478877f14b4217d`
 - الملفات: M	docs/START_HERE_AR.md 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-06T16:26:39Z — AI status: no live Gemini probe (free tier is 20 requests/day); docs 
+- Commit: `14cab6d0b163da7d8d2a86ed167c8af41af64533`
+- الملفات: M	docs/START_HERE_AR.md;M	src/v2-bridge.ts;M	tests/ai-status.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
