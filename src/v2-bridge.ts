@@ -14,7 +14,7 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-05.1";
+export const V2_BUILD = "2026-11-06.1";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 const OWNED_SECTIONS = new Set(SECTIONS.map((s) => s.slug));
@@ -60,9 +60,13 @@ let aiStatusCache: { at: number; value: unknown } | null = null;
 /** Probes Gemini through the exact client the news pipeline uses (including model self-healing). Never returns keys or API messages. */
 export async function aiStatus(env: Env, now = Date.now()): Promise<unknown> {
   if (aiStatusCache && now - aiStatusCache.at < 10 * 60 * 1000) return aiStatusCache.value;
-  const r: any = env.GEMINI_API_KEY ? await callGemini(env as never, "Reply with the single word: ok") : { ok: false, kind: "missing_key" };
-  const value = { checkedAt: new Date(now).toISOString(), gemini: { configured: !!env.GEMINI_API_KEY, ok: !!r.ok, model: r.ok ? r.model : resolveGeminiModel((env as any).GEMINI_MODEL), error: r.ok ? undefined : String(r.kind || "unknown"), status: r.ok ? undefined : r.status }, workersAi: { configured: !!(env as any).AI } };
-  aiStatusCache = { at: now, value };
+  const hasKey = String((env as any).GEMINI_API_KEY ?? "").trim() !== ""; // same trimming rule as the Gemini client
+  const r: any = hasKey ? await callGemini(env as never, "Reply with the single word: ok") : { ok: false, kind: "missing_key" };
+  const raw = (env as any).GEMINI_API_KEY;
+  // keyState tells "binding missing" from "binding present but empty" without revealing anything about the value.
+  const keyState = raw === undefined || raw === null ? "absent" : String(raw).trim() === "" ? "empty" : "set";
+  const value = { checkedAt: new Date(now).toISOString(), build: V2_BUILD, deployedCommit: String((env as any).BAYAN_COMMIT_SHA || "").slice(0, 12) || undefined, gemini: { configured: hasKey, keyState, ok: !!r.ok, model: r.ok ? r.model : resolveGeminiModel((env as any).GEMINI_MODEL), error: r.ok ? undefined : String(r.kind || "unknown"), status: r.ok ? undefined : r.status }, workersAi: { configured: !!(env as any).AI } };
+  if (hasKey) aiStatusCache = { at: now, value }; // a missing key is never cached, so a fix shows up on the next request
   return value;
 }
 export const resetAiStatusCache = () => { aiStatusCache = null; };
