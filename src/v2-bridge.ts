@@ -5,8 +5,8 @@ import type { Env } from "./types";
 import { createHandler } from "../v2/src/worker";
 import { d1Store } from "../v2/src/store";
 import { wikipediaProvider } from "../v2/src/providers/wikipedia";
-import { SECTIONS } from "../v2/src/sections";
-import { wikiApi } from "../v2/src/wiki";
+import { SECTIONS, type Lang } from "../v2/src/sections";
+import { wikiApi, type WikiApi } from "../v2/src/wiki";
 import { news } from "./services/news";
 import { api } from "./routes/api";
 import { callGemini, resolveGeminiModel } from "./services/gemini";
@@ -14,14 +14,47 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-06.2";
+export const V2_BUILD = "2026-11-06.3";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
+
+/** Stale-while-revalidate for slow upstream calls, kept in the isolate's memory (the edge Cache API does nothing on *.workers.dev). */
+const SWR_STORE = new Map<string, { at: number; value: unknown }>();
+const SWR_INFLIGHT = new Map<string, Promise<unknown>>();
+let ctxRef: ExecutionContext | undefined;
+export const resetSwr = () => { SWR_STORE.clear(); SWR_INFLIGHT.clear(); MEM.clear(); };
+export async function swr<T>(key: string, freshMs: number, staleMs: number, load: () => Promise<T>, maxWaitMs?: number, keep: (v: T) => boolean = () => true): Promise<T> {
+  const hit = SWR_STORE.get(key); const age = hit ? Date.now() - hit.at : Infinity;
+  const refresh = (): Promise<T> => {
+    let p = SWR_INFLIGHT.get(key) as Promise<T> | undefined;
+    if (!p) {
+      p = load().then((v) => { if (keep(v)) { SWR_STORE.set(key, { at: Date.now(), value: v }); while (SWR_STORE.size > 400) SWR_STORE.delete(SWR_STORE.keys().next().value as string); } return v; }).finally(() => SWR_INFLIGHT.delete(key));
+      SWR_INFLIGHT.set(key, p);
+      ctxRef?.waitUntil(p.then(() => undefined, () => undefined)); // keep the refresh alive after the response is sent
+    }
+    return p;
+  };
+  if (hit && age < freshMs) return hit.value as T;
+  if (hit && age < staleMs) { refresh().catch(() => undefined); return hit.value as T; }
+  if (!maxWaitMs) return refresh();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try { return await Promise.race([refresh(), new Promise<T>((_, reject) => { timer = setTimeout(() => reject(new Error("swr_timeout")), maxWaitMs); })]); } finally { if (timer) clearTimeout(timer); }
+}
+const fetchLive = async (env: Env, lang: Lang): Promise<any[]> => {
+  const live: any = await news(env, lang);
+  return (Array.isArray(live?.items) ? live.items : []).map((st: any) => ({ title: String(st.title || ""), summary: String(st.summary || ""), publisher: String(st.publisher || ""), publishedAt: st.publishedAt ? String(st.publishedAt) : undefined, imageUrl: /^https:\/\//i.test(String(st.imageUrl || "")) ? String(st.imageUrl) : undefined, imageAlt: String(st.imageAlt || st.title || ""), url: /^https:\/\//i.test(String(st.url || "")) ? String(st.url) : undefined }));
+};
+/** Encyclopedia calls change slowly: 30 minutes fresh, 6 hours stale, never cached when empty. */
+const memoWiki = (api: WikiApi): WikiApi => {
+  const m = <A extends unknown[], R>(name: string, fn: (...a: A) => Promise<R>) => (...a: A) => swr(`wiki:${name}:${JSON.stringify(a)}`, 30 * 60_000, 6 * 3600_000, () => fn(...a), undefined, (v) => !(Array.isArray(v) && v.length === 0) && v !== null);
+  return { cards: m("cards", api.cards.bind(api)), arabicTitles: m("ar", api.arabicTitles.bind(api)), entry: m("entry", api.entry.bind(api)), mostRead: m("most", api.mostRead.bind(api)) };
+};
+
 const OWNED_SECTIONS = new Set(SECTIONS.map((s) => s.slug));
 const handler = createHandler({
   providers: (lang) => [wikipediaProvider(lang)],
   store: (env) => d1Store(env.DB),
-  wiki: wikiApi(),
+  wiki: memoWiki(wikiApi()),
   aiStatus: (env) => aiStatus(env as Env),
   // Detailed article for one story: the same builder the site always used (multi-source, evidence-gated), rendered in the new layout.
   research: async (env, story, lang, request) => {
@@ -49,11 +82,8 @@ const handler = createHandler({
     return { items, notice: items.length ? "" : String(data?.message || "") };
   },
   live: { fx: (env) => fx(env as Env), gold: (env) => gold(env as Env), weather: (env, city) => weather(city, env as Env), prayer: (env, city, country) => prayerTimes(city, country, env as Env) },
-  liveNews: async (env, lang) => {
-    // A slow RSS refresh must not hold the page: after 6s the page renders from the archive alone.
-    const live: any = await Promise.race([news(env as Env, lang), new Promise((_, reject) => setTimeout(() => reject(new Error("news_timeout")), 6000))]);
-    return (Array.isArray(live?.items) ? live.items : []).map((st: any) => ({ title: String(st.title || ""), summary: String(st.summary || ""), publisher: String(st.publisher || ""), publishedAt: st.publishedAt ? String(st.publishedAt) : undefined, imageUrl: /^https:\/\//i.test(String(st.imageUrl || "")) ? String(st.imageUrl) : undefined, imageAlt: String(st.imageAlt || st.title || ""), url: /^https:\/\//i.test(String(st.url || "")) ? String(st.url) : undefined }));
-  },
+  // Headlines are served from an in-isolate stale-while-revalidate cache: only a cold isolate waits (at most 2.5s); the RSS fetch then finishes in the background.
+  liveNews: (env, lang) => swr(`news:${lang}`, 120_000, 20 * 60_000, () => fetchLive(env as Env, lang), 2500, (v) => v.length > 0),
 });
 
 let aiStatusCache: { at: number; value: unknown } | null = null;
@@ -104,14 +134,22 @@ async function render(request: Request, env: Env): Promise<Response | null> {
   return out;
 }
 
-/** Stores a copy that stays in the edge cache for 6x its freshness window, remembering when it was built. */
-async function remember(cache: Cache, key: Request, out: Response): Promise<void> {
+/** In-isolate page store: the edge Cache API is a no-op on *.workers.dev, so this is what actually makes repeat visits fast there. */
+const MEM = new Map<string, Response>();
+const memGet = (k: Request) => { const r = MEM.get(k.url); if (!r) return undefined; MEM.delete(k.url); MEM.set(k.url, r); return r.clone(); };
+const memPut = (k: Request, r: Response) => { MEM.delete(k.url); MEM.set(k.url, r); while (MEM.size > 120) MEM.delete(MEM.keys().next().value as string); };
+
+/** Stores a copy (isolate memory + edge cache where it works) for 6x its freshness window, remembering when it was built. */
+async function remember(cache: Cache | null, key: Request, out: Response): Promise<void> {
   const smax = sMaxAge(out);
   if (!smax) return;
   const h = new Headers(out.headers);
   h.set("x-bayan-cached-at", String(Date.now())); h.set("x-bayan-smax", String(smax)); h.set("x-bayan-cached-build", V2_BUILD);
   h.set("x-bayan-cc", out.headers.get("cache-control") || ""); h.set("cache-control", `public, max-age=${6 * smax}`);
-  await cache.put(key, new Response(out.clone().body, { status: 200, headers: h }));
+  const buf = await out.clone().arrayBuffer();
+  const mk = () => new Response(buf, { status: 200, headers: h });
+  memPut(key, mk());
+  if (cache) await cache.put(key, mk()).catch(() => undefined);
 }
 
 /**
@@ -121,11 +159,12 @@ async function remember(cache: Cache, key: Request, out: Response): Promise<void
  */
 export async function serveV2(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response | null> {
   if (!v2Owns(request)) return null;
+  if (ctx) ctxRef = ctx;
   const cache = typeof caches !== "undefined" ? (caches as unknown as { default: Cache }).default : null;
   const key = new Request(request.url, { method: "GET" });
   try {
-    if (cache && request.method === "GET") {
-      const hit = await cache.match(key);
+    if (request.method === "GET") {
+      const hit = memGet(key) ?? (cache ? await cache.match(key).catch(() => undefined) : undefined);
       const at = Number(hit?.headers.get("x-bayan-cached-at") || 0), smax = Number(hit?.headers.get("x-bayan-smax") || 0);
       // A copy built by an older deploy is never served, so a new design/build shows up immediately after release.
       if (hit && at && smax && hit.headers.get("x-bayan-cached-build") === V2_BUILD) {
@@ -143,7 +182,7 @@ export async function serveV2(request: Request, env: Env, ctx?: ExecutionContext
     const out = await render(request, env);
     if (!out) return null;
     out.headers.set("x-bayan-cache", "MISS");
-    if (cache && ctx && request.method === "GET") ctx.waitUntil(remember(cache, key, out.clone()).catch(() => undefined));
+    if (ctx && request.method === "GET") ctx.waitUntil(remember(cache, key, out.clone()).catch(() => undefined));
     return out;
   } catch (error) {
     console.warn("BAYAN_V2_FALLBACK", String(error instanceof Error ? error.message : error).slice(0, 160));
