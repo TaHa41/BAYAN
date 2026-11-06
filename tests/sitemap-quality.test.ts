@@ -21,7 +21,7 @@ describe("general sitemap quality gate", () => {
   });
   it("lists /weather and /prayer in both languages", async () => {
     const xml = await (await sitemap(env([]))).text();
-    for (const p of ["/weather?lang=ar", "/weather?lang=en", "/prayer?lang=ar", "/prayer?lang=en"]) expect(xml).toContain(p);
+    for (const p of ["/sections?lang=ar", "/sections?lang=en", "/weather?lang=ar", "/weather?lang=en", "/prayer?lang=ar", "/prayer?lang=en"]) expect(xml).toContain(p);
   });
   it("lists a bundled article only when it passes the same quality gate as database articles", async () => {
     const xml = await (await sitemap(env([]))).text();
