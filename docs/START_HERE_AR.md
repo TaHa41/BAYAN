@@ -154,6 +154,7 @@ Bindings: `DB` (D1)، `AI` (Workers AI)، `AI_SEARCH`، `ASSETS`.
 - **المتبقي بعد الدمج (تحقق حي لم يُنفَّذ بعد):** نجاح job `deploy`، ثم طلب صفحة حقيقية مرتين وقراءة `x-bayan-cache` (MISS ثم HIT) و`x-bayan-v2-build: 2026-11-05.1`.
 
 ## 17) حالة الإنتاج الآن
+- (6 نوفمبر) `/api/health/ai` صار يعرض `keyState` (`absent` = لا يوجد binding، `empty` = موجود بقيمة فارغة، `set`) و`build` و`deployedCommit`، ولا يخزّن نتيجة «مفتاح غير موجود» بالكاش. استخدمه لتمييز سبب `missing_key`.
 - تصميم الأقسام الجديد منشور (PR #592). النشر ينجح، وفحص `verify-production` يفشل بسبب `news_publication_gap` (متوقع حتى يعمل الذكاء الاصطناعي).
 - `GEMINI_API_KEY` غير مضبوط في الإنتاج (إشارة `/api/health/ai`)، وهو سبب توقف الأخبار الجديدة ورسائل «تعذر تحضير معالجة مفصلة».
 

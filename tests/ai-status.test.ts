@@ -28,4 +28,13 @@ describe("public AI status (no secrets)", () => {
     const v: any = await aiStatus({} as unknown as Env);
     expect(v.gemini).toMatchObject({ configured: false, ok: false, error: "missing_key" }); expect(f).not.toHaveBeenCalled();
   });
+  it("tells an absent key from an empty one, never caches a missing key, and exposes only the build", async () => {
+    vi.stubGlobal("fetch", gem(200, {}));
+    const absent: any = await aiStatus({} as unknown as Env);
+    expect(absent.gemini.keyState).toBe("absent"); expect(absent.build).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/);
+    const empty: any = await aiStatus({ GEMINI_API_KEY: "  " } as unknown as Env);
+    expect(empty.gemini).toMatchObject({ configured: false, keyState: "empty" });
+    const fixed: any = await aiStatus({ GEMINI_API_KEY: "k-secret", BAYAN_COMMIT_SHA: "abcdef1234567890" } as unknown as Env);
+    expect(fixed.gemini.keyState).toBe("set"); expect(fixed.deployedCommit).toBe("abcdef123456"); expect(JSON.stringify(fixed)).not.toContain("k-secret");
+  });
 });
