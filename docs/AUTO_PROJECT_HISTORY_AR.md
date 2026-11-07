@@ -324,3 +324,8 @@
 - Commit: `27ed23397b0eecef319438c85c1d086a9c2d3863`
 - الملفات: M	docs/START_HERE_AR.md;M	src/v2-bridge.ts;M	tests/v2-bridge.test.ts;A	v2/src/admin.ts;M	v2/src/ui.ts;M	v2/src/worker.ts;M	v2/tests/worker.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-07T19:05:33Z — Fix /health shadowing, v2 owns all pages (new-layout 404), legacy redirects, faster search, compact diagnostics; tests; docs; V2_BUILD 2026-11-07.2 
+- Commit: `cd45d4830c2af77bcd975ac0b41a3bfafcfcdc60`
+- الملفات: M	docs/START_HERE_AR.md;M	scripts/page-diagnostics.mjs;M	src/v2-bridge.ts;M	tests/v2-bridge.test.ts;M	v2/src/worker.ts;M	v2/tests/worker.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
