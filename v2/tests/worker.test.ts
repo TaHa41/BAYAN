@@ -156,11 +156,12 @@ describe("v2 research, archive items, trends and contribution (no link leaves th
     expect(html).toContain("<h2>تفاصيل</h2>"); expect(html).toContain("https://bbc.com/a"); expect(html).not.toContain("insecure.com"); expect(html).toContain("https://img.example/photos/r-2026.jpg");
     expect(html).toContain('class="ribbon"'); expect(html).toContain('class="progress"'); expect(html).not.toContain("ملخص من المصدر");
   });
-  it("/research is honest when the builder returns only a summary or fails: notice, source link, retry link, no invented detail", async () => {
+  it("/research is always a complete organised article, with the source link, and no apology or invented detail, even when the builder returns only a summary or fails", async () => {
     const summaryOnly = await (await call(q, {}, { research: async () => ({ title: "خبر", summary: "ملخص", body: "ملخص", sources: [], status: "source_only" }) })).text();
-    expect(summaryOnly).toContain("ملخص من المصدر"); expect(summaryOnly).toContain("https://bbc.com/a");
+    expect(summaryOnly).toContain("<h2>الخلاصة</h2>"); expect(summaryOnly).toContain("https://bbc.com/a"); expect(summaryOnly).not.toContain("تعذر");
     const failed = await (await call(q, {}, { research: async () => { throw new Error("ai down"); } })).text();
-    expect(failed).toContain("تعذر تحضير معالجة مفصلة"); expect(failed).toContain("حاول مرة أخرى"); expect(failed).toContain("/research?");
+    for (const x of ["تعذر تحضير", "حاول مرة أخرى", "class=\"verdict\""]) expect(failed).not.toContain(x);
+    expect(failed).toContain("<h2>الخلاصة</h2>"); expect(failed).toContain("https://bbc.com/a"); expect(failed).toContain("لم تُضف معلومات من خارجها");
   });
   it("/research without a title is a 404 and the result is never indexed", async () => {
     expect((await call("/research")).status).toBe(404);
