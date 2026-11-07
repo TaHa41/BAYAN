@@ -161,3 +161,9 @@ jobs:
         env:
           BAYAN_PRODUCTION_URL: https://bayan.tahaomar411.workers.dev
         run: node scripts/news-sitemap-diagnostics.mjs
+      - name: Report page diagnostics (non-blocking)
+        if: always()
+        continue-on-error: true
+        env:
+          BAYAN_PRODUCTION_URL: https://bayan.tahaomar411.workers.dev
+        run: node scripts/page-diagnostics.mjs
