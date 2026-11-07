@@ -15,7 +15,7 @@ const ok: Provider = { name: "ok", run: async () => [{ title: "نتيجة", summ
 
 describe("v2 infrastructure routes", () => {
   it("health, robots (links sitemap, blocks api/admin)", async () => {
-    expect(await (await call("/health")).json()).toEqual({ ok: true, service: "bayan-v2" });
+    expect(await (await call("/healthz")).json()).toEqual({ ok: true, service: "bayan-v2" });
     const body = await (await call("/robots.txt")).text();
     expect(body).toContain("Disallow: /api/");
     expect(body).toContain("Sitemap: https://bayan.test/sitemap.xml");
@@ -395,6 +395,23 @@ describe("admin, saved and ask pages in the new layout", () => {
     const html = await (await call("/ask?lang=ar&q=" + encodeURIComponent("ما هو التضخم؟"))).text();
     expect(html).toContain('id="ask-form"'); expect(html).toContain("/api/ask?lang="); expect(html).toContain("/search?q="); expect(html).toContain("ما هو التضخم؟");
     expect(html).not.toContain("تعذر");
+  });
+});
+
+describe("routes that used to be shadowed or left on the old site", () => {
+  it("/health is the Health section page (HTML), the JSON probe is /healthz", async () => {
+    const page = await call("/health?lang=ar"); const html = await page.text();
+    expect(page.status).toBe(200); expect(page.headers.get("content-type")).toContain("text/html"); expect(html).toContain("<h1>"); expect(html).toContain("صحة");
+    const probe = await call("/healthz"); expect(await probe.json()).toEqual({ ok: true, service: "bayan-v2" });
+  });
+  it("old v1 addresses redirect to their place on the new site", async () => {
+    for (const [from, to] of [["/tools?lang=en", "/sections?lang=en"], ["/people/Ahmed_Zewail?lang=ar", "/wiki/Ahmed_Zewail?lang=ar"], ["/review/12?lang=ar", "/admin?lang=ar"], ["/review?lang=ar", "/admin?lang=ar"]] as const) {
+      const r = await call(from); expect(r.status, from).toBe(301); expect(r.headers.get("location"), from).toBe(to);
+    }
+  });
+  it("an unknown page is the new-layout 404, not the old site", async () => {
+    const r = await call("/no-such-page?lang=en"); const html = await r.text();
+    expect(r.status).toBe(404); expect(html).toContain("<!doctype html>"); expect(html).toContain("noindex");
   });
 });
 

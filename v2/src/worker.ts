@@ -65,7 +65,7 @@ export function createHandler(deps: Deps) {
     const page = (o: { title: string; description: string; body: string; path: string; active?: string; image?: string; jsonLd?: unknown; noindex?: boolean; ticker?: TickerItem[]; progress?: boolean }, status = 200, cache?: string) =>
       html(layout({ lang, origin, ...o }), status, cache);
 
-    if (path === "/health") return json({ ok: true, service: "bayan-v2" });
+    if (path === "/healthz") return json({ ok: true, service: "bayan-v2" }); // "/health" is the Health section page, so the JSON probe lives here
     if (path === "/robots.txt") return text(`User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nSitemap: ${origin}/sitemap.xml\n`);
     if (path === "/ads.txt") return adsTxt(env);
 
@@ -122,9 +122,12 @@ export function createHandler(deps: Deps) {
       const q = (url.searchParams.get("q") || "").trim().slice(0, 200);
       if (!q) return page({ title: (lang === "ar" ? "البحث | " : "Search | ") + SITE.name, description: "BAYAN search", body: searchBody(lang, "", null), path: "/search", noindex: true });
       // Full BAYAN search (all providers, rate limits, archive filing) when available; Wikipedia alone is the safety net.
-      const full = deps.search ? await soft(deps.search(env, q, lang, request), 25000, null) : null;
+      // The Wikipedia-backed fallback starts at once, so when the full search is slow (6s budget) the visitor still gets results immediately.
+      const fast = searchAll(q, deps.providers(lang));
+      fast.catch(() => undefined);
+      const full = deps.search ? await soft(deps.search(env, q, lang, request), 6000, null) : null;
       if (full) return html(layout({ lang, origin, path: `/search?q=${encodeURIComponent(q)}`, title: `${q} | ${SITE.name}`, description: full.items[0]?.summary ? plain(full.items[0].summary) : q, body: searchResultsBody(lang, q, full.items, full.notice), noindex: true }), 200, "no-store");
-      const outcome = await searchAll(q, deps.providers(lang));
+      const outcome = await fast;
       return html(layout({ lang, origin, path: `/search?q=${encodeURIComponent(q)}`, title: `${q} | ${SITE.name}`, description: outcome.hits[0]?.summary || q, body: searchBody(lang, q, outcome), noindex: true }), 200, "no-store");
     }
 
@@ -188,6 +191,12 @@ export function createHandler(deps: Deps) {
       if (!item) return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404);
       return researchPage(item, url.pathname + url.search);
     }
+    // Old v1 addresses: send visitors to their place on the new site.
+    const go = (to: string) => new Response(null, { status: 301, headers: { location: to, "cache-control": "public, max-age=3600" } });
+    if (path === "/tools" || path === "/index.html") return go(path === "/tools" ? `/sections?lang=${lang}` : `/?lang=${lang}`);
+    const person = path.match(/^\/people\/([^/]+)$/);
+    if (person) return go(`/wiki/${person[1]}?lang=${lang}`);
+    if (path === "/review" || path.startsWith("/review/")) return go(`/admin?lang=${lang}`);
     if (path === "/admin") return page({ title: `${lang === "ar" ? "لوحة الإدارة" : "Admin"} | ${SITE.name}`, description: "", body: adminBody(lang, SECTIONS.map((x) => x.slug)), path, noindex: true }, 200, "no-store");
     if (path === "/saved") return page({ title: `${lang === "ar" ? "المحفوظات" : "Saved"} | ${SITE.name}`, description: "", body: savedBody(lang), path, noindex: true }, 200, "no-store");
     if (path === "/ask") return page({ title: `${lang === "ar" ? "اسأل بيان" : "Ask BAYAN"} | ${SITE.name}`, description: lang === "ar" ? "اسأل بيان: إجابات مبنية على المصادر." : "Ask BAYAN: answers built on sources.", body: askBody(lang, (url.searchParams.get("q") || "").trim().slice(0, 300)), path, noindex: true }, 200, "no-store");

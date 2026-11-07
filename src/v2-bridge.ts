@@ -14,7 +14,7 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-07.1";
+export const V2_BUILD = "2026-11-07.2";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 
@@ -75,14 +75,15 @@ const handler = createHandler({
   },
   // The same search the site always had (all providers, rate limits, section filing), rendered in the new design.
   // The original request headers are forwarded so per-visitor limits and analytics exclusions keep working.
-  search: async (env, q, lang, request) => {
+  // Repeated searches are served from the isolate for 10 minutes (stale up to an hour) instead of re-querying every provider.
+  search: (env, q, lang, request) => swr(`search:${lang}:${q.toLowerCase()}`, 10 * 60_000, 60 * 60_000, async () => {
     const u = new URL(request.url);
     const res = await api(new Request(`${u.origin}/api/search?q=${encodeURIComponent(q)}&lang=${lang}`, { headers: request.headers }), env as Env);
     if (!res.ok) return null;
     const data: any = await res.json();
     const items = (Array.isArray(data?.results) ? data.results : []).slice(0, 12).map((r: any) => ({ title: String(r.title || ""), summary: String(r.summary || ""), section: r.section ? String(r.section) : undefined, publisher: String(r.publisher || r.sources?.[0]?.publisher || ""), url: /^https:\/\//i.test(String(r.url || r.sources?.[0]?.url || "")) ? String(r.url || r.sources[0].url) : undefined, slug: r.slug ? String(r.slug) : undefined, imageUrl: /^https:\/\//i.test(String(r.imageUrl || "")) ? String(r.imageUrl) : undefined, evidence: r.evidence ? String(r.evidence) : undefined, sourceCount: Array.isArray(r.sources) ? r.sources.length : (r.url ? 1 : 0) })).filter((r: any) => r.title);
     return { items, notice: items.length ? "" : String(data?.message || "") };
-  },
+  }, undefined, (v) => !!v && v.items.length > 0),
   live: { fx: (env) => fx(env as Env), gold: (env) => gold(env as Env), weather: (env, city) => weather(city, env as Env), prayer: (env, city, country) => prayerTimes(city, country, env as Env) },
   // Headlines are served from an in-isolate stale-while-revalidate cache: only a cold isolate waits (at most 2.5s); the RSS fetch then finishes in the background.
   liveNews: (env, lang) => swr(`news:${lang}`, 120_000, 20 * 60_000, () => fetchLive(env as Env, lang), 2500, (v) => v.length > 0),
@@ -107,7 +108,10 @@ export function v2Owns(request: Request): boolean {
   const path = u.pathname.replace(/(.)\/+$/, "$1");
   if (request.method === "POST") return path === "/contribute";
   if (request.method !== "GET") return false;
-  return path === "/" || OWNED_SECTIONS.has(path.slice(1)) || /^\/article\/[^/]+$/.test(path) || /^\/wiki\/[^/]+$/.test(path) || path === "/prices" || path === "/sections" || path === "/admin" || path === "/saved" || path === "/ask" || path === "/weather" || path === "/prayer" || path === "/search" || ["/about", "/methodology", "/privacy", "/terms", "/research", "/contribute"].includes(path) || path === "/api/health/ai" || ADMIN_AI.has(path);
+  if (path === "/api/health/ai" || ADMIN_AI.has(path)) return true;
+  // The API, files with an extension (sitemaps, robots, images, manifest...) and well-known paths stay with the Worker core; every other page is v2's, including its 404.
+  if (path.startsWith("/api/") || path.startsWith("/.well-known/") || /\.[a-z0-9]{2,6}$/i.test(path)) return false;
+  return true;
 }
 
 const REFRESHING = new Set<string>();
