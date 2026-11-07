@@ -9,7 +9,7 @@ import { classifyStory } from "./classify";
 import { topicsFor } from "./topics";
 import { STATIC_SLUGS, staticPage, type StaticSlug } from "./pages";
 import type { WikiApi } from "./wiki";
-import { articleBody, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, wikiEntryBody, siteJsonLd, sectionJsonLd, sectionsHubBody, sectionsJsonLd, staticBody, searchResultsBody, researchBody, trendsBody, contributeBody, type ResearchArticle, type ContributeValues, type SearchItem, pricesBody, weatherBody, prayerBody, tickerItems, esc, type ClassifiedStory, type LiveStory, type TickerItem } from "./ui";
+import { articleBody, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, wikiEntryBody, siteJsonLd, sectionJsonLd, sectionsHubBody, sectionsJsonLd, staticBody, searchResultsBody, researchBody, relatedStories, trendsBody, contributeBody, type ResearchArticle, type ContributeValues, type SearchItem, pricesBody, weatherBody, prayerBody, tickerItems, esc, type ClassifiedStory, type LiveStory, type TickerItem } from "./ui";
 
 export interface Env extends AiEnv { DB: D1Database; ADS_TXT?: string; SITE_ORIGIN?: string; BAYAN_AI_MANAGER_TOKEN?: string }
 export interface Deps { providers: (lang: Lang) => Provider[]; store: (env: Env) => Store; liveNews?: (env: Env, lang: Lang) => Promise<LiveStory[]>; wiki?: WikiApi; live?: LiveApi; aiStatus?: (env: Env) => Promise<unknown>; search?: (env: Env, q: string, lang: Lang, request: Request) => Promise<{ items: SearchItem[]; notice?: string } | null>; research?: (env: Env, story: LiveStory, lang: Lang, request: Request) => Promise<ResearchArticle | null>; contribute?: (env: Env, data: { title: string; body: string; source: string; section: string }, lang: Lang, request: Request) => Promise<{ ok: boolean }> }
@@ -171,8 +171,10 @@ export function createHandler(deps: Deps) {
 
     // Detailed article for one story, built by the research service from several sources (never an invented text).
     const researchPage = async (story: LiveStory, retryHref: string) => {
-      const a = deps.research ? await soft(deps.research(env, story, lang, request), 45000, null) : null;
-      return html(layout({ lang, origin, path, title: `${plain(a?.title || story.title)} | ${SITE.name}`, description: plain(a?.summary || story.summary), body: researchBody(lang, story, a, retryHref), noindex: true, progress: true, image: a?.image || story.imageUrl }), 200, "no-store");
+      // The detailed write-up gets 14 seconds; after that the visitor gets the complete organised summary at once (the write-up keeps running and is reused next time).
+      const [a, pool] = await Promise.all([deps.research ? soft(deps.research(env, story, lang, request), 14000, null) : Promise.resolve(null), deps.liveNews ? soft(deps.liveNews(env, lang), 2500, [] as LiveStory[]) : Promise.resolve([] as LiveStory[])]);
+      const related = relatedStories(story, pool);
+      return html(layout({ lang, origin, path, title: `${plain(a?.title || story.title)} | ${SITE.name}`, description: plain(a?.summary || story.summary), body: researchBody(lang, story, a, related), noindex: true, progress: true, image: a?.image || story.imageUrl }), 200, "no-store");
     };
     if (path === "/research") {
       const title = (url.searchParams.get("title") || "").trim().slice(0, 300);

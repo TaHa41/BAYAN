@@ -322,18 +322,43 @@ export function searchResultsBody(lang: Lang, q: string, items: SearchItem[], no
   return `<div class="page-head"><h1>${esc(q)}</h1></div>${searchForm(lang)}${notice ? `<p class="verdict">${esc(notice)}</p>` : ""}${cards ? `<div class="grid" style="margin-top:18px">${cards}</div>` : `<p class="verdict">${T(lang, "لم نعثر على نتائج لها مصدر حقيقي في هذه المحاولة، ولم نعرض شيئًا بدلًا من التخمين. جرّب صياغة أخرى.", "No results with a real source were found this time, and nothing was shown instead of guessing. Try another phrasing.")}</p>`}`;
 }
 export interface ResearchArticle { title: string; summary: string; body: string; sources: { title: string; publisher: string; url: string }[]; image?: string | null; status?: string; section?: string }
-/** Detailed article built by the existing research service from several sources, in the new layout. Honest about its status. */
-export function researchBody(lang: Lang, story: LiveStory, a: ResearchArticle | null, retryHref: string): string {
+const sentences = (t: string): string[] => (plain(t).match(/[^.!؟?؛!\n]+[.!؟?!]?/g) || []).map((x) => x.trim()).filter((x) => x.length > 24);
+const sameStory = (a: string, b: string): boolean => {
+  const tok = (x: string) => new Set(plain(x).toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 3));
+  const A = tok(a), B = tok(b); if (A.size < 3 || B.size < 3) return false;
+  let hit = 0; for (const w of A) if (B.has(w)) hit++;
+  return hit / Math.min(A.size, B.size) >= 0.5;
+};
+/** Other publishers' coverage of the same story, taken only from the live feed (never invented). */
+export const relatedStories = (story: LiveStory, pool: LiveStory[], max = 5): LiveStory[] => {
+  const seen = new Set<string>([story.publisher]);
+  return pool.filter((x) => x.url && x.publisher && !seen.has(x.publisher) && sameStory(story.title, x.title) && (seen.add(x.publisher), true)).slice(0, max);
+};
+/**
+ * A complete, organised article built only from real material: the source summary, how each publisher covered it, and the source list.
+ * Used whenever the detailed write-up is not available, so a visitor never sees an apology or a half page.
+ */
+function composedBody(lang: Lang, story: LiveStory, related: LiveStory[]): string {
+  const own = sentences(story.summary), cover = [story, ...related].filter((x) => x.url);
+  const points = own.length > 1 ? own : [];
+  const covered = cover.map((x) => `<li><b>${esc(x.publisher)}</b>${x.publishedAt ? ` <span class="updated">· ${esc(x.publishedAt.slice(0, 10))}</span>` : ""}<br>${esc(plain(x.title))}${x.summary && plain(x.summary) !== plain(x.title) ? ` — ${esc(plain(x.summary).slice(0, 280))}` : ""} <a href="${esc(x.url!)}" rel="noopener nofollow" target="_blank">${T(lang, "اقرأ المصدر ↗", "Read the source ↗")}</a></li>`).join("");
+  return `<h2>${T(lang, "الخلاصة", "In brief")}</h2><p>${esc(plain(story.summary) || plain(story.title))}</p>`
+    + (points.length ? `<h2>${T(lang, "أبرز النقاط", "Key points")}</h2><ul>${points.slice(0, 5).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : "")
+    + (covered ? `<h2>${T(lang, related.length ? "كيف تناولته المصادر" : "المصدر", related.length ? "How the sources covered it" : "Source")}</h2><ul class="cover">${covered}</ul>` : "")
+    + `<p class="updated">${T(lang, `مبني على ${cover.length || 1} ${cover.length > 2 ? "مصادر" : "مصدر"} منشورة؛ لم تُضف معلومات من خارجها.`, `Based on ${cover.length || 1} published source${cover.length === 1 ? "" : "s"}; nothing outside them was added.`)}</p>`;
+}
+/** Article for one story: the research service's write-up when it exists, otherwise a complete organised summary from real sources. */
+export function researchBody(lang: Lang, story: LiveStory, a: ResearchArticle | null, related: LiveStory[] = []): string {
   const title = plain(a?.title || story.title), summary = plain(a?.summary || story.summary);
   const imgUrl = [a?.image, story.imageUrl].find((u) => u && /^https:\/\//i.test(String(u)) && !isGenericImage(String(u))) as string | undefined;
   const hasDetail = !!a && a.body.replace(/\s+/g, " ").trim() !== a.summary.replace(/\s+/g, " ").trim() && a.status !== "source_only";
-  const notice = !a ? `<p class="verdict">${T(lang, "تعذر تحضير معالجة مفصلة لهذا الخبر الآن، وهذا ملخص المصدر فقط.", "A detailed write-up could not be prepared right now; this is the source summary only.")} <a class="kicker" href="${esc(retryHref)}">${T(lang, "حاول مرة أخرى", "Try again")}</a></p>`
-    : hasDetail ? "" : `<p class="verdict">${T(lang, "ملخص من المصدر: لم تتوفر مصادر مستقلة كافية لمعالجة مفصلة، ولم نضف أي معلومة من خارجها.", "Source summary: not enough independent sources were available for a detailed write-up, and nothing beyond them was added.")}</p>`;
   const sources = (a?.sources?.length ? a.sources : story.url ? [{ title: story.publisher, publisher: story.publisher, url: story.url }] : []).filter((s) => /^https:\/\//i.test(s.url));
+  const content = hasDetail ? `<p class="lead" style="margin-inline:0;color:var(--mut)">${esc(summary)}</p>${renderBody(a!.body)}` : composedBody(lang, story, related);
+  const list = hasDetail ? sources : sources.length > 1 ? sources : [];
   return `<article class="full">${imgUrl ? `<img class="hero-img" src="${esc(imgUrl)}" alt="${esc(title)}" width="1200" height="675">` : ""}
-<p class="meta" style="margin-top:14px"><span class="kicker">${esc([secLabel(a?.section, lang), story.publisher].filter(Boolean).join(" · "))}</span>${story.publishedAt ? " · " + esc(story.publishedAt.slice(0, 10)) : ""}</p><h1>${esc(title)}</h1>${notice}
-<p class="lead" style="margin-inline:0;color:var(--mut)">${esc(summary)}</p>${hasDetail ? renderBody(a!.body) : ""}
-${sources.length ? `<div class="sources"><h2>${T(lang, "المصادر", "Sources")}</h2><ul>${sources.map((s) => `<li><a href="${esc(s.url)}" rel="noopener nofollow" target="_blank">${esc(s.title || s.publisher || s.url)}</a>${s.publisher && s.title ? ` — ${esc(s.publisher)}` : ""}</li>`).join("")}</ul></div>` : ""}</article>`;
+<p class="meta" style="margin-top:14px"><span class="kicker">${esc([secLabel(a?.section, lang), story.publisher].filter(Boolean).join(" · "))}</span>${story.publishedAt ? " · " + esc(story.publishedAt.slice(0, 10)) : ""}</p><h1>${esc(title)}</h1>
+${content}
+${list.length ? `<div class="sources"><h2>${T(lang, "المصادر", "Sources")}</h2><ul>${list.map((s) => `<li><a href="${esc(s.url)}" rel="noopener nofollow" target="_blank">${esc(s.title || s.publisher || s.url)}</a>${s.publisher && s.title ? ` — ${esc(s.publisher)}` : ""}</li>`).join("")}</ul></div>` : ""}</article>`;
 }
 
 export function trendsBody(lang: Lang, d: { mostRead: WikiCard[]; stories: ClassifiedStory[] }, now = Date.now()): string {

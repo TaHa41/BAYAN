@@ -14,7 +14,7 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-06.5";
+export const V2_BUILD = "2026-11-06.6";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 
@@ -60,7 +60,9 @@ const handler = createHandler({
   research: async (env, story, lang, request) => {
     const u = new URL(request.url);
     const qs = new URLSearchParams({ title: story.title, summary: story.summary, url: story.url || "", publisher: story.publisher, image: story.imageUrl || "", lang });
-    const res = await api(new Request(`${u.origin}/api/news/article?${qs}`, { headers: request.headers }), env as Env);
+    const pending = api(new Request(`${u.origin}/api/news/article?${qs}`, { headers: request.headers }), env as Env);
+    ctxRef?.waitUntil(pending.then(() => undefined, () => undefined)); // keep building (and caching) the write-up even if this visitor stops waiting
+    const res = await pending;
     if (!res.ok) return null;
     const d: any = await res.json(); const a = d?.article;
     return d?.ok && a?.title ? { title: String(a.title), summary: String(a.summary || ""), body: String(a.body || ""), sources: (Array.isArray(a.sources) ? a.sources : []).map((s: any) => ({ title: String(s.title || ""), publisher: String(s.publisher || ""), url: String(s.url || "") })), image: a.image ? String(a.image) : null, status: a.status ? String(a.status) : undefined, section: a.section ? String(a.section) : undefined } : null;
