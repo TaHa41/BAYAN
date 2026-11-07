@@ -309,3 +309,8 @@
 - Commit: `14cab6d0b163da7d8d2a86ed167c8af41af64533`
 - الملفات: M	docs/START_HERE_AR.md;M	src/v2-bridge.ts;M	tests/ai-status.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-07T00:10:29Z — Complete articles always (no apology), related coverage, 14s write-up budget with background completion, Workers AI model fallback; tests; docs; V2_BUILD 2026-11-06.6 
+- Commit: `bb0bb7ffd5d9c97bddd2b4099a1c7cc10f524be3`
+- الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/services/ai.ts;M	src/v2-bridge.ts;A	tests/complete-articles.test.ts;M	v2/src/ui.ts;M	v2/src/worker.ts;M	v2/tests/worker.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
