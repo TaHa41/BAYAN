@@ -314,3 +314,8 @@
 - Commit: `bb0bb7ffd5d9c97bddd2b4099a1c7cc10f524be3`
 - الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/services/ai.ts;M	src/v2-bridge.ts;A	tests/complete-articles.test.ts;M	v2/src/ui.ts;M	v2/src/worker.ts;M	v2/tests/worker.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-07T00:23:25Z — CI: non-blocking page diagnostics (status, cold/warm timing, markers, 1102 detection) after each deploy 
+- Commit: `66d9c8c31465b47ab37ae65bd2463c181d0e6759`
+- الملفات: M	.github/workflows/deploy-worker.yml;A	scripts/page-diagnostics.mjs 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
