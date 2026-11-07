@@ -366,3 +366,35 @@ describe("sections hub", () => {
   });
   it("the home page links to the hub", async () => { expect(await (await call("/?lang=en")).text()).toContain('href="/sections?lang=en"'); });
 });
+
+describe("admin, saved and ask pages in the new layout", () => {
+  const scripts = (html: string) => [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  it("every inline script on these pages is valid JavaScript", async () => {
+    for (const p of ["/admin?lang=ar", "/admin?lang=en", "/saved?lang=ar", "/ask?lang=en&q=hello"]) {
+      const html = await (await call(p)).text();
+      const list = scripts(html); expect(list.length).toBeGreaterThan(0);
+      for (const code of list) expect(() => new Function(code), p).not.toThrow();
+    }
+  });
+  it("/admin: never cached or indexed, with all six tabs wired to the existing admin endpoints and the manager token header", async () => {
+    const res = await call("/admin?lang=ar"); const html = await res.text();
+    expect(res.status).toBe(200); expect(res.headers.get("cache-control")).toBe("no-store"); expect(html).toContain("noindex");
+    for (const t of ["overview", "articles", "contrib", "system", "searches", "settings"]) expect(html).toContain(`["${t}",`);
+    for (const e of ["/api/admin/analytics", "/api/admin/articles", "/api/admin/article/status", "/api/admin/article/delete", "/api/admin/article/restore", "/api/admin/article/expand", "/api/admin/article/revisions", "/api/admin/contributions", "/api/admin/contributions/review", "/api/admin/runtime", "/api/admin/repairs", "/api/admin/repair", "/api/admin/ai-repair", "/api/admin/telegram-test", "/api/admin/searches", "/api/admin/settings"]) expect(html).toContain(e);
+    expect(html).toContain("x-bayan-manager-token"); expect(html).toContain("sessionStorage");
+    for (const slug of ["politics", "egypt", "arab"]) expect(html).toContain(slug);
+  });
+  it("/saved keeps the list in this browser only; the save button is on story pages", async () => {
+    const saved = await (await call("/saved?lang=en")).text();
+    expect(saved).toContain("Saved"); expect(saved).toContain("bayan-saved"); expect(saved).not.toContain("fetch(");
+    const storyUrl = "/research?lang=ar&title=" + encodeURIComponent("خبر اختبار") + "&summary=" + encodeURIComponent("ملخص الخبر في جملة واضحة.") + "&publisher=BBC&url=" + encodeURIComponent("https://bbc.com/a");
+    const story = await (await call(storyUrl, {}, { research: async () => null })).text();
+    expect(story).toContain('id="save-btn"'); expect(story).toContain("bayan-saved");
+  });
+  it("/ask has a form, posts to the answer service, and falls back to the real search instead of showing an apology", async () => {
+    const html = await (await call("/ask?lang=ar&q=" + encodeURIComponent("ما هو التضخم؟"))).text();
+    expect(html).toContain('id="ask-form"'); expect(html).toContain("/api/ask?lang="); expect(html).toContain("/search?q="); expect(html).toContain("ما هو التضخم؟");
+    expect(html).not.toContain("تعذر");
+  });
+});
+

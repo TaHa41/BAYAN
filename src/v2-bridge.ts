@@ -14,7 +14,7 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-06.6";
+export const V2_BUILD = "2026-11-07.1";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 
@@ -107,7 +107,7 @@ export function v2Owns(request: Request): boolean {
   const path = u.pathname.replace(/(.)\/+$/, "$1");
   if (request.method === "POST") return path === "/contribute";
   if (request.method !== "GET") return false;
-  return path === "/" || OWNED_SECTIONS.has(path.slice(1)) || /^\/article\/[^/]+$/.test(path) || /^\/wiki\/[^/]+$/.test(path) || path === "/prices" || path === "/sections" || path === "/weather" || path === "/prayer" || path === "/search" || ["/about", "/methodology", "/privacy", "/terms", "/research", "/contribute"].includes(path) || path === "/api/health/ai" || ADMIN_AI.has(path);
+  return path === "/" || OWNED_SECTIONS.has(path.slice(1)) || /^\/article\/[^/]+$/.test(path) || /^\/wiki\/[^/]+$/.test(path) || path === "/prices" || path === "/sections" || path === "/admin" || path === "/saved" || path === "/ask" || path === "/weather" || path === "/prayer" || path === "/search" || ["/about", "/methodology", "/privacy", "/terms", "/research", "/contribute"].includes(path) || path === "/api/health/ai" || ADMIN_AI.has(path);
 }
 
 const REFRESHING = new Set<string>();
