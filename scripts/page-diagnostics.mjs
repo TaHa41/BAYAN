@@ -14,26 +14,25 @@ async function hit(path) {
 function marks(body) {
   return {
     bytes: body.length, h1: count(body, /<h1[ >]/g), cards: count(body, /class="card[ "]/g), imgs: count(body, /<img /g), noimg: count(body, /class="noimg"/g),
-    h2: count(body, /<h2[ >]/g), apology: /تعذر|could not be prepared|Try again|حاول مرة أخرى/.test(body), cf1102: /Error 1102|exceeded resource limits/i.test(body),
+    h2: count(body, /<h2[ >]/g), apology: /تعذر تحضير|تعذر إكمال|could not be prepared|Try again|حاول مرة أخرى/.test(body), cf1102: /Error 1102|exceeded resource limits/i.test(body),
     cfErr: (/Error (1\d{3})/.exec(body) || [])[1] || undefined,
   };
 }
+const rows = [];
 async function report(path) {
   const a = await hit(path);
-  if (a.error) { out(path, { error: a.error, ms: a.ms }); return null; }
-  const b = await hit(path);
-  out(path, { status: a.r.status, coldMs: a.ms, warmMs: b.ms, cache: b.r?.headers.get("x-bayan-cache") || null, build: a.r.headers.get("x-bayan-v2-build") || null, ...marks(a.body) });
+  if (a.error) { rows.push({ p: path.slice(0, 60), err: a.error, ms: a.ms }); return null; }
+  const b = await hit(path); const m = marks(a.body);
+  rows.push({ p: path.slice(0, 60), s: a.r.status, c: a.ms, w: b.ms, k: b.r?.headers.get("x-bayan-cache") || "-", kb: Math.round(m.bytes / 1024), cd: m.cards, im: m.imgs, ni: m.noimg, h2: m.h2, ap: m.apology ? 1 : 0, e: m.cf1102 ? "1102" : m.cfErr });
   return a.body;
 }
-function out(path, data) {
-  const line = JSON.stringify({ path, ...data });
-  console.log("PAGE_DIAGNOSTICS " + line);
-  console.log("::notice title=PAGE " + path.slice(0, 40).replace(/[:,%\n]/g, "_") + "::" + line.slice(0, 880));
+function flush() { // GitHub shows only 10 annotations per step, so rows are grouped three per notice.
+  for (let i = 0; i < rows.length; i += 3) { const line = JSON.stringify(rows.slice(i, i + 3)); console.log("PAGE_DIAGNOSTICS " + line); console.log("::notice title=PAGES " + (i / 3 + 1) + "::" + line.slice(0, 880)); }
 }
 let home = "", news = "";
 for (const p of paths) { const body = await report(p); if (p === "/") home = body || ""; if (p === "/news") news = body || ""; }
-// One real story page and one real article page, found from the live listings themselves.
 const find = (html, re) => { const m = re.exec(html); return m ? m[1].replace(/&amp;/g, "&") : null; };
 const story = find(news + home, /href="(\/research\?[^"]+)"/), article = find(news + home, /href="(\/article\/[^"?]+\?[^"]*)"/);
-if (story) await report(story); else out("(no story link found on / or /news)", { note: "listings have no external stories" });
-if (article) await report(article);
+if (story) await report(story); else rows.push({ p: "(no story link on / or /news)" });
+if (article) await report(article); else rows.push({ p: "(no article link on / or /news)" });
+flush();
