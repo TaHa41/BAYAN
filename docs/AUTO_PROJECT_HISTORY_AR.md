@@ -344,3 +344,8 @@
 - Commit: `fd0235302fa5f9ea4a2a786b4e1d87482957bbfd`
 - الملفات: M	scripts/page-diagnostics.mjs;M	src/v2-bridge.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-08T05:55:33Z — Make fallbacks to the old site visible (/api/health/v2) and never caused by a broken cached copy; diagnostics read it; tests; V2_BUILD 2026-11-07.6 
+- Commit: `0c39837150637ab8eefd98add7356851bc66e4aa`
+- الملفات: M	scripts/page-diagnostics.mjs;M	src/v2-bridge.ts;M	tests/v2-swr.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
