@@ -36,4 +36,8 @@ const find = (html, re) => { const m = re.exec(html); return m ? m[1].replace(/&
 const story = find(news + home, /href="(\/research\?[^"]+)"/), article = find(news + home, /href="(\/article\/[^"?]+\?[^"]*)"/);
 if (story) await report(story); else rows.push({ p: "(no story link on / or /news)" });
 if (article) await report(article); else rows.push({ p: "(no article link on / or /news)" });
+try { // why any request fell back to the old site (messages only)
+  const r = await fetch(origin + "/api/health/v2", { signal: AbortSignal.timeout(15000) });
+  rows.push({ p: "/api/health/v2", s: r.status, fb: (await r.text()).slice(0, 700) });
+} catch (error) { rows.push({ p: "/api/health/v2", err: String(error).slice(0, 120) }); }
 flush();
