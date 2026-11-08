@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createHandler, type Deps, type Env } from "../src/worker";
 import type { Article, Store } from "../src/store";
 import type { Provider } from "../src/search";
@@ -435,6 +435,20 @@ describe("responsive design system", () => {
     const home = await (await call("/", {}, { liveNews: async () => [{ title: "خبر", summary: "ملخص", publisher: "ن", url: "https://s.example/1", imageUrl: "https://i.example/a.jpg" }] })).text();
     const css = /<style>([\s\S]*?)<\/style>/.exec(home)![1];
     for (const c of ["wrap", "bar", "logo", "pill", "ribbon", "ticker", "hero", "front", "lead-story", "side", "grid", "card", "art-card", "sec-card", "grp-head", "chips", "kicker", "badge", "verdict", "page-head", "sec-title", "full", "sources", "stat", "times", "tool", "search", "save-btn", "wisdom", "legal", "noimg", "progress"]) expect(css, c).toContain("." + c);
+  });
+});
+
+describe("story pages are never held up by a slow write-up", () => {
+  it("after 3.5 seconds the complete organised page is returned, and it is cached for repeat visitors", async () => {
+    vi.useFakeTimers();
+    try {
+      const url = "/research?lang=ar&title=" + encodeURIComponent("خبر بطيء") + "&summary=" + encodeURIComponent("ملخص الخبر في جملة واضحة ومفهومة.") + "&publisher=BBC&url=" + encodeURIComponent("https://bbc.com/a");
+      const pending = call(url, {}, { research: () => new Promise(() => undefined) });
+      await vi.advanceTimersByTimeAsync(3600);
+      const res = await pending; const html = await res.text();
+      expect(res.status).toBe(200); expect(html).toContain("<h2>الخلاصة</h2>"); expect(html).not.toContain("تعذر");
+      expect(res.headers.get("cache-control")).toContain("s-maxage=300");
+    } finally { vi.useRealTimers(); }
   });
 });
 

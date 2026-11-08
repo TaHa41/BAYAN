@@ -23,7 +23,7 @@ async function report(path) {
   const a = await hit(path);
   if (a.error) { rows.push({ p: path.slice(0, 60), err: a.error, ms: a.ms }); return null; }
   const b = await hit(path); const m = marks(a.body);
-  rows.push({ p: path.slice(0, 60), s: a.r.status, c: a.ms, w: b.ms, k: b.r?.headers.get("x-bayan-cache") || "-", kb: Math.round(m.bytes / 1024), cd: m.cards, im: m.imgs, ni: m.noimg, h2: m.h2, ap: m.apology ? 1 : 0, e: m.cf1102 ? "1102" : m.cfErr });
+  rows.push({ p: path.slice(0, 60), s: a.r.status, c: a.ms, w: b.ms, k: b.r?.headers.get("x-bayan-cache") || "-", rd: b.r?.headers.get("x-bayan-renderer") || "-", cc: (b.r?.headers.get("cache-control") || "-").replace("public, ", "").slice(0, 34), ag: b.r?.headers.get("age") || undefined, kb: Math.round(m.bytes / 1024), cd: m.cards, im: m.imgs, ni: m.noimg, h2: m.h2, ap: m.apology ? 1 : 0, e: m.cf1102 ? "1102" : m.cfErr });
   return a.body;
 }
 function flush() { // GitHub shows only 10 annotations per step, so rows are grouped three per notice.
