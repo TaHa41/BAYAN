@@ -329,3 +329,8 @@
 - Commit: `cd45d4830c2af77bcd975ac0b41a3bfafcfcdc60`
 - الملفات: M	docs/START_HERE_AR.md;M	scripts/page-diagnostics.mjs;M	src/v2-bridge.ts;M	tests/v2-bridge.test.ts;M	v2/src/worker.ts;M	v2/tests/worker.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-08T05:33:13Z — Redesign from scratch: mobile-first design system, section/news page caching, search budget; tests; docs; V2_BUILD 2026-11-07.3 
+- Commit: `33575bacd99e04e4e8ad91f2a6c009b05a77d947`
+- الملفات: M	docs/START_HERE_AR.md;M	src/v2-bridge.ts;A	v2/src/styles.ts;M	v2/src/ui.ts;M	v2/src/worker.ts;M	v2/tests/worker.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
