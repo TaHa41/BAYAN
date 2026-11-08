@@ -175,10 +175,10 @@ export function createHandler(deps: Deps) {
 
     // Detailed article for one story, built by the research service from several sources (never an invented text).
     const researchPage = async (story: LiveStory, retryHref: string) => {
-      // The detailed write-up gets 14 seconds; after that the visitor gets the complete organised summary at once (the write-up keeps running and is reused next time).
-      const [a, pool] = await Promise.all([deps.research ? soft(deps.research(env, story, lang, request), 14000, null) : Promise.resolve(null), deps.liveNews ? soft(deps.liveNews(env, lang), 2500, [] as LiveStory[]) : Promise.resolve([] as LiveStory[])]);
+      // The detailed write-up gets 3.5 seconds; after that the visitor gets the complete organised summary at once (the write-up keeps running in the background and is reused next time).
+      const [a, pool] = await Promise.all([deps.research ? soft(deps.research(env, story, lang, request), 3500, null) : Promise.resolve(null), deps.liveNews ? soft(deps.liveNews(env, lang), 2500, [] as LiveStory[]) : Promise.resolve([] as LiveStory[])]);
       const related = relatedStories(story, pool);
-      return html(layout({ lang, origin, path, title: `${plain(a?.title || story.title)} | ${SITE.name}`, description: plain(a?.summary || story.summary), body: researchBody(lang, story, a, related), noindex: true, progress: true, image: a?.image || story.imageUrl }), 200, "no-store");
+      return html(layout({ lang, origin, path, title: `${plain(a?.title || story.title)} | ${SITE.name}`, description: plain(a?.summary || story.summary), body: researchBody(lang, story, a, related), noindex: true, progress: true, image: a?.image || story.imageUrl }), 200, a && a.status !== "source_only" && a.body.trim() !== a.summary.trim() ? "public, max-age=300, s-maxage=1800" : "public, max-age=60, s-maxage=300");
     };
     if (path === "/research") {
       const title = (url.searchParams.get("title") || "").trim().slice(0, 300);
