@@ -13,6 +13,7 @@ async function hit(path) {
 }
 function marks(body) {
   return {
+    title: ((/<title>([^<]{0,60})/.exec(body) || [])[1] || "").trim(),
     bytes: body.length, h1: count(body, /<h1[ >]/g), cards: count(body, /class="card[ "]/g), imgs: count(body, /<img /g), noimg: count(body, /class="noimg"/g),
     h2: count(body, /<h2[ >]/g), apology: /تعذر تحضير|تعذر إكمال|could not be prepared|Try again|حاول مرة أخرى/.test(body), cf1102: /Error 1102|exceeded resource limits/i.test(body),
     cfErr: (/Error (1\d{3})/.exec(body) || [])[1] || undefined,
@@ -23,7 +24,7 @@ async function report(path) {
   const a = await hit(path);
   if (a.error) { rows.push({ p: path.slice(0, 60), err: a.error, ms: a.ms }); return null; }
   const b = await hit(path); const m = marks(a.body);
-  rows.push({ p: path.slice(0, 60), s: a.r.status, c: a.ms, w: b.ms, k: b.r?.headers.get("x-bayan-cache") || "-", rd: b.r?.headers.get("x-bayan-renderer") || "-", cc: (b.r?.headers.get("cache-control") || "-").replace("public, ", "").slice(0, 34), ag: b.r?.headers.get("age") || undefined, kb: Math.round(m.bytes / 1024), cd: m.cards, im: m.imgs, ni: m.noimg, h2: m.h2, ap: m.apology ? 1 : 0, e: m.cf1102 ? "1102" : m.cfErr });
+  rows.push({ p: path.slice(0, 60), s: a.r.status, c: a.ms, w: b.ms, k: b.r?.headers.get("x-bayan-cache") || "-", bl: (b.r?.headers.get("x-bayan-build") || "").slice(0, 14) || undefined, v2: a.r.headers.get("x-bayan-v2-build") || undefined, st: m.title, rd: b.r?.headers.get("x-bayan-renderer") || "-", cc: (b.r?.headers.get("cache-control") || "-").replace("public, ", "").slice(0, 34), ag: b.r?.headers.get("age") || undefined, kb: Math.round(m.bytes / 1024), cd: m.cards, im: m.imgs, ni: m.noimg, h2: m.h2, ap: m.apology ? 1 : 0, e: m.cf1102 ? "1102" : m.cfErr });
   return a.body;
 }
 function flush() { // GitHub shows only 10 annotations per step, so rows are grouped three per notice.
