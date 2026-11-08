@@ -334,3 +334,8 @@
 - Commit: `33575bacd99e04e4e8ad91f2a6c009b05a77d947`
 - الملفات: M	docs/START_HERE_AR.md;M	src/v2-bridge.ts;A	v2/src/styles.ts;M	v2/src/ui.ts;M	v2/src/worker.ts;M	v2/tests/worker.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-08T05:40:46Z — Story page: 3.5s write-up budget and cache; diagnostics show renderer/cache headers; test; docs; V2_BUILD 2026-11-07.4 
+- Commit: `0b7af862e18a395fcecd2c4957a39229ea555d5b`
+- الملفات: M	docs/START_HERE_AR.md;M	scripts/page-diagnostics.mjs;M	src/v2-bridge.ts;M	v2/src/worker.ts;M	v2/tests/worker.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
