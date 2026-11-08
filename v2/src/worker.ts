@@ -122,10 +122,10 @@ export function createHandler(deps: Deps) {
       const q = (url.searchParams.get("q") || "").trim().slice(0, 200);
       if (!q) return page({ title: (lang === "ar" ? "البحث | " : "Search | ") + SITE.name, description: "BAYAN search", body: searchBody(lang, "", null), path: "/search", noindex: true });
       // Full BAYAN search (all providers, rate limits, archive filing) when available; Wikipedia alone is the safety net.
-      // The Wikipedia-backed fallback starts at once, so when the full search is slow (6s budget) the visitor still gets results immediately.
+      // The Wikipedia-backed fallback starts at once, so when the full search is slow (3s budget) the visitor still gets results immediately.
       const fast = searchAll(q, deps.providers(lang));
       fast.catch(() => undefined);
-      const full = deps.search ? await soft(deps.search(env, q, lang, request), 6000, null) : null;
+      const full = deps.search ? await soft(deps.search(env, q, lang, request), 3000, null) : null;
       if (full) return html(layout({ lang, origin, path: `/search?q=${encodeURIComponent(q)}`, title: `${q} | ${SITE.name}`, description: full.items[0]?.summary ? plain(full.items[0].summary) : q, body: searchResultsBody(lang, q, full.items, full.notice), noindex: true }), 200, "no-store");
       const outcome = await fast;
       return html(layout({ lang, origin, path: `/search?q=${encodeURIComponent(q)}`, title: `${q} | ${SITE.name}`, description: outcome.hits[0]?.summary || q, body: searchBody(lang, q, outcome), noindex: true }), 200, "no-store");
@@ -228,7 +228,7 @@ export function createHandler(deps: Deps) {
     if (path === "/news") {
       const stories = await loadNews();
       const s = sectionBySlug("news")!;
-      return page({ title: `${lang === "ar" ? s.ar : s.en} | ${SITE.name}`, description: lang === "ar" ? s.descAr : s.descEn, body: newsBody(lang, stories.slice(0, 36)), path, active: "news", ticker: tickerItems(stories, lang) });
+      return page({ title: `${lang === "ar" ? s.ar : s.en} | ${SITE.name}`, description: lang === "ar" ? s.descAr : s.descEn, body: newsBody(lang, stories.slice(0, 36)), path, active: "news", ticker: tickerItems(stories, lang) }, 200, "public, max-age=60, s-maxage=300");
     }
 
     const section = sectionBySlug(path.slice(1));
@@ -237,7 +237,7 @@ export function createHandler(deps: Deps) {
       const wikiCards = () => soft((async () => { const seeds = topicsFor(section.slug).slice(0, 12); if (!seeds.length || !deps.wiki) return []; try { return await deps.wiki.cards(lang, lang === "ar" ? await deps.wiki.arabicTitles(seeds) : seeds); } catch (error) { return []; } })(), 3500, []);
       const [stories, items, wiki] = await Promise.all([loadNews(), store.bySection(section.slug, lang, 12).catch(() => []), wikiCards()]);
       const inSection = stories.filter((st) => st.section === section.slug).slice(0, 12);
-      return page({ title: `${lang === "ar" ? section.ar : section.en} | ${SITE.name}`, description: lang === "ar" ? section.descAr : section.descEn, body: sectionBody(lang, section, { stories: inSection, articles: items.filter((a) => !a.archived), archive: items.filter((a) => a.archived), wiki }), path, active: section.slug, ticker: tickerItems(stories, lang), jsonLd: sectionJsonLd(origin, lang, section) });
+      return page({ title: `${lang === "ar" ? section.ar : section.en} | ${SITE.name}`, description: lang === "ar" ? section.descAr : section.descEn, body: sectionBody(lang, section, { stories: inSection, articles: items.filter((a) => !a.archived), archive: items.filter((a) => a.archived), wiki }), path, active: section.slug, ticker: tickerItems(stories, lang), jsonLd: sectionJsonLd(origin, lang, section) }, 200, "public, max-age=60, s-maxage=300");
     }
 
     return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404);

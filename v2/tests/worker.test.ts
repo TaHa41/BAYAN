@@ -231,7 +231,7 @@ describe("v2 motion and navigation", () => {
     const html = await (await call("/", {}, { liveNews: async () => stories })).text();
     for (const slug of ["prices", "weather", "prayer"]) expect(html).toContain(`href="/${slug}?lang=ar"`);
     expect(html).toContain('class="ticker"'); expect(html).toContain("خبر عاجل أول"); expect(html).toContain('aria-hidden="true" class="ticker-copy"');
-    expect(html).toContain("animation-timeline:view()");
+    expect(html).toContain("animation-timeline:scroll(root)");
   });
   it("articles and encyclopedia entries get the reading-progress bar; motion is disabled for reduced-motion users", async () => {
     const html = await (await call("/article/a1", {}, { store: () => store({ get: async () => art() }) })).text();
@@ -412,6 +412,29 @@ describe("routes that used to be shadowed or left on the old site", () => {
   it("an unknown page is the new-layout 404, not the old site", async () => {
     const r = await call("/no-such-page?lang=en"); const html = await r.text();
     expect(r.status).toBe(404); expect(html).toContain("<!doctype html>"); expect(html).toContain("noindex");
+  });
+});
+
+describe("responsive design system", () => {
+  it("every page is mobile-first: viewport with safe areas, fluid grids, no fixed-width layouts, light and dark, RTL/LTR logical properties, reduced motion", async () => {
+    for (const lang of ["ar", "en"]) {
+      const html = await (await call("/sections?lang=" + lang)).text();
+      expect(html).toContain('<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">');
+      expect(html).toContain(lang === "ar" ? 'dir="rtl"' : 'dir="ltr"');
+      const css = /<style>([\s\S]*?)<\/style>/.exec(html)![1];
+      expect(css).toContain("prefers-color-scheme:dark"); expect(css).toContain("prefers-reduced-motion:reduce"); expect(css).toContain("env(safe-area-inset-left)");
+      expect(css).toContain("minmax(min(100%,260px),1fr)"); expect(css).toContain("margin-inline"); expect(css).toContain("padding-inline");
+      expect(css).toMatch(/@media\(min-width:760px\)/); expect(css).toMatch(/@media\(max-width:420px\)/);
+      // nothing may force a width wider than a phone: no fixed pixel widths above 320px on layout boxes
+      const fixed = [...css.matchAll(/(?:^|[;{])width:(\d+)px/g)].map((m) => Number(m[1])).filter((n) => n > 320);
+      expect(fixed).toEqual([]);
+      expect(css).not.toMatch(/overflow-x:\s*(?!auto|hidden|visible)/);
+    }
+  });
+  it("the stylesheet defines every class the page templates use", async () => {
+    const home = await (await call("/", {}, { liveNews: async () => [{ title: "خبر", summary: "ملخص", publisher: "ن", url: "https://s.example/1", imageUrl: "https://i.example/a.jpg" }] })).text();
+    const css = /<style>([\s\S]*?)<\/style>/.exec(home)![1];
+    for (const c of ["wrap", "bar", "logo", "pill", "ribbon", "ticker", "hero", "front", "lead-story", "side", "grid", "card", "art-card", "sec-card", "grp-head", "chips", "kicker", "badge", "verdict", "page-head", "sec-title", "full", "sources", "stat", "times", "tool", "search", "save-btn", "wisdom", "legal", "noimg", "progress"]) expect(css, c).toContain("." + c);
   });
 });
 
