@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../src/types";
-import { serveV2, swr, resetSwr, V2_BUILD } from "../src/v2-bridge";
+import { serveV2, swr, resetSwr, fallbackReport, resetFallbacks, V2_BUILD } from "../src/v2-bridge";
 
 // /about is a static page (no network, no database): s-maxage=3600, so HIT < 1h, STALE < 6h, MISS after.
 const HOUR = 3600_000;
@@ -118,3 +118,23 @@ describe("swr helper for slow upstream calls", () => {
     expect(await swr("slow", 1000, 10_000, async () => [9], 10)).toEqual([7]);
   });
 });
+
+describe("falling back to the old site is never silent", () => {
+  it("/api/health/v2 reports the build and the recent fallbacks, with messages only", async () => {
+    resetFallbacks();
+    const res = await serveV2(get("/api/health/v2"), env, ctx); const body: any = await res!.json();
+    expect(body).toMatchObject({ build: V2_BUILD, count: 0, recent: [] }); expect(res!.headers.get("cache-control")).toBe("no-store");
+  });
+  it("a cached copy that cannot be served is dropped and the page is rendered fresh, not sent to the old site", async () => {
+    resetFallbacks();
+    await serveV2(get(), env, ctx); await settle();
+    const bad = new Response("x", { status: 200, headers: { "x-bayan-cached-at": String(Date.now()), "x-bayan-smax": "3600", "x-bayan-cached-build": V2_BUILD } });
+    Object.defineProperty(bad, "clone", { value: () => { throw new Error("body already used"); } });
+    // replace the in-isolate copy with a broken one by storing through the edge mock path
+    resetSwr();
+    store.set(new Request("https://bayan.test/about?lang=ar").url, bad);
+    const out = await serveV2(get(), env, ctx);
+    expect(out).not.toBeNull(); expect(out!.status).toBe(200); expect(out!.headers.get("x-bayan-cache")).toBe("MISS");
+  });
+});
+

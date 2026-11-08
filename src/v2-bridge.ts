@@ -14,7 +14,7 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-07.5";
+export const V2_BUILD = "2026-11-07.6";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 
@@ -49,6 +49,13 @@ const memoWiki = (api: WikiApi): WikiApi => {
   const m = <A extends unknown[], R>(name: string, fn: (...a: A) => Promise<R>) => (...a: A) => swr(`wiki:${name}:${JSON.stringify(a)}`, 30 * 60_000, 6 * 3600_000, () => fn(...a), undefined, (v) => !(Array.isArray(v) && v.length === 0) && v !== null);
   return { cards: m("cards", api.cards.bind(api)), arabicTitles: m("ar", api.arabicTitles.bind(api)), entry: m("entry", api.entry.bind(api)), mostRead: m("most", api.mostRead.bind(api)) };
 };
+
+/** Why a request fell back to the old site: kept in memory and shown (messages only, truncated) at /api/health/v2, so a silent fallback can be diagnosed. */
+const FALLBACKS: { at: string; path: string; why: string }[] = [];
+let fallbackCount = 0;
+const noteFallback = (path: string, why: unknown) => { fallbackCount++; FALLBACKS.unshift({ at: new Date().toISOString(), path: path.slice(0, 80), why: String(why instanceof Error ? why.name + ": " + why.message : why).slice(0, 220) }); FALLBACKS.length = Math.min(FALLBACKS.length, 8); };
+export const fallbackReport = () => ({ build: V2_BUILD, count: fallbackCount, recent: FALLBACKS });
+export const resetFallbacks = () => { FALLBACKS.length = 0; fallbackCount = 0; };
 
 const OWNED_SECTIONS = new Set(SECTIONS.map((s) => s.slug));
 const handler = createHandler({
@@ -108,7 +115,7 @@ export function v2Owns(request: Request): boolean {
   const path = u.pathname.replace(/(.)\/+$/, "$1");
   if (request.method === "POST") return path === "/contribute";
   if (request.method !== "GET") return false;
-  if (path === "/api/health/ai" || ADMIN_AI.has(path)) return true;
+  if (path === "/api/health/ai" || path === "/api/health/v2" || ADMIN_AI.has(path)) return true;
   // The API, files with an extension (sitemaps, robots, images, manifest...) and well-known paths stay with the Worker core; every other page is v2's, including its 404.
   if (path.startsWith("/api/") || path.startsWith("/.well-known/") || /\.[a-z0-9]{2,6}$/i.test(path)) return false;
   return true;
@@ -130,7 +137,7 @@ const tag = (res: Response, state: string) => {
 async function render(request: Request, env: Env): Promise<Response | null> {
   const res = await handler(request, env as never);
   const path = new URL(request.url).pathname;
-  if (res.status !== 200 && !(request.method === "POST" && res.status < 500) && !ADMIN_AI.has(path) && path !== "/api/health/ai") return null; // unknown article / anything else: v1 decides
+  if (res.status !== 200 && !(request.method === "POST" && res.status < 500) && !ADMIN_AI.has(path) && path !== "/api/health/ai" && path !== "/api/health/v2") { if (res.status !== 404) noteFallback(path, "status_" + res.status); return null; } // unknown article / anything else: v1 decides
   const out = new Response(res.body, res);
   out.headers.set("referrer-policy", "strict-origin-when-cross-origin");
   out.headers.set("x-frame-options", "DENY");
@@ -165,22 +172,25 @@ async function remember(cache: Cache | null, key: Request, out: Response): Promi
 export async function serveV2(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response | null> {
   if (!v2Owns(request)) return null;
   if (ctx) ctxRef = ctx;
+  if (new URL(request.url).pathname === "/api/health/v2") return new Response(JSON.stringify(fallbackReport()), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" } });
   const cache = typeof caches !== "undefined" ? (caches as unknown as { default: Cache }).default : null;
   const key = new Request(request.url, { method: "GET" });
   try {
     if (request.method === "GET") {
-      const hit = memGet(key) ?? (cache ? await cache.match(key).catch(() => undefined) : undefined);
+      let hit: Response | undefined;
+      try { hit = memGet(key) ?? (cache ? await cache.match(key).catch(() => undefined) : undefined); } catch (error) { MEM.delete(key.url); noteFallback(new URL(request.url).pathname, "cache_read: " + (error instanceof Error ? error.message : error)); hit = undefined; }
       const at = Number(hit?.headers.get("x-bayan-cached-at") || 0), smax = Number(hit?.headers.get("x-bayan-smax") || 0);
       // A copy built by an older deploy is never served, so a new design/build shows up immediately after release.
       if (hit && at && smax && hit.headers.get("x-bayan-cached-build") === V2_BUILD) {
         const age = (Date.now() - at) / 1000;
-        if (age < smax) return tag(hit, "HIT");
+        if (age < smax) { try { return tag(hit, "HIT"); } catch (error) { MEM.delete(key.url); noteFallback(new URL(request.url).pathname, "cache_serve: " + (error instanceof Error ? error.message : error)); } }
+        else
         if (age < 6 * smax) {
           if (ctx && !REFRESHING.has(key.url)) {
             REFRESHING.add(key.url);
             ctx.waitUntil(render(request, env).then((fresh) => (fresh ? remember(cache, key, fresh) : undefined)).catch(() => undefined).finally(() => REFRESHING.delete(key.url)));
           }
-          return tag(hit, "STALE");
+          try { return tag(hit, "STALE"); } catch (error) { MEM.delete(key.url); noteFallback(new URL(request.url).pathname, "cache_stale: " + (error instanceof Error ? error.message : error)); }
         }
       }
     }
@@ -191,6 +201,7 @@ export async function serveV2(request: Request, env: Env, ctx?: ExecutionContext
     return out;
   } catch (error) {
     console.warn("BAYAN_V2_FALLBACK", String(error instanceof Error ? error.message : error).slice(0, 160));
+    noteFallback(new URL(request.url).pathname, error);
     return null;
   }
 }
