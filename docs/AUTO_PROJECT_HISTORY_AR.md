@@ -339,3 +339,8 @@
 - Commit: `0b7af862e18a395fcecd2c4957a39229ea555d5b`
 - الملفات: M	docs/START_HERE_AR.md;M	scripts/page-diagnostics.mjs;M	src/v2-bridge.ts;M	v2/src/worker.ts;M	v2/tests/worker.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-08T05:47:51Z — Diagnostics: show which renderer served each page (v1 build header, v2 build, title); V2_BUILD 2026-11-07.5 
+- Commit: `fd0235302fa5f9ea4a2a786b4e1d87482957bbfd`
+- الملفات: M	scripts/page-diagnostics.mjs;M	src/v2-bridge.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
