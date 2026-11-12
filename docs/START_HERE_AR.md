@@ -4,31 +4,35 @@
 
 <!-- BAYAN_LIVE_STATUS_START -->
 ## الحالة الحية (تُحدَّث آليًا بعد كل نشر — لا تعدّلها يدويًا)
-- آخر تحديث: 2026-11-12T22:38:18.619Z
-- V2_BUILD في الشيفرة: `2026-11-13.1`
-- آخر نشر: failure للكوميت `bdc01fd2` (https://github.com/TaHa41/BAYAN/actions/runs/43321455588)
+- آخر تحديث: 2026-11-12T22:44:51.006Z
+- V2_BUILD في الشيفرة: `2026-11-13.2`
+- آخر نشر: failure للكوميت `e3d8e696` (https://github.com/TaHa41/BAYAN/actions/runs/43322454603)
 - نتائج الـjobs: deploy=success، verify-production=failure
-- حالة الذكاء الاصطناعي (إعداد فقط، بلا استدعاء): {"checkedAt":"2026-11-12T22:37:54.230Z","build":"2026-11-13.1","deployedCommit":"bdc01fd29981","probe":"off","gemini":{"configured":true,"keyState":"set","model":"gemini-3.8-flash"},"workersAi":{"configured":true}}
+- حالة الذكاء الاصطناعي (إعداد فقط، بلا استدعاء): {"checkedAt":"2026-11-12T22:44:23.424Z","build":"2026-11-13.2","deployedCommit":"e3d8e696a406","probe":"off","gemini":{"configured":true,"keyState":"set","model":"gemini-3.8-flash"},"workersAi":{"configured":true}}
 - فحص الإنتاج: news_publication_gap: archive has 200 candidates ready for article drafting but the news sitemap contains no published articles
-- خط نشر الأخبار (/api/health/pipeline): {"checkedAt":"2026-11-12T22:38:07.201Z","build":"2026-11-13.1","pipeline":{"enabled":true,"setting":"true","aiDailyLimit":"40"},"providers":{"gemini":true,"openai":true,"workersAi":true},"d1":"ok","events":[{"at":"2026-11-12T22:36:11","level":"WARN","kind":"news_archive_article_generation","message":"{\"status\":\"attempted_failed\",\"id\":49782,\"language\":\"en\",\"publishReason\":\"ai_unavailable\",\"publishReasonDetail\":\"all_providers_unavailable\",\"retryMinutes\":15,\"attemptsPreserved\":0}"},{"at":"2026-11-12T22:36:10","level":"WARN","kind":"news_archive_article_generation","message":"ai_unavailable_deferred: {\"id\":49782,\"language\":\"en\",\"retryMinutes\":15,\"attemptsPreserved\
+- خط نشر الأخبار (/api/health/pipeline): {"build":"2026-11-13.2","pipeline":{"enabled":true,"setting":"true","aiDailyLimit":"40"},"providers":{"gemini":true,"openai":true,"workersAi":true},"d1":"ok","breakers":{"openai":{"open":false,"code":"credit_balance_exhausted","until":"2026-10-20T06:06:01"},"gemini":{"open":true,"code":"quota_exceeded","until":"2026-11-13T00:55:51"}}}
+- آخر أحداث الصياغة والمزوّدين: 2026-11-12T22:44:29 ai_circuit_breaker: gemini_breaker_open: {"state":"open","code":"quota_exceeded","openedUntil":"2026-11-13T00:55:51.136Z"} || 2026-11-12T22:37:59 ai_circuit_breaker: gemini_breaker_open: {"state":"open","code":"quota_exceeded","openedUntil":"2026-11-13T00:55:51.136Z"} || 2026-11-12T22:36:11 news_archive_article_generation: {"status":"attempted_failed","id":49782,"language":"en","publishReason":"ai_unavailable","publishReasonDetail":"all_providers_unavailable","retryMinutes":15,"attemptsPreserved": || 2026-11-12T22:36:10 news_archive_article_generation: ai_unavailable_deferred: {"id":49782,"language":"en","retryMinutes":15,"attemptsPreserved":0} || 2026-11-12T22:36:10 news_ai_budget: daily_ai_budget_exhausted: UTC daily news AI call limit reached (40) || 2026-11-12T22:36:02 ai_circuit_breaker: gemini_breaker_open: {"state":"open","code":"quota_exceeded","openedUntil":"2026-11-13T00:55:51.136Z"} || 2026-11-12T22:26:07 news_archive_article_generation: {"status":"attempted_failed","id":49767,"language":"ar","publishReason":"ai_unavailable","publishReasonDetail":"all_providers_unavailable","retryMinutes":15,"attemptsPreserved": || 2026-11-12T22:26:07 news_archive_article_generation: ai_unavailable_deferred: {"id":49767,"language":"ar","retryMinutes":15,"attemptsPreserved":0} || 2026-11-12T22:26:06 news_ai_budget: daily_ai_budget_exhausted: UTC daily news AI call limit reached (40) || 2026-11-12T22:26:04 ai_circuit_breaker: gemini_breaker_open: {"state":"open","
 - خريطة الأخبار والأرشيف: {"status":200,"contentType":"application/xml; charset=utf-8","urlCount":0,"candidateCount":"0","archiveCandidateCount":"200","archiveReadyForArticleDraftingCount":"200","eligibleCount":"0","rejectedCount":"0","rejectionReasons":"{}","archiveReasons":"{\"never_attempted\":157,\"attempts_0\":200,\"ai_unavailable\":12,\"skipped_low_evidence\":31}","xmlBytes":167}
-- أسباب الرجوع للموقع القديم (/api/health/v2): /api/health/v2","s":200,"fb":"{\"build\":\"2026-11-13.1\",\"count\":0,\"recent\":[]}"}]
+- أسباب الرجوع للموقع القديم (/api/health/v2): /api/health/v2","s":200,"fb":"{\"build\":\"2026-11-13.2\",\"count\":0,\"recent\":[]}"}]
 - أداء الصفحات الحقيقية (بارد/دافئ بالملّي ثانية، كاش، المُرسِم):
-  - `/research?title=%D8%AF%D8%B9%D9%88%D9%89`: حالة 200، 4017/54، كاش HIT، مُرسِم v2
-  - `/article/politics-public-consultation-ar`: حالة 200، 35/39، كاش HIT، مُرسِم v2
-  - `/weather`: حالة 200، 278/35، كاش HIT، مُرسِم v2
-  - `/prayer`: حالة 200، 238/74، كاش HIT، مُرسِم v2
-  - `/trends`: حالة 200، 176/42، كاش HIT، مُرسِم v2
-  - `/about`: حالة 200، 41/33، كاش HIT، مُرسِم v2
-  - `/search?q=%D9%85%D8%B5%D8%B1`: حالة 200، 3150/1890، كاش MISS، مُرسِم v2
-  - `/prices`: حالة 200، 241/35، كاش HIT، مُرسِم v2
-  - `/economy`: حالة 200، 310/104، كاش HIT، مُرسِم v2
-  - `/health`: حالة 200، 313/33، كاش HIT، مُرسِم v2
-  - `/sections`: حالة 200، 49/49، كاش HIT، مُرسِم v2
-  - `/`: حالة 200، 198/62، كاش HIT، مُرسِم v2
-  - `/news`: حالة 200، 189/37، كاش HIT، مُرسِم v2
-  - `/politics`: حالة 200، 310/79، كاش HIT، مُرسِم v2
+  - `/research?title=%D8%AF%D8%B9%D9%88%D9%89`: حالة 200، 3529/36، كاش HIT، مُرسِم v2
+  - `/article/politics-public-consultation-ar`: حالة 200، 30/21، كاش HIT، مُرسِم v2
+  - `/weather`: حالة 200، 226/41، كاش HIT، مُرسِم v2
+  - `/prayer`: حالة 200، 265/17، كاش HIT، مُرسِم v2
+  - `/trends`: حالة 200، 153/21، كاش HIT، مُرسِم v2
+  - `/about`: حالة 200، 68/18، كاش HIT، مُرسِم v2
+  - `/search?q=%D9%85%D8%B5%D8%B1`: حالة 200، 3047/3020، كاش MISS، مُرسِم v2
+  - `/prices`: حالة 200، 427/21، كاش HIT، مُرسِم v2
+  - `/economy`: حالة 200، 309/24، كاش HIT، مُرسِم v2
+  - `/health`: حالة 200، 302/46، كاش HIT، مُرسِم v2
+  - `/sections`: حالة 200، 25/30، كاش HIT، مُرسِم v2
+  - `/`: حالة 200، 131/31، كاش HIT، مُرسِم v2
+  - `/news`: حالة 200، 285/39، كاش HIT، مُرسِم v2
+  - `/politics`: حالة 200، 275/20، كاش HIT، مُرسِم v2
 - آخر الـcommits على main:
+  - d20ad02 2026-11-12 docs: automatically record project history
+  - b762a0f 2026-11-12 Pipeline status: breaker states and provider failure events; CI prints them; V2_BUILD 2026-11-13.2
+  - 45bebc0 2026-11-12 docs: automatically refresh live status
   - fb6ca37 2026-11-12 docs: automatically record project history
   - 630fcea 2026-11-12 Public pipeline status (/api/health/pipeline) in CI diagnostics and the live status block; tests; docs; V2_BUIL
   - 6340cc4 2026-11-12 docs: automatically refresh live status
@@ -36,9 +40,6 @@
   - bf6763a 2026-11-12 Live status block in the main reference updates itself after every deploy; reference reorganised (status vs req
   - a8d1e41 2026-11-12 Root cause of fallbacks to the old site: store plain bytes in the isolate cache, never Response objects; test; 
   - 473821f 2026-11-08 docs: automatically record project history
-  - 0c39837 2026-11-08 Make fallbacks to the old site visible (/api/health/v2) and never caused by a broken cached copy; diagnostics r
-  - 6eeca76 2026-11-08 docs: automatically record project history
-  - fd02353 2026-11-08 Diagnostics: show which renderer served each page (v1 build header, v2 build, title); V2_BUILD 2026-11-07.5
 <!-- BAYAN_LIVE_STATUS_END -->
 
 ## 1) كيف تبدأ في محادثة جديدة (3 دقائق)
