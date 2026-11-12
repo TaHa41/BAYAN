@@ -349,3 +349,13 @@
 - Commit: `0c39837150637ab8eefd98add7356851bc66e4aa`
 - الملفات: M	scripts/page-diagnostics.mjs;M	src/v2-bridge.ts;M	tests/v2-swr.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-12T09:39:03Z — Root cause of fallbacks to the old site: store plain bytes in the isolate cache, never Response objects; test; V2_BUILD 2026-11-08.1 
+- Commit: `a8d1e41066e23b5c4346e5669eb724f12483e3f1`
+- الملفات: M	src/v2-bridge.ts;M	tests/v2-swr.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-12T09:40:47Z — Live status block in the main reference updates itself after every deploy; reference reorganised (status vs requests); fix section numbering 
+- Commit: `bf6763a50b4d2d8c40d6bb29affbd91794308376`
+- الملفات: A	.github/workflows/auto-live-status.yml;M	docs/START_HERE_AR.md;A	scripts/update-live-status.d.mts;A	scripts/update-live-status.mjs;A	tests/live-status.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
