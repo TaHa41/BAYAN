@@ -14,7 +14,7 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-08.1";
+export const V2_BUILD = "2026-11-13.1";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 
@@ -49,6 +49,18 @@ const memoWiki = (api: WikiApi): WikiApi => {
   const m = <A extends unknown[], R>(name: string, fn: (...a: A) => Promise<R>) => (...a: A) => swr(`wiki:${name}:${JSON.stringify(a)}`, 30 * 60_000, 6 * 3600_000, () => fn(...a), undefined, (v) => !(Array.isArray(v) && v.length === 0) && v !== null);
   return { cards: m("cards", api.cards.bind(api)), arabicTitles: m("ar", api.arabicTitles.bind(api)), entry: m("entry", api.entry.bind(api)), mostRead: m("most", api.mostRead.bind(api)) };
 };
+
+/** Public, secret-free view of why articles are (not) being drafted: switches, configured providers and the last scheduled-run outcomes. */
+export async function pipelineStatus(env: Env): Promise<unknown> {
+  const e: any = env;
+  const has = (v: unknown) => String(v ?? "").trim() !== "";
+  const out: any = { checkedAt: new Date().toISOString(), build: V2_BUILD, pipeline: { enabled: e.NEWS_PIPELINE_ENABLED === "true", setting: e.NEWS_PIPELINE_ENABLED === undefined ? "absent" : e.NEWS_PIPELINE_ENABLED === "true" ? "true" : "not_true", aiDailyLimit: has(e.NEWS_AI_DAILY_LIMIT) ? String(e.NEWS_AI_DAILY_LIMIT).slice(0, 6) : "default" }, providers: { gemini: has(e.GEMINI_API_KEY), openai: has(e.OPENAI_API_KEY), workersAi: !!e.AI }, d1: "ok", events: [] };
+  try {
+    const r: any = await e.DB.prepare("SELECT level,kind,message,created_at FROM runtime_events WHERE kind IN ('news_archive_article_generation','scheduled_news_archive_refresh','scheduled_self_heal') ORDER BY created_at DESC LIMIT 5").all();
+    out.events = (r?.results || []).map((x: any) => ({ at: String(x.created_at || "").slice(0, 19), level: String(x.level || ""), kind: String(x.kind || ""), message: String(x.message || "").replace(/(key|token|secret|authorization)["'=:\s]+[^\s"',}]+/gi, "$1=…").slice(0, 220) }));
+  } catch (error) { out.d1 = /quota|limit|exceeded/i.test(String(error)) ? "quota_blocked" : "error"; }
+  return out;
+}
 
 /** Why a request fell back to the old site: kept in memory and shown (messages only, truncated) at /api/health/v2, so a silent fallback can be diagnosed. */
 const FALLBACKS: { at: string; path: string; why: string }[] = [];
@@ -115,7 +127,7 @@ export function v2Owns(request: Request): boolean {
   const path = u.pathname.replace(/(.)\/+$/, "$1");
   if (request.method === "POST") return path === "/contribute";
   if (request.method !== "GET") return false;
-  if (path === "/api/health/ai" || path === "/api/health/v2" || ADMIN_AI.has(path)) return true;
+  if (path === "/api/health/ai" || path === "/api/health/v2" || path === "/api/health/pipeline" || ADMIN_AI.has(path)) return true;
   // The API, files with an extension (sitemaps, robots, images, manifest...) and well-known paths stay with the Worker core; every other page is v2's, including its 404.
   if (path.startsWith("/api/") || path.startsWith("/.well-known/") || /\.[a-z0-9]{2,6}$/i.test(path)) return false;
   return true;
@@ -137,7 +149,7 @@ const tag = (res: Response, state: string) => {
 async function render(request: Request, env: Env): Promise<Response | null> {
   const res = await handler(request, env as never);
   const path = new URL(request.url).pathname;
-  if (res.status !== 200 && !(request.method === "POST" && res.status < 500) && !ADMIN_AI.has(path) && path !== "/api/health/ai" && path !== "/api/health/v2") { if (res.status !== 404) noteFallback(path, "status_" + res.status); return null; } // unknown article / anything else: v1 decides
+  if (res.status !== 200 && !(request.method === "POST" && res.status < 500) && !ADMIN_AI.has(path) && path !== "/api/health/ai" && path !== "/api/health/v2" && path !== "/api/health/pipeline") { if (res.status !== 404) noteFallback(path, "status_" + res.status); return null; } // unknown article / anything else: v1 decides
   const out = new Response(res.body, res);
   out.headers.set("referrer-policy", "strict-origin-when-cross-origin");
   out.headers.set("x-frame-options", "DENY");
@@ -177,6 +189,7 @@ async function remember(cache: Cache | null, key: Request, out: Response): Promi
 export async function serveV2(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response | null> {
   if (!v2Owns(request)) return null;
   if (ctx) ctxRef = ctx;
+  if (new URL(request.url).pathname === "/api/health/pipeline") return new Response(JSON.stringify(await pipelineStatus(env)), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" } });
   if (new URL(request.url).pathname === "/api/health/v2") return new Response(JSON.stringify(fallbackReport()), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" } });
   const cache = typeof caches !== "undefined" ? (caches as unknown as { default: Cache }).default : null;
   const key = new Request(request.url, { method: "GET" });

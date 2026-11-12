@@ -32,6 +32,8 @@ export function buildBlock(info) {
   if (info.jobs?.length) L.push(`- نتائج الـjobs: ${info.jobs.map((j) => `${j.name}=${j.conclusion || j.status}`).join("، ")}`);
   if (info.ai) L.push(`- حالة الذكاء الاصطناعي (إعداد فقط، بلا استدعاء): ${clip(info.ai, 360)}`);
   if (info.health) L.push(`- فحص الإنتاج: ${clip(info.health, 300)}`);
+  if (info.pipeline) L.push(`- خط نشر الأخبار (/api/health/pipeline): ${clip(info.pipeline, 700)}`);
+  if (info.news) L.push(`- خريطة الأخبار والأرشيف: ${clip(info.news, 520)}`);
   if (info.fallbacks) L.push(`- أسباب الرجوع للموقع القديم (/api/health/v2): ${clip(info.fallbacks, 420)}`);
   if (info.pages?.length) {
     L.push("- أداء الصفحات الحقيقية (بارد/دافئ بالملّي ثانية، كاش، المُرسِم):");
@@ -63,6 +65,8 @@ async function main() {
       for (const a of ann) {
         const t = String(a.title || ""), m = String(a.message || "");
         if (t === "BAYAN AI status") info.ai = m;
+        else if (t === "PIPELINE") info.pipeline = m;
+        else if (t === "NEWS_SITEMAP_DIAGNOSTICS") info.news = m;
         else if (t === "BAYAN health check failed") info.health = m;
         else if (t.startsWith("PAGES")) { for (const r of rowsFrom(m)) info.pages.push(r); if (m.includes("/api/health/v2")) info.fallbacks = m.slice(m.indexOf("/api/health/v2")); }
       }
