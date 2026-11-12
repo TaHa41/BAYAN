@@ -4,20 +4,39 @@
 
 <!-- BAYAN_LIVE_STATUS_START -->
 ## الحالة الحية (تُحدَّث آليًا بعد كل نشر — لا تعدّلها يدويًا)
-- آخر تحديث: 2026-11-12T09:40:18.156Z
+- آخر تحديث: 2026-11-12T09:44:50.566Z
 - V2_BUILD في الشيفرة: `2026-11-08.1`
-- آخر نشر: غير متاح
+- آخر نشر: failure للكوميت `786c83ae` (https://github.com/TaHa41/BAYAN/actions/runs/43193835443)
+- نتائج الـjobs: deploy=success، verify-production=failure
+- حالة الذكاء الاصطناعي (إعداد فقط، بلا استدعاء): {"checkedAt":"2026-11-12T09:44:22.971Z","build":"2026-11-08.1","deployedCommit":"786c83ae394f","probe":"off","gemini":{"configured":true,"keyState":"set","model":"gemini-3.8-flash"},"workersAi":{"configured":true}}
+- فحص الإنتاج: news_publication_gap: archive has 200 candidates ready for article drafting but the news sitemap contains no published articles
+- أسباب الرجوع للموقع القديم (/api/health/v2): /api/health/v2","s":200,"fb":"{\"build\":\"2026-11-08.1\",\"count\":0,\"recent\":[]}"}]
+- أداء الصفحات الحقيقية (بارد/دافئ بالملّي ثانية، كاش، المُرسِم):
+  - `/research?title=%C2%AB%D9%87%D9%8A%D9%88`: حالة 200، 3548/25، كاش HIT، مُرسِم v2
+  - `/article/politics-public-consultation-ar`: حالة 200، 67/30، كاش HIT، مُرسِم v2
+  - `/weather`: حالة 200، 1362/59، كاش HIT، مُرسِم v2
+  - `/prayer`: حالة 200، 547/24، كاش HIT، مُرسِم v2
+  - `/trends`: حالة 200، 231/31، كاش HIT، مُرسِم v2
+  - `/about`: حالة 200، 39/201، كاش HIT، مُرسِم v2
+  - `/search?q=%D9%85%D8%B5%D8%B1`: حالة 200، 3079/2724، كاش MISS، مُرسِم v2
+  - `/prices`: حالة 200، 109/26، كاش HIT، مُرسِم v2
+  - `/economy`: حالة 200، 415/27، كاش HIT، مُرسِم v2
+  - `/health`: حالة 200، 383/28، كاش HIT، مُرسِم v2
+  - `/sections`: حالة 200، 60/26، كاش HIT، مُرسِم v2
+  - `/`: حالة 200، 138/50، كاش HIT، مُرسِم v2
+  - `/news`: حالة 200، 250/56، كاش HIT، مُرسِم v2
+  - `/politics`: حالة 200، 414/43، كاش HIT، مُرسِم v2
 - آخر الـcommits على main:
-  - a8d1e410 2026-11-12 Root cause of fallbacks to the old site: store plain bytes in the isolate cache, never Response objects; test;
-  - 473821fa 2026-11-08 docs: automatically record project history
-  - 0c398371 2026-11-08 Make fallbacks to the old site visible (/api/health/v2) and never caused by a broken cached copy; diagnostics 
-  - 6eeca760 2026-11-08 docs: automatically record project history
-  - fd023530 2026-11-08 Diagnostics: show which renderer served each page (v1 build header, v2 build, title); V2_BUILD 2026-11-07.5
-  - 7afd49d9 2026-11-08 docs: automatically record project history
-  - 0b7af862 2026-11-08 Story page: 3.5s write-up budget and cache; diagnostics show renderer/cache headers; test; docs; V2_BUILD 2026
-  - efbb9ee6 2026-11-08 docs: automatically record project history
-  - 33575bac 2026-11-08 Redesign from scratch: mobile-first design system, section/news page caching, search budget; tests; docs; V2_B
-  - 3aadae72 2026-11-07 docs: automatically record project history
+  - a76f008 2026-11-12 docs: automatically record project history
+  - bf6763a 2026-11-12 Live status block in the main reference updates itself after every deploy; reference reorganised (status vs req
+  - a8d1e41 2026-11-12 Root cause of fallbacks to the old site: store plain bytes in the isolate cache, never Response objects; test; 
+  - 473821f 2026-11-08 docs: automatically record project history
+  - 0c39837 2026-11-08 Make fallbacks to the old site visible (/api/health/v2) and never caused by a broken cached copy; diagnostics r
+  - 6eeca76 2026-11-08 docs: automatically record project history
+  - fd02353 2026-11-08 Diagnostics: show which renderer served each page (v1 build header, v2 build, title); V2_BUILD 2026-11-07.5
+  - 7afd49d 2026-11-08 docs: automatically record project history
+  - 0b7af86 2026-11-08 Story page: 3.5s write-up budget and cache; diagnostics show renderer/cache headers; test; docs; V2_BUILD 2026-
+  - efbb9ee 2026-11-08 docs: automatically record project history
 <!-- BAYAN_LIVE_STATUS_END -->
 
 ## 1) كيف تبدأ في محادثة جديدة (3 دقائق)
