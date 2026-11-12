@@ -369,3 +369,8 @@
 - Commit: `b762a0fe9398c69672b4182fd30134342367aad1`
 - الملفات: M	scripts/page-diagnostics.mjs;M	scripts/update-live-status.mjs;M	src/v2-bridge.ts;M	tests/v2-swr.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-12T22:48:39Z — AI budget: refund when no provider answered; pipeline status shows provider failures and today's budget; tests; docs; V2_BUILD 2026-11-13.3 
+- Commit: `82ffa9ac903ddd1348600816acc0451e25b7ff32`
+- الملفات: M	docs/START_HERE_AR.md;M	scripts/page-diagnostics.mjs;M	scripts/update-live-status.mjs;M	src/services/ai.ts;M	src/v2-bridge.ts;A	tests/ai-budget-refund.test.ts;M	tests/v2-swr.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
