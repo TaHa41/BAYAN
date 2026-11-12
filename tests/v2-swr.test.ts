@@ -151,7 +151,7 @@ describe("the in-isolate store keeps plain data, never Response objects", () => 
 
 describe("public pipeline status", () => {
   const rows = [{ level: "WARN", kind: "news_archive_article_generation", message: 'ai_unavailable api_key=SECRET123 {"status":"x"}', created_at: "2026-11-13T01:02:03.000Z" }];
-  const dbWith = (fn: () => Promise<unknown>) => ({ prepare: () => ({ all: fn }) });
+  const dbWith = (fn: () => Promise<unknown>) => ({ prepare: () => ({ all: fn, first: async () => null }) });
   it("shows switches, configured providers and the last outcomes, with secrets redacted", async () => {
     const out: any = await pipelineStatus({ NEWS_PIPELINE_ENABLED: "true", NEWS_AI_DAILY_LIMIT: "40", GEMINI_API_KEY: "k1", OPENAI_API_KEY: "  ", AI: {}, DB: dbWith(async () => ({ results: rows })) } as any);
     expect(out.pipeline).toMatchObject({ enabled: true, setting: "true", aiDailyLimit: "40" }); expect(out.providers).toEqual({ gemini: true, openai: false, workersAi: true });

@@ -46,6 +46,9 @@ try { // why articles are or are not being drafted (switches, providers, last sc
   if (j) { // two notices so neither is truncated: switches/providers/breakers, then the latest outcomes line by line
     const head = JSON.stringify({ build: j.build, pipeline: j.pipeline, providers: j.providers, d1: j.d1, breakers: j.breakers }).slice(0, 860);
     console.log("PIPELINE " + head); console.log("::notice title=PIPELINE::" + head);
+    const pf = (j.providerFailures || []).map((e) => `${e.at} ${e.message}`.replace(/\s+/g, " ").slice(0, 210)).join(" || ").slice(0, 1400);
+    const head2 = "budgetToday=" + (j.budgetToday || "?") + " | providerFailures: " + (pf || "none");
+    console.log("PIPELINE_PROVIDERS " + head2); console.log("::notice title=PIPELINE_PROVIDERS::" + head2.slice(0, 1700));
     const ev = (j.events || []).map((e) => `${e.at} ${e.kind}: ${e.message}`.replace(/\s+/g, " ").slice(0, 230)).join(" || ").slice(0, 3000);
     console.log("PIPELINE_EVENTS " + ev); console.log("::notice title=PIPELINE_EVENTS::" + ev);
   } else { console.log("::notice title=PIPELINE::" + raw.slice(0, 860)); }

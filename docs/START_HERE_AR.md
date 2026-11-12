@@ -292,3 +292,8 @@ Bindings: `DB` (D1)، `AI` (Workers AI)، `AI_SEARCH`، `ASSETS`.
 - أُضيف `/api/health/pipeline` (عام بلا أسرار): حالة المفتاح (`absent`/`not_true`/`true`)، حد الذكاء الاصطناعي، المزوّدون المضبوطون (Gemini وOpenAI وWorkers AI)، وآخر 5 نتائج مجدولة. يُطبع في CI بعنوان `PIPELINE` ويظهر في «الحالة الحية» أعلى الملف مع تشخيص خريطة الأخبار.
 - **المطلوب من المالك إن ظهر `setting: "absent"` أو `"not_true"`:** في Cloudflare → Workers → bayan → Settings → Variables: اضبط `NEWS_PIPELINE_ENABLED` على `true` (متغير نصي) ثم Deploy.
 
+## 32) السبب الحقيقي لتوقف نشر الأخبار (13 نوفمبر، V2_BUILD 2026-11-13.3)
+- من `/api/health/pipeline` (الإنتاج): الخط مفعّل وكل المزوّدين مضبوطون وD1 يعمل، لكن **كل محاولات الصياغة تفشل بـ`all_providers_unavailable`**: Gemini قاطعه مفتوح `quota_exceeded` (الحصة المجانية)، وOpenAI آخر خطأ مسجّل `credit_balance_exhausted` (رصيد الحساب منتهٍ)، وWorkers AI يفشل أيضًا (سبب فشله يُطبع الآن في `PIPELINE_PROVIDERS`).
+- **ثم تُستهلك ميزانية اليوم (40) على محاولات فاشلة** فيتوقف الخط حتى لو عاد مزوّد: حدث `daily_ai_budget_exhausted` الساعة 22:26 UTC. الإصلاح: `refundDailyNewsAiCall` يعيد الوحدة المحجوزة عندما لا يجيب أي مزوّد (الفشل لا يكلّف شيئًا).
+- **المطلوب من المالك لتعود المقالات فعلًا (لا يمكن إصلاحه بالشيفرة):** مزوّد واحد على الأقل بحصة: (1) شحن رصيد OpenAI، أو (2) تفعيل الفوترة لمشروع Gemini، أو (3) إصلاح Workers AI (انظر سببه في الحالة الحية).
+

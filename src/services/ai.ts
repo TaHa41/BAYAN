@@ -148,6 +148,11 @@ export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[
 // Keep scheduled publication viable when no explicit budget is configured. The limit remains
 // bounded and can be lowered through NEWS_AI_DAILY_LIMIT for stricter quota control.
 export const newsAiDailyLimit=(env:Env):number=>{const n=Number(env.NEWS_AI_DAILY_LIMIT);return Number.isFinite(n)&&n>=10?Math.min(Math.floor(n),500):40};
+// A generation attempt that no provider answered cost nothing, so its reserved unit is given back; otherwise a day of unavailable providers
+// (free-tier quota, empty credit) would spend the whole budget on failures and stop publication even after a provider recovers.
+export const refundDailyNewsAiCall=async(env:Env)=>{
+  try{const day=new Date().toISOString().slice(0,10);await env.DB.prepare("UPDATE admin_settings SET value=substr(value,1,11)||CAST(MAX(0,CAST(substr(value,12) AS INTEGER)-1) AS TEXT) WHERE key='news_ai_budget_daily' AND substr(value,1,10)=?").bind(day).run();return true}catch{return false}
+};
 export const consumeDailyNewsAiCall=async(env:Env)=>{
   const limit=newsAiDailyLimit(env);
   const day=new Date().toISOString().slice(0,10);
@@ -242,11 +247,13 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
     }
     return{sections:accepted,rejected};
   };
+  let charged=false;
   const generate=async(extraInstruction:string)=>{
     const messages=[{role:"system",content:system},{role:"user",content:"Topic/question: "+question+"\nEvidence excerpts (only these snippets may be used): "+evidenceText+(extraInstruction?"\nCorrection required: "+extraInstruction:"")}];
     // Reserve one daily budget unit per generation attempt, not per provider.
     // A failed provider must not consume the budget needed for fallback providers.
     if(backgroundBudget&&!await consumeDailyNewsAiCall(env))return "";
+    charged=backgroundBudget;
     if(env.GEMINI_API_KEY){
       const answer=await callGeminiText(env,"Gemini draft",system,"Topic/question: "+question+"\nEvidence excerpts (only these snippets may be used): "+evidenceText+(extraInstruction?"\nCorrection required: "+extraInstruction:""),{json:true,temperature:0,maxOutputTokens:3600,timeoutMs:9000});
       if(answer)return answer;
@@ -268,6 +275,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
     return "";
   };
   let raw=await generate("");
+  if(!raw&&charged){await refundDailyNewsAiCall(env);charged=false}
   if(!raw)return{status:"mixed" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[]),reason:"ai_unavailable" as const,verification:{removedSentences:0,remainingSentences:0,retried:false,failureStage:"all_providers_unavailable"}};
   let retried=false,totalRemoved=0;
   let sections=parseDraft(raw);
