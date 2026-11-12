@@ -359,3 +359,8 @@
 - Commit: `bf6763a50b4d2d8c40d6bb29affbd91794308376`
 - الملفات: A	.github/workflows/auto-live-status.yml;M	docs/START_HERE_AR.md;A	scripts/update-live-status.d.mts;A	scripts/update-live-status.mjs;A	tests/live-status.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-12T22:34:46Z — Public pipeline status (/api/health/pipeline) in CI diagnostics and the live status block; tests; docs; V2_BUILD 2026-11-13.1 
+- Commit: `630fceae8806b73b5614e165868090cd65603606`
+- الملفات: M	docs/START_HERE_AR.md;M	scripts/page-diagnostics.mjs;M	scripts/update-live-status.mjs;M	src/v2-bridge.ts;M	tests/v2-swr.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
