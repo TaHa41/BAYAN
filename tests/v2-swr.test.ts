@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../src/types";
-import { serveV2, swr, resetSwr, fallbackReport, resetFallbacks, V2_BUILD } from "../src/v2-bridge";
+import { serveV2, swr, resetSwr, fallbackReport, resetFallbacks, pipelineStatus, V2_BUILD } from "../src/v2-bridge";
 
 // /about is a static page (no network, no database): s-maxage=3600, so HIT < 1h, STALE < 6h, MISS after.
 const HOUR = 3600_000;
@@ -146,6 +146,25 @@ describe("the in-isolate store keeps plain data, never Response objects", () => 
     const [ta, tb] = await Promise.all([a!.text(), b!.text()]);
     expect(ta.length).toBeGreaterThan(1000); expect(tb).toBe(ta);
     expect(await (await serveV2(get(), env, ctx))!.text()).toBe(ta); // a third, later request reads it again
+  });
+});
+
+describe("public pipeline status", () => {
+  const rows = [{ level: "WARN", kind: "news_archive_article_generation", message: 'ai_unavailable api_key=SECRET123 {"status":"x"}', created_at: "2026-11-13T01:02:03.000Z" }];
+  const dbWith = (fn: () => Promise<unknown>) => ({ prepare: () => ({ all: fn }) });
+  it("shows switches, configured providers and the last outcomes, with secrets redacted", async () => {
+    const out: any = await pipelineStatus({ NEWS_PIPELINE_ENABLED: "true", NEWS_AI_DAILY_LIMIT: "40", GEMINI_API_KEY: "k1", OPENAI_API_KEY: "  ", AI: {}, DB: dbWith(async () => ({ results: rows })) } as any);
+    expect(out.pipeline).toMatchObject({ enabled: true, setting: "true", aiDailyLimit: "40" }); expect(out.providers).toEqual({ gemini: true, openai: false, workersAi: true });
+    expect(out.events[0]).toMatchObject({ level: "WARN", kind: "news_archive_article_generation" }); expect(JSON.stringify(out)).not.toContain("SECRET123"); expect(JSON.stringify(out)).not.toContain("k1");
+  });
+  it("tells a disabled or absent switch apart, and reports a blocked database without throwing", async () => {
+    const off: any = await pipelineStatus({ NEWS_PIPELINE_ENABLED: "false", DB: dbWith(async () => { throw new Error("D1_ERROR: free tier daily row read limit exceeded"); }) } as any);
+    expect(off.pipeline).toMatchObject({ enabled: false, setting: "not_true" }); expect(off.d1).toBe("quota_blocked");
+    expect(((await pipelineStatus({ DB: dbWith(async () => ({ results: [] })) } as any)) as any).pipeline.setting).toBe("absent");
+  });
+  it("is served by the bridge as a no-store GET route", async () => {
+    const res = await serveV2(get("/api/health/pipeline"), { DB: dbWith(async () => ({ results: [] })) } as any, ctx);
+    expect(res!.status).toBe(200); expect(res!.headers.get("cache-control")).toBe("no-store"); expect(((await res!.json()) as any).build).toBe(V2_BUILD);
   });
 });
 

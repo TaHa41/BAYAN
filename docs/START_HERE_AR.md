@@ -284,3 +284,8 @@ Bindings: `DB` (D1)، `AI` (Workers AI)، `AI_SEARCH`، `ASSETS`.
 
 **قاعدة الجلسة القادمة:** ابدأ بقراءة «الحالة الحية» في أعلى هذا الملف (تتجدد آليًا بعد كل نشر عبر `.github/workflows/auto-live-status.yml` و`scripts/update-live-status.mjs`)، لا بالمحادثة.
 
+## 31) لماذا لا تُنشر مقالات الأخبار؟ (13 نوفمبر، V2_BUILD 2026-11-13.1)
+- القياس: الأرشيف فيه ~200 مرشح جاهز للصياغة لكن `attempts_0` = 199 تقريبًا (لم تُجرَّب صياغتهم)؛ والـcron لا يصوغ إلا إذا كان `NEWS_PIPELINE_ENABLED === "true"` (يُضبط في لوحة Cloudflare فقط، ليس في `wrangler.jsonc`)، ويتوقف كليًا إن كان حجب D1 اليومي مفعّلًا، ويصوغ صفًّا واحدًا لكل دورة.
+- أُضيف `/api/health/pipeline` (عام بلا أسرار): حالة المفتاح (`absent`/`not_true`/`true`)، حد الذكاء الاصطناعي، المزوّدون المضبوطون (Gemini وOpenAI وWorkers AI)، وآخر 5 نتائج مجدولة. يُطبع في CI بعنوان `PIPELINE` ويظهر في «الحالة الحية» أعلى الملف مع تشخيص خريطة الأخبار.
+- **المطلوب من المالك إن ظهر `setting: "absent"` أو `"not_true"`:** في Cloudflare → Workers → bayan → Settings → Variables: اضبط `NEWS_PIPELINE_ENABLED` على `true` (متغير نصي) ثم Deploy.
+

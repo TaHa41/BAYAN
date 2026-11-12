@@ -40,4 +40,9 @@ try { // why any request fell back to the old site (messages only)
   const r = await fetch(origin + "/api/health/v2", { signal: AbortSignal.timeout(15000) });
   rows.push({ p: "/api/health/v2", s: r.status, fb: (await r.text()).slice(0, 700) });
 } catch (error) { rows.push({ p: "/api/health/v2", err: String(error).slice(0, 120) }); }
+try { // why articles are or are not being drafted (switches, providers, last scheduled outcomes; no secrets)
+  const r = await fetch(origin + "/api/health/pipeline", { signal: AbortSignal.timeout(15000) });
+  const txt = (await r.text()).slice(0, 860);
+  console.log("PIPELINE " + txt); console.log("::notice title=PIPELINE::" + txt);
+} catch (error) { console.log("::notice title=PIPELINE::unreachable " + String(error).slice(0, 100)); }
 flush();
