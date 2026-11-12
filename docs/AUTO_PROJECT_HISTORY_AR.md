@@ -364,3 +364,8 @@
 - Commit: `630fceae8806b73b5614e165868090cd65603606`
 - الملفات: M	docs/START_HERE_AR.md;M	scripts/page-diagnostics.mjs;M	scripts/update-live-status.mjs;M	src/v2-bridge.ts;M	tests/v2-swr.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-12T22:41:23Z — Pipeline status: breaker states and provider failure events; CI prints them; V2_BUILD 2026-11-13.2 
+- Commit: `b762a0fe9398c69672b4182fd30134342367aad1`
+- الملفات: M	scripts/page-diagnostics.mjs;M	scripts/update-live-status.mjs;M	src/v2-bridge.ts;M	tests/v2-swr.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
