@@ -5,6 +5,8 @@ on:
     workflows: ["BAYAN Worker Deploy"]
     types: [completed]
     branches: [main]
+  schedule:
+    - cron: "17 */6 * * *"
   workflow_dispatch:
 permissions:
   contents: write
@@ -28,6 +30,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEPLOY_RUN_ID: ${{ github.event.workflow_run.id }}
+          BAYAN_PRODUCTION_URL: https://bayan.tahaomar411.workers.dev
         run: node scripts/update-live-status.mjs
       - name: Commit when it changed
         run: |

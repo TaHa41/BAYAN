@@ -76,6 +76,18 @@ async function main() {
       }
     }
   }
+  if (!info.pipeline) { // scheduled runs have no deploy annotations: read the public status endpoints directly
+    const origin = String(process.env.BAYAN_PRODUCTION_URL || "https://bayan.tahaomar411.workers.dev").replace(/\/+$/, "");
+    const get = async (path) => { try { const r = await fetch(origin + path, { signal: AbortSignal.timeout(20000) }); return r.ok ? await r.json() : null; } catch { return null; } };
+    const pl = await get("/api/health/pipeline");
+    if (pl) {
+      info.pipeline = JSON.stringify({ build: pl.build, pipeline: pl.pipeline, providers: pl.providers, d1: pl.d1, breakers: pl.breakers });
+      info.pipelineProviders = "budgetToday=" + (pl.budgetToday || "?") + " | providerFailures: " + ((pl.providerFailures || []).map((e) => `${e.at} ${e.message}`).join(" || ") || "none");
+      info.pipelineEvents = (pl.events || []).map((e) => `${e.at} ${e.kind}: ${e.message}`).join(" || ");
+    }
+    const ai = await get("/api/health/ai"); if (ai && !info.ai) info.ai = JSON.stringify(ai);
+    const fb = await get("/api/health/v2"); if (fb && !info.fallbacks) info.fallbacks = "/api/health/v2 " + JSON.stringify(fb);
+  }
   const doc = readFileSync("docs/START_HERE_AR.md", "utf8");
   const next = replaceBlock(doc, buildBlock(info));
   if (next !== doc) writeFileSync("docs/START_HERE_AR.md", next);
