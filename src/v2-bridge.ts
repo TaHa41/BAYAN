@@ -14,7 +14,7 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-13.1";
+export const V2_BUILD = "2026-11-13.2";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 
@@ -56,8 +56,10 @@ export async function pipelineStatus(env: Env): Promise<unknown> {
   const has = (v: unknown) => String(v ?? "").trim() !== "";
   const out: any = { checkedAt: new Date().toISOString(), build: V2_BUILD, pipeline: { enabled: e.NEWS_PIPELINE_ENABLED === "true", setting: e.NEWS_PIPELINE_ENABLED === undefined ? "absent" : e.NEWS_PIPELINE_ENABLED === "true" ? "true" : "not_true", aiDailyLimit: has(e.NEWS_AI_DAILY_LIMIT) ? String(e.NEWS_AI_DAILY_LIMIT).slice(0, 6) : "default" }, providers: { gemini: has(e.GEMINI_API_KEY), openai: has(e.OPENAI_API_KEY), workersAi: !!e.AI }, d1: "ok", events: [] };
   try {
-    const r: any = await e.DB.prepare("SELECT level,kind,message,created_at FROM runtime_events WHERE kind IN ('news_archive_article_generation','scheduled_news_archive_refresh','scheduled_self_heal') ORDER BY created_at DESC LIMIT 5").all();
+    const r: any = await e.DB.prepare("SELECT level,kind,message,created_at FROM runtime_events WHERE kind IN ('news_archive_article_generation','scheduled_news_archive_refresh','scheduled_self_heal','ai_generation','ai_circuit_breaker','news_ai_budget') ORDER BY created_at DESC LIMIT 14").all();
     out.events = (r?.results || []).map((x: any) => ({ at: String(x.created_at || "").slice(0, 19), level: String(x.level || ""), kind: String(x.kind || ""), message: String(x.message || "").replace(/(key|token|secret|authorization)["'=:\s]+[^\s"',}]+/gi, "$1=…").slice(0, 220) }));
+    const br: any = await e.DB.prepare("SELECT key,value FROM admin_settings WHERE key LIKE 'ai_breaker_%'").all();
+    out.breakers = Object.fromEntries((br?.results || []).map((x: any) => { let s: any = {}; try { s = JSON.parse(String(x.value)); } catch { /* keep empty */ } return [String(x.key).replace("ai_breaker_", ""), { open: Number(s.openedUntil) > Date.now(), code: String(s.code || "closed").slice(0, 40), until: s.openedUntil ? new Date(Number(s.openedUntil)).toISOString().slice(0, 19) : undefined }]; }));
   } catch (error) { out.d1 = /quota|limit|exceeded/i.test(String(error)) ? "quota_blocked" : "error"; }
   return out;
 }

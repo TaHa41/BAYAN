@@ -42,7 +42,12 @@ try { // why any request fell back to the old site (messages only)
 } catch (error) { rows.push({ p: "/api/health/v2", err: String(error).slice(0, 120) }); }
 try { // why articles are or are not being drafted (switches, providers, last scheduled outcomes; no secrets)
   const r = await fetch(origin + "/api/health/pipeline", { signal: AbortSignal.timeout(15000) });
-  const txt = (await r.text()).slice(0, 860);
-  console.log("PIPELINE " + txt); console.log("::notice title=PIPELINE::" + txt);
+  const raw = await r.text(); let j = null; try { j = JSON.parse(raw); } catch { /* not json */ }
+  if (j) { // two notices so neither is truncated: switches/providers/breakers, then the latest outcomes line by line
+    const head = JSON.stringify({ build: j.build, pipeline: j.pipeline, providers: j.providers, d1: j.d1, breakers: j.breakers }).slice(0, 860);
+    console.log("PIPELINE " + head); console.log("::notice title=PIPELINE::" + head);
+    const ev = (j.events || []).map((e) => `${e.at} ${e.kind}: ${e.message}`.replace(/\s+/g, " ").slice(0, 230)).join(" || ").slice(0, 3000);
+    console.log("PIPELINE_EVENTS " + ev); console.log("::notice title=PIPELINE_EVENTS::" + ev);
+  } else { console.log("::notice title=PIPELINE::" + raw.slice(0, 860)); }
 } catch (error) { console.log("::notice title=PIPELINE::unreachable " + String(error).slice(0, 100)); }
 flush();
