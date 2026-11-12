@@ -14,7 +14,7 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-07.6";
+export const V2_BUILD = "2026-11-08.1";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 
@@ -146,10 +146,15 @@ async function render(request: Request, env: Env): Promise<Response | null> {
   return out;
 }
 
-/** In-isolate page store: the edge Cache API is a no-op on *.workers.dev, so this is what actually makes repeat visits fast there. */
-const MEM = new Map<string, Response>();
-const memGet = (k: Request) => { const r = MEM.get(k.url); if (!r) return undefined; MEM.delete(k.url); MEM.set(k.url, r); return r.clone(); };
-const memPut = (k: Request, r: Response) => { MEM.delete(k.url); MEM.set(k.url, r); while (MEM.size > 120) MEM.delete(MEM.keys().next().value as string); };
+/**
+ * In-isolate page store. It keeps plain data (bytes + header pairs) and builds a fresh Response per request: a Response object created in one
+ * request cannot be read from another ("Cannot perform I/O on behalf of a different request"), which is what sent visitors to the old site.
+ * The edge Cache API is a no-op on *.workers.dev, so this is what makes repeat visits fast there.
+ */
+type MemEntry = { buf: ArrayBuffer; headers: [string, string][]; status: number };
+const MEM = new Map<string, MemEntry>();
+const memGet = (k: Request): Response | undefined => { const e = MEM.get(k.url); if (!e) return undefined; MEM.delete(k.url); MEM.set(k.url, e); return new Response(e.buf.slice(0), { status: e.status, headers: e.headers }); };
+const memPut = (k: Request, e: MemEntry) => { MEM.delete(k.url); MEM.set(k.url, e); while (MEM.size > 120) MEM.delete(MEM.keys().next().value as string); };
 
 /** Stores a copy (isolate memory + edge cache where it works) for 6x its freshness window, remembering when it was built. */
 async function remember(cache: Cache | null, key: Request, out: Response): Promise<void> {
@@ -160,7 +165,7 @@ async function remember(cache: Cache | null, key: Request, out: Response): Promi
   h.set("x-bayan-cc", out.headers.get("cache-control") || ""); h.set("cache-control", `public, max-age=${6 * smax}`);
   const buf = await out.clone().arrayBuffer();
   const mk = () => new Response(buf, { status: 200, headers: h });
-  memPut(key, mk());
+  memPut(key, { buf, headers: [...h.entries()], status: 200 });
   if (cache) await cache.put(key, mk()).catch(() => undefined);
 }
 

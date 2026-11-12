@@ -138,3 +138,14 @@ describe("falling back to the old site is never silent", () => {
   });
 });
 
+describe("the in-isolate store keeps plain data, never Response objects", () => {
+  it("every hit is a fresh Response, so several readers (and later requests) can each read the whole body", async () => {
+    await serveV2(get(), env, ctx); await settle(); at(60_000);
+    const [a, b] = [await serveV2(get(), env, ctx), await serveV2(get(), env, ctx)];
+    expect(a).not.toBe(b); expect(a!.headers.get("x-bayan-cache")).toBe("HIT");
+    const [ta, tb] = await Promise.all([a!.text(), b!.text()]);
+    expect(ta.length).toBeGreaterThan(1000); expect(tb).toBe(ta);
+    expect(await (await serveV2(get(), env, ctx))!.text()).toBe(ta); // a third, later request reads it again
+  });
+});
+

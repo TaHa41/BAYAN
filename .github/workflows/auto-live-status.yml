@@ -1,0 +1,41 @@
+name: BAYAN automatic live status
+# Rewrites the "live status" block of docs/START_HERE_AR.md after every production deploy (and on demand), so the main reference never goes stale.
+on:
+  workflow_run:
+    workflows: ["BAYAN Worker Deploy"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+  checks: read
+concurrency:
+  group: bayan-live-status
+  cancel-in-progress: false
+jobs:
+  live-status:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 20
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Rewrite the live status block
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPLOY_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: node scripts/update-live-status.mjs
+      - name: Commit when it changed
+        run: |
+          set -euo pipefail
+          git diff --quiet -- docs/START_HERE_AR.md && { echo "No change."; exit 0; }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/START_HERE_AR.md
+          git commit -m "docs: automatically refresh live status"
+          git pull --rebase origin main
+          git push

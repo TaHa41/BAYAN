@@ -2,6 +2,24 @@
 
 > آخر تحديث: 6 نوفمبر 2026. هذا الملف هو **أول ما يُقرأ** في أي محادثة أو جلسة جديدة (Claude أو غيره). يلخص ما بُني، والمشاكل وحلولها، وما لم يُنجز، وكل مطالب المالك، وكيف يتصل Claude بالمستودع. الملفات القديمة (`MASTER_PROJECT_REFERENCE_AR.md`, `WORK_STATE.md`, `AUTO_PROJECT_HISTORY_AR.md`) أقدم من معمارية v2 أدناه؛ إذا تعارضت معها فهذا الملف هو الأحدث. لا تضع هنا أسرارًا أو توكنات أبدًا.
 
+<!-- BAYAN_LIVE_STATUS_START -->
+## الحالة الحية (تُحدَّث آليًا بعد كل نشر — لا تعدّلها يدويًا)
+- آخر تحديث: 2026-11-12T09:40:18.156Z
+- V2_BUILD في الشيفرة: `2026-11-08.1`
+- آخر نشر: غير متاح
+- آخر الـcommits على main:
+  - a8d1e410 2026-11-12 Root cause of fallbacks to the old site: store plain bytes in the isolate cache, never Response objects; test;
+  - 473821fa 2026-11-08 docs: automatically record project history
+  - 0c398371 2026-11-08 Make fallbacks to the old site visible (/api/health/v2) and never caused by a broken cached copy; diagnostics 
+  - 6eeca760 2026-11-08 docs: automatically record project history
+  - fd023530 2026-11-08 Diagnostics: show which renderer served each page (v1 build header, v2 build, title); V2_BUILD 2026-11-07.5
+  - 7afd49d9 2026-11-08 docs: automatically record project history
+  - 0b7af862 2026-11-08 Story page: 3.5s write-up budget and cache; diagnostics show renderer/cache headers; test; docs; V2_BUILD 2026
+  - efbb9ee6 2026-11-08 docs: automatically record project history
+  - 33575bac 2026-11-08 Redesign from scratch: mobile-first design system, section/news page caching, search budget; tests; docs; V2_B
+  - 3aadae72 2026-11-07 docs: automatically record project history
+<!-- BAYAN_LIVE_STATUS_END -->
+
 ## 1) كيف تبدأ في محادثة جديدة (3 دقائق)
 1. اقرأ هذا الملف و`CLAUDE.md` (قواعد الأمان) ثم `docs/WORK_STATE.md` إن لزم.
 2. تحقق من الواقع قبل أي ادعاء: آخر commits على `main`، وآخر تشغيل لـ `BAYAN Worker Deploy`، وإشعارات (annotations) فحص الإنتاج. لا تعتمد على الذاكرة.
@@ -185,7 +203,7 @@ Bindings: `DB` (D1)، `AI` (Workers AI)، `AI_SEARCH`، `ASSETS`.
 - **حد معروف:** الذاكرة داخل isolate واحد؛ أول زيارة لكل isolate جديدة لا تزال باردة. الحل الكامل (كاش حافة مشترك) يتطلب **دومينًا خاصًا** على Cloudflare.
 - **التحقق الحي المطلوب:** `curl -sI https://bayan.tahaomar411.workers.dev/about` مرتين: الثانية `x-bayan-cache: HIT`، مع `x-bayan-v2-build: 2026-11-06.3`.
 
-## 22) أداء الموقع والخطأ 1102 (6 نوفمبر)
+## 22ب) أداء الموقع والخطأ 1102 (6 نوفمبر)
 - **الاكتشاف:** `caches.default` (Cache API) لا يعمل على نطاقات `*.workers.dev`، فكل صفحة كانت تُرسم من جديد مع كل زيارة. والأخطر أن `news()` كان يتحوّل إلى الجلب الحي (7 مصادر RSS + بدائل) كلما كان كاش الأخبار أقل من 3 عناصر موثّقة، أي عند أي زائر؛ وهذا أرجح سبب الخطأ **1102 (Worker exceeded resource limits)** وبطء الموقع على الخطة المجانية (حد المعالج ~10ms).
 - **الإصلاح (V2_BUILD 2026-11-06.4):** (1) خيار `cacheOnly` في `news()`: كل مسار يصل إليه الزائر يقرأ الكاش فقط ولا يبدأ جلبًا حيًا أبدًا؛ التحديث الحي للـcron وسير self-heal فقط (`forceRefresh`). (2) كاش صفحات داخل ذاكرة الـisolate (طبقة فوق Cache API) مع stale-while-revalidate. (3) `swr()` للعناوين (طازج دقيقتان، قديم حتى 20 دقيقة، والتحميل البارد ينتظر 2.5 ثانية فقط) ولاستدعاءات الموسوعة (طازج 30 دقيقة، قديم حتى 6 ساعات).
 - **قياس محلي:** رسم الصفحة الواحدة 0.6 إلى 3ms (Node، دافئ).
@@ -195,7 +213,7 @@ Bindings: `DB` (D1)، `AI` (Workers AI)، `AI_SEARCH`، `ASSETS`.
 - النتيجة الحية: `gemini.ok:false`, `error:"quota"`, 429 على `gemini-3.8-flash` (حصة الخطة المجانية لكل نموذج منفصلة).
 - `callGemini` صار يجرّب `gemini-2.5-flash` ثم `gemini-2.5-flash-lite` عند 429 أو 503 (مرة واحدة لكل نموذج)، ويتذكّر النموذج الناجح 10 دقائق، ولا يعيد المحاولة عند أخطاء المفتاح. إن فشلت كل النماذج يُعاد الخطأ الأصلي. اختبارات في `tests/gemini-fallback.test.ts`. لا يغيّر `GEMINI_MODEL` ولا الأسرار.
 
-## 23) نماذج Gemini والخطأ 1102 المستمر (6 نوفمبر)
+## 23ب) نماذج Gemini والخطأ 1102 المستمر (6 نوفمبر)
 - `callGemini` صار يجرّب `gemini-2.5-flash` ثم `gemini-2.5-flash-lite` عند 429 أو 503 على النموذج المضبوط (الحصة المجانية لكل نموذج منفصلة)، ويتذكر النموذج الناجح 10 دقائق. أخطاء المصادقة لا تُعاد.
 - **1102 ما زال يظهر بعد بناء 2026-11-06.4** (الزائر لم يحدد المسار). لم يُحسم السبب لأن سجلات Cloudflare غير متاحة لنا. المطلوب من المالك: من Workers Logs نسخ سطر الاستثناء (فيه المسار و`cpuTime`)، ونوع الخطة، ومنحنى CPU time للـWorker. الفرضيات: ردّ بارد لأول زائر على isolate جديد (جلب الموسوعة وتحليل JSON وبناء HTML أكثر من 10ms على الخطة المجانية)، أو مسار v1 غير الذي صُحّح. لا نعدّل أكثر بالتخمين.
 
@@ -235,4 +253,15 @@ Bindings: `DB` (D1)، `AI` (Workers AI)، `AI_SEARCH`، `ASSETS`.
 - قياس الإنتاج: `/research` بارد **14033ms ودافئ 14032ms** (MISS في الاثنين): الانتظار الكامل للمعالجة المفصلة التي لا تنجح حاليًا (حصة Gemini) ثم `no-store`. الإصلاح: ميزانية **3.5 ثانية** ثم الصفحة المنظمة الكاملة فورًا، ورأس كاش `s-maxage=300` (مقال مفصّل فعلي: 1800) ليُخزَّن في الـisolate؛ المعالجة تكمل بالخلفية وتُستخدم في الزيارة التالية.
 - لوحظ أن صفحات (`/economy` `/health` `/politics` `/news` `/sections` `/trends` `/weather` `/prices`) تعرض `x-bayan-cache` فارغًا في القياس رغم أن العامل يعيد `s-maxage` (اختبار محلي يؤكد). أُضيفت إلى التشخيص حقول `rd` (المُرسِم) و`cc` (cache-control) و`ag` (Age) لمعرفة السبب من القياس التالي.
 - قياسات بعد إعادة التصميم: الرئيسية 100ms بارد/46 دافئ (HIT)، `/search` 3067ms بارد (الميزانية 3 ثوانٍ)، ولا 1102.
+
+## 30) ما طلبه المالك مقابل ما تم (مراجعة من المرجع، 8 نوفمبر 2026)
+**مكتمل ومنشور على main:** إكمال `feat/seo-speed` (SWR وsitemap وJSON-LD) · مركز الأقسام `/sections` وتصميم بطاقات جديد · لوحة إدارة v2 كاملة (6 تبويبات) · `/saved` و`/ask` في v2 · تحويلات `/tools` و`/people/*` و`/review*` · صفحة الصحة (`/health` لم يكن يفتح لأن JSON الفحص حجبه، صار `/healthz`) · v2 تملك كل صفحات HTML بما فيها الـ404 · لا رسالة «تعذر تحضير…» أبدًا (صفحة خبر منظمة كاملة من مصادر حقيقية: الخلاصة، النقاط، تغطية الناشرين، المصادر) · إعادة تصميم كاملة mobile-first (فُحصت في Chromium على 390/768/1366 بلا تمرير أفقي) · سلسلة بدائل الذكاء الاصطناعي (Gemini ← OpenAI ← Workers AI بثلاثة نماذج، وGemini يجرّب نماذج احتياطية عند 429/503) · لا استدعاء حي لـGemini من صفحة الصحة (حصته المجانية 20 طلبًا يوميًا).
+
+**منشور لكنه ينتظر تحقق حي:** سبب «بعض الصفحات تدخل على الموقع القديم» (الحقيقي): تخزين `Response` في ذاكرة الـisolate يرمي «Cannot perform I/O on behalf of a different request» في الطلب الثاني فتسقط الصفحة إلى v1. أُصلح (V2_BUILD 2026-11-08.1) بتخزين بايتات خام. **التحقق:** في الكتلة الحية أعلاه يجب أن يظهر كاش `HIT` ومُرسِم `v2` لكل صفحة، وأن يكون `/api/health/v2` عدّاده لا يزيد.
+
+**لم يُنفَّذ بعد:** حذف كود v1 (`SHELL` في `src/index.ts` و`public/app-*.js`) — شرطه أن يثبت `/api/health/v2` أن لا صفحة تسقط إلى v1 لمدة يوم، ثم PR واحد صغير. · أقسام «رأي» (`arab`) و«مجتمع» (`egypt`) تعرض معرفة وأخبارًا لكن لا كتّاب؛ يحتاج قرار تحريري.
+
+**ينتظر المالك (لا أستطيع من هنا):** تفعيل Workers Paid (حد المعالج 10ms والـD1 يوميًا يسببان 1102 تحت الحمل) · دومين خاص (يفعّل كاش الحافة ويحل الفهرسة، ثم Search Console كما في القسم 18) · Gemini: فوترة المشروع أو إضافة مفتاح OpenAI، وضبط `GEMINI_MODEL` · سحب توكن GitHub الذي لُصق في المحادثات.
+
+**قاعدة الجلسة القادمة:** ابدأ بقراءة «الحالة الحية» في أعلى هذا الملف (تتجدد آليًا بعد كل نشر عبر `.github/workflows/auto-live-status.yml` و`scripts/update-live-status.mjs`)، لا بالمحادثة.
 
