@@ -374,3 +374,8 @@
 - Commit: `82ffa9ac903ddd1348600816acc0451e25b7ff32`
 - الملفات: M	docs/START_HERE_AR.md;M	scripts/page-diagnostics.mjs;M	scripts/update-live-status.mjs;M	src/services/ai.ts;M	src/v2-bridge.ts;A	tests/ai-budget-refund.test.ts;M	tests/v2-swr.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-12T22:54:52Z — Live status refreshes every 6 hours from the public status endpoints, not only after deploys 
+- Commit: `7cbc5a35f220acb9545426fdf7c39ff82a377380`
+- الملفات: M	.github/workflows/auto-live-status.yml;M	docs/START_HERE_AR.md;M	scripts/update-live-status.mjs 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
