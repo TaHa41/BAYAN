@@ -10,6 +10,9 @@ import { wikiApi, type WikiApi } from "../v2/src/wiki";
 import { news } from "./services/news";
 import { api } from "./routes/api";
 import { callGemini, resolveGeminiModel } from "./services/gemini";
+import { track } from "./db";
+import { analyticsExcluded, visitorId } from "./security";
+import { layout, SITE } from "../v2/src/ui";
 import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
@@ -192,7 +195,7 @@ async function remember(cache: Cache | null, key: Request, out: Response): Promi
  * 6x the window, it is still served immediately (STALE) while a background refresh rebuilds it; only older or missing pages (MISS)
  * wait for a rebuild. Search engines and readers therefore almost never wait on news feeds or encyclopedia calls.
  */
-export async function serveV2(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response | null> {
+async function serveV2Inner(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response | null> {
   if (!v2Owns(request)) return null;
   if (ctx) ctxRef = ctx;
   if (new URL(request.url).pathname === "/api/health/pipeline") return new Response(JSON.stringify(await pipelineStatus(env)), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" } });
@@ -228,4 +231,44 @@ export async function serveV2(request: Request, env: Env, ctx?: ExecutionContext
     noteFallback(new URL(request.url).pathname, error);
     return null;
   }
+}
+
+
+/**
+ * Visit counting (what the old page renderer did): one "page" event per served HTML page, never for the owner, the admin, API or assets.
+ * `?bayan_owner=1` marks this browser as the owner (and removes its earlier visits), `?bayan_owner=0` clears the mark; opening /admin marks it too.
+ * Cookies are added to the response after it left the page cache, so they can never be stored and served to anyone else.
+ */
+export async function serveV2(request: Request, env: Env, ctx?: ExecutionContext): Promise<Response | null> {
+  const res = await serveV2Inner(request, env, ctx);
+  if (!res || request.method !== "GET") return res;
+  const u = new URL(request.url);
+  const path = u.pathname.replace(/(.)\/+$/, "$1");
+  const html = /text\/html/i.test(res.headers.get("content-type") || "");
+  const lang: Lang = u.searchParams.get("lang") === "en" ? "en" : "ar";
+  const owner = u.searchParams.get("bayan_owner");
+  const out = new Response(res.body, res);
+  const cookie = "bayan_exclude_analytics";
+  if (html && ((path === "/admin" && owner !== "0") || owner === "1")) out.headers.append("Set-Cookie", `${cookie}=1; Max-Age=31536000; Path=/; SameSite=Lax; Secure`);
+  if (owner === "0") out.headers.append("Set-Cookie", `${cookie}=; Max-Age=0; Path=/; SameSite=Lax; Secure`);
+  const counts = html && res.status === 200 && path !== "/admin" && owner !== "0" && !analyticsExcluded(request) && owner !== "1";
+  if (ctx && (counts || (html && owner === "1"))) {
+    ctx.waitUntil((async () => {
+      try {
+        const visitor = await visitorId(request);
+        if (owner === "1") await env.DB.prepare("DELETE FROM analytics WHERE visitor_hash=?").bind(visitor).run();
+        else await track(env, visitor, "page", path, lang);
+      } catch { /* counting must never affect a page */ }
+    })());
+  }
+  return out;
+}
+
+/** Plain notice in the new design, used only when a page could not be rendered at all (the old shell no longer exists). */
+export function unavailablePage(request: Request): Response {
+  const u = new URL(request.url);
+  const lang: Lang = u.searchParams.get("lang") === "en" ? "en" : "ar";
+  const body = `<div class="page-head"><h1>${lang === "ar" ? "الصفحة غير متاحة لحظيًا" : "This page is momentarily unavailable"}</h1><p>${lang === "ar" ? "حدّث الصفحة بعد لحظات، أو ابدأ من الرئيسية." : "Refresh in a moment, or start from the home page."}</p></div><p><a class="ext" href="/?lang=${lang}">${lang === "ar" ? "الصفحة الرئيسية ←" : "Home page →"}</a></p>`;
+  const html = layout({ lang, origin: u.origin, path: u.pathname, title: `${lang === "ar" ? "غير متاحة" : "Unavailable"} | ${SITE.name}`, description: "", body, noindex: true } as any);
+  return new Response(html, { status: 503, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "retry-after": "30", "x-content-type-options": "nosniff", "x-bayan-renderer": "unavailable" } });
 }
