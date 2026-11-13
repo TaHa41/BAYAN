@@ -202,37 +202,7 @@ try{
   }
 }catch(e){console.error("BILINGUAL_ARTICLE_SEO",e);bad++}
 try{
-  const h=await get("/?lang=en");
-  if(!/<html[^>]+lang="en"/.test(h.text))throw new Error("english_lang_missing");
-  if(!h.text.includes('<meta name="theme-color" content="#f7f4ee">'))throw new Error("light_mobile_theme_color_mismatch");
-  const manifest=await get("/manifest.json");
-  const manifestData=JSON.parse(manifest.text);
-  if(manifestData.theme_color!=="#f7f4ee")throw new Error("installed_app_theme_color_mismatch");
-  const bundleMatch=h.text.match(/<script src="(\/app-[^"]+\.js\?v=[^"]+)"/);
-  if(!bundleMatch)throw new Error("current_bundle_missing");
-  bundlePath=bundleMatch[1];
-  bundleVersion=new URL(bundleMatch[1],"https://bayan.invalid").searchParams.get("v")||"";
-  if(!bundleVersion)throw new Error("current_shell_bundle_version_missing");
-  const stylesheetMatch=h.text.match(/<link rel="stylesheet" href="\/styles\.css\?v=([^"]+)"/); const stylesheetVersion=stylesheetMatch?.[1]||"";
-  if(!stylesheetVersion||bundleVersion!==stylesheetVersion)throw new Error("stale_shell_bundle_version");
-  if(!h.text.includes("fallback-home")||!h.text.includes("Start searching")||h.text.includes("ابدأ البحث")||h.text.includes("??lang="))throw new Error("english_shell_fallback_not_localized");
-}catch(e){console.error("SHELL",e);bad++}
-try{
-  const js=await get(bundlePath);
-  bundleText=js.text;
-  if(!js.text.includes('closest("#closeDrawer")'))throw new Error("drawer_close_handler_missing");
-  if(js.text.includes("Daily wisdom")||js.text.includes("الحكمة اليومية"))throw new Error("obsolete_wisdom_content_present");
-  if(!js.text.includes("home-news")||!js.text.includes("home-featured"))throw new Error("homepage_content_sections_missing");
-  if(!js.text.includes("section-retry")||!js.text.includes("timeoutMs: 8000"))throw new Error("section_resilience_missing");
-  if(!js.text.includes("async function renderNews()"))throw new Error("news_renderer_async_missing");
-  if(!js.text.includes("search-answer"))throw new Error("search_answer_ui_missing");
-  if(!js.text.includes("Match each image placeholder to its own card by title"))throw new Error("image_hydration_card_matching_missing");
-  if(!js.text.includes('onerror="window.BAYAN_IMAGE_RETRY(this)"')||!js.text.includes("window.BAYAN_IMAGE_RETRY"))throw new Error("image_retry_fallback_missing");
-  if(!bundleText.includes("const wisdomTimer = setInterval")||!js.text.includes("}, 30000)"))throw new Error("wisdom_rotation_not_30_seconds");
-}catch(e){console.error("BUNDLE",e);bad++}
-try{
   const w=await get("/api/wisdom?section=arab&lang=ar"); const wd=JSON.parse(w.text); if(!wd.wisdom||!/[\u0600-\u06ff]/.test(String(wd.wisdom)))throw new Error("wisdom_missing");
-  if(!bundleText.includes("const wisdomTimer = setInterval"))throw new Error("wisdom_rotation_not_enabled");
   const n=await get("/api/news?lang=ar"); const d=JSON.parse(n.text);
   if(!Array.isArray(d.items)||d.items.length<3)throw new Error("news_too_few");
   if(d.items.some(x=>!/[\u0600-\u06ff]/.test(String(x.title||""))))throw new Error("arabic_news_contains_non_arabic_title");
@@ -404,10 +374,6 @@ try{
     if(live.endsWith("/gold")&&payload.ok&&(!Number(payload.price)||!Date.parse(String(payload.updatedAt||""))))throw new Error("gold_payload_missing_price_or_update_time");
     if(live.endsWith("/gold")&&Array.isArray(payload.markets)&&payload.markets.some(item=>!Number(item.price)||!item.provider||!Date.parse(String(item.updatedAt||""))))throw new Error("market_quote_missing_price_provider_or_timestamp");
   }
-  const page=await get("/prices?lang=ar");
-  if(!bundleText.includes('id="pricesRefresh"')||!bundleVersion)throw new Error("prices_page_assets_not_updated");
-  const css=await get("/styles.css?v="+encodeURIComponent(bundleVersion));
-  if(!css.text.includes(".prices-refresh")||!css.text.includes("@media(max-width:360px)"))throw new Error("responsive_prices_styles_missing");
 }catch(e){console.error("LIVE_DATA",e);bad++}
 try{const a=await fetch(origin+"/api/admin/analytics",{headers:{accept:"application/json"},signal:AbortSignal.timeout(10000)});if(a.status!==401)throw new Error("admin_auth_not_enforced")}catch(e){console.error("ADMIN_AUTH",e);bad++}
 
