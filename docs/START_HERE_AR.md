@@ -4,7 +4,7 @@
 
 <!-- BAYAN_LIVE_STATUS_START -->
 ## الحالة الحية (تُحدَّث آليًا بعد كل نشر — لا تعدّلها يدويًا)
-- آخر تحديث: 2026-11-12T22:52:29.895Z
+- آخر تحديث: 2026-11-13T06:36:22.048Z
 - V2_BUILD في الشيفرة: `2026-11-13.3`
 - آخر نشر: failure للكوميت `7d50cbf2` (https://github.com/TaHa41/BAYAN/actions/runs/43323546415)
 - نتائج الـjobs: deploy=success، verify-production=failure
@@ -31,6 +31,9 @@
   - `/news`: حالة 200، 509/58، كاش HIT، مُرسِم v2
   - `/politics`: حالة 200، 541/55، كاش HIT، مُرسِم v2
 - آخر الـcommits على main:
+  - 0f14abf 2026-11-12 docs: automatically record project history
+  - 7cbc5a3 2026-11-12 Live status refreshes every 6 hours from the public status endpoints, not only after deploys
+  - c9cbd97 2026-11-12 docs: automatically refresh live status
   - c779ba4 2026-11-12 docs: automatically record project history
   - 82ffa9a 2026-11-12 AI budget: refund when no provider answered; pipeline status shows provider failures and today's budget; tests;
   - ef146bd 2026-11-12 docs: automatically refresh live status
@@ -38,9 +41,6 @@
   - b762a0f 2026-11-12 Pipeline status: breaker states and provider failure events; CI prints them; V2_BUILD 2026-11-13.2
   - 45bebc0 2026-11-12 docs: automatically refresh live status
   - fb6ca37 2026-11-12 docs: automatically record project history
-  - 630fcea 2026-11-12 Public pipeline status (/api/health/pipeline) in CI diagnostics and the live status block; tests; docs; V2_BUIL
-  - 6340cc4 2026-11-12 docs: automatically refresh live status
-  - a76f008 2026-11-12 docs: automatically record project history
 <!-- BAYAN_LIVE_STATUS_END -->
 
 ## 1) كيف تبدأ في محادثة جديدة (3 دقائق)
