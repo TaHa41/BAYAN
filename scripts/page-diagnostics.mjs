@@ -44,7 +44,7 @@ try { // why articles are or are not being drafted (switches, providers, last sc
   const r = await fetch(origin + "/api/health/pipeline", { signal: AbortSignal.timeout(15000) });
   const raw = await r.text(); let j = null; try { j = JSON.parse(raw); } catch { /* not json */ }
   if (j) { // two notices so neither is truncated: switches/providers/breakers, then the latest outcomes line by line
-    const head = JSON.stringify({ build: j.build, pipeline: j.pipeline, providers: j.providers, d1: j.d1, breakers: j.breakers }).slice(0, 860);
+    const head = JSON.stringify({ build: j.build, pipeline: j.pipeline, providers: j.providers, d1: j.d1, breakers: j.breakers, workersAiProbe: j.workersAiProbe }).slice(0, 880);
     console.log("PIPELINE " + head); console.log("::notice title=PIPELINE::" + head);
     const pf = (j.providerFailures || []).map((e) => `${e.at} ${e.message}`.replace(/\s+/g, " ").slice(0, 210)).join(" || ").slice(0, 1400);
     const head2 = "budgetToday=" + (j.budgetToday || "?") + " | providerFailures: " + (pf || "none");
