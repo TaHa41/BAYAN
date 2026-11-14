@@ -394,3 +394,8 @@
 - Commit: `20d59717264d89bf568808222c68632738c390ad`
 - الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/services/ai.ts;M	src/services/search.ts;M	src/v2-bridge.ts;D	tests/ai-budget-refund.test.ts;A	tests/ai-budget.test.ts;M	tests/ai-draft.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-14T09:02:18Z — AI budget: fresh counter key so the polluted counter of failed attempts stops blocking drafting; V2_BUILD 2026-11-14.3 
+- Commit: `8049d1b61df20d12bfcc2a3d5b5a5d3086091b4f`
+- الملفات: M	docs/START_HERE_AR.md;M	src/services/ai.ts;M	src/v2-bridge.ts;M	tests/ai-draft.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
