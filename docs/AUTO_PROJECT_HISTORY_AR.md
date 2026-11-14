@@ -384,3 +384,8 @@
 - Commit: `000462f66105bd712cacf6e55699ab8d7a8bac5d`
 - الملفات: M	docs/START_HERE_AR.md;M	package.json;D	public/app-20261007-21.js;D	public/app-20261007-22.js;D	public/app-20261008-01.js;D	public/app-20261009-01.js;D	public/app-20261013-01.js;D	public/app-20261019-01.js;D	public/app-20261026-01.js;D	public/app-20261026-admin-03.js;D	public/app-20261027-01.js;D	public/app-20261027-02.js;D	public/app-20261027-03.js;D	public/bayan-article-share.svg.;D	public/index.html;D	public/styles.css;M	scripts/production-smoke.mjs;M	scripts/source-contract-smoke.mjs;M	src/index.ts;M	src/v2-bridge.ts;A	tests/old-site-removed.test.ts;M	wrangler.jsonc 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-14T08:52:24Z — Workers AI probe in pipeline status, 2s search budget; docs; V2_BUILD 2026-11-14.1 
+- Commit: `9de7c4d09e80fb7b54b437dde9f5b8dde81ba208`
+- الملفات: M	docs/START_HERE_AR.md;M	scripts/page-diagnostics.mjs;M	src/v2-bridge.ts;M	tests/v2-swr.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
