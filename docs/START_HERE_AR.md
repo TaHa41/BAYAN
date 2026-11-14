@@ -4,33 +4,36 @@
 
 <!-- BAYAN_LIVE_STATUS_START -->
 ## الحالة الحية (تُحدَّث آليًا بعد كل نشر — لا تعدّلها يدويًا)
-- آخر تحديث: 2026-11-14T09:03:16.342Z
-- V2_BUILD في الشيفرة: `2026-11-14.2`
-- آخر نشر: failure للكوميت `11eefcc8` (https://github.com/TaHa41/BAYAN/actions/runs/43578561009)
+- آخر تحديث: 2026-11-14T09:05:39.034Z
+- V2_BUILD في الشيفرة: `2026-11-14.3`
+- آخر نشر: failure للكوميت `6ba93e02` (https://github.com/TaHa41/BAYAN/actions/runs/43578721214)
 - نتائج الـjobs: deploy=success، verify-production=failure
-- حالة الذكاء الاصطناعي (إعداد فقط، بلا استدعاء): {"checkedAt":"2026-11-14T09:02:50.642Z","build":"2026-11-14.2","deployedCommit":"11eefcc8c622","probe":"off","gemini":{"configured":true,"keyState":"set","model":"gemini-3.8-flash"},"workersAi":{"configured":true}}
+- حالة الذكاء الاصطناعي (إعداد فقط، بلا استدعاء): {"checkedAt":"2026-11-14T09:05:06.820Z","build":"2026-11-14.3","deployedCommit":"6ba93e02ecd6","probe":"off","gemini":{"configured":true,"keyState":"set","model":"gemini-3.8-flash"},"workersAi":{"configured":true}}
 - فحص الإنتاج: news_publication_gap: archive has 200 candidates ready for article drafting but the news sitemap contains no published articles
-- خط نشر الأخبار (/api/health/pipeline): {"build":"2026-11-14.2","pipeline":{"enabled":true,"setting":"true","aiDailyLimit":"40"},"providers":{"gemini":true,"openai":true,"workersAi":true},"d1":"ok","breakers":{"openai":{"open":false,"code":"credit_balance_exhausted","until":"2026-10-20T06:06:01"},"gemini":{"open":false,"code":"closed"}},"workersAiProbe":{"ok":true,"model":"@cf/meta/llama-3.1-8b-instruct-fp8","ms":368}}
-- أسباب فشل المزوّدين وميزانية اليوم: budgetToday=2026-11-14:40 | providerFailures: 2026-11-14T09:03:05 ai_provider_failure: Gemini answer: This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later. || 2026-11-14T08:55:32 ai_provider_failure: Gemini answer: This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later. || 2026-11-14T08:35:49 ai_provider_failure: Gemini answer: This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later. || 2026-11-14T08:21:06 ai_provider_failure: Gemini answer: This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later. || 2026-11-14T07:56:17 ai_provider_failure: Gemini answer: request timed out || 2026-11-14T07:36:11 ai_provider_failure: Gemini answer: request timed out
+- خط نشر الأخبار (/api/health/pipeline): {"build":"2026-11-14.3","pipeline":{"enabled":true,"setting":"true","aiDailyLimit":"40"},"providers":{"gemini":true,"openai":true,"workersAi":true},"d1":"ok","breakers":{"openai":{"open":false,"code":"credit_balance_exhausted","until":"2026-10-20T06:06:01"},"gemini":{"open":false,"code":"closed"}},"workersAiProbe":{"ok":true,"model":"@cf/meta/llama-3.1-8b-instruct-fp8","ms":302}}
+- أسباب فشل المزوّدين وميزانية اليوم: budgetToday=? | providerFailures: 2026-11-14T09:03:05 ai_provider_failure: Gemini answer: This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later. || 2026-11-14T08:55:32 ai_provider_failure: Gemini answer: This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later. || 2026-11-14T08:35:49 ai_provider_failure: Gemini answer: This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later. || 2026-11-14T08:21:06 ai_provider_failure: Gemini answer: This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later. || 2026-11-14T07:56:17 ai_provider_failure: Gemini answer: request timed out || 2026-11-14T07:36:11 ai_provider_failure: Gemini answer: request timed out
 - آخر أحداث الصياغة والمزوّدين: 2026-11-14T09:03:05 ai_circuit_breaker: gemini_breaker_closed: {"state":"closed","code":"closed","openedUntil":null} || 2026-11-14T09:03:05 ai_generation: ai_provider_failure: Gemini answer: This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later. || 2026-11-14T08:55:57 news_archive_article_generation: {"status":"attempted_failed","id":51795,"language":"en","publishReason":"ai_unavailable","publishReasonDetail":"all_providers_unavailable","retryMinutes":15,"attemptsPreserved": || 2026-11-14T08:55:56 news_archive_article_generation: ai_unavailable_deferred: {"id":51795,"language":"en","retryMinutes":15,"attemptsPreserved":0} || 2026-11-14T08:55:55 news_ai_budget: daily_ai_budget_exhausted: UTC daily news AI call limit reached (40) || 2026-11-14T08:55:32 ai_circuit_breaker: gemini_breaker_closed: {"state":"closed","code":"closed","openedUntil":null} || 2026-11-14T08:55:32 ai_generation: ai_provider_failure: Gemini answer: This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later. || 2026-11-14T08:51:09 news_archive_article_generation: {"status":"attempted_no_publish","id":51771,"language":"ar","searchStatus":"mixed","publishReason":"no_independent_sources","queueStatus":"skipped_low_evidence","publishReasonDe || 2026-11-14T08:36:23 news_archive_article_generation: {"status":"attempted_failed","id":51795,"language":"en","publishReason":"ai_unavailable","publishReasonDe
 - خريطة الأخبار والأرشيف: {"status":200,"contentType":"application/xml; charset=utf-8","urlCount":0,"candidateCount":"0","archiveCandidateCount":"200","archiveReadyForArticleDraftingCount":"200","eligibleCount":"0","rejectedCount":"0","rejectionReasons":"{}","archiveReasons":"{\"never_attempted\":141,\"attempts_0\":198,\"skipped_low_evidence\":42,\"ai_unavailable\":15,\"draft_not_verified\":2,\"attempts_1\":2}","xmlBytes":167}
-- أسباب الرجوع للموقع القديم (/api/health/v2): /api/health/v2","s":200,"fb":"{\"build\":\"2026-11-14.2\",\"count\":0,\"recent\":[]}"}]
+- أسباب الرجوع للموقع القديم (/api/health/v2): /api/health/v2","s":200,"fb":"{\"build\":\"2026-11-14.3\",\"count\":0,\"recent\":[]}"}]
 - أداء الصفحات الحقيقية (بارد/دافئ بالملّي ثانية، كاش، المُرسِم):
-  - `/research?title=%D8%A7%D9%84%D9%82%D9%85`: حالة 200، 3604/17، كاش HIT، مُرسِم v2
-  - `/article/politics-public-consultation-ar`: حالة 200، 21/19، كاش HIT، مُرسِم v2
-  - `/weather`: حالة 200، 510/20، كاش HIT، مُرسِم v2
-  - `/prayer`: حالة 200، 182/20، كاش HIT، مُرسِم v2
-  - `/trends`: حالة 200، 139/19، كاش HIT، مُرسِم v2
-  - `/about`: حالة 200، 20/29، كاش HIT، مُرسِم v2
-  - `/search?q=%D9%85%D8%B5%D8%B1`: حالة 200، 3030/3023، كاش MISS، مُرسِم v2
-  - `/prices`: حالة 200، 584/30، كاش HIT، مُرسِم v2
-  - `/economy`: حالة 200، 241/20، كاش HIT، مُرسِم v2
-  - `/health`: حالة 200، 249/57، كاش HIT، مُرسِم v2
-  - `/sections`: حالة 200، 41/32، كاش HIT، مُرسِم v2
-  - `/`: حالة 200، 169/43، كاش HIT، مُرسِم v2
-  - `/news`: حالة 200، 287/37، كاش HIT، مُرسِم v2
-  - `/politics`: حالة 200، 258/35، كاش HIT، مُرسِم v2
+  - `/research?title=%D8%A7%D9%84%D9%82%D9%85`: حالة 200، 3573/18، كاش HIT، مُرسِم v2
+  - `/article/politics-public-consultation-ar`: حالة 200، 30/25، كاش HIT، مُرسِم v2
+  - `/weather`: حالة 200، 291/23، كاش HIT، مُرسِم v2
+  - `/prayer`: حالة 200، 603/22، كاش HIT، مُرسِم v2
+  - `/trends`: حالة 200، 224/18، كاش HIT، مُرسِم v2
+  - `/about`: حالة 200، 51/20، كاش HIT، مُرسِم v2
+  - `/search?q=%D9%85%D8%B5%D8%B1`: حالة 200، 3094/3025، كاش MISS، مُرسِم v2
+  - `/prices`: حالة 200، 64/51، كاش HIT، مُرسِم v2
+  - `/economy`: حالة 200، 394/34، كاش HIT، مُرسِم v2
+  - `/health`: حالة 200، 386/21، كاش HIT، مُرسِم v2
+  - `/sections`: حالة 200، 33/17، كاش HIT، مُرسِم v2
+  - `/`: حالة 200، 151/38، كاش HIT، مُرسِم v2
+  - `/news`: حالة 200، 232/66، كاش HIT، مُرسِم v2
+  - `/politics`: حالة 200، 386/69، كاش HIT، مُرسِم v2
 - آخر الـcommits على main:
+  - 0b3b7c3 2026-11-14 docs: automatically record project history
+  - 8cad802 2026-11-14 docs: automatically refresh live status
+  - 8049d1b 2026-11-14 AI budget: fresh counter key so the polluted counter of failed attempts stops blocking drafting; V2_BUILD 2026-
   - d25fb42 2026-11-14 docs: automatically record project history
   - 20d5971 2026-11-14 AI budget: check first, charge only after a provider answered (fixes all_providers_unavailable with a working W
   - 259f129 2026-11-14 docs: automatically refresh live status
@@ -38,9 +41,6 @@
   - 9de7c4d 2026-11-14 Workers AI probe in pipeline status, 2s search budget; docs; V2_BUILD 2026-11-14.1
   - 6dd7927 2026-11-14 docs: automatically refresh live status
   - ac50693 2026-11-13 docs: automatically refresh live status
-  - 49e7c45 2026-11-13 docs: automatically refresh live status
-  - 4465f53 2026-11-13 docs: automatically record project history
-  - 000462f 2026-11-13 Delete the old site: shell, page renderer, 11 client bundles, old stylesheet; visit counting moves to the new s
 <!-- BAYAN_LIVE_STATUS_END -->
 
 ## 1) كيف تبدأ في محادثة جديدة (3 دقائق)
