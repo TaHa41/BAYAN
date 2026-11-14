@@ -389,3 +389,8 @@
 - Commit: `9de7c4d09e80fb7b54b437dde9f5b8dde81ba208`
 - الملفات: M	docs/START_HERE_AR.md;M	scripts/page-diagnostics.mjs;M	src/v2-bridge.ts;M	tests/v2-swr.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-14T09:00:24Z — AI budget: check first, charge only after a provider answered (fixes all_providers_unavailable with a working Workers AI); tests; docs; V2_BUILD 2026-11-14.2 
+- Commit: `20d59717264d89bf568808222c68632738c390ad`
+- الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/services/ai.ts;M	src/services/search.ts;M	src/v2-bridge.ts;D	tests/ai-budget-refund.test.ts;A	tests/ai-budget.test.ts;M	tests/ai-draft.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
