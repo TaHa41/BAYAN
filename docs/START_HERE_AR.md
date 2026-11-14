@@ -308,3 +308,10 @@ Bindings: `DB` (D1)، `AI` (Workers AI)، `AI_SEARCH`، `ASSETS`.
 - **عدّ الزيارات** كان في الكود القديم وانتقل للموقع الجديد (`serveV2` في `src/v2-bridge.ts`): حدث `page` واحد لكل صفحة HTML مخدومة، ولا يُعدّ المالك (الكوكي `bayan_exclude_analytics`) ولا `/admin` ولا الـAPI؛ `?bayan_owner=1` يمسح زياراتك السابقة ويعلّم المتصفح، و`?bayan_owner=0` يزيل العلامة، وفتح `/admin` يعلّمه. الكوكيز تُضاف بعد الكاش فلا تُخزَّن أبدًا لزائر آخر.
 - **سكربتات الفحص:** حُذفت من `production-smoke.mjs` فحوص الحزمة والستايل القديمين، ومن `package.json` أوامر `node --check public/app-*.js`، وأُحيلت إلى «متقاعدة» 73 فحصًا في `source-contract-smoke.mjs` كانت تصف الواجهة القديمة فقط (ما غطّته صار في اختبارات vitest للموقع الجديد)، وأُضيف فحصان يمنعان رجوع الموقع القديم.
 
+## 35) مشاكل الإنتاج المفتوحة وما فُعل (14 نوفمبر، V2_BUILD 2026-11-14.1)
+- **الأخبار لا تُنشر (الأهم):** من الحالة الحية: `all_providers_unavailable`. أحداث الفشل الظاهرة كلها من Gemini (`request timed out` و`high demand` و`quota`)، أما OpenAI فرصيده منتهٍ (`credit_balance_exhausted`)، وWorkers AI لم نكن نعرف هل يجيب. أُضيف إلى `/api/health/pipeline` حقل `workersAiProbe`: نداء واحد صغير (~10 نيورون) كل 15 دقيقة كحد أقصى لكل isolate يُظهر هل المزوّد المجاني يعمل ونموذجه وسبب فشله إن فشل، ويُطبع في `PIPELINE` بالحالة الحية.
+  - إن ظهر `workersAiProbe.ok: true` ولم تُنشر مقالات فالسبب في تحقق الصياغة (`draft_not_verified`) لا في توفر المزوّد.
+  - إن ظهر `ok: false` فالسبب مكتوب في `error`.
+- **البحث البارد:** ميزانية البحث الكامل صارت ثانيتين (كانت 3) مع النتائج الاحتياطية الفورية.
+- **سير العمل (Workflows):** 15 ملفًا. `deploy-direct.yml` (نشر يدوي بديل) و`lighthouse-audit` و`strix-security` و`production-acceptance-audit` كلها `workflow_dispatch` فقط، لا تعمل تلقائيًا؛ لم تُحذف لأن فحوص العقد تشير إلى `deploy-direct`.
+

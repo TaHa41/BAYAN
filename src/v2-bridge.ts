@@ -11,13 +11,14 @@ import { news } from "./services/news";
 import { api } from "./routes/api";
 import { callGemini, resolveGeminiModel } from "./services/gemini";
 import { track } from "./db";
+import { runWorkersAi, workersAiModel } from "./services/ai";
 import { analyticsExcluded, visitorId } from "./security";
 import { layout, SITE } from "../v2/src/ui";
 import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-13.3";
+export const V2_BUILD = "2026-11-14.1";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 
@@ -58,6 +59,12 @@ export async function pipelineStatus(env: Env): Promise<unknown> {
   const e: any = env;
   const has = (v: unknown) => String(v ?? "").trim() !== "";
   const out: any = { checkedAt: new Date().toISOString(), build: V2_BUILD, pipeline: { enabled: e.NEWS_PIPELINE_ENABLED === "true", setting: e.NEWS_PIPELINE_ENABLED === undefined ? "absent" : e.NEWS_PIPELINE_ENABLED === "true" ? "true" : "not_true", aiDailyLimit: has(e.NEWS_AI_DAILY_LIMIT) ? String(e.NEWS_AI_DAILY_LIMIT).slice(0, 6) : "default" }, providers: { gemini: has(e.GEMINI_API_KEY), openai: has(e.OPENAI_API_KEY), workersAi: !!e.AI }, d1: "ok", events: [] };
+  // One tiny Workers AI call (about 10 neurons), cached 15 minutes per isolate: tells whether the free provider really answers and with which model.
+  out.workersAiProbe = !e.AI ? { ok: false, error: "no_binding" } : await swr("probe:workers-ai", 15 * 60_000, 15 * 60_000, async () => {
+    const t0 = Date.now(), model = workersAiModel(e);
+    try { const r: any = await runWorkersAi(e, { messages: [{ role: "user", content: "Reply with one word: ok" }], max_tokens: 6, temperature: 0 }); const text = String(r?.response ?? r?.result?.response ?? "").trim(); return { ok: text.length > 0, model, ms: Date.now() - t0 }; }
+    catch (error) { return { ok: false, model, ms: Date.now() - t0, error: String(error instanceof Error ? error.message : error).replace(/(key|token|secret|authorization)["'=:\s]+[^\s"',}]+/gi, "$1=…").slice(0, 180) }; }
+  }, 6000).catch(() => ({ ok: false, error: "probe_timeout" }));
   try {
     const r: any = await e.DB.prepare("SELECT level,kind,message,created_at FROM runtime_events WHERE kind IN ('news_archive_article_generation','scheduled_news_archive_refresh','scheduled_self_heal','ai_generation','ai_circuit_breaker','news_ai_budget') ORDER BY created_at DESC LIMIT 14").all();
     out.events = (r?.results || []).map((x: any) => ({ at: String(x.created_at || "").slice(0, 19), level: String(x.level || ""), kind: String(x.kind || ""), message: String(x.message || "").replace(/(key|token|secret|authorization)["'=:\s]+[^\s"',}]+/gi, "$1=…").slice(0, 220) }));

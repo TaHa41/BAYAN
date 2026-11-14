@@ -168,3 +168,20 @@ describe("public pipeline status", () => {
   });
 });
 
+describe("Workers AI probe in the public pipeline status", () => {
+  const dbOk = { prepare: () => ({ all: async () => ({ results: [] }), first: async () => null }) };
+  it("reports a working free provider with its model, and calls it only once per 15 minutes", async () => {
+    resetSwr(); let calls = 0;
+    const AI = { run: async () => { calls++; return { response: "ok" }; } };
+    const a: any = await pipelineStatus({ AI, DB: dbOk } as any); const b: any = await pipelineStatus({ AI, DB: dbOk } as any);
+    expect(a.workersAiProbe).toMatchObject({ ok: true }); expect(typeof a.workersAiProbe.model).toBe("string"); expect(b.workersAiProbe.ok).toBe(true); expect(calls).toBe(1);
+  });
+  it("reports why it fails (redacted) and still answers when the binding is missing", async () => {
+    resetSwr();
+    const AI = { run: async () => { throw new Error("3040: Capacity temporarily exceeded api_key=SECRET"); } };
+    const f: any = await pipelineStatus({ AI, DB: dbOk } as any);
+    expect(f.workersAiProbe.ok).toBe(false); expect(f.workersAiProbe.error).toContain("Capacity"); expect(JSON.stringify(f)).not.toContain("SECRET");
+    expect(((await pipelineStatus({ DB: dbOk } as any)) as any).workersAiProbe).toEqual({ ok: false, error: "no_binding" });
+  });
+});
+
