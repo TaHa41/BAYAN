@@ -4,7 +4,7 @@ import type {Env,Locale,SearchResponse,SearchResult,Source} from "../types";
 import {searchArticles,saveSearch,publishVerifiedResearch,publicationRejectionReason} from "../db";
 import {boundedLikeKeywords,escapedLikePattern} from "../search-patterns";
 import {recordRuntimeEventLimited} from "../runtime-events";
-import {ask,draftArticle,ARTICLE_DRAFT_TIMEOUT_MS,answerHasUnsupportedSpecifics,answerUnsupportedSpecificsDetail,handleOpenAIResponseFailure,consumeDailyNewsAiCall,openAIAllowed} from "./ai";
+import {ask,draftArticle,ARTICLE_DRAFT_TIMEOUT_MS,answerHasUnsupportedSpecifics,answerUnsupportedSpecificsDetail,handleOpenAIResponseFailure,dailyNewsAiBudgetAvailable,chargeDailyNewsAiCall,openAIAllowed} from "./ai";
 import {findRelatedImage,searchNewsFeed,searchTrustedNewsFeeds,resolvePublisherArticleUrl} from "./news";
 import {fetchGdeltEvidenceStories} from "./gdelt-evidence";
 import {searchWikimediaEnterprise} from "./wikimedia-enterprise";
@@ -324,7 +324,7 @@ async function openAiWebSearch(env:Env,q:string,language:Locale,diagnostics?:str
   if(!env.OPENAI_API_KEY||!(await openAIAllowed(env)))return[];
   const breaker=await getProviderBreaker(env,"openai");
   if(breaker.open){diagnostics?.push("OpenAI Web Search skipped: circuit_breaker_open code="+breaker.code);return[];}
-  if(backgroundBudget&&!(await consumeDailyNewsAiCall(env))){diagnostics?.push("OpenAI Web Search skipped: background AI budget exhausted");return[];}
+  if(backgroundBudget&&!(await dailyNewsAiBudgetAvailable(env))){diagnostics?.push("OpenAI Web Search skipped: background AI budget exhausted");return[];}
   try{
     const response=await fetch("https://api.openai.com/v1/responses",{
       method:"POST",
@@ -340,6 +340,7 @@ async function openAiWebSearch(env:Env,q:string,language:Locale,diagnostics?:str
       })
     });
     if(!response.ok){await handleOpenAIResponseFailure(env,"OpenAI Web Search",response);diagnostics?.push("OpenAI Web Search HTTP "+response.status+" classified");return[];}
+    if(backgroundBudget)await chargeDailyNewsAiCall(env);
     const data=await response.json<any>();
     const output=String(data.output_text||"").trim();
     const cited=new Map<string,string>();
