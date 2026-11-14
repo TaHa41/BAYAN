@@ -148,24 +148,25 @@ export const answerHasUnsupportedSpecifics=(answer:string,evidence:SearchResult[
 // Keep scheduled publication viable when no explicit budget is configured. The limit remains
 // bounded and can be lowered through NEWS_AI_DAILY_LIMIT for stricter quota control.
 export const newsAiDailyLimit=(env:Env):number=>{const n=Number(env.NEWS_AI_DAILY_LIMIT);return Number.isFinite(n)&&n>=10?Math.min(Math.floor(n),500):40};
-// A generation attempt that no provider answered cost nothing, so its reserved unit is given back; otherwise a day of unavailable providers
-// (free-tier quota, empty credit) would spend the whole budget on failures and stop publication even after a provider recovers.
-export const refundDailyNewsAiCall=async(env:Env)=>{
-  try{const day=new Date().toISOString().slice(0,10);await env.DB.prepare("UPDATE admin_settings SET value=substr(value,1,11)||CAST(MAX(0,CAST(substr(value,12) AS INTEGER)-1) AS TEXT) WHERE key='news_ai_budget_daily' AND substr(value,1,10)=?").bind(day).run();return true}catch{return false}
-};
-export const consumeDailyNewsAiCall=async(env:Env)=>{
-  const limit=newsAiDailyLimit(env);
-  const day=new Date().toISOString().slice(0,10);
-  const stamp=new Date().toISOString();
+// The daily budget counts generations that a provider actually answered. Checking is read-only and charging happens after a successful answer,
+// so unavailable providers (free-tier quota, empty credit, timeouts) can never spend the budget that working providers need.
+export const dailyNewsAiBudgetAvailable=async(env:Env)=>{
+  const limit=newsAiDailyLimit(env),day=new Date().toISOString().slice(0,10);
   try{
-    const row=await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES('news_ai_budget_daily',?,?) ON CONFLICT(key) DO UPDATE SET value=CASE WHEN substr(admin_settings.value,1,10)=substr(excluded.value,1,10) THEN substr(admin_settings.value,1,11)||CAST(CAST(substr(admin_settings.value,12) AS INTEGER)+1 AS TEXT) ELSE excluded.value END,updated_at=excluded.updated_at WHERE substr(admin_settings.value,1,10)!=substr(excluded.value,1,10) OR CAST(substr(admin_settings.value,12) AS INTEGER)<? RETURNING value").bind(day+":1",stamp,limit).first<any>();
-    if(row?.value)return true;
+    const row=await env.DB.prepare("SELECT value FROM admin_settings WHERE key='news_ai_budget_daily' LIMIT 1").first<{value:string}>();
+    const value=String(row?.value||"");
+    if(!value||value.slice(0,10)!==day)return true;
+    if(Number(value.slice(11))<limit)return true;
     await recordRuntimeEventLimited(env,"news_ai_budget","daily_ai_budget_exhausted","UTC daily news AI call limit reached ("+limit+")");
     return false;
   }catch(error){
     await recordRuntimeEventLimited(env,"news_ai_budget","budget_counter_unavailable","background AI generation blocked because budget accounting failed");
     return false;
   }
+};
+export const chargeDailyNewsAiCall=async(env:Env)=>{
+  const day=new Date().toISOString().slice(0,10),stamp=new Date().toISOString();
+  try{await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES('news_ai_budget_daily',?,?) ON CONFLICT(key) DO UPDATE SET value=CASE WHEN substr(admin_settings.value,1,10)=substr(excluded.value,1,10) THEN substr(admin_settings.value,1,11)||CAST(CAST(substr(admin_settings.value,12) AS INTEGER)+1 AS TEXT) ELSE excluded.value END,updated_at=excluded.updated_at").bind(day+":1",stamp).run();return true}catch{return false}
 };
 const independentSourceCount=(env:Env,evidence:SearchResult[])=>new Set(evidence.flatMap(item=>item.sources||[]).map(source=>{
   try{const host=new URL(String(source.url||"")).hostname.toLowerCase().replace(/^www\./,"");if(host)return host}catch(error){void recordRuntimeEventLimited(env,"ai_source_url","invalid_evidence_source_url",error)}
@@ -247,35 +248,33 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
     }
     return{sections:accepted,rejected};
   };
-  let charged=false;
   const generate=async(extraInstruction:string)=>{
     const messages=[{role:"system",content:system},{role:"user",content:"Topic/question: "+question+"\nEvidence excerpts (only these snippets may be used): "+evidenceText+(extraInstruction?"\nCorrection required: "+extraInstruction:"")}];
     // Reserve one daily budget unit per generation attempt, not per provider.
     // A failed provider must not consume the budget needed for fallback providers.
-    if(backgroundBudget&&!await consumeDailyNewsAiCall(env))return "";
-    charged=backgroundBudget;
+    if(backgroundBudget&&!await dailyNewsAiBudgetAvailable(env))return "";
+    const charge=async(answer:string)=>{if(backgroundBudget)await chargeDailyNewsAiCall(env);return answer};
     if(env.GEMINI_API_KEY){
       const answer=await callGeminiText(env,"Gemini draft",system,"Topic/question: "+question+"\nEvidence excerpts (only these snippets may be used): "+evidenceText+(extraInstruction?"\nCorrection required: "+extraInstruction:""),{json:true,temperature:0,maxOutputTokens:3600,timeoutMs:9000});
-      if(answer)return answer;
+      if(answer)return charge(answer);
     }
     if(env.OPENAI_API_KEY&&await openAIAllowed(env))try{
       const response=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(9000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",messages,temperature:0,max_tokens:3600,response_format:{type:"json_object"}})});
       if(response.ok){
         const data=await response.json<any>(),answer=String(data.choices?.[0]?.message?.content||"").trim();
-        if(answer)return answer;
+        if(answer)return charge(answer);
         await recordAiFailure(env,"OpenAI draft","empty_response");
       }else await handleOpenAIResponseFailure(env,"OpenAI draft",response);
     }catch(error){await recordAiFailure(env,"OpenAI draft",aiFailureDetail(error));}
     if(env.AI)try{
       const response=await runWorkersAi(env,{messages,max_tokens:3600,temperature:0,response_format:{type:"json_object"}});
       const answer=workersAIResponseText(response);
-      if(answer)return answer;
+      if(answer)return charge(answer);
       await recordAiFailure(env,"Workers AI draft","empty_response");
     }catch(error){await recordAiFailure(env,"Workers AI draft",aiFailureDetail(error));const failure=classifyWorkersAIFailure(error);await recordProviderDiagnostic(env,failure);await recordAiFailure(env,"Workers AI draft",failure.detail);}
     return "";
   };
   let raw=await generate("");
-  if(!raw&&charged){await refundDailyNewsAiCall(env);charged=false}
   if(!raw)return{status:"mixed" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[]),reason:"ai_unavailable" as const,verification:{removedSentences:0,remainingSentences:0,retried:false,failureStage:"all_providers_unavailable"}};
   let retried=false,totalRemoved=0;
   let sections=parseDraft(raw);
