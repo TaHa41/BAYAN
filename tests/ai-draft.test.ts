@@ -108,11 +108,11 @@ it("keeps Workers AI fallback available after a failed Gemini attempt, and charg
   const db = {
     prepare(sql: string) {
       return {
-        async first() { if (sql.includes("SELECT value FROM admin_settings WHERE key='news_ai_budget_daily'")) { reads += 1; return { value: new Date().toISOString().slice(0, 10) + ":1" }; } return null; },
+        async first() { if (sql.includes("SELECT value FROM admin_settings WHERE key='news_ai_charged_daily'")) { reads += 1; return { value: new Date().toISOString().slice(0, 10) + ":1" }; } return null; },
         bind(..._values: unknown[]) {
           return {
             async first() { return null; },
-            async run() { if (sql.includes("INSERT INTO admin_settings(key,value,updated_at) VALUES('news_ai_budget_daily'")) charges += 1; return { success: true }; },
+            async run() { if (sql.includes("INSERT INTO admin_settings(key,value,updated_at) VALUES('news_ai_charged_daily'")) charges += 1; return { success: true }; },
           };
         },
       };
@@ -143,7 +143,7 @@ it("keeps Workers AI fallback available after a failed Gemini attempt, and charg
 
 it("an attempt that no provider answers does not spend the daily budget", async () => {
   let charges = 0;
-  const db = { prepare(sql: string) { return { async first() { return null; }, bind() { return { async first() { return null; }, async run() { if (sql.includes("news_ai_budget_daily")) charges += 1; return {}; } }; } }; } };
+  const db = { prepare(sql: string) { return { async first() { return null; }, bind() { return { async first() { return null; }, async run() { if (sql.includes("news_ai_charged_daily")) charges += 1; return {}; } }; } }; } };
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: { status: "UNAVAILABLE", message: "high demand" } }), { status: 503 })));
   const result = await draftArticle({ DB: db, GEMINI_API_KEY: "test-key", AI: { async run() { throw new Error("capacity"); } } } as any, "documented topic", "en", evidenceFor("en"), true);
   expect(result.status).not.toBe("verified"); expect(charges).toBe(0);

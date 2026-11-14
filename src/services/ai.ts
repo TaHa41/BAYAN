@@ -153,7 +153,7 @@ export const newsAiDailyLimit=(env:Env):number=>{const n=Number(env.NEWS_AI_DAIL
 export const dailyNewsAiBudgetAvailable=async(env:Env)=>{
   const limit=newsAiDailyLimit(env),day=new Date().toISOString().slice(0,10);
   try{
-    const row=await env.DB.prepare("SELECT value FROM admin_settings WHERE key='news_ai_budget_daily' LIMIT 1").first<{value:string}>();
+    const row=await env.DB.prepare("SELECT value FROM admin_settings WHERE key='news_ai_charged_daily' LIMIT 1").first<{value:string}>();
     const value=String(row?.value||"");
     if(!value||value.slice(0,10)!==day)return true;
     if(Number(value.slice(11))<limit)return true;
@@ -166,7 +166,7 @@ export const dailyNewsAiBudgetAvailable=async(env:Env)=>{
 };
 export const chargeDailyNewsAiCall=async(env:Env)=>{
   const day=new Date().toISOString().slice(0,10),stamp=new Date().toISOString();
-  try{await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES('news_ai_budget_daily',?,?) ON CONFLICT(key) DO UPDATE SET value=CASE WHEN substr(admin_settings.value,1,10)=substr(excluded.value,1,10) THEN substr(admin_settings.value,1,11)||CAST(CAST(substr(admin_settings.value,12) AS INTEGER)+1 AS TEXT) ELSE excluded.value END,updated_at=excluded.updated_at").bind(day+":1",stamp).run();return true}catch{return false}
+  try{await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES('news_ai_charged_daily',?,?) ON CONFLICT(key) DO UPDATE SET value=CASE WHEN substr(admin_settings.value,1,10)=substr(excluded.value,1,10) THEN substr(admin_settings.value,1,11)||CAST(CAST(substr(admin_settings.value,12) AS INTEGER)+1 AS TEXT) ELSE excluded.value END,updated_at=excluded.updated_at").bind(day+":1",stamp).run();return true}catch{return false}
 };
 const independentSourceCount=(env:Env,evidence:SearchResult[])=>new Set(evidence.flatMap(item=>item.sources||[]).map(source=>{
   try{const host=new URL(String(source.url||"")).hostname.toLowerCase().replace(/^www\./,"");if(host)return host}catch(error){void recordRuntimeEventLimited(env,"ai_source_url","invalid_evidence_source_url",error)}
