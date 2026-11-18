@@ -1,5 +1,6 @@
 import{isD1IndependentApiPath,isD1QuotaTolerantApiPath}from"./services/d1-independent-routes";import{safePublicImageUrl}from"./image-url";import{d1Blocked,d1BlockedPersisted,isD1QuotaError,logD1QuotaOncePerHour,persistD1Block,withD1QuotaGuard}from"./services/d1-guard";import{recordRuntimeEventLimited}from"./runtime-events";
-import type{Env}from"./types";import{api}from"./routes/api";import{robots,sitemap,newsSitemap,adsTxt}from"./seo";import{serveV2,unavailablePage}from"./v2-bridge";import{selfHeal}from"./services/repair";import{news}from"./services/news";import{publishNextArchivedNewsArticle}from"./services/news-article-publisher";import{track}from"./db";import{analyticsExcluded,manager,visitorId}from"./security";import{ensureSchema}from"./schema";import{ORIGIN,SECTIONS}from"./config";import{notify}from"./services/telegram";import{bundledArticleBySlug,bundledArticlesForSection}from"./fallback-content";
+import type{Env}from"./types";import{api}from"./routes/api";import{robots,sitemap,newsSitemap,adsTxt}from"./seo";import{serveV2,unavailablePage}from"./v2-bridge"
+import{countSubrequests}from"./subrequests";import{selfHeal}from"./services/repair";import{news}from"./services/news";import{publishNextArchivedNewsArticle}from"./services/news-article-publisher";import{track}from"./db";import{analyticsExcluded,manager,visitorId}from"./security";import{ensureSchema}from"./schema";import{ORIGIN,SECTIONS}from"./config";import{notify}from"./services/telegram";import{bundledArticleBySlug,bundledArticlesForSection}from"./fallback-content";
 const BUILD="2026.10.21.05";
 const COMMIT_SHA="0000000000000000000000000000000000000000";
 let lastManualNewsTriggerAt=0;
@@ -191,13 +192,15 @@ return notFoundResponse(u.searchParams.get("lang")==="en"?"en":"ar");
     }
   }else if(env.NEWS_PIPELINE_ENABLED==="true"&&(task===1||(task===2&&scheduleSlot%12!==2&&scheduleSlot%12!==8))){
     try{
-      const result=await publishNextArchivedNewsArticle(env);
+      const counting=countSubrequests(env);
+      let result:Awaited<ReturnType<typeof publishNextArchivedNewsArticle>>;
+      try{result=await publishNextArchivedNewsArticle(counting.env)}finally{counting.restore()}
       // The publisher reports exhausted/unavailable D1 budget without throwing. Do not
       // turn that expected quota state into a second D1 telemetry write.
       if(result.status==="budget_exhausted")return;
       if(result.status!=="idle"){
         const level=result.status==="published"?"INFO":"WARN";
-        const details=JSON.stringify(result).slice(0,900);
+        const details=JSON.stringify({subs:counting.stats,...result}).slice(0,900);
         try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind(level,"news_archive_article_generation",details,new Date().toISOString()).run()}catch(error){await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}
         console.info("news_archive_article_generation",details);
       }
