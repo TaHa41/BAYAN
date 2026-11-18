@@ -1,4 +1,4 @@
-// The 15 public content sections. Slugs are kept from v1 so existing URLs and D1 rows keep working.
+// The 12 public content sections. Slugs are kept from v1 so existing URLs and D1 rows keep working.
 // Live prices/markets return as a dedicated module (see README parity list), not as a content section.
 export type Lang = "ar" | "en";
 export interface Section { slug: string; ar: string; en: string; descAr: string; descEn: string; glyph: string; hue: number }
@@ -13,13 +13,14 @@ export const SECTIONS: Section[] = [
   { slug: "sports", ar: "رياضة", en: "Sports", descAr: "النتائج والإحصاءات وأخبار الرياضة.", descEn: "Results, statistics and sports news.", glyph: "◐", hue: 25 },
   { slug: "history", ar: "تاريخ", en: "History", descAr: "التاريخ والتراث والثقافة.", descEn: "History, heritage and culture.", glyph: "❖", hue: 40 },
   { slug: "art", ar: "فنون", en: "Arts", descAr: "الفن والسينما والموسيقى والثقافة الشعبية.", descEn: "Art, film, music and popular culture.", glyph: "✎", hue: 280 },
-  { slug: "travel", ar: "سفر", en: "Travel", descAr: "وجهات وأماكن ومعلومات عملية للسفر.", descEn: "Destinations, places and practical travel information.", glyph: "✈", hue: 180 },
   { slug: "egypt", ar: "مجتمع", en: "Society", descAr: "حياة الناس والخدمات والمجتمع بمعلومات موثقة.", descEn: "Everyday life, services and society, grounded in evidence.", glyph: "☷", hue: 140 },
-  { slug: "arab", ar: "رأي", en: "Opinion", descAr: "وجهات نظر ونقاشات بسياق ومصادر واضحة.", descEn: "Viewpoints and debates with context and clear sources.", glyph: "❝", hue: 260 },
   { slug: "world", ar: "العالم", en: "World", descAr: "تحولات عالمية وتأثيرها على الاقتصاد والتقنية والمجتمع.", descEn: "Global shifts and their impact on economy, technology and society.", glyph: "◍", hue: 210 },
-  { slug: "trends", ar: "اتجاهات", en: "Trends", descAr: "ما يشغل الناس الآن، منفصلًا عن الأخبار الموثقة.", descEn: "What people are talking about, kept separate from verified news.", glyph: "↗", hue: 12 },
 ];
 export const sectionBySlug = (slug: string): Section | undefined => SECTIONS.find((s) => s.slug === slug);
+/** Retired sections (Opinion, Travel, Trends): their old addresses and the articles stored under them move to the section that fits best. */
+export const LEGACY_SECTIONS: Record<string, string> = { arab: "world", travel: "world", trends: "news" };
+export const canonicalSlug = (slug: string): string => LEGACY_SECTIONS[slug] ?? slug;
+export const sectionSlugsFor = (slug: string): string[] => [slug, ...Object.entries(LEGACY_SECTIONS).filter(([, to]) => to === slug).map(([from]) => from)];
 
 // Live tools (data pages, not content sections): shown in the ribbon after the sections.
 export interface Tool { slug: "prices" | "weather" | "prayer"; ar: string; en: string; descAr: string; descEn: string; hue: number }

@@ -1,7 +1,7 @@
 // BAYAN v2 request handler: pure routing over injected dependencies, so every route is unit-testable without
 // Cloudflare bindings. Failures degrade (a section with no items, an empty sitemap) instead of returning errors.
 import { searchAll, type Provider } from "./search";
-import { SECTIONS, TOOLS, sectionBySlug, type Lang } from "./sections";
+import { SECTIONS, TOOLS, LEGACY_SECTIONS, sectionBySlug, sectionSlugsFor, type Lang } from "./sections";
 import type { Store } from "./store";
 import { generate, geminiGenerate, listGeminiFlashModels, workersAiGenerate, type AiEnv } from "./ai";
 import { analyze, type Signals } from "./engineer";
@@ -10,7 +10,7 @@ import { topicsFor } from "./topics";
 import { STATIC_SLUGS, staticPage, type StaticSlug } from "./pages";
 import type { WikiApi } from "./wiki";
 import { adminBody } from "./admin";
-import { articleBody, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, wikiEntryBody, siteJsonLd, sectionJsonLd, sectionsHubBody, sectionsJsonLd, staticBody, searchResultsBody, researchBody, relatedStories, savedBody, askBody, trendsBody, contributeBody, type ResearchArticle, type ContributeValues, type SearchItem, pricesBody, weatherBody, prayerBody, tickerItems, esc, type ClassifiedStory, type LiveStory, type TickerItem } from "./ui";
+import { articleBody, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, wikiEntryBody, siteJsonLd, sectionJsonLd, sectionsHubBody, sectionsJsonLd, staticBody, searchResultsBody, researchBody, relatedStories, savedBody, askBody, contributeBody, type ResearchArticle, type ContributeValues, type SearchItem, pricesBody, weatherBody, prayerBody, tickerItems, esc, type ClassifiedStory, type LiveStory, type TickerItem } from "./ui";
 
 export interface Env extends AiEnv { DB: D1Database; ADS_TXT?: string; SITE_ORIGIN?: string; BAYAN_AI_MANAGER_TOKEN?: string }
 export interface Deps { providers: (lang: Lang) => Provider[]; store: (env: Env) => Store; liveNews?: (env: Env, lang: Lang) => Promise<LiveStory[]>; wiki?: WikiApi; live?: LiveApi; aiStatus?: (env: Env) => Promise<unknown>; search?: (env: Env, q: string, lang: Lang, request: Request) => Promise<{ items: SearchItem[]; notice?: string } | null>; research?: (env: Env, story: LiveStory, lang: Lang, request: Request) => Promise<ResearchArticle | null>; contribute?: (env: Env, data: { title: string; body: string; source: string; section: string }, lang: Lang, request: Request) => Promise<{ ok: boolean }> }
@@ -122,10 +122,10 @@ export function createHandler(deps: Deps) {
       const q = (url.searchParams.get("q") || "").trim().slice(0, 200);
       if (!q) return page({ title: (lang === "ar" ? "البحث | " : "Search | ") + SITE.name, description: "BAYAN search", body: searchBody(lang, "", null), path: "/search", noindex: true });
       // Full BAYAN search (all providers, rate limits, archive filing) when available; Wikipedia alone is the safety net.
-      // The Wikipedia-backed fallback starts at once, so when the full search is slow (3s budget) the visitor still gets results immediately.
+      // The Wikipedia-backed fallback starts at once, so when the full search is slow (2s budget) the visitor still gets results immediately.
       const fast = searchAll(q, deps.providers(lang));
       fast.catch(() => undefined);
-      const full = deps.search ? await soft(deps.search(env, q, lang, request), 3000, null) : null;
+      const full = deps.search ? await soft(deps.search(env, q, lang, request), 2000, null) : null;
       if (full) return html(layout({ lang, origin, path: `/search?q=${encodeURIComponent(q)}`, title: `${q} | ${SITE.name}`, description: full.items[0]?.summary ? plain(full.items[0].summary) : q, body: searchResultsBody(lang, q, full.items, full.notice), noindex: true }), 200, "no-store");
       const outcome = await fast;
       return html(layout({ lang, origin, path: `/search?q=${encodeURIComponent(q)}`, title: `${q} | ${SITE.name}`, description: outcome.hits[0]?.summary || q, body: searchBody(lang, q, outcome), noindex: true }), 200, "no-store");
@@ -196,6 +196,7 @@ export function createHandler(deps: Deps) {
     if (path === "/tools" || path === "/index.html") return go(path === "/tools" ? `/sections?lang=${lang}` : `/?lang=${lang}`);
     const person = path.match(/^\/people\/([^/]+)$/);
     if (person) return go(`/wiki/${person[1]}?lang=${lang}`);
+    if (LEGACY_SECTIONS[path.slice(1)]) return go(`/${LEGACY_SECTIONS[path.slice(1)]}?lang=${lang}`);
     if (path === "/review" || path.startsWith("/review/")) return go(`/admin?lang=${lang}`);
     if (path === "/admin") return page({ title: `${lang === "ar" ? "لوحة الإدارة" : "Admin"} | ${SITE.name}`, description: "", body: adminBody(lang, SECTIONS.map((x) => x.slug)), path, noindex: true }, 200, "no-store");
     if (path === "/saved") return page({ title: `${lang === "ar" ? "المحفوظات" : "Saved"} | ${SITE.name}`, description: "", body: savedBody(lang), path, noindex: true }, 200, "no-store");
@@ -205,11 +206,6 @@ export function createHandler(deps: Deps) {
       return page({ title: `${hub} | ${SITE.name}`, description: lang === "ar" ? "كل أقسام بيان في صفحة واحدة: الأخبار والعلوم والثقافة والمجتمع والرأي، مع أدوات الأسعار والطقس والمواقيت." : "Every BAYAN section on one page: news, science, culture, society and opinion, plus the markets, weather and prayer-time tools.", body: sectionsHubBody(lang), path, jsonLd: sectionsJsonLd(origin, lang) }, 200, "public, max-age=300, s-maxage=3600");
     }
 
-    if (path === "/trends") {
-      const [stories, mostRead] = await Promise.all([loadNews(), deps.wiki ? soft(deps.wiki.mostRead(lang), 3500, []) : Promise.resolve([])]);
-      const s = sectionBySlug("trends")!;
-      return page({ title: `${lang === "ar" ? s.ar : s.en} | ${SITE.name}`, description: lang === "ar" ? s.descAr : s.descEn, body: trendsBody(lang, { mostRead, stories }), path, active: "trends", ticker: tickerItems(stories, lang) }, 200, "public, max-age=60, s-maxage=300");
-    }
     if (path === "/contribute") {
       let msg: { ok: boolean; text: string } | undefined; let vals: ContributeValues = {};
       if (request.method === "POST") {
@@ -235,7 +231,7 @@ export function createHandler(deps: Deps) {
     if (section) {
       // Encyclopedia cards: seed topics for this section, Arabic titles resolved through interlanguage links. Failure just hides the group.
       const wikiCards = () => soft((async () => { const seeds = topicsFor(section.slug).slice(0, 12); if (!seeds.length || !deps.wiki) return []; try { return await deps.wiki.cards(lang, lang === "ar" ? await deps.wiki.arabicTitles(seeds) : seeds); } catch (error) { return []; } })(), 3500, []);
-      const [stories, items, wiki] = await Promise.all([loadNews(), store.bySection(section.slug, lang, 12).catch(() => []), wikiCards()]);
+      const [stories, items, wiki] = await Promise.all([loadNews(), Promise.all(sectionSlugsFor(section.slug).map((s) => store.bySection(s, lang, 12).catch(() => []))).then((lists) => lists.flat().sort((x, y) => String(y.updatedAt || "").localeCompare(String(x.updatedAt || ""))).slice(0, 12)), wikiCards()]);
       const inSection = stories.filter((st) => st.section === section.slug).slice(0, 12);
       return page({ title: `${lang === "ar" ? section.ar : section.en} | ${SITE.name}`, description: lang === "ar" ? section.descAr : section.descEn, body: sectionBody(lang, section, { stories: inSection, articles: items.filter((a) => !a.archived), archive: items.filter((a) => a.archived), wiki }), path, active: section.slug, ticker: tickerItems(stories, lang), jsonLd: sectionJsonLd(origin, lang, section) }, 200, "public, max-age=60, s-maxage=300");
     }

@@ -16,7 +16,7 @@ describe("BAYAN public page routing",()=>{
     expect(html).toContain("<html lang=");
     expect(html).toContain("المعلومة أولًا، والدليل قبل الادعاء");
     expect(html).toContain("Created by Taha Omar");
-    expect((html.match(/class="card sec-card"/g)||[]).length).toBe(15);
+    expect((html.match(/class="chips"/g)||[]).length).toBeGreaterThan(0);expect((html.match(/class="card sec-card"/g)||[]).length).toBe(0);
     expect(r.headers.get("x-bayan-renderer")).toBe("v2");
   });
 });

@@ -1,7 +1,7 @@
 // Non-blocking, read-only: fetches the key public pages twice (cold then warm) and prints status, timings, size and content markers as run annotations,
 // so slowness, Cloudflare errors (1102) and thin or broken pages can be seen from the CI run without access to the site.
 const origin = String(process.env.BAYAN_PRODUCTION_URL || "https://bayan.tahaomar411.workers.dev").replace(/\/+$/, "");
-const paths = ["/", "/news", "/politics", "/economy", "/health", "/sections", "/about", "/search?q=" + encodeURIComponent("مصر"), "/prices", "/weather", "/prayer", "/trends"];
+const paths = ["/", "/news", "/politics", "/economy", "/health", "/sections", "/about", "/search?q=" + encodeURIComponent("مصر"), "/prices", "/weather", "/prayer", "/world"];
 const count = (s, re) => (s.match(re) || []).length;
 async function hit(path) {
   const t = performance.now();

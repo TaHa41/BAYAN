@@ -56,7 +56,7 @@ export function d1Store(db: D1Database): Store {
     },
     // Archived news the pipeline already collected (same table v1 reads). Only HTTPS images are kept.
     async newsArchive(lang, limit) {
-      const r = await db.prepare("SELECT id,title,summary,publisher,published_at,image_url,image_alt FROM news_archive WHERE language=? AND section='news' ORDER BY fetched_at DESC LIMIT ?").bind(lang, limit).all<any>();
+      const r = await db.prepare("SELECT id,title,summary,publisher,published_at,image_url,image_alt FROM news_archive WHERE language=? AND section='news' ORDER BY published_at DESC LIMIT ?").bind(lang, limit).all<any>();
       return (r.results || []).filter((x) => String(x.title || "").trim()).map((x) => ({ title: String(x.title), summary: String(x.summary || ""), publisher: String(x.publisher || ""), publishedAt: x.published_at ? String(x.published_at) : undefined, imageUrl: https(x.image_url) ? String(x.image_url) : undefined, imageAlt: String(x.image_alt || x.title || ""), href: `/news?archive=${encodeURIComponent(String(x.id))}&lang=${lang}` }));
     },
     async newsArchiveItem(id, lang) {
