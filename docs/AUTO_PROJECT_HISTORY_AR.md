@@ -404,3 +404,8 @@
 - Commit: `b3b1d4a364dbd37b20ee31627266f459bfc8d93e`
 - الملفات: M	docs/START_HERE_AR.md;M	scripts/page-diagnostics.mjs;M	scripts/production-smoke.mjs;M	src/seo.ts;M	src/v2-bridge.ts;M	tests/api.test.ts;M	v2/src/sections.ts;M	v2/src/store.ts;M	v2/src/ui.ts;M	v2/src/worker.ts;M	v2/tests/worker.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-18T09:42:38Z — Measure per-run subrequests of article drafting (Free plan limit is 50); docs; V2_BUILD 2026-11-18.1 
+- Commit: `f22cd162e2f4e91fde9fbfc28f7d41677bb16486`
+- الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/index.ts;A	src/subrequests.ts;M	src/v2-bridge.ts;A	tests/subrequests.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
