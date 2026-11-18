@@ -17,7 +17,7 @@ try {
   process.exit(1);
 }
 const checks=["/","/saved?lang=ar","/tools?lang=ar","/about?lang=ar","/methodology?lang=ar","/privacy?lang=ar","/terms?lang=ar","/api/health","/api/features","/api/live/weather","/api/live/fx","/api/live/gold","/news?lang=ar","/news?lang=en","/prices?lang=ar","/art?lang=ar","/trends?lang=ar","/robots.txt","/sitemap.xml","/news-sitemap.xml","/llms.txt","/.well-known/ai-catalog.json","/ai-catalog.json"];
-const sections=["science","technology","economy","politics","health","history","people","sports","travel","art","news","trends","prices","egypt","arab","world"];
+const sections=["science","technology","economy","politics","health","history","people","sports","art","news","prices","egypt","world"];
 let bad=0;
 let degradedSections=0;
 let bundleText="";
@@ -36,7 +36,7 @@ async function get(path){
   const pathname=new URL(path,origin).pathname;
   const emptyNewsSitemapUnavailable=pathname==="/news-sitemap.xml"&&r.status===503&&r.headers.get("x-bayan-news-sitemap-eligible-count")==="0";
   if(!r.ok&&!emptyNewsSitemapUnavailable)throw new Error(path+" status "+r.status);
-  const htmlRoutes=new Set(["/","/index.html","/saved","/tools","/about","/methodology","/privacy","/terms","/news","/prices","/art","/trends"]);
+  const htmlRoutes=new Set(["/","/index.html","/saved","/tools","/about","/methodology","/privacy","/terms","/news","/prices","/art"]);
   const isHtmlRoute=htmlRoutes.has(pathname)||sections.includes(pathname.replace(/^\//,""))||pathname.startsWith("/article/");
   if(isHtmlRoute&&!/text\/html/i.test(r.headers.get("content-type")||""))throw new Error(path+" expected text/html but received "+(r.headers.get("content-type")||"missing content-type"));
   if(isHtmlRoute&&!/<html\b/i.test(text))throw new Error(path+" html_document_missing");
@@ -163,7 +163,7 @@ try{
     ["/science?lang=ar",300],
     ["/art?lang=ar",300],["/economy?lang=ar",300],["/politics?lang=ar",300],
     ["/health?lang=ar",300],["/history?lang=ar",300],["/people?lang=ar",300],
-    ["/sports?lang=ar",300],["/travel?lang=ar",300],["/egypt?lang=ar",300],["/arab?lang=ar",300]
+    ["/sports?lang=ar",300],["/egypt?lang=ar",300] 
   ];
   await inBatches(contentDepthPages,3,async([path,minWords])=>{
     const page=await get(path);

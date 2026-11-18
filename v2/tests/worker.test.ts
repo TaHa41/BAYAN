@@ -173,10 +173,10 @@ describe("v2 research, archive items, trends and contribution (no link leaves th
     expect(ok.status).toBe(200); expect(await ok.text()).toContain("عنوان معالج");
     expect((await call("/news?archive=99", {}, { store: () => store({ newsArchiveItem: async () => null }) })).status).toBe(404);
   });
-  it("/trends combines the encyclopedia's most-read list with current headlines and has an honest empty state", async () => {
-    const html = await (await call("/trends", {}, { wiki: wikiStub({ mostRead: async () => [{ title: "محمد صلاح", extract: "لاعب كرة قدم مصري يلعب في ليفربول وله إنجازات كثيرة.", url: "https://ar.wikipedia.org/wiki/x", views: 9000 }] }), liveNews: async () => [{ title: "خبر عاجل", summary: "ملخص", publisher: "م", url: "https://s.example/1" }] })).text();
-    expect(html).toContain("ما يقرؤه الناس الآن"); expect(html).toContain("عناوين متداولة"); expect(html).toContain("/wiki/");
-    expect(await (await call("/trends")).text()).toContain("لا توجد اتجاهات متاحة الآن");
+  it("retired sections (Opinion, Travel, Trends) redirect to the section that now holds their content", async () => {
+    for (const [from, to] of [["/trends", "/news"], ["/arab", "/world"], ["/travel", "/world"]] as const) {
+      const r = await call(from + "?lang=en"); expect(r.status, from).toBe(301); expect(r.headers.get("location"), from).toBe(to + "?lang=en");
+    }
   });
   it("contribute: GET shows the form; valid POST is sent for review; invalid POST is rejected before the service; honeypot is silently accepted", async () => {
     expect(await (await call("/contribute")).text()).toContain('name="website"');
@@ -266,14 +266,15 @@ describe("v2 pages", () => {
     expect(html).toContain("Created by Taha Omar");
     expect(html).toContain('rel="canonical"'); expect(html).toContain('hreflang="en"');
     expect(html).toContain("حكمة الساعة");
-    expect((html.match(/class="card sec-card"/g) || []).length).toBe(15);
+    expect((html.match(/class="card sec-card"/g) || []).length).toBe(0); // the home page carries compact section chips, the full cards live on /sections
+    for (const s of ["news", "politics", "economy", "world", "science", "technology", "health", "history", "people", "art", "sports", "egypt"]) expect(html).toContain(`href="/${s}?lang=ar"`);
     expect(html).not.toContain("<script>x");
   });
   it("home with articles shows a lead story, side stories and the section ribbon with icons", async () => {
     const items = [art({ slug: "l", title: "الخبر الرئيسي" }), art({ slug: "s1", title: "جانبي ١" }), art({ slug: "s2", title: "جانبي ٢" })];
     const html = await (await call("/", {}, { store: () => store({ latest: async () => items }) })).text();
     expect(html).toContain('class="lead-story"'); expect(html).toContain("الخبر الرئيسي"); expect(html).toContain('class="side"');
-    expect((html.match(/<svg viewBox="0 0 24 24"/g) || []).length).toBeGreaterThanOrEqual(30);
+    expect((html.match(/<svg viewBox="0 0 24 24"/g) || []).length).toBeGreaterThanOrEqual(12); // one icon per ribbon link (12 sections + tools)
     expect(html).not.toContain('class="hero"');
   });
   it("canonical matches the sitemap: Arabic home is the clean root, every other page keeps ?lang=", async () => {
@@ -282,18 +283,19 @@ describe("v2 pages", () => {
     expect(en).toContain('rel="canonical" href="https://bayan.test/?lang=en"'); expect(en).toContain('hreflang="ar" href="https://bayan.test/"');
     expect(sec).toContain('rel="canonical" href="https://bayan.test/politics?lang=ar"');
   });
-  it("sections are shown in four groups with a numbered header, every card has a watermark icon, an arrow and a call to action, and none is lost", async () => {
-    const html = await (await call("/")).text();
-    for (const g of ["أخبار وتحليل", "معرفة وعلوم", "ناس وثقافة", "مجتمع ورأي"]) expect(html).toContain(`<h3>${g}</h3>`);
-    expect((html.match(/class="grp-head"/g) || []).length).toBe(4); expect((html.match(/class="cta"/g) || []).length).toBe(15);
-    expect((html.match(/class="card sec-card"/g) || []).length).toBe(15);
-    expect((html.match(/class="wm"/g) || []).length).toBe(15); expect((html.match(/class="go"/g) || []).length).toBe(15);
-    for (const s of ["news", "politics", "economy", "world", "arab", "trends", "science", "technology", "health", "history", "people", "art", "sports", "travel", "egypt"]) expect(html).toContain(`href="/${s}?lang=ar"`);
+  it("sections are shown in three groups with a numbered header, every card has a watermark icon, an arrow and a call to action, and none is lost", async () => {
+    const html = await (await call("/sections")).text();
+    for (const g of ["أخبار وتحليل", "معرفة وعلوم", "ناس ومجتمع"]) expect(html).toContain(`<h3>${g}</h3>`);
+    expect((html.match(/class="grp-head"/g) || []).length).toBe(3); expect((html.match(/class="cta"/g) || []).length).toBe(12);
+    expect((html.match(/class="card sec-card"/g) || []).length).toBe(12);
+    expect((html.match(/class="wm"/g) || []).length).toBe(12); expect((html.match(/class="go"/g) || []).length).toBe(12);
+    for (const s of ["news", "politics", "economy", "world", "science", "technology", "health", "history", "people", "art", "sports", "egypt"]) expect(html).toContain(`href="/${s}?lang=ar"`);
+    for (const gone of ["arab", "trends", "travel"]) expect(html).not.toContain(`href="/${gone}?lang=ar"`);
     expect(html).toContain("sections");
   });
   it("English sections use the English group names and a left-to-right arrow", async () => {
-    const html = await (await call("/?lang=en")).text();
-    expect(html).toContain("<h3>News and analysis</h3>"); expect(html).toContain("<h3>Society and opinion</h3>"); expect(html).toContain(">→<");
+    const html = await (await call("/sections?lang=en")).text();
+    expect(html).toContain("<h3>News and analysis</h3>"); expect(html).toContain("<h3>People and society</h3>"); expect(html).toContain(">→<");
   });
   it("English home switches direction and copy", async () => {
     const html = await (await call("/?lang=en")).text();
@@ -307,7 +309,7 @@ describe("v2 pages", () => {
   it("section with no items shows the filing hint, unknown section is 404", async () => {
     expect(await (await call("/health2")).text()).toContain("الصفحة غير موجودة");
     expect((await call("/health2")).status).toBe(404);
-    expect(await (await call("/arab")).text()).toContain("يُحفظ هنا تلقائيًا");
+    expect(await (await call("/egypt")).text()).toContain("يُحفظ هنا تلقائيًا");
   });
   it("article page escapes content, renders headings/lists, shows sources and image; missing article is 404", async () => {
     const html = await (await call("/article/a1", {}, { store: () => store({ get: async () => art() }) })).text();
@@ -382,7 +384,7 @@ describe("admin, saved and ask pages in the new layout", () => {
     for (const t of ["overview", "articles", "contrib", "system", "searches", "settings"]) expect(html).toContain(`["${t}",`);
     for (const e of ["/api/admin/analytics", "/api/admin/articles", "/api/admin/article/status", "/api/admin/article/delete", "/api/admin/article/restore", "/api/admin/article/expand", "/api/admin/article/revisions", "/api/admin/contributions", "/api/admin/contributions/review", "/api/admin/runtime", "/api/admin/repairs", "/api/admin/repair", "/api/admin/ai-repair", "/api/admin/telegram-test", "/api/admin/searches", "/api/admin/settings"]) expect(html).toContain(e);
     expect(html).toContain("x-bayan-manager-token"); expect(html).toContain("sessionStorage");
-    for (const slug of ["politics", "egypt", "arab"]) expect(html).toContain(slug);
+    for (const slug of ["politics", "egypt", "world"]) expect(html).toContain(slug);
   });
   it("/saved keeps the list in this browser only; the save button is on story pages", async () => {
     const saved = await (await call("/saved?lang=en")).text();

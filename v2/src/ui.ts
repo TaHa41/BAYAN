@@ -1,7 +1,7 @@
 // Server-rendered pages. No client framework: every page is complete HTML from the Worker, so there is no
 // browser-side bundle that can fail. One tiny inline script handles the mobile menu only.
 import { CSS } from "./styles";
-import { SECTIONS, TOOLS, sectionBySlug, type Lang, type Section } from "./sections";
+import { SECTIONS, TOOLS, sectionBySlug, type Lang, type Section, canonicalSlug } from "./sections";
 import type { Article } from "./store";
 import { independentPublishers, verdictFor } from "./evidence";
 import type { SearchOutcome } from "./search";
@@ -49,10 +49,9 @@ ${o.jsonLd ? `<script type="application/ld+json">${JSON.stringify(o.jsonLd).repl
 const sectionCard = (s: Section, lang: Lang, i: number) => `<a class="card sec-card" style="--h:${s.hue};animation-delay:${i * 40}ms" href="/${s.slug}?lang=${lang}"><span class="wm" aria-hidden="true">${icon(s.slug)}</span><div class="top"><i aria-hidden="true">${icon(s.slug)}</i><b class="go" aria-hidden="true">${lang === "ar" ? "←" : "→"}</b></div><h3>${esc(lang === "ar" ? s.ar : s.en)}</h3><p>${esc(lang === "ar" ? s.descAr : s.descEn)}</p><span class="cta">${T(lang, "تصفّح القسم", "Browse section")}</span></a>`;
 // Every section belongs to exactly one group (tests enforce it), grouped by what the reader wants to do.
 export const SECTION_GROUPS: { id: string; ar: string; en: string; blurbAr: string; blurbEn: string; slugs: string[] }[] = [
-  { id: "news", ar: "أخبار وتحليل", en: "News and analysis", blurbAr: "ما يحدث الآن، بعد التحقق من مصادره.", blurbEn: "What is happening now, checked against its sources.", slugs: ["news", "politics", "economy", "world", "trends"] },
+  { id: "news", ar: "أخبار وتحليل", en: "News and analysis", blurbAr: "ما يحدث الآن، بعد التحقق من مصادره.", blurbEn: "What is happening now, checked against its sources.", slugs: ["news", "politics", "economy", "world"] },
   { id: "knowledge", ar: "معرفة وعلوم", en: "Knowledge and science", blurbAr: "شروح مبنية على الأدلة في العلم والتقنية والصحة والتاريخ.", blurbEn: "Evidence-based explainers in science, technology, health and history.", slugs: ["science", "technology", "health", "history"] },
-  { id: "culture", ar: "ناس وثقافة", en: "People and culture", blurbAr: "سير وفنون ورياضة ووجهات سفر.", blurbEn: "Biographies, arts, sports and travel.", slugs: ["people", "art", "sports", "travel"] },
-  { id: "society", ar: "مجتمع ورأي", en: "Society and opinion", blurbAr: "حياة الناس والخدمات، ووجهات نظر بسياق ومصادر واضحة.", blurbEn: "Everyday life and services, and viewpoints with clear context and sources.", slugs: ["egypt", "arab"] },
+  { id: "culture", ar: "ناس ومجتمع", en: "People and society", blurbAr: "سير وفنون ورياضة، وحياة الناس والخدمات بمعلومات موثقة.", blurbEn: "Biographies, arts and sports, and everyday life and services with sourced information.", slugs: ["people", "art", "sports", "egypt"] },
 ];
 const groupHtml = (g: (typeof SECTION_GROUPS)[number], lang: Lang, gi: number) => `<section class="grp" id="g-${g.id}"><header class="grp-head"><span class="num" aria-hidden="true">${String(gi + 1).padStart(2, "0")}</span><div><h3>${esc(lang === "ar" ? g.ar : g.en)}</h3><p>${esc(lang === "ar" ? g.blurbAr : g.blurbEn)}</p></div><span class="cnt">${g.slugs.length} ${T(lang, "أقسام", "sections")}</span></header><div class="sec-grid">${g.slugs.map((slug, i) => sectionCard(sectionBySlug(slug)!, lang, gi * 5 + i)).join("")}</div></section>`;
 const sectionsBlock = (lang: Lang) => SECTION_GROUPS.map((g, gi) => groupHtml(g, lang, gi)).join("");
@@ -74,7 +73,7 @@ export function articleCard(a: Article, lang: Lang, i = 0): string {
 }
 
 interface FrontItem { title: string; summary: string; imageUrl: string; imageAlt: string; kicker: string; href: string }
-const secLabel = (slug: string | null | undefined, lang: Lang) => { const x = slug ? sectionBySlug(slug) : undefined; return x ? (lang === "ar" ? x.ar : x.en) : ""; };
+const secLabel = (slug: string | null | undefined, lang: Lang) => { const x = slug ? sectionBySlug(canonicalSlug(slug)) : undefined; return x ? (lang === "ar" ? x.ar : x.en) : ""; };
 const fromStory = (st: LiveStory, lang: Lang, section?: string | null): FrontItem => ({ title: plain(st.title), summary: plain(st.summary), imageUrl: st.imageUrl || "", imageAlt: st.imageAlt || st.title, kicker: [secLabel(section, lang), st.publisher].filter(Boolean).join(" · "), href: storyHref(st, lang) });
 const fromArticle = (a: Article, lang: Lang): FrontItem => ({ title: a.title, summary: plain(a.summary), imageUrl: a.imageUrl, imageAlt: a.imageAlt, kicker: secLabel(a.section, lang), href: `/article/${encodeURIComponent(a.slug)}?lang=${lang}` });
 export type ClassifiedStory = LiveStory & { section?: string | null };
@@ -104,7 +103,7 @@ export function homeBody(lang: Lang, d: { stories: ClassifiedStory[]; articles: 
   return `${front}${more.length ? `<h2 class="sec-title">${T(lang, "آخر الأخبار", "Latest news")}</h2><div class="grid">${more.map((st, i) => storyCard(st, lang, i, st.section)).join("")}</div><p style="margin-top:14px"><a class="kicker" href="/news?lang=${lang}">${T(lang, "كل الأخبار ←", "All news →")}</a></p>` : ""}
 ${d.mostRead?.length ? `<h2 class="sec-title">${T(lang, "الأكثر قراءة اليوم في الموسوعة", "Most read today in the encyclopedia")}</h2><div class="grid">${d.mostRead.slice(0, 8).map((c, i) => wikiCard(c, lang, i)).join("")}</div>` : ""}
 ${articles.length ? `<h2 class="sec-title">${T(lang, "مقالات معرفية", "Explainers")}</h2><div class="grid">${articles.map((a, i) => articleCard(a, lang, i)).join("")}</div>` : ""}
-<h2 class="sec-title" id="sections">${T(lang, "الأقسام", "Sections")}</h2>${sectionsBlock(lang)}<p style="margin-top:14px"><a class="kicker" href="/sections?lang=${lang}">${T(lang, "كل الأقسام والأدوات ←", "All sections and tools →")}</a></p>
+<h2 class="sec-title" id="sections">${T(lang, "الأقسام", "Sections")}</h2><nav class="chips" aria-label="${T(lang, "الأقسام", "Sections")}">${SECTIONS.map((s) => `<a href="/${s.slug}?lang=${lang}">${esc(lang === "ar" ? s.ar : s.en)}</a>`).join("")}</nav><p style="margin-top:14px"><a class="kicker" href="/sections?lang=${lang}">${T(lang, "كل الأقسام والأدوات ←", "All sections and tools →")}</a></p>
 ${wisdomBlock(lang, now)}`;
 }
 
@@ -264,12 +263,6 @@ ${content}
 ${list.length ? `<div class="sources"><h2>${T(lang, "المصادر", "Sources")}</h2><ul>${list.map((s) => `<li><a href="${esc(s.url)}" rel="noopener nofollow" target="_blank">${esc(s.title || s.publisher || s.url)}</a>${s.publisher && s.title ? ` — ${esc(s.publisher)}` : ""}</li>`).join("")}</ul></div>` : ""}</article>`;
 }
 
-export function trendsBody(lang: Lang, d: { mostRead: WikiCard[]; stories: ClassifiedStory[] }, now = Date.now()): string {
-  const s = sectionBySlug("trends")!;
-  const read = d.mostRead.length ? `<h2 class="sec-title">${T(lang, "ما يقرؤه الناس الآن", "What people are reading now")}</h2><div class="grid">${d.mostRead.map((c, i) => wikiCard(c, lang, i, "trends")).join("")}</div>` : "";
-  const news = d.stories.length ? `<h2 class="sec-title">${T(lang, "عناوين متداولة", "Headlines in circulation")}</h2><div class="grid">${d.stories.slice(0, 12).map((st, i) => storyCard(st, lang, i, st.section)).join("")}</div>` : "";
-  return `<div class="page-head"><h1>${esc(lang === "ar" ? s.ar : s.en)}</h1><p>${esc(lang === "ar" ? s.descAr : s.descEn)}</p></div>${read}${news}${!read && !news ? `<p class="verdict">${T(lang, "لا توجد اتجاهات متاحة الآن، وسنعرضها هنا فور توفرها من المصادر.", "No trends are available right now; they will appear here as soon as the sources provide them.")}</p>` : ""}${wisdomBlock(lang, now)}`;
-}
 
 export interface ContributeValues { title?: string; body?: string; source?: string; section?: string }
 export function contributeBody(lang: Lang, msg?: { ok: boolean; text: string }, v: ContributeValues = {}): string {
