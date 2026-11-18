@@ -399,3 +399,8 @@
 - Commit: `8049d1b61df20d12bfcc2a3d5b5a5d3086091b4f`
 - الملفات: M	docs/START_HERE_AR.md;M	src/services/ai.ts;M	src/v2-bridge.ts;M	tests/ai-draft.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-18T09:35:23Z — Lighter site: retire Opinion/Travel/Trends with redirects, 3x4 groups, home section chips, archive query uses its index; tests; docs; V2_BUILD 2026-11-14.4 
+- Commit: `b3b1d4a364dbd37b20ee31627266f459bfc8d93e`
+- الملفات: M	docs/START_HERE_AR.md;M	scripts/page-diagnostics.mjs;M	scripts/production-smoke.mjs;M	src/seo.ts;M	src/v2-bridge.ts;M	tests/api.test.ts;M	v2/src/sections.ts;M	v2/src/store.ts;M	v2/src/ui.ts;M	v2/src/worker.ts;M	v2/tests/worker.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
