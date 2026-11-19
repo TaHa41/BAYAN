@@ -4,7 +4,7 @@
 
 <!-- BAYAN_LIVE_STATUS_START -->
 ## الحالة الحية (تُحدَّث آليًا بعد كل نشر — لا تعدّلها يدويًا)
-- آخر تحديث: 2026-11-19T07:04:18.832Z
+- آخر تحديث: 2026-11-19T07:18:15.175Z
 - V2_BUILD في الشيفرة: `2026-11-18.2`
 - آخر نشر: failure للكوميت `ce1a1cce` (https://github.com/TaHa41/BAYAN/actions/runs/44476514129)
 - نتائج الـjobs: deploy=success، verify-production=failure
@@ -31,6 +31,7 @@
   - `/news`: حالة 200، 301/61، كاش HIT، مُرسِم v2
   - `/politics`: حالة 200، 439/99، كاش HIT، مُرسِم v2
 - آخر الـcommits على main:
+  - 1a7c79b 2026-11-19 docs: automatically refresh live status
   - ef33a24 2026-11-19 docs: automatically record project history
   - ec0c80f 2026-11-19 Cron heartbeat and D1 write probe in the pipeline status; tests; docs; V2_BUILD 2026-11-18.2
   - 779b94f 2026-11-18 docs: automatically refresh live status
@@ -40,7 +41,6 @@
   - 1237c5c 2026-11-18 docs: automatically refresh live status
   - f93477f 2026-11-18 docs: automatically record project history
   - b3b1d4a 2026-11-18 Lighter site: retire Opinion/Travel/Trends with redirects, 3x4 groups, home section chips, archive query uses i
-  - 66d02b9 2026-11-18 docs: automatically refresh live status
 <!-- BAYAN_LIVE_STATUS_END -->
 
 ## 1) كيف تبدأ في محادثة جديدة (3 دقائق)
