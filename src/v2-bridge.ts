@@ -18,7 +18,7 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-18.1";
+export const V2_BUILD = "2026-11-18.2";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 
@@ -70,6 +70,13 @@ export async function pipelineStatus(env: Env): Promise<unknown> {
     out.events = (r?.results || []).map((x: any) => ({ at: String(x.created_at || "").slice(0, 19), level: String(x.level || ""), kind: String(x.kind || ""), message: String(x.message || "").replace(/(key|token|secret|authorization)["'=:\s]+[^\s"',}]+/gi, "$1=…").slice(0, 220) }));
     const pf: any = await e.DB.prepare("SELECT message,created_at FROM runtime_events WHERE kind='ai_generation' ORDER BY created_at DESC LIMIT 6").all();
     out.providerFailures = (pf?.results || []).map((x: any) => ({ at: String(x.created_at || "").slice(0, 19), message: String(x.message || "").replace(/(key|token|secret|authorization)["'=:\s]+[^\s"',}]+/gi, "$1=…").slice(0, 200) }));
+    const tick: any = await e.DB.prepare("SELECT value FROM admin_settings WHERE key='scheduled_last_tick' LIMIT 1").first();
+    out.lastScheduledTick = tick?.value ? String(tick.value).slice(0, 24) : "never_recorded";
+    // One tiny write, cached 15 minutes per isolate: tells whether D1 still accepts writes (the free tier also has a daily write limit).
+    out.writeProbe = await swr("probe:d1-write", 15 * 60_000, 15 * 60_000, async () => {
+      try { const now = new Date().toISOString(); await e.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES('health_write_probe',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(now, now).run(); return { ok: true }; }
+      catch (error) { return { ok: false, error: String(error instanceof Error ? error.message : error).slice(0, 180) }; }
+    }, 4000).catch(() => ({ ok: false, error: "probe_timeout" }));
     const bud: any = await e.DB.prepare("SELECT value FROM admin_settings WHERE key='news_ai_charged_daily' LIMIT 1").first();
     out.budgetToday = bud?.value ? String(bud.value).slice(0, 20) : undefined;
     const br: any = await e.DB.prepare("SELECT key,value FROM admin_settings WHERE key LIKE 'ai_breaker_%'").all();

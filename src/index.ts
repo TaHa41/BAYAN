@@ -163,6 +163,9 @@ if((request.method==="GET"||request.method==="HEAD")&&/\.[a-z0-9]{1,10}$/i.test(
 if(request.method==="GET"&&(request.headers.get("accept")||"").includes("text/html"))return unavailablePage(request);
 return notFoundResponse(u.searchParams.get("lang")==="en"?"en":"ar");
 },async scheduled(event:ScheduledEvent,env:Env){
+  // Heartbeat: proves the cron really fires and that D1 accepts writes (shown by /api/health/pipeline as lastScheduledTick).
+  try{const now=new Date().toISOString();await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES('scheduled_last_tick',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(now,now).run()}catch(error){console.warn("BAYAN_TICK_WRITE_FAILED",String(error instanceof Error?error.message:error).slice(0,160))}
+
   env=withD1QuotaGuard(env);
   if(await d1BlockedPersisted())return;
   try{await ensureSchema(env)}catch(error){if(isD1QuotaError(error)){await persistD1Block();logD1QuotaOncePerHour(error);return;}await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}

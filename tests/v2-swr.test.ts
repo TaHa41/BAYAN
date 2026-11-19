@@ -185,3 +185,18 @@ describe("Workers AI probe in the public pipeline status", () => {
   });
 });
 
+describe("pipeline status heartbeat and write probe", () => {
+  it("reports the last cron tick and whether D1 accepts writes", async () => {
+    resetSwr(); const runs: string[] = [];
+    const DB = { prepare: (sql: string) => ({ all: async () => ({ results: [] }), first: async () => (sql.includes("scheduled_last_tick") ? { value: "2026-11-18T20:25:00.000Z" } : null), bind: () => ({ run: async () => { runs.push(sql); return {}; } }) }) };
+    const out: any = await pipelineStatus({ DB } as any);
+    expect(out.lastScheduledTick).toBe("2026-11-18T20:25:00.000Z"); expect(out.writeProbe).toEqual({ ok: true }); expect(runs.some((s) => s.includes("health_write_probe"))).toBe(true);
+  });
+  it("shows a write failure (for example the free-tier daily write limit) instead of hiding it", async () => {
+    resetSwr();
+    const DB = { prepare: () => ({ all: async () => ({ results: [] }), first: async () => null, bind: () => ({ run: async () => { throw new Error("D1_ERROR: free tier daily write limit exceeded"); } }) }) };
+    const out: any = await pipelineStatus({ DB } as any);
+    expect(out.lastScheduledTick).toBe("never_recorded"); expect(out.writeProbe.ok).toBe(false); expect(out.writeProbe.error).toContain("write limit");
+  });
+});
+
