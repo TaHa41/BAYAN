@@ -414,3 +414,8 @@
 - Commit: `ec0c80f9e4d754aa0ced7370e1a8e05a34087c93`
 - الملفات: M	docs/START_HERE_AR.md;M	scripts/page-diagnostics.mjs;M	src/index.ts;M	src/v2-bridge.ts;M	tests/v2-swr.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-19T19:58:31Z — docs: plan to avoid running out of budget (session and site) and solve all problems, with measured subrequest costs 
+- Commit: `88e5ab6c08a19fa872846a580759b836a48f08fe`
+- الملفات: M	docs/START_HERE_AR.md 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
