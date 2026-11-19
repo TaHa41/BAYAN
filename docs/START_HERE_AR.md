@@ -4,7 +4,7 @@
 
 <!-- BAYAN_LIVE_STATUS_START -->
 ## الحالة الحية (تُحدَّث آليًا بعد كل نشر — لا تعدّلها يدويًا)
-- آخر تحديث: 2026-11-19T07:18:15.175Z
+- آخر تحديث: 2026-11-19T20:29:58.372Z
 - V2_BUILD في الشيفرة: `2026-11-18.2`
 - آخر نشر: failure للكوميت `ce1a1cce` (https://github.com/TaHa41/BAYAN/actions/runs/44476514129)
 - نتائج الـjobs: deploy=success، verify-production=failure
@@ -31,6 +31,9 @@
   - `/news`: حالة 200، 301/61، كاش HIT، مُرسِم v2
   - `/politics`: حالة 200، 439/99، كاش HIT، مُرسِم v2
 - آخر الـcommits على main:
+  - b37ac8d 2026-11-19 docs: automatically record project history
+  - 88e5ab6 2026-11-19 docs: plan to avoid running out of budget (session and site) and solve all problems, with measured subrequest c
+  - 3b73949 2026-11-19 docs: automatically refresh live status
   - 1a7c79b 2026-11-19 docs: automatically refresh live status
   - ef33a24 2026-11-19 docs: automatically record project history
   - ec0c80f 2026-11-19 Cron heartbeat and D1 write probe in the pipeline status; tests; docs; V2_BUILD 2026-11-18.2
@@ -38,9 +41,6 @@
   - a7db60d 2026-11-18 docs: automatically refresh live status
   - 386ee3c 2026-11-18 docs: automatically record project history
   - f22cd16 2026-11-18 Measure per-run subrequests of article drafting (Free plan limit is 50); docs; V2_BUILD 2026-11-18.1
-  - 1237c5c 2026-11-18 docs: automatically refresh live status
-  - f93477f 2026-11-18 docs: automatically record project history
-  - b3b1d4a 2026-11-18 Lighter site: retire Opinion/Travel/Trends with redirects, 3x4 groups, home section chips, archive query uses i
 <!-- BAYAN_LIVE_STATUS_END -->
 
 ## 1) كيف تبدأ في محادثة جديدة (3 دقائق)
