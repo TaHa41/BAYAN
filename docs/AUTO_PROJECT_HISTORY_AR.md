@@ -419,3 +419,8 @@
 - Commit: `88e5ab6c08a19fa872846a580759b836a48f08fe`
 - الملفات: M	docs/START_HERE_AR.md 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-20T07:55:07Z — Publication run: fewer D1 statements (one settings read, one rotation write, one diagnostics event) and a cap on evidence fetches so the AI call keeps room under 50 subrequests; tests; docs; V2_BUILD 2026-11-19.1 
+- Commit: `f64a2532644da1635bd603de1e9b1a9d0ecbf508`
+- الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/index.ts;M	src/services/news-article-publisher.ts;M	src/subrequests.ts;M	src/v2-bridge.ts;M	tests/subrequests.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
