@@ -60,13 +60,14 @@ async function publishNextArchivedNewsArticleInner(env:Env){
   const cutoff=new Date(now-48*60*60*1000).toISOString();
   const retryBefore=new Date(now-60*60*1000).toISOString();
   const lowEvidenceRetryBefore=new Date(now-6*60*60*1000).toISOString();
-  let setting:any=null;try{setting=await env.DB.prepare("SELECT value FROM admin_settings WHERE key=? LIMIT 1").bind("news_article_queue_language").first<any>()}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","settings_read_failed",error)}
-  const preferred:Locale=String(setting?.value||"ar")==="en"?"en":"ar";
+  // One read for both queue settings (every D1 statement counts against the per-invocation subrequest limit).
+  const settings=new Map<string,string>();try{const rows=await env.DB.prepare("SELECT key,value FROM admin_settings WHERE key IN (?,?)").bind("news_article_queue_language","news_article_queue_last_publisher").all<any>();for(const x of rows.results||[])settings.set(String(x.key),String(x.value))}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","settings_read_failed",error)}
+  const preferred:Locale=String(settings.get("news_article_queue_language")||"ar")==="en"?"en":"ar";
   const futureLimit=new Date(now+5*60*1000).toISOString();
   const pick=async(language:Locale)=>{
     const candidates=await env.DB.prepare(NEWS_ARCHIVE_CANDIDATES_SQL).bind(language,cutoff,futureLimit,cutoff,retryBefore,lowEvidenceRetryBefore,retryBefore).all<any>();
     const recent=await env.DB.prepare(RECENT_LOW_EVIDENCE_SQL).bind(language,lowEvidenceRetryBefore).all<any>();
-    const last=await env.DB.prepare("SELECT value FROM admin_settings WHERE key=? LIMIT 1").bind("news_article_queue_last_publisher").first<any>();
+    const last={value:settings.get("news_article_queue_last_publisher")};
     return pickCandidate(candidates.results||[],recent.results||[],last?.value?String(last.value):null);
   };
   let row=await pick(preferred);
@@ -80,9 +81,9 @@ async function publishNextArchivedNewsArticleInner(env:Env){
   // Persist the next language before drafting so a failed Arabic attempt cannot
   // starve English news forever (and vice versa).
   const nextLanguage:Locale=language==="ar"?"en":"ar";
-  try{await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind("news_article_queue_language",nextLanguage,stamp).run()}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","language_rotation_failed",error)}
   const selectedPublisher=String(row.publisher||"").trim().slice(0,160);
-  if(selectedPublisher)try{await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind("news_article_queue_last_publisher",selectedPublisher,stamp).run()}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","publisher_rotation_failed",error)}
+  // Language rotation and last publisher in one statement instead of two.
+  try{const rotation:[string,string][]=[["news_article_queue_language",nextLanguage]];if(selectedPublisher)rotation.push(["news_article_queue_last_publisher",selectedPublisher]);await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES "+rotation.map(()=>"(?,?,?)").join(",")+" ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(...rotation.flatMap(([key,value])=>[key,value,stamp])).run()}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","queue_rotation_failed",error)}
   try{
     const result=await search(env,title,language,{publish:true,draft:true,images:true,publicationContext:String(row.summary||"").slice(0,500)});
     const slug=String(result.articleSlug||"").trim();
@@ -106,10 +107,8 @@ async function publishNextArchivedNewsArticleInner(env:Env){
       const expandedSearchAttempted=attempts.some((value:string)=>value.includes("Expanded topic variants")||value.includes("Expanded variant "));
       const providerFailures=summarizeProviderFailures(attempts);
       const providerDiagnosticParts=attempts.slice(-12).map((value:string)=>value.replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").replace(/\s+/g," ").slice(0,100)).filter(Boolean);
-      for(let offset=0;offset<providerDiagnosticParts.length;offset+=3){
-        const providerDiagnostic=providerDiagnosticParts.slice(offset,offset+3).join(" | ").slice(0,350);
-        if(providerDiagnostic)await recordRuntimeEventLimited(env,"news_archive_provider_diagnostics_part_"+(Math.floor(offset/3)+1),"provider_diagnostics",providerDiagnostic);
-      }
+      const providerDiagnostic=providerDiagnosticParts.join(" | ").slice(0,480);
+      if(providerDiagnostic)await recordRuntimeEventLimited(env,"news_archive_provider_diagnostics_part_1","provider_diagnostics",providerDiagnostic);
       const publishReason=String(result.publishReason||"publish_rejected").slice(0,350);
       const detail=String(result.publishReasonDetail||"detail_not_provided").replace(/https?:\/\/[^\s]+/g,"[url]").replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|Bearer\s+\S+)\b/gi,"[redacted]").replace(/\s+/g," ").slice(0,300);
       const sourceCount=new Set(sourceRecords.map((source:any)=>String(source.url||"").trim()).filter(Boolean)).size;

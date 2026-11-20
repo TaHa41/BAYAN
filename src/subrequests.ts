@@ -7,10 +7,12 @@ import type { Env } from "./types";
  */
 export interface SubrequestStats { fetch: number; db: number; ai: number }
 
-export function countSubrequests(env: Env): { env: Env; stats: SubrequestStats; restore: () => void } {
+export function countSubrequests(env: Env, options: { fetchCap?: number } = {}): { env: Env; stats: SubrequestStats; restore: () => void } {
   const stats: SubrequestStats = { fetch: 0, db: 0, ai: 0 };
   const realFetch = globalThis.fetch;
-  globalThis.fetch = ((...args: Parameters<typeof fetch>) => { stats.fetch++; return realFetch(...args); }) as typeof fetch;
+  // With a cap, evidence fetches beyond it fail fast like a network error, so the budget left (D1 writes, the Workers AI call) is never eaten by lookups.
+  const cap = options.fetchCap ?? Infinity;
+  globalThis.fetch = ((...args: Parameters<typeof fetch>) => { if (stats.fetch >= cap) return Promise.reject(new Error("subrequest_budget_reached")); stats.fetch++; return realFetch(...args); }) as typeof fetch;
   const wrap = <T extends object>(target: T | undefined, methods: string[], key: keyof SubrequestStats): T | undefined => {
     if (!target) return target;
     return new Proxy(target, {
