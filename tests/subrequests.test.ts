@@ -23,4 +23,11 @@ describe("subrequest counter for scheduled work", () => {
     const { env, restore } = countSubrequests({ DB: { prepare: () => ({}) } } as unknown as Env);
     expect((env as any).AI).toBeUndefined(); restore();
   });
+  it("with a fetch cap, lookups beyond it fail fast like a network error and are not counted, so the AI call keeps its room", async () => {
+    let real = 0; globalThis.fetch = (async () => { real++; return new Response("ok"); }) as typeof fetch;
+    const { stats, restore } = countSubrequests({ DB: { prepare: () => ({}) } } as unknown as Env, { fetchCap: 3 });
+    for (let i = 0; i < 3; i++) await fetch("https://e.example/" + i);
+    await expect(fetch("https://e.example/over")).rejects.toThrow("subrequest_budget_reached");
+    expect(real).toBe(3); expect(stats.fetch).toBe(3); restore();
+  });
 });
