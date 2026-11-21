@@ -424,3 +424,8 @@
 - Commit: `f64a2532644da1635bd603de1e9b1a9d0ecbf508`
 - الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/index.ts;M	src/services/news-article-publisher.ts;M	src/subrequests.ts;M	src/v2-bridge.ts;M	tests/subrequests.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-21T04:51:06Z — Reference refresh (executive summary, historical banner, news pipeline state); longer pipeline event details; V2_BUILD 2026-11-21.1 
+- Commit: `b5198259fcda5625ae4b31f865d736ced1d4580e`
+- الملفات: M	docs/START_HERE_AR.md;M	scripts/page-diagnostics.mjs;M	scripts/update-live-status.mjs;M	src/v2-bridge.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
