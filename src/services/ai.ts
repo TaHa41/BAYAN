@@ -3,9 +3,12 @@ import{recordRuntimeEventLimited}from"../runtime-events";
 export const DEFAULT_WORKERS_AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8";
 /** Workers AI with model fallback: the configured model first, then two other models, so one unavailable model never leaves a page without a write-up. */
 export const WORKERS_AI_FALLBACKS = ["@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/mistralai/mistral-small-3.1-24b-instruct"];
-export async function runWorkersAi(env: Pick<Env, "AI" | "NEWS_AI_MODEL">, input: any): Promise<any> {
+export async function runWorkersAi(env: Pick<Env, "AI" | "NEWS_AI_MODEL">, input: any, preferLarge = false): Promise<any> {
   let last: unknown = new Error("workers_ai_unavailable");
-  for (const model of [...new Set([workersAiModel(env), ...WORKERS_AI_FALLBACKS])]) {
+  // Article drafts try the large model first (unless the owner pinned a model): the 8B model returned ~6 sentences where 12 sentences and 4 headings are required.
+  const pinned = String((env as any).NEWS_AI_MODEL || "").trim() !== "";
+  const order = preferLarge && !pinned ? [WORKERS_AI_FALLBACKS[0], workersAiModel(env), ...WORKERS_AI_FALLBACKS.slice(1)] : [workersAiModel(env), ...WORKERS_AI_FALLBACKS];
+  for (const model of [...new Set(order)]) {
     try { const r = await (env.AI as any).run(model, input); if (workersAIResponseText(r)) return r; last = new Error("empty_response"); } catch (error) { last = error; }
   }
   throw last;
@@ -80,7 +83,7 @@ export const answerUnsupportedSpecificsDetail=(answer:string,evidence:SearchResu
   // specific must still be supported by one evidence record that also matches
   // the surrounding claim context; unrelated snippets cannot validate a name.
 
-  const generic=new Set(["the","this","these","those","according","based","however","therefore","overall","summary","conclusion","answer","key","main","important","first","second","third","one","two","three","it","they","he","she","we","you","and","but","because","during","after","before","global","world","health","history","science","technology","economy","politics","sports","travel","art","bayan","من","هو","هي","ما","ماذا","كيف","متى","أين","اين","لماذا","هل","عن","حول","آخر","اخر","أخبار","اخبار","ماهو","ماهي","مع","في","إلى","الى","what","who","when","where","why","how","does","did","is","are","was","were","current","club","player","play","about","explain","tell","me","latest","news","for","from","with","during","in","on","at","to","of","a","an","لنادي","نادي","فريق","الفريق","المنتخب","مع"]);
+  const generic=new Set(["evidence","source","sources","report","reports","sentence","sentences","the","this","these","those","according","based","however","therefore","overall","summary","conclusion","answer","key","main","important","first","second","third","one","two","three","it","they","he","she","we","you","and","but","because","during","after","before","global","world","health","history","science","technology","economy","politics","sports","travel","art","bayan","من","هو","هي","ما","ماذا","كيف","متى","أين","اين","لماذا","هل","عن","حول","آخر","اخر","أخبار","اخبار","ماهو","ماهي","مع","في","إلى","الى","what","who","when","where","why","how","does","did","is","are","was","were","current","club","player","play","about","explain","tell","me","latest","news","for","from","with","during","in","on","at","to","of","a","an","لنادي","نادي","فريق","الفريق","المنتخب","مع"]);
   const normalizeDigits=(value:string)=>value.replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).replace(/[٬,]/g,"");
   const sentences=answer.replace(/^\s*\d+[.)]\s/gm,"").split(/[\n.!؟?]+/).map(sentence=>sentence.trim()).filter(Boolean);
   const tokenize=(value:string)=>String(value||"").normalize("NFKC").toLowerCase().replace(/[٠-٩]/g,d=>String("٠١٢٣٤٥٦٧٨٩".indexOf(d))).match(/[\p{L}\p{N}&.-]+/gu)||[];
@@ -267,7 +270,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
       }else await handleOpenAIResponseFailure(env,"OpenAI draft",response);
     }catch(error){await recordAiFailure(env,"OpenAI draft",aiFailureDetail(error));}
     if(env.AI)try{
-      const response=await runWorkersAi(env,{messages,max_tokens:3600,temperature:0,response_format:{type:"json_object"}});
+      const response=await runWorkersAi(env,{messages,max_tokens:3600,temperature:0,response_format:{type:"json_object"}},true);
       const answer=workersAIResponseText(response);
       if(answer)return charge(answer);
       await recordAiFailure(env,"Workers AI draft","empty_response");
