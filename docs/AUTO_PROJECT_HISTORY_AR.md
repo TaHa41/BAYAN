@@ -429,3 +429,8 @@
 - Commit: `b5198259fcda5625ae4b31f865d736ced1d4580e`
 - الملفات: M	docs/START_HERE_AR.md;M	scripts/page-diagnostics.mjs;M	scripts/update-live-status.mjs;M	src/v2-bridge.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-21T13:25:04Z — Drafts: large Workers AI model first, scaffolding words are not invented names; tests; docs; V2_BUILD 2026-11-21.2 
+- Commit: `f45beb23c04d53ead3d0b8d3490c3a149c4b4710`
+- الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/services/ai.ts;M	src/v2-bridge.ts;M	tests/complete-articles.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
