@@ -18,7 +18,7 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-19.1";
+export const V2_BUILD = "2026-11-21.1";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 
@@ -67,7 +67,7 @@ export async function pipelineStatus(env: Env): Promise<unknown> {
   }, 6000).catch(() => ({ ok: false, error: "probe_timeout" }));
   try {
     const r: any = await e.DB.prepare("SELECT level,kind,message,created_at FROM runtime_events WHERE kind IN ('news_archive_article_generation','scheduled_news_archive_refresh','scheduled_self_heal','ai_generation','ai_circuit_breaker','news_ai_budget') ORDER BY created_at DESC LIMIT 14").all();
-    out.events = (r?.results || []).map((x: any) => ({ at: String(x.created_at || "").slice(0, 19), level: String(x.level || ""), kind: String(x.kind || ""), message: String(x.message || "").replace(/(key|token|secret|authorization)["'=:\s]+[^\s"',}]+/gi, "$1=…").slice(0, 220) }));
+    out.events = (r?.results || []).map((x: any) => ({ at: String(x.created_at || "").slice(0, 19), level: String(x.level || ""), kind: String(x.kind || ""), message: String(x.message || "").replace(/(key|token|secret|authorization)["'=:\s]+[^\s"',}]+/gi, "$1=…").slice(0, 480) }));
     const pf: any = await e.DB.prepare("SELECT message,created_at FROM runtime_events WHERE kind='ai_generation' ORDER BY created_at DESC LIMIT 6").all();
     out.providerFailures = (pf?.results || []).map((x: any) => ({ at: String(x.created_at || "").slice(0, 19), message: String(x.message || "").replace(/(key|token|secret|authorization)["'=:\s]+[^\s"',}]+/gi, "$1=…").slice(0, 200) }));
     const tick: any = await e.DB.prepare("SELECT value FROM admin_settings WHERE key='scheduled_last_tick' LIMIT 1").first();

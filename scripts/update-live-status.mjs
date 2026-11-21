@@ -34,7 +34,7 @@ export function buildBlock(info) {
   if (info.health) L.push(`- فحص الإنتاج: ${clip(info.health, 300)}`);
   if (info.pipeline) L.push(`- خط نشر الأخبار (/api/health/pipeline): ${clip(info.pipeline, 700)}`);
   if (info.pipelineProviders) L.push(`- أسباب فشل المزوّدين وميزانية اليوم: ${clip(info.pipelineProviders, 1400)}`);
-  if (info.pipelineEvents) L.push(`- آخر أحداث الصياغة والمزوّدين: ${clip(info.pipelineEvents, 1500)}`);
+  if (info.pipelineEvents) L.push(`- آخر أحداث الصياغة والمزوّدين: ${clip(info.pipelineEvents, 3000)}`);
   if (info.news) L.push(`- خريطة الأخبار والأرشيف: ${clip(info.news, 520)}`);
   if (info.fallbacks) L.push(`- أسباب الرجوع للموقع القديم (/api/health/v2): ${clip(info.fallbacks, 420)}`);
   if (info.pages?.length) {
