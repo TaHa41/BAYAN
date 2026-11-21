@@ -55,3 +55,23 @@ describe("Workers AI falls back to other models", () => {
     await expect(runWorkersAi({ AI } as any, {})).rejects.toThrow("down");
   });
 });
+
+describe("article drafts: large Workers AI model first, scaffolding words are not invented names", () => {
+  it("drafts try the large model first, an explicitly pinned model wins, and plain answers keep the configured one", async () => {
+    const seen: string[][] = [[], [], []];
+    const mk = (i: number) => ({ run: async (m: string) => { seen[i].push(m); return { response: "ok" }; } });
+    await runWorkersAi({ AI: mk(0) } as any, {}, true);
+    expect(seen[0][0]).toBe("@cf/meta/llama-3.3-70b-instruct-fp8-fast");
+    await runWorkersAi({ AI: mk(1), NEWS_AI_MODEL: "@cf/custom/pinned" } as any, {}, true);
+    expect(seen[1][0]).toBe("@cf/custom/pinned");
+    await runWorkersAi({ AI: mk(2) } as any, {});
+    expect(seen[2][0]).not.toBe("@cf/meta/llama-3.3-70b-instruct-fp8-fast");
+  });
+  it("a sentence that starts with the word Evidence is not an unsupported name, but a real unsupported name still is", async () => {
+    const { answerHasUnsupportedSpecifics } = await import("../src/services/ai");
+    const evidence: any[] = [{ title: "Central bank raises interest rates in Cairo", summary: "The central bank raised interest rates by one point on Thursday.", url: "https://a.example", sources: [{ title: "Rates rise", publisher: "Outlet A", url: "https://a.example" }] }];
+    expect(answerHasUnsupportedSpecifics("Evidence shows the central bank raised interest rates.", evidence, "interest rates")).toBe(false);
+    expect(answerHasUnsupportedSpecifics("Governor Smithson raised interest rates.", evidence, "interest rates")).toBe(true);
+  });
+});
+
