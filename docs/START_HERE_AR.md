@@ -4,7 +4,7 @@
 
 <!-- BAYAN_LIVE_STATUS_START -->
 ## الحالة الحية (تُحدَّث آليًا بعد كل نشر — لا تعدّلها يدويًا)
-- آخر تحديث: 2026-11-21T04:53:50.919Z
+- آخر تحديث: 2026-11-21T06:59:19.017Z
 - V2_BUILD في الشيفرة: `2026-11-21.1`
 - آخر نشر: failure للكوميت `6596435c` (https://github.com/TaHa41/BAYAN/actions/runs/44868175727)
 - نتائج الـjobs: deploy=success، verify-production=failure
@@ -31,6 +31,7 @@
   - `/news`: حالة 200، 314/39، كاش HIT، مُرسِم v2
   - `/politics`: حالة 200، 266/41، كاش HIT، مُرسِم v2
 - آخر الـcommits على main:
+  - 8070690 2026-11-21 docs: automatically refresh live status
   - c7b38e9 2026-11-21 docs: automatically record project history
   - b519825 2026-11-21 Reference refresh (executive summary, historical banner, news pipeline state); longer pipeline event details; V
   - 000d7bf 2026-11-20 docs: automatically refresh live status
@@ -40,7 +41,6 @@
   - 6c73f50 2026-11-20 docs: automatically refresh live status
   - ebcfe08 2026-11-19 docs: automatically refresh live status
   - b37ac8d 2026-11-19 docs: automatically record project history
-  - 88e5ab6 2026-11-19 docs: plan to avoid running out of budget (session and site) and solve all problems, with measured subrequest c
 <!-- BAYAN_LIVE_STATUS_END -->
 
 ## الملخص التنفيذي الراهن (21 نوفمبر 2026) — اقرأه بعد «الحالة الحية»
