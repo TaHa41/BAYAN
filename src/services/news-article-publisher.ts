@@ -46,7 +46,7 @@ const reserveDailyD1ReadCalls=async(env:Env)=>{
 const settleDailyD1ReadCalls=async(env:Env,day:string,actualReads:number)=>{
   try{
     await env.DB.prepare("UPDATE admin_settings SET value=substr(value,1,11)||CAST(MAX(0,CAST(substr(value,12) AS INTEGER)-120+?) AS TEXT),updated_at=? WHERE key='news_d1_read_calls_daily' AND substr(value,1,10)=?").bind(Math.min(D1_READ_RESERVATION,Math.max(0,actualReads)),new Date().toISOString(),day).run();
-    await recordRuntimeEventLimited(env,"news_d1_budget","background_read_usage",JSON.stringify({day,readCalls:Math.min(D1_READ_RESERVATION,Math.max(0,actualReads)),dailyLimit:DAILY_D1_READ_CALL_LIMIT}));
+    // (no usage event here: every D1 statement counts against the per-invocation subrequest limit)
   }catch(error){await recordRuntimeEventLimited(env,"news_d1_budget","usage_persist_failed","could not persist background D1 read usage");}
 };
 

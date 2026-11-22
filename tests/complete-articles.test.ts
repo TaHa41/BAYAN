@@ -75,3 +75,12 @@ describe("article drafts: large Workers AI model first, scaffolding words are no
   });
 });
 
+describe("Workers AI does not retry other models once the subrequest limit is hit", () => {
+  it("stops at the first 'Too many subrequests' error instead of spending more calls", async () => {
+    let calls = 0;
+    const AI = { run: async () => { calls++; throw new Error("Too many subrequests by single Worker invocation."); } };
+    await expect(runWorkersAi({ AI } as any, {}, true)).rejects.toThrow("Too many subrequests");
+    expect(calls).toBe(1);
+  });
+});
+

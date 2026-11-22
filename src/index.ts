@@ -195,7 +195,7 @@ return notFoundResponse(u.searchParams.get("lang")==="en"?"en":"ar");
     }
   }else if(env.NEWS_PIPELINE_ENABLED==="true"&&(task===1||(task===2&&scheduleSlot%12!==2&&scheduleSlot%12!==8))){
     try{
-      const counting=countSubrequests(env,{fetchCap:24});
+      const counting=countSubrequests(env,{fetchCap:20});
       let result:Awaited<ReturnType<typeof publishNextArchivedNewsArticle>>;
       try{result=await publishNextArchivedNewsArticle(counting.env)}finally{counting.restore()}
       // The publisher reports exhausted/unavailable D1 budget without throwing. Do not
