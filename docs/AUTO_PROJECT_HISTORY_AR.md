@@ -434,3 +434,8 @@
 - Commit: `f45beb23c04d53ead3d0b8d3490c3a149c4b4710`
 - الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/services/ai.ts;M	src/v2-bridge.ts;M	tests/complete-articles.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-22T00:13:52Z — Free AI provider failover (Groq, Cerebras, OpenRouter) in drafting and answers; tests; docs; V2_BUILD 2026-11-22.1 
+- Commit: `719dbe54fe8080e00d101f2b04676b9a30899a5a`
+- الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/services/ai.ts;A	src/services/openai-compatible.ts;M	src/types.ts;M	src/v2-bridge.ts;A	tests/openai-compatible.test.ts;M	tests/v2-swr.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
