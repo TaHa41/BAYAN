@@ -1,4 +1,5 @@
-import type{Env,Locale,SearchResult}from"../types";import{classifyOpenAIFailure,classifyWorkersAIFailure,classifyGeminiFailure,getProviderBreaker,updateProviderBreaker,recordProviderDiagnostic,normalizeDraftJson,isOpenAIQuotaFailure,workersAIResponseText}from"./ai-provider-resilience";import{notify}from"./telegram";import{callGemini}from"./gemini";export{normalizeDraftJson};
+import type{Env,Locale,SearchResult}from"../types";
+import{callCompatProviders}from"./openai-compatible";import{classifyOpenAIFailure,classifyWorkersAIFailure,classifyGeminiFailure,getProviderBreaker,updateProviderBreaker,recordProviderDiagnostic,normalizeDraftJson,isOpenAIQuotaFailure,workersAIResponseText}from"./ai-provider-resilience";import{notify}from"./telegram";import{callGemini}from"./gemini";export{normalizeDraftJson};
 import{recordRuntimeEventLimited}from"../runtime-events";
 export const DEFAULT_WORKERS_AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8";
 /** Workers AI with model fallback: the configured model first, then two other models, so one unavailable model never leaves a page without a write-up. */
@@ -261,6 +262,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
       const answer=await callGeminiText(env,"Gemini draft",system,"Topic/question: "+question+"\nEvidence excerpts (only these snippets may be used): "+evidenceText+(extraInstruction?"\nCorrection required: "+extraInstruction:""),{json:true,temperature:0,maxOutputTokens:3600,timeoutMs:9000});
       if(answer)return charge(answer);
     }
+    {const text=await callCompatProviders(env,messages,{json:true,maxTokens:3600,timeoutMs:12000,label:"Draft"},(label,detail)=>recordAiFailure(env,label,detail));if(text)return charge(text)}
     if(env.OPENAI_API_KEY&&await openAIAllowed(env))try{
       const response=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(9000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",messages,temperature:0,max_tokens:3600,response_format:{type:"json_object"}})});
       if(response.ok){
@@ -321,6 +323,11 @@ export async function ask(env:Env,question:string,locale:Locale,evidence:SearchR
     const answer=await callGeminiText(env,"Gemini answer",geminiSystem,"Question: "+question+"\nEvidence: "+evidenceText,{temperature:0.1,maxOutputTokens:1200,timeoutMs:10000});
     if(answer&&languageConsistent(answer,locale))return{status:independentSourceCount(env,evidence)>=2&&!answerHasUnsupportedSpecifics(answer,evidence,question)?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(x=>x.sources)};
     if(answer)await recordAiFailure(env,"Gemini answer","language_mismatch");
+  }
+  {
+    const compat=await callCompatProviders(env,[{role:"system",content:geminiSystem},{role:"user",content:"Question: "+question+"\nEvidence: "+evidenceText}],{maxTokens:1200,timeoutMs:10000,label:"Answer"},(label,detail)=>recordAiFailure(env,label,detail));
+    if(compat&&languageConsistent(compat,locale))return{status:independentSourceCount(env,evidence)>=2&&!answerHasUnsupportedSpecifics(compat,evidence,question)?"verified" as const:"mixed" as const,answer:compat,sources:evidence.flatMap(x=>x.sources)};
+    if(compat)await recordAiFailure(env,"Compatible provider answer","language_mismatch");
   }
   if(env.OPENAI_API_KEY&&await openAIAllowed(env))try{
     const r=await fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY,"content-type":"application/json"},signal:AbortSignal.timeout(12000),body:JSON.stringify({model:env.OPENAI_MODEL||"gpt-5-mini",messages:[{role:"system",content:locale==="ar"?"أنت BAYAN. أجب بالعربية الفصحى فقط، ولا تضع جملًا إنجليزية أو فقرات بلغة أخرى. استخدم الأدلة المقدمة فقط، ولا تضف اسم شخص أو نادٍ أو مؤسسة أو رقمًا غير موجود في الأدلة. احتفظ بالتهجئة الأصلية للأسماء الخاصة بين قوسين إذا كانت موجودة في المصدر. ابدأ بإجابة مباشرة، ثم نظّم الأفكار في أقسام قصيرة مترابطة عند الحاجة. لا تكرر الفكرة أو الجملة بصياغة أخرى، ولا تخلط بين أشخاص أو أحداث متشابهة. ميّز بين الحقيقة والاستنتاج وعدم اليقين، ولا تخترع معلومة.":"You are BAYAN. Answer in English only. Do not include Arabic sentences or paragraphs. Use only the supplied evidence, and do not introduce any person, club, organization or number that does not appear in the evidence. Start with a direct answer, then organize related ideas into concise sections when useful. Never repeat the same claim in different wording or conflate similar people/events. Distinguish facts from inference and uncertainty, and never invent facts."},{role:"user",content:"Question: "+question+"\nEvidence: "+evidenceText}],temperature:.1})});
