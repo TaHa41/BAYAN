@@ -444,3 +444,8 @@
 - Commit: `f55cb1f45f021e64c859a56584d65fe333f1f252`
 - الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/index.ts;M	src/services/ai.ts;M	src/services/news-article-publisher.ts;M	src/v2-bridge.ts;M	tests/complete-articles.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-22T16:04:16Z — Draft prompts ask for 15-16 sentences; Workers AI probe every 6h to save neurons; docs; V2_BUILD 2026-11-22.3 
+- Commit: `7419e7f3e1366a85f17968076075507f66fb691d`
+- الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/services/ai.ts;M	src/v2-bridge.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
