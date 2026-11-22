@@ -10,7 +10,7 @@ export async function runWorkersAi(env: Pick<Env, "AI" | "NEWS_AI_MODEL">, input
   const pinned = String((env as any).NEWS_AI_MODEL || "").trim() !== "";
   const order = preferLarge && !pinned ? [WORKERS_AI_FALLBACKS[0], workersAiModel(env), ...WORKERS_AI_FALLBACKS.slice(1)] : [workersAiModel(env), ...WORKERS_AI_FALLBACKS];
   for (const model of [...new Set(order)]) {
-    try { const r = await (env.AI as any).run(model, input); if (workersAIResponseText(r)) return r; last = new Error("empty_response"); } catch (error) { last = error; }
+    try { const r = await (env.AI as any).run(model, input); if (workersAIResponseText(r)) return r; last = new Error("empty_response"); } catch (error) { last = error; if (/too many subrequests/i.test(String((error as any)?.message ?? error))) break; /* another model cannot succeed once the per-invocation limit is hit */ }
   }
   throw last;
 }
