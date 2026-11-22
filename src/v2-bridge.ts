@@ -18,7 +18,7 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-21.2";
+export const V2_BUILD = "2026-11-22.1";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 
@@ -58,7 +58,7 @@ const memoWiki = (api: WikiApi): WikiApi => {
 export async function pipelineStatus(env: Env): Promise<unknown> {
   const e: any = env;
   const has = (v: unknown) => String(v ?? "").trim() !== "";
-  const out: any = { checkedAt: new Date().toISOString(), build: V2_BUILD, pipeline: { enabled: e.NEWS_PIPELINE_ENABLED === "true", setting: e.NEWS_PIPELINE_ENABLED === undefined ? "absent" : e.NEWS_PIPELINE_ENABLED === "true" ? "true" : "not_true", aiDailyLimit: has(e.NEWS_AI_DAILY_LIMIT) ? String(e.NEWS_AI_DAILY_LIMIT).slice(0, 6) : "default" }, providers: { gemini: has(e.GEMINI_API_KEY), openai: has(e.OPENAI_API_KEY), workersAi: !!e.AI }, d1: "ok", events: [] };
+  const out: any = { checkedAt: new Date().toISOString(), build: V2_BUILD, pipeline: { enabled: e.NEWS_PIPELINE_ENABLED === "true", setting: e.NEWS_PIPELINE_ENABLED === undefined ? "absent" : e.NEWS_PIPELINE_ENABLED === "true" ? "true" : "not_true", aiDailyLimit: has(e.NEWS_AI_DAILY_LIMIT) ? String(e.NEWS_AI_DAILY_LIMIT).slice(0, 6) : "default" }, providers: { gemini: has(e.GEMINI_API_KEY), openai: has(e.OPENAI_API_KEY), groq: has(e.GROQ_API_KEY), cerebras: has(e.CEREBRAS_API_KEY), openrouter: has(e.OPENROUTER_API_KEY), workersAi: !!e.AI }, d1: "ok", events: [] };
   // One tiny Workers AI call (about 10 neurons), cached 15 minutes per isolate: tells whether the free provider really answers and with which model.
   out.workersAiProbe = !e.AI ? { ok: false, error: "no_binding" } : await swr("probe:workers-ai", 15 * 60_000, 15 * 60_000, async () => {
     const t0 = Date.now(), model = workersAiModel(e);

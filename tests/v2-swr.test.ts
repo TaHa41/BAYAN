@@ -154,7 +154,7 @@ describe("public pipeline status", () => {
   const dbWith = (fn: () => Promise<unknown>) => ({ prepare: () => ({ all: fn, first: async () => null }) });
   it("shows switches, configured providers and the last outcomes, with secrets redacted", async () => {
     const out: any = await pipelineStatus({ NEWS_PIPELINE_ENABLED: "true", NEWS_AI_DAILY_LIMIT: "40", GEMINI_API_KEY: "k1", OPENAI_API_KEY: "  ", AI: {}, DB: dbWith(async () => ({ results: rows })) } as any);
-    expect(out.pipeline).toMatchObject({ enabled: true, setting: "true", aiDailyLimit: "40" }); expect(out.providers).toEqual({ gemini: true, openai: false, workersAi: true });
+    expect(out.pipeline).toMatchObject({ enabled: true, setting: "true", aiDailyLimit: "40" }); expect(out.providers).toEqual({ gemini: true, openai: false, groq: false, cerebras: false, openrouter: false, workersAi: true });
     expect(out.events[0]).toMatchObject({ level: "WARN", kind: "news_archive_article_generation" }); expect(out.breakers).toBeDefined(); expect(JSON.stringify(out)).not.toContain("SECRET123"); expect(JSON.stringify(out)).not.toContain("k1");
   });
   it("tells a disabled or absent switch apart, and reports a blocked database without throwing", async () => {

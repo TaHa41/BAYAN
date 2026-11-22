@@ -377,6 +377,8 @@ checks.push(["every HTML page is served by the new site, which counts visits and
 
 checks.push(["a publication run stays well under the 50-subrequest Free-plan limit: one settings read, one rotation statement, one diagnostics event, and a cap on evidence fetches", (()=>{const pub=read("src/services/news-article-publisher.ts");return pub.includes('WHERE key IN (?,?)')&&!pub.includes('WHERE key=? LIMIT 1").bind("news_article_queue_last_publisher")')&&pub.includes('rotation.map(()=>"(?,?,?)")')&&!pub.includes('offset+=3')&&read("src/index.ts").includes("countSubrequests(env,{fetchCap:24})")})()]);
 
+checks.push(["article drafting and answers fail over across free OpenAI-compatible providers (Groq, Cerebras, OpenRouter) before paid or limited ones, with cooldowns kept in memory and keys never logged", (()=>{const ai2=read("src/services/ai.ts"),c=read("src/services/openai-compatible.ts");return ai2.includes("callCompatProviders(env,messages,{json:true,maxTokens:3600")&&ai2.indexOf("callCompatProviders(env,messages")<ai2.indexOf('fetch("https://api.openai.com/v1/chat/completions",{method:"POST",headers:{authorization:"Bearer "+env.OPENAI_API_KEY')&&ai2.includes('label:"Answer"')&&c.includes("GROQ_API_KEY")&&c.includes("CEREBRAS_API_KEY")&&c.includes("OPENROUTER_API_KEY")&&c.includes("const cooldown = new Map")&&c.includes("redact(")})()]);
+
 // Checks that only described the deleted old client (public/app-*.js, styles.css, the single-page shell and its page renderer in src/index.ts).
 // What they covered now lives in the new site (v2/) and is covered by the vitest suite, so they are retired instead of left failing.
 const RETIRED_OLD_SITE_CHECKS = new Set([
