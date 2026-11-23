@@ -4,7 +4,7 @@
 
 <!-- BAYAN_LIVE_STATUS_START -->
 ## الحالة الحية (تُحدَّث آليًا بعد كل نشر — لا تعدّلها يدويًا)
-- آخر تحديث: 2026-11-23T00:23:28.858Z
+- آخر تحديث: 2026-11-23T07:28:55.506Z
 - V2_BUILD في الشيفرة: `2026-11-23.1`
 - آخر نشر: failure للكوميت `604a1764` (https://github.com/TaHa41/BAYAN/actions/runs/45088283233)
 - نتائج الـjobs: deploy=success، verify-production=failure
@@ -31,6 +31,7 @@
   - `/news`: حالة 200، 264/46، كاش HIT، مُرسِم v2
   - `/politics`: حالة 200، 394/32، كاش HIT، مُرسِم v2
 - آخر الـcommits على main:
+  - 82209de 2026-11-23 docs: automatically refresh live status
   - 13f7d8c 2026-11-23 docs: automatically record project history
   - dde8f82 2026-11-23 Pipeline runs do not write visitor search history; reference corrected about platform limits; V2_BUILD 2026-11-
   - 759b7ba 2026-11-22 docs: automatically refresh live status
@@ -39,8 +40,7 @@
   - 7419e7f 2026-11-22 Draft prompts ask for 15-16 sentences; Workers AI probe every 6h to save neurons; docs; V2_BUILD 2026-11-22.3
   - 58a97e2 2026-11-22 docs: automatically refresh live status
   - 6bb1aef 2026-11-22 docs: automatically record project history
-  - f55cb1f 2026-11-22 Trim publication run subrequests (fetch cap 20, no usage event, stop model retries at the limit); tests; docs; 
-  - 367ffa1 2026-11-22 docs: automatically refresh live status
+  - f55cb1f 2026-11-22 Trim publication run subrequests (fetch cap 20, no usage event, stop model retries at the limit); tests; docs;
 <!-- BAYAN_LIVE_STATUS_END -->
 
 ## الملخص التنفيذي الراهن (21 نوفمبر 2026) — اقرأه بعد «الحالة الحية»
