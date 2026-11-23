@@ -449,3 +449,8 @@
 - Commit: `7419e7f3e1366a85f17968076075507f66fb691d`
 - الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/services/ai.ts;M	src/v2-bridge.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-23T00:20:07Z — Pipeline runs do not write visitor search history; reference corrected about platform limits; V2_BUILD 2026-11-23.1 
+- Commit: `dde8f82cfda89aef76f9f69bb99dd88dd1e60b3f`
+- الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/services/news-article-publisher.ts;M	src/services/search.ts;M	src/v2-bridge.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
