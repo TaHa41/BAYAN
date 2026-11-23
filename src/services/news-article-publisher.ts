@@ -85,7 +85,7 @@ async function publishNextArchivedNewsArticleInner(env:Env){
   // Language rotation and last publisher in one statement instead of two.
   try{const rotation:[string,string][]=[["news_article_queue_language",nextLanguage]];if(selectedPublisher)rotation.push(["news_article_queue_last_publisher",selectedPublisher]);await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES "+rotation.map(()=>"(?,?,?)").join(",")+" ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(...rotation.flatMap(([key,value])=>[key,value,stamp])).run()}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","queue_rotation_failed",error)}
   try{
-    const result=await search(env,title,language,{publish:true,draft:true,images:true,publicationContext:String(row.summary||"").slice(0,500)});
+    const result=await search(env,title,language,{publish:true,draft:true,images:true,saveHistory:false,publicationContext:String(row.summary||"").slice(0,500)});
     const slug=String(result.articleSlug||"").trim();
     const resultReason=String(result.publishReason||"");
     if(resultReason==="ai_unavailable"){
