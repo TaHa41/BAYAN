@@ -383,6 +383,8 @@ checks.push(["article draft prompts ask for 15-16 sentences so that at least 12 
 
 checks.push(["background publication runs do not write visitor search history (one statement fewer per run, and pipeline titles stay out of the admin searches list)", read("src/services/news-article-publisher.ts").includes("saveHistory:false") && read("src/services/search.ts").includes("options.saveHistory!==false")]);
 
+checks.push(["background drafting is skipped (no evidence fetches) when every AI provider is cooling down, and Workers AI daily-quota failures open its breaker", (()=>{const ai3=read("src/services/ai.ts"),pub=read("src/services/news-article-publisher.ts");return ai3.includes("export const anyAiProviderUsable")&&ai3.includes('updateProviderBreaker(env,"workers_ai",failure)')&&ai3.includes('getProviderBreaker(env,"workers_ai")).open')&&pub.includes("anyAiProviderUsable(env)")&&pub.includes("providers_cooling_down")})()]);
+
 // Checks that only described the deleted old client (public/app-*.js, styles.css, the single-page shell and its page renderer in src/index.ts).
 // What they covered now lives in the new site (v2/) and is covered by the vitest suite, so they are retired instead of left failing.
 const RETIRED_OLD_SITE_CHECKS = new Set([

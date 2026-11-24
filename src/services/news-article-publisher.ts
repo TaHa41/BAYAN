@@ -1,3 +1,4 @@
+import{anyAiProviderUsable}from"./ai";
 import type {Env,Locale} from "../types";
 import {search} from "./search";
 import {recordRuntimeEventLimited} from "../runtime-events";
@@ -139,6 +140,10 @@ async function publishNextArchivedNewsArticleInner(env:Env){
 }
 
 export async function publishNextArchivedNewsArticle(env:Env){
+  if(!(await anyAiProviderUsable(env))){
+    await recordRuntimeEventLimited(env,"news_archive_article_generation","providers_cooling_down","every configured AI provider is cooling down; evidence gathering skipped until one recovers");
+    return {status:"providers_cooling_down" as const};
+  }
   const reservation=await reserveDailyD1ReadCalls(env);
   if(!reservation){
     await recordRuntimeEventLimited(env,"news_d1_budget","daily_read_budget_exhausted","UTC daily background D1 read-call limit reached");

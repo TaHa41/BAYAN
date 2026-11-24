@@ -1,5 +1,5 @@
 import type{Env,Locale,SearchResult}from"../types";
-import{callCompatProviders}from"./openai-compatible";import{classifyOpenAIFailure,classifyWorkersAIFailure,classifyGeminiFailure,getProviderBreaker,updateProviderBreaker,recordProviderDiagnostic,normalizeDraftJson,isOpenAIQuotaFailure,workersAIResponseText}from"./ai-provider-resilience";import{notify}from"./telegram";import{callGemini}from"./gemini";export{normalizeDraftJson};
+import{callCompatProviders,compatProvidersConfigured}from"./openai-compatible";import{classifyOpenAIFailure,classifyWorkersAIFailure,classifyGeminiFailure,getProviderBreaker,updateProviderBreaker,recordProviderDiagnostic,normalizeDraftJson,isOpenAIQuotaFailure,workersAIResponseText}from"./ai-provider-resilience";import{notify}from"./telegram";import{callGemini}from"./gemini";export{normalizeDraftJson};
 import{recordRuntimeEventLimited}from"../runtime-events";
 export const DEFAULT_WORKERS_AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8";
 /** Workers AI with model fallback: the configured model first, then two other models, so one unavailable model never leaves a page without a write-up. */
@@ -271,12 +271,12 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
         await recordAiFailure(env,"OpenAI draft","empty_response");
       }else await handleOpenAIResponseFailure(env,"OpenAI draft",response);
     }catch(error){await recordAiFailure(env,"OpenAI draft",aiFailureDetail(error));}
-    if(env.AI)try{
+    if(env.AI&&!(await getProviderBreaker(env,"workers_ai")).open)try{
       const response=await runWorkersAi(env,{messages,max_tokens:3600,temperature:0,response_format:{type:"json_object"}},true);
       const answer=workersAIResponseText(response);
       if(answer)return charge(answer);
       await recordAiFailure(env,"Workers AI draft","empty_response");
-    }catch(error){await recordAiFailure(env,"Workers AI draft",aiFailureDetail(error));const failure=classifyWorkersAIFailure(error);await recordProviderDiagnostic(env,failure);await recordAiFailure(env,"Workers AI draft",failure.detail);}
+    }catch(error){await recordAiFailure(env,"Workers AI draft",aiFailureDetail(error));const failure=classifyWorkersAIFailure(error);await recordProviderDiagnostic(env,failure);await updateProviderBreaker(env,"workers_ai",failure);await recordAiFailure(env,"Workers AI draft",failure.detail);}
     return "";
   };
   let raw=await generate("");
@@ -337,7 +337,7 @@ export async function ask(env:Env,question:string,locale:Locale,evidence:SearchR
   // AI_SEARCH is a retrieval binding, not the text-generation runtime.
   // Use the Workers AI binding for drafting when OpenAI is unavailable; keep
   // retrieval evidence supplied above and never ask the model to invent sources.
-  if(env.AI)try{
+  if(env.AI&&!(await getProviderBreaker(env,"workers_ai")).open)try{
     const system=locale==="ar"
       ?"أنت بيان. أجب بالعربية الفصحى فقط وبالاعتماد على الأدلة المرفقة وحدها. لا تخترع أسماء أو أرقامًا أو مصادر. ميّز الحقائق من الاستنتاجات، واذكر بوضوح ما لا تثبته الأدلة."
       :"You are BAYAN. Answer in English only using only the supplied evidence. Do not invent names, numbers, or sources. Distinguish facts from inference and state clearly what the evidence does not establish.";
@@ -345,6 +345,16 @@ export async function ask(env:Env,question:string,locale:Locale,evidence:SearchR
     const answer=workersAIResponseText(r);
     if(answer && languageConsistent(answer,locale))return{status:independentSourceCount(env,evidence)>=2&&!answerHasUnsupportedSpecifics(answer,evidence,question)?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(x=>x.sources)};
     await recordAiFailure(env,"Workers AI answer",answer?"language_mismatch":"empty_response");
-  }catch(error){await recordAiFailure(env,"Workers AI answer",aiFailureDetail(error));const failure=classifyWorkersAIFailure(error);await recordProviderDiagnostic(env,failure);await recordAiFailure(env,"Workers AI answer",failure.detail);}
+  }catch(error){await recordAiFailure(env,"Workers AI answer",aiFailureDetail(error));const failure=classifyWorkersAIFailure(error);await recordProviderDiagnostic(env,failure);await updateProviderBreaker(env,"workers_ai",failure);await recordAiFailure(env,"Workers AI answer",failure.detail);}
   return{status:"mixed" as const,answer:locale==="ar"?"وجدت أدلة يمكن الرجوع إليها، لكن تعذر تشغيل صياغة BAYAN الذكية الآن. راجع الأدلة الظاهرة قبل اتخاذ قرار.":"Relevant evidence was found, but BAYAN's drafting model is temporarily unavailable. Review the evidence before acting.",sources:evidence.flatMap(x=>x.sources),reason:"ai_unavailable" as const}
 }
+
+// Pre-flight for background drafting: when every configured provider is cooling down (quota, no credit, daily neurons used up), gathering evidence would only burn
+// fetches, D1 statements and time, so the run is skipped until a provider recovers.
+export const anyAiProviderUsable=async(env:Env)=>{
+  if(compatProvidersConfigured(env).length)return true;
+  if(String(env.GEMINI_API_KEY||"").trim()&&!(await getProviderBreaker(env,"gemini")).open)return true;
+  if(String(env.OPENAI_API_KEY||"").trim()&&await openAIAllowed(env))return true;
+  if(env.AI&&!(await getProviderBreaker(env,"workers_ai")).open)return true;
+  return false;
+};
