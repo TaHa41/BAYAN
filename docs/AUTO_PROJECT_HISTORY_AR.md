@@ -454,3 +454,8 @@
 - Commit: `dde8f82cfda89aef76f9f69bb99dd88dd1e60b3f`
 - الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/services/news-article-publisher.ts;M	src/services/search.ts;M	src/v2-bridge.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-24T22:18:59Z — Workers AI quota breaker and provider pre-flight (skip evidence gathering when no provider is usable); tests; docs; V2_BUILD 2026-11-23.2 
+- Commit: `7192b7c6c487d6efb74d93253138f683b59c7e3d`
+- الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/services/ai.ts;M	src/services/news-article-publisher.ts;M	src/v2-bridge.ts;A	tests/provider-preflight.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
