@@ -847,7 +847,11 @@ export async function searchAvailabilityProbe():Promise<boolean>{
   return wikipedia.length>0;
 }
 
-export async function search(env:Env,q:string,language:Locale,options:{publish?:boolean;draft?:boolean;images?:boolean;healthCheck?:boolean;saveHistory?:boolean;publicationContext?:string;background?:(task:Promise<unknown>)=>void}={}):Promise<SearchResponse>{
+// Two-phase pipeline hooks (see news-evidence-store.ts): with evidenceStage="collect" a run that passes the
+// independent-evidence gate parks its evidence through storeEvidence and stops before any AI call.
+export type SearchOptions={publish?:boolean;draft?:boolean;images?:boolean;healthCheck?:boolean;saveHistory?:boolean;publicationContext?:string;background?:(task:Promise<unknown>)=>void;evidenceStage?:"collect";storeEvidence?:(results:SearchResult[])=>Promise<boolean>};
+type PublishContext={s:Record<string,any>;results:SearchResult[];providers:string[];providerAttempted:string[];providerDiagnostics:string[];personQuery:boolean};
+export async function search(env:Env,q:string,language:Locale,options:SearchOptions={}):Promise<SearchResponse>{
   if(disallowedContent(q)){const message=language==="ar"?"لا يعرض بيان المحتوى الإباحي أو الاستغلالي. جرّب البحث عن موضوع تعليمي أو معرفي آخر.":"BAYAN does not provide pornographic or exploitative content. Try an educational or knowledge-focused topic.";try{await saveSearch(env,q,language,intent(q),"blocked",0,"world",[])}catch(error){await recordRuntimeEventLimited(env,"search_log_persistence","blocked_search_log_write_failed",error)}return{query:q,locale:language,results:[],providers:["BAYAN content safety"],providerAttempted:["BAYAN content safety"],status:"insufficient",message};}
   // Reuse a recent, previously verified answer when its evidence is still source-diverse.
   // This avoids re-running the full external-provider fan-out for repeat queries.
@@ -1171,6 +1175,10 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   }
   for(const item of results){item.imageUrl=safePublicImageUrl(item.imageUrl);for(const source of item.sources||[])source.imageUrl=safePublicImageUrl(source.imageUrl);}
   const providers=[...new Set(candidates.map(x=>x.provider))];
+  return verifyAndPublish(env,q,language,options,{s,results,providers,providerAttempted,providerDiagnostics,personQuery});
+}
+async function verifyAndPublish(env:Env,q:string,language:Locale,options:SearchOptions,ctx:PublishContext):Promise<SearchResponse>{
+  const {s,results,providers,providerAttempted,providerDiagnostics,personQuery}=ctx;
   // Verification must reflect independent evidence, not the number of labels.
   // Wikipedia + Wikidata, or several aggregators pointing to one publisher, are not independent corroboration.
   const independentEvidence=(items:SearchResult[])=>{
@@ -1217,6 +1225,14 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
   const exactPersonConfirmed=options.publicationContext!==undefined||!personQuery||results.some(item=>normalizedEntityTitle(item.title)===normalizedEntityTitle(personQueryName(q))&&personEvidence(item));
   if(options.publish!==false&&independentlyVerified&&!exactPersonConfirmed){publishReason="draft_not_verified";publishReasonDetail="entity_identity_unconfirmed";}
   if(options.publish!==false&&options.draft===false){publishReason="draft_not_verified";publishReasonDetail="drafting_disabled_by_caller";}
+  if(options.evidenceStage==="collect"&&options.publish!==false&&independentlyVerified&&exactPersonConfirmed&&options.draft!==false&&classifySection(q,results,language)!=="unclassified"){
+    // Phase 1 of the two-phase pipeline: the independent-publisher gate above already passed with the full evidence set.
+    // Park that evidence for the next cron cycle instead of spending this invocation's remaining subrequests on AI calls.
+    let parked=false;
+    try{parked=options.storeEvidence?await options.storeEvidence(results):false}catch(error){await recordPublicationWarning(env,publicationFailureReason(error))}
+    if(parked)return{query:q,locale:language,results,providers,providerAttempted,status,publishReason:"evidence_stored",publishReasonDetail:("publishers="+corroboration.publishers.size+";hosts="+corroboration.hosts.size+";required="+configuredMin+";stored_for_next_cycle").slice(0,300)};
+    // Not parked (too large or write failed): continue with the single-run path below, exactly as before.
+  }
   if(results.length&&exactPersonConfirmed&&options.draft!==false&&!(options.publicationContext!==undefined&&options.publish!==false&&!independentlyVerified)){
     try{
       const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:"",reason:"ai_unavailable"}),7500))]);
@@ -1284,6 +1300,14 @@ const medicalQuery=/(pubmed|medical research|clinical trial|systematic review|me
     const failedProviderNames=new Set([...providerDiagnostics,...providerAttempted].filter(item=>/(?:timeout|connection_failure|invalid_response|request_failure|http_\d{3})/i.test(item)).map(item=>item.split(":")[0]));const allExternalFailed=results.length===0&&failedProviderNames.size>=3;const message=results.length?undefined:allExternalFailed?(language==="ar"?"تعذر الاتصال بعدة مزودين للبحث الخارجي. سجّل بيان أسباب الفشل وأعاد المحاولة عبر المصادر البديلة؛ لم تُعرض نتائج غير موثوقة. حاول مجددًا بعد قليل.":"Several external search providers failed to respond. BAYAN recorded failure categories and attempted fallback sources; no unverified results were shown. Please retry shortly."):(language==="ar"?"لم تُرجع محاولات البحث المتاحة نتائج ذات صلة كافية. جرّب إضافة سياق أو كتابة الاسم الكامل أو استخدام صياغة أخرى؛ لن يعرض بيان نتائج غير مرتبطة لمجرد ملء الصفحة.":"The available search attempts did not return sufficiently relevant results. Add context, use the full name, or try another phrasing; BAYAN will not show unrelated results just to fill the page.");
   providerAttempted.push(...providerDiagnostics.filter(item=>!providerAttempted.includes(item)));if(!options.healthCheck&&options.saveHistory!==false)try{await saveSearch(env,q,language,intent(q),status,results.length,classifySection(q,results,language),results)}catch(error){await recordRuntimeEventLimited(env,"search_log_persistence","search_log_write_failed",error)}
   return {query:q,locale:language,results,providers,providerAttempted,status,message,answer,answerStatus,articleSlug:publishedSlug,publishReason,publishReasonDetail};
+}
+// Phase 2 of the two-phase pipeline: draft, verify and publish from evidence parked by an earlier cycle.
+// It performs no evidence gathering; every gate in verifyAndPublish (independent publishers and hosts, claim
+// verification, image, publication quality) runs again on the stored evidence.
+export async function publishFromStoredEvidence(env:Env,q:string,language:Locale,results:SearchResult[],publicationContext:string):Promise<SearchResponse>{
+  const s=await settings(env);
+  const personQuery=!!(personLookup(q)||nameOnlyArabicQuery(q));
+  return verifyAndPublish(env,q,language,{publish:true,draft:true,images:true,saveHistory:false,publicationContext},{s,results,providers:["BAYAN stored evidence"],providerAttempted:["BAYAN stored evidence"],providerDiagnostics:[],personQuery});
 }
 function intent(q:string){
   const s=q.toLowerCase();
