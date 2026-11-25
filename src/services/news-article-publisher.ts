@@ -1,6 +1,8 @@
 import{anyAiProviderUsable}from"./ai";
 import type {Env,Locale} from "../types";
-import {search} from "./search";
+import {search,publishFromStoredEvidence} from "./search";
+import {PENDING_EVIDENCE_KEY,readPendingEvidence,serializePendingEvidence} from "./news-evidence-store";
+import type {PendingEvidence} from "./news-evidence-store";
 import {recordRuntimeEventLimited} from "../runtime-events";
 import {isD1QuotaError,logD1QuotaOncePerHour,persistD1Block} from "./d1-guard";
 import {independentEvidenceHost} from "./evidence-diversity";
@@ -62,7 +64,7 @@ async function publishNextArchivedNewsArticleInner(env:Env){
   const retryBefore=new Date(now-60*60*1000).toISOString();
   const lowEvidenceRetryBefore=new Date(now-6*60*60*1000).toISOString();
   // One read for both queue settings (every D1 statement counts against the per-invocation subrequest limit).
-  const settings=new Map<string,string>();try{const rows=await env.DB.prepare("SELECT key,value FROM admin_settings WHERE key IN (?,?)").bind("news_article_queue_language","news_article_queue_last_publisher").all<any>();for(const x of rows.results||[])settings.set(String(x.key),String(x.value))}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","settings_read_failed",error)}
+  const settings=new Map<string,string>();let pendingStamp="";try{const rows=await env.DB.prepare("SELECT key,value,updated_at FROM admin_settings WHERE key IN (?,?,?)").bind("news_article_queue_language","news_article_queue_last_publisher",PENDING_EVIDENCE_KEY).all<any>();for(const x of rows.results||[]){settings.set(String(x.key),String(x.value));if(String(x.key)===PENDING_EVIDENCE_KEY)pendingStamp=String(x.updated_at||"")}}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","settings_read_failed",error)}
   const preferred:Locale=String(settings.get("news_article_queue_language")||"ar")==="en"?"en":"ar";
   const futureLimit=new Date(now+5*60*1000).toISOString();
   const pick=async(language:Locale)=>{
@@ -71,29 +73,65 @@ async function publishNextArchivedNewsArticleInner(env:Env){
     const last={value:settings.get("news_article_queue_last_publisher")};
     return pickCandidate(candidates.results||[],recent.results||[],last?.value?String(last.value):null);
   };
-  let row=await pick(preferred);
-  if(!row)row=await pick(preferred==="ar"?"en":"ar");
+  // Phase 2 of the two-phase pipeline: evidence parked by an earlier cycle is drafted first, with no evidence fetches.
+  const pendingState=readPendingEvidence(settings.get(PENDING_EVIDENCE_KEY),now);
+  if(pendingState.state==="waiting")return{status:"evidence_waiting" as const,retryAfter:pendingState.retryAfter};
+  let row:any=null;let pendingEvidence:PendingEvidence|null=null;
+  if(pendingState.state==="ready"){
+    // Atomic claim: only the invocation that deletes the parked row may use it (cron and manual trigger cannot both draft it).
+    const claimed=await env.DB.prepare("DELETE FROM admin_settings WHERE key=? AND updated_at=?").bind(PENDING_EVIDENCE_KEY,pendingStamp).run();
+    if(Number((claimed.meta as any)?.changes||0)!==1)return{status:"already_claimed" as const,id:pendingState.evidence.id};
+    row=await env.DB.prepare("SELECT id,title,summary,language,article_attempts,publisher FROM news_archive WHERE id=? AND article_slug IS NULL AND article_attempts<2").bind(pendingState.evidence.id).first<any>();
+    if(row)pendingEvidence=pendingState.evidence;
+    else await recordRuntimeEventLimited(env,"news_archive_article_generation","pending_evidence_discarded","archive row already published or out of attempts; id="+pendingState.evidence.id);
+  }else if(pendingState.state==="expired"||pendingState.state==="invalid"){
+    try{await env.DB.prepare("DELETE FROM admin_settings WHERE key=?").bind(PENDING_EVIDENCE_KEY).run()}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","pending_evidence_cleanup_failed",error)}
+    await recordRuntimeEventLimited(env,"news_archive_article_generation","pending_evidence_discarded","state="+pendingState.state);
+  }
+  if(!row)row=await pick(preferred);
+  if(!row&&!pendingEvidence)row=await pick(preferred==="ar"?"en":"ar");
   if(!row)return{status:"idle" as const};
   const id=Number(row.id),language=row.language as Locale,title=String(row.title||"").trim();
   if(!Number.isInteger(id)||id<1||!title)return{status:"invalid_queue_item" as const};
   const stamp=new Date(now).toISOString();
-  const claim=await env.DB.prepare("UPDATE news_archive SET article_last_attempt_at=? WHERE id=? AND article_slug IS NULL AND article_attempts<2 AND "+ARTICLE_RETRY_DUE_SQL).bind(stamp,id,retryBefore,lowEvidenceRetryBefore,retryBefore).run();
-  if(Number((claim.meta as any)?.changes||0)!==1)return{status:"already_claimed" as const,id};
-  // Persist the next language before drafting so a failed Arabic attempt cannot
-  // starve English news forever (and vice versa).
-  const nextLanguage:Locale=language==="ar"?"en":"ar";
-  const selectedPublisher=String(row.publisher||"").trim().slice(0,160);
-  // Language rotation and last publisher in one statement instead of two.
-  try{const rotation:[string,string][]=[["news_article_queue_language",nextLanguage]];if(selectedPublisher)rotation.push(["news_article_queue_last_publisher",selectedPublisher]);await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES "+rotation.map(()=>"(?,?,?)").join(",")+" ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(...rotation.flatMap(([key,value])=>[key,value,stamp])).run()}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","queue_rotation_failed",error)}
+  if(!pendingEvidence){
+    const claim=await env.DB.prepare("UPDATE news_archive SET article_last_attempt_at=? WHERE id=? AND article_slug IS NULL AND article_attempts<2 AND "+ARTICLE_RETRY_DUE_SQL).bind(stamp,id,retryBefore,lowEvidenceRetryBefore,retryBefore).run();
+    if(Number((claim.meta as any)?.changes||0)!==1)return{status:"already_claimed" as const,id};
+    // Persist the next language before drafting so a failed Arabic attempt cannot
+    // starve English news forever (and vice versa).
+    const nextLanguage:Locale=language==="ar"?"en":"ar";
+    const selectedPublisher=String(row.publisher||"").trim().slice(0,160);
+    // Language rotation and last publisher in one statement instead of two.
+    try{const rotation:[string,string][]=[["news_article_queue_language",nextLanguage]];if(selectedPublisher)rotation.push(["news_article_queue_last_publisher",selectedPublisher]);await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES "+rotation.map(()=>"(?,?,?)").join(",")+" ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(...rotation.flatMap(([key,value])=>[key,value,stamp])).run()}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","queue_rotation_failed",error)}
+  }
   try{
-    const result=await search(env,title,language,{publish:true,draft:true,images:true,saveHistory:false,publicationContext:String(row.summary||"").slice(0,500)});
+    const publicationContext=String(row.summary||"").slice(0,500);
+    const parkEvidence=async(results:any[]):Promise<boolean>=>{
+      const value=serializePendingEvidence({id,language,results,storedAt:new Date().toISOString()});
+      if(!value)return false;
+      try{await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(PENDING_EVIDENCE_KEY,value,new Date().toISOString()).run();return true}
+      catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","pending_evidence_store_failed",error);return false}
+    };
+    const result=pendingEvidence
+      ?await publishFromStoredEvidence(env,title,language,pendingEvidence.results,publicationContext)
+      :await search(env,title,language,{publish:true,draft:true,images:true,saveHistory:false,publicationContext,evidenceStage:"collect",storeEvidence:parkEvidence});
     const slug=String(result.articleSlug||"").trim();
     const resultReason=String(result.publishReason||"");
+    if(resultReason==="evidence_stored"){
+      const storedDetail=String(result.publishReasonDetail||"stored_for_next_cycle").slice(0,300);
+      await recordRuntimeEventLimited(env,"news_archive_article_generation","evidence_stored","id="+id+";language="+language+";"+storedDetail);
+      return{status:"evidence_stored" as const,id,language,publishReasonDetail:storedDetail};
+    }
     if(resultReason==="ai_unavailable"){
       const backoffAttempt=Math.max(0,Number(row.article_attempts||0));
       const retryMinutes=Math.min(120,15*Math.pow(2,backoffAttempt));
       await env.DB.prepare("UPDATE news_archive SET article_last_reason='ai_unavailable',article_last_detail=?,article_last_attempt_at=? WHERE id=?").bind(JSON.stringify({reason:"all_providers_unavailable",retryMinutes,backoffAttempt}),new Date(now).toISOString(),id).run();
       await recordRuntimeEventLimited(env,"news_archive_article_generation","ai_unavailable_deferred",JSON.stringify({id,language,retryMinutes,attemptsPreserved:Number(row.article_attempts||0)}));
+      if(pendingEvidence){
+        // Keep the parked evidence (same storedAt, so the 4 h TTL still applies) and retry drafting after the backoff, without re-fetching.
+        const keep=serializePendingEvidence({id,language,results:pendingEvidence.results,storedAt:pendingEvidence.storedAt,retryAfter:new Date(now+retryMinutes*60*1000).toISOString()});
+        if(keep)try{await env.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES(?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(PENDING_EVIDENCE_KEY,keep,new Date().toISOString()).run()}catch(error){await recordRuntimeEventLimited(env,"news_queue_settings","pending_evidence_keep_failed",error)}
+      }
       return{status:"attempted_failed" as const,id,language,publishReason:"ai_unavailable",publishReasonDetail:"all_providers_unavailable",retryMinutes,attemptsPreserved:Number(row.article_attempts||0)};
     }
     if(shouldCountArticleDraftAttempt(resultReason)){

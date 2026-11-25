@@ -201,8 +201,9 @@ return notFoundResponse(u.searchParams.get("lang")==="en"?"en":"ar");
       // The publisher reports exhausted/unavailable D1 budget without throwing. Do not
       // turn that expected quota state into a second D1 telemetry write.
       if(result.status==="budget_exhausted")return;
-      if(result.status!=="idle"){
-        const level=result.status==="published"?"INFO":"WARN";
+      // evidence_waiting is the quiet backoff between the two pipeline phases: no telemetry write per tick.
+      if(result.status!=="idle"&&result.status!=="evidence_waiting"){
+        const level=result.status==="published"||result.status==="evidence_stored"?"INFO":"WARN";
         const details=JSON.stringify({subs:counting.stats,...result}).slice(0,900);
         try{await env.DB.prepare("INSERT INTO runtime_events(level,kind,message,created_at) VALUES(?,?,?,?)").bind(level,"news_archive_article_generation",details,new Date().toISOString()).run()}catch(error){await recordRuntimeEventLimited(env,"worker_operation","operation_failed",error)}
         console.info("news_archive_article_generation",details);
