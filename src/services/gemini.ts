@@ -3,7 +3,7 @@ export type GeminiEnv = { GEMINI_API_KEY?: string; GEMINI_MODEL?: string };
 export type GeminiFailureKind = "no_key" | "auth" | "rate_limited" | "quota" | "blocked" | "http" | "timeout" | "bad_response";
 export type GeminiResult =
   | { ok: true; text: string; model: string; finishReason?: string }
-  | { ok: false; kind: GeminiFailureKind; status?: number; detail: string };
+  | { ok: false; kind: GeminiFailureKind; status?: number; detail: string; retryAfterMs?: number };
 export type GeminiOptions = { triedModels?: string[];
   system?: string;
   json?: boolean;
@@ -48,6 +48,14 @@ const redact = (value: string, key: string): string => {
   return out.replace(/AIza[0-9A-Za-z_\-]{20,}|AQ\.[0-9A-Za-z_\-]{20,}/g, "[redacted]");
 };
 
+/** RetryInfo from a 429 body, e.g. "retryDelay":"37s". Bounded to ten minutes so a bad value cannot park the provider. */
+export function parseRetryDelayMs(detailsText: string): number | undefined {
+  const match = /"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/i.exec(String(detailsText || ""));
+  if (!match) return undefined;
+  const ms = Math.round(Number(match[1]) * 1000);
+  return Number.isFinite(ms) && ms > 0 ? Math.min(ms, 10 * 60_000) : undefined;
+}
+
 export async function callGemini(env: GeminiEnv, prompt: string, options: GeminiOptions = {}): Promise<GeminiResult> {
   const key = String(env.GEMINI_API_KEY ?? "").trim();
   if (!key) return { ok: false, kind: "no_key", detail: "GEMINI_API_KEY is not configured" };
@@ -85,8 +93,13 @@ export async function callGemini(env: GeminiEnv, prompt: string, options: Gemini
         return { ok: false, kind: "auth", status: response.status, detail: redact(apiMessage, key) };
       }
       if (response.status === 429 || response.status === 503 || apiStatus === "RESOURCE_EXHAUSTED") {
-        const quota = /quota|per day|daily|billing/i.test(apiMessage);
-        const failure: GeminiResult = response.status === 503 ? { ok: false, kind: "http", status: 503, detail: redact(apiMessage, key) } : { ok: false, kind: quota ? "quota" : "rate_limited", status: response.status, detail: redact(apiMessage, key) };
+        // Google words per-minute and per-day 429s the same ("exceeded your current quota ... billing"); only the quota id
+        // (…PerDay…) tells them apart. A per-minute limit clears in seconds and must not open a many-hour breaker.
+        let detailsText = "";
+        try { detailsText = JSON.stringify(data?.error?.details ?? ""); } catch { detailsText = ""; }
+        const quota = /per.?day|daily|requestsperday|limit:\s*0\b/i.test(apiMessage + " " + detailsText);
+        const retryAfterMs = parseRetryDelayMs(detailsText);
+        const failure: GeminiResult = response.status === 503 ? { ok: false, kind: "http", status: 503, detail: redact(apiMessage, key) } : { ok: false, kind: quota ? "quota" : "rate_limited", status: response.status, detail: redact(apiMessage, key), ...(retryAfterMs ? { retryAfterMs } : {}) };
         const tried = [...(options.triedModels ?? []), model];
         const next = FALLBACK_MODELS.find((m) => !tried.includes(m));
         if (next) {

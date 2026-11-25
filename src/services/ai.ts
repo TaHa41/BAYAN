@@ -1,16 +1,27 @@
 import type{Env,Locale,SearchResult}from"../types";
 import{callCompatProviders,compatProvidersConfigured}from"./openai-compatible";import{classifyOpenAIFailure,classifyWorkersAIFailure,classifyGeminiFailure,getProviderBreaker,updateProviderBreaker,recordProviderDiagnostic,normalizeDraftJson,isOpenAIQuotaFailure,workersAIResponseText}from"./ai-provider-resilience";import{notify}from"./telegram";import{callGemini}from"./gemini";export{normalizeDraftJson};
 import{recordRuntimeEventLimited}from"../runtime-events";
+import{createWorkersAiMeter,estimateCallNeurons,neuronBudget,neuronsFromResponse}from"./ai-budget";
+import type{AiPriority,WorkersAiMeter}from"./ai-budget";
 export const DEFAULT_WORKERS_AI_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8";
 /** Workers AI with model fallback: the configured model first, then two other models, so one unavailable model never leaves a page without a write-up. */
 export const WORKERS_AI_FALLBACKS = ["@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/mistralai/mistral-small-3.1-24b-instruct"];
-export async function runWorkersAi(env: Pick<Env, "AI" | "NEWS_AI_MODEL">, input: any, preferLarge = false): Promise<any> {
+export async function runWorkersAi(env: Pick<Env, "AI" | "NEWS_AI_MODEL">, input: any, preferLarge = false, meter?: WorkersAiMeter): Promise<any> {
   let last: unknown = new Error("workers_ai_unavailable");
   // Article drafts try the large model first (unless the owner pinned a model): the 8B model returned ~6 sentences where 12 sentences and 4 headings are required.
+  // When the large model no longer fits the day's budget the next choice is the 24B model, not the 8B one: it is far cheaper than 70B on output and still writes full articles.
   const pinned = String((env as any).NEWS_AI_MODEL || "").trim() !== "";
-  const order = preferLarge && !pinned ? [WORKERS_AI_FALLBACKS[0], workersAiModel(env), ...WORKERS_AI_FALLBACKS.slice(1)] : [workersAiModel(env), ...WORKERS_AI_FALLBACKS];
+  const order = preferLarge && !pinned ? [WORKERS_AI_FALLBACKS[0], WORKERS_AI_FALLBACKS[1], workersAiModel(env)] : [workersAiModel(env), ...WORKERS_AI_FALLBACKS];
   for (const model of [...new Set(order)]) {
-    try { const r = await (env.AI as any).run(model, input); if (workersAIResponseText(r)) return r; last = new Error("empty_response"); } catch (error) { last = error; if (/too many subrequests/i.test(String((error as any)?.message ?? error))) break; /* another model cannot succeed once the per-invocation limit is hit */ }
+    // With a meter, a model is skipped when its estimated cost does not fit the remaining neuron budget (the large model needs headroom for several calls).
+    if (meter && !(await meter.allow(model, estimateCallNeurons(model, input)))) { last = new Error("workers_ai_budget_exhausted: " + model); continue; }
+    try {
+      const r = await (env.AI as any).run(model, input);
+      const text = workersAIResponseText(r);
+      if (meter) await meter.charge(model, neuronsFromResponse(model, input, r, text));
+      if (text) return r;
+      last = new Error("empty_response");
+    } catch (error) { last = error; if (/too many subrequests/i.test(String((error as any)?.message ?? error))) break; /* another model cannot succeed once the per-invocation limit is hit */ }
   }
   throw last;
 }
@@ -31,7 +42,7 @@ async function callGeminiText(env:Env,provider:string,system:string,prompt:strin
   }
   const result=await callGemini(env,prompt,{system,...options});
   if(result.ok)return result.text;
-  const failure=classifyGeminiFailure(result.kind,result.status,result.detail);
+  const failure=classifyGeminiFailure(result.kind,result.status,result.detail,(result as {retryAfterMs?:number}).retryAfterMs);
   const state=await updateProviderBreaker(env,"gemini",failure);
   await recordProviderDiagnostic(env,failure);
   await recordAiFailure(env,provider,result.detail);
@@ -272,7 +283,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
       }else await handleOpenAIResponseFailure(env,"OpenAI draft",response);
     }catch(error){await recordAiFailure(env,"OpenAI draft",aiFailureDetail(error));}
     if(env.AI&&!(await getProviderBreaker(env,"workers_ai")).open)try{
-      const response=await runWorkersAi(env,{messages,max_tokens:3600,temperature:0,response_format:{type:"json_object"}},true);
+      const response=await runWorkersAi(env,{messages,max_tokens:3600,temperature:0,response_format:{type:"json_object"}},true,createWorkersAiMeter(env,backgroundBudget?"background":"foreground"));
       const answer=workersAIResponseText(response);
       if(answer)return charge(answer);
       await recordAiFailure(env,"Workers AI draft","empty_response");
@@ -291,7 +302,12 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
   if(!sections)return{status:"mixed" as const,answer:"",sources:evidence.flatMap(item=>item.sources||[]),reason:"draft_not_verified" as const,verification:{removedSentences:0,remainingSentences:0,retried,failureStage:"invalid_json_or_source_id"}};
   let checked=verifySections(sections);
   totalRemoved+=checked.rejected.length;
-  if(checked.rejected.length&&!retried){
+  // Rejected sentences are simply dropped, so an article that still meets the usefulness thresholds needs no second (paid) generation.
+  const meetsUsefulness=(candidate:{sections:any[]})=>{
+    const text=candidate.sections.map(section=>"## "+section.heading+"\n\n"+section.sentences.map((sentence:any)=>sentence.text).join(" ")).join("\n\n");
+    return text.length>=1800&&candidate.sections.reduce((n,section)=>n+section.sentences.length,0)>=12&&candidate.sections.length>=4;
+  };
+  if(checked.rejected.length&&!retried&&!meetsUsefulness(checked)){
     retried=true;
     const rejected=checked.rejected.slice(0,8).join(" | ");
     const retryRaw=await generate("Regenerate the article JSON once. The following sentences failed evidence verification and must be omitted or replaced with directly supported claims: "+rejected+". Each sentence must cite valid sourceIds.");
@@ -313,7 +329,7 @@ export async function draftArticle(env:Env,question:string,locale:Locale,evidenc
   return{status:verified?"verified" as const:"mixed" as const,answer:body,sources:evidence.flatMap(item=>item.sources||[]),reason:verified?undefined:"draft_not_verified" as const,verification:{sentenceCount,headings,rejectedSentences:totalRemoved,removedSentences:totalRemoved,remainingSentences:sentenceCount,retried}};
 
 }
-export async function ask(env:Env,question:string,locale:Locale,evidence:SearchResult[]){
+export async function ask(env:Env,question:string,locale:Locale,evidence:SearchResult[],priority:AiPriority="foreground"){
   if(!evidence.length)return{status:"insufficient" as const,answer:locale==="ar"?"لا أملك أدلة موثقة كافية للإجابة بثقة.":"I do not have enough verified evidence to answer confidently.",sources:[]};
   const evidenceText=JSON.stringify(evidence).slice(0,18000);
   const geminiSystem=locale==="ar"
@@ -341,7 +357,7 @@ export async function ask(env:Env,question:string,locale:Locale,evidence:SearchR
     const system=locale==="ar"
       ?"أنت بيان. أجب بالعربية الفصحى فقط وبالاعتماد على الأدلة المرفقة وحدها. لا تخترع أسماء أو أرقامًا أو مصادر. ميّز الحقائق من الاستنتاجات، واذكر بوضوح ما لا تثبته الأدلة."
       :"You are BAYAN. Answer in English only using only the supplied evidence. Do not invent names, numbers, or sources. Distinguish facts from inference and state clearly what the evidence does not establish.";
-    const r=await runWorkersAi(env,{messages:[{role:"system",content:system},{role:"user",content:"Question: "+question+"\nEvidence: "+evidenceText}],max_tokens:1200,temperature:0.1});
+    const r=await runWorkersAi(env,{messages:[{role:"system",content:system},{role:"user",content:"Question: "+question+"\nEvidence: "+evidenceText}],max_tokens:1200,temperature:0.1},false,createWorkersAiMeter(env,priority));
     const answer=workersAIResponseText(r);
     if(answer && languageConsistent(answer,locale))return{status:independentSourceCount(env,evidence)>=2&&!answerHasUnsupportedSpecifics(answer,evidence,question)?"verified" as const:"mixed" as const,answer,sources:evidence.flatMap(x=>x.sources)};
     await recordAiFailure(env,"Workers AI answer",answer?"language_mismatch":"empty_response");
@@ -355,6 +371,6 @@ export const anyAiProviderUsable=async(env:Env)=>{
   if(compatProvidersConfigured(env).length)return true;
   if(String(env.GEMINI_API_KEY||"").trim()&&!(await getProviderBreaker(env,"gemini")).open)return true;
   if(String(env.OPENAI_API_KEY||"").trim()&&await openAIAllowed(env))return true;
-  if(env.AI&&!(await getProviderBreaker(env,"workers_ai")).open)return true;
+  if(env.AI&&!(await getProviderBreaker(env,"workers_ai")).open&&(await neuronBudget(env,"background")).allowed)return true;
   return false;
 };

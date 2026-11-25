@@ -10,6 +10,7 @@ import { wikiApi, type WikiApi } from "../v2/src/wiki";
 import { news } from "./services/news";
 import { api } from "./routes/api";
 import { callGemini, resolveGeminiModel } from "./services/gemini";
+import { neuronBudget } from "./services/ai-budget";
 import { track } from "./db";
 import { runWorkersAi, workersAiModel } from "./services/ai";
 import { analyticsExcluded, visitorId } from "./security";
@@ -18,7 +19,7 @@ import { fx, gold, prayerTimes, weather } from "./services/live";
 
 // Bump this on every change under v2/: the deploy workflow only watches src/**, so this keeps v2-only edits deploying.
 // It is also sent as a response header so the live build can be verified.
-export const V2_BUILD = "2026-11-25.1";
+export const V2_BUILD = "2026-11-25.2";
 
 // Every public page is served by v2 now. News, research and search reuse the same services (news feeds, article builder, full search).
 
@@ -72,6 +73,8 @@ export async function pipelineStatus(env: Env): Promise<unknown> {
     out.providerFailures = (pf?.results || []).map((x: any) => ({ at: String(x.created_at || "").slice(0, 19), message: String(x.message || "").replace(/(key|token|secret|authorization)["'=:\s]+[^\s"',}]+/gi, "$1=…").slice(0, 200) }));
     const tick: any = await e.DB.prepare("SELECT value FROM admin_settings WHERE key='scheduled_last_tick' LIMIT 1").first();
     out.lastScheduledTick = tick?.value ? String(tick.value).slice(0, 24) : "never_recorded";
+    // Workers AI neurons spent today (UTC) against the governor's caps; the daily live-status block copies this so the budget is visible without opening the dashboard.
+    try { const b = await neuronBudget(e, "background"); out.aiBudget = { workersAiNeuronsUsedToday: b.used, backgroundCap: b.cap, totalDaily: b.total, backgroundAllowed: b.allowed, resetsAtUtc: b.resetsAt }; } catch { /* best effort */ }
     // One tiny write, cached 15 minutes per isolate: tells whether D1 still accepts writes (the free tier also has a daily write limit).
     out.writeProbe = await swr("probe:d1-write", 15 * 60_000, 15 * 60_000, async () => {
       try { const now = new Date().toISOString(); await e.DB.prepare("INSERT INTO admin_settings(key,value,updated_at) VALUES('health_write_probe',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(now, now).run(); return { ok: true }; }
