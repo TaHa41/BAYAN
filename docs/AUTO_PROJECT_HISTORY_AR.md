@@ -464,3 +464,8 @@
 - Commit: `fd57c657d76e861eebd0281695bc35fddf44caa3`
 - الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/index.ts;M	src/services/news-article-publisher.ts;A	src/services/news-evidence-store.ts;M	src/services/search.ts;M	src/v2-bridge.ts;A	tests/news-article-publisher-two-phase.test.ts;A	tests/news-evidence-store.test.ts;A	tests/publish-from-stored-evidence.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-25T06:43:57Z — docs: record first post-deploy measurement and fetchCap finding for the two-phase pipeline 
+- Commit: `2fcff8c1ca2a7c12cfe26b4c8482fc5948f75ebd`
+- الملفات: M	docs/START_HERE_AR.md 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
