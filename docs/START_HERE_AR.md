@@ -4,7 +4,7 @@
 
 <!-- BAYAN_LIVE_STATUS_START -->
 ## الحالة الحية (تُحدَّث آليًا بعد كل نشر — لا تعدّلها يدويًا)
-- آخر تحديث: 2026-11-25T06:42:25.698Z
+- آخر تحديث: 2026-11-25T08:24:47.527Z
 - V2_BUILD في الشيفرة: `2026-11-25.1`
 - آخر نشر: failure للكوميت `62881abf` (https://github.com/TaHa41/BAYAN/actions/runs/45562310961)
 - نتائج الـjobs: deploy=success، verify-production=failure
@@ -30,6 +30,9 @@
   - `/news`: حالة 200، 410/69، كاش HIT، مُرسِم v2
   - `/politics`: حالة 200، 361/64، كاش HIT، مُرسِم v2
 - آخر الـcommits على main:
+  - 19fdbb7 2026-11-25 docs: automatically record project history
+  - 2fcff8c 2026-11-25 docs: record first post-deploy measurement and fetchCap finding for the two-phase pipeline
+  - 5289039 2026-11-25 docs: automatically refresh live status
   - 65633ce 2026-11-25 docs: automatically record project history
   - fd57c65 2026-11-25 Two-phase news pipeline: gather and gate evidence in one cron cycle, draft from the parked evidence in the next
   - 25934a3 2026-11-24 docs: automatically refresh live status
@@ -37,9 +40,6 @@
   - c8f22ae 2026-11-24 docs: automatically record project history
   - 7192b7c 2026-11-24 Workers AI quota breaker and provider pre-flight (skip evidence gathering when no provider is usable); tests; d
   - 985de48 2026-11-24 docs: automatically refresh live status
-  - ee2297e 2026-11-23 docs: automatically refresh live status
-  - 9501496 2026-11-23 docs: automatically refresh live status
-  - 82209de 2026-11-23 docs: automatically refresh live status
 <!-- BAYAN_LIVE_STATUS_END -->
 
 ## الملخص التنفيذي الراهن (21 نوفمبر 2026) — اقرأه بعد «الحالة الحية»
