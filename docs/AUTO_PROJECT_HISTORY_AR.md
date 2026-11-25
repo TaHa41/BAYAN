@@ -459,3 +459,8 @@
 - Commit: `7192b7c6c487d6efb74d93253138f683b59c7e3d`
 - الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/services/ai.ts;M	src/services/news-article-publisher.ts;M	src/v2-bridge.ts;A	tests/provider-preflight.test.ts 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-25T06:38:51Z — Two-phase news pipeline: gather and gate evidence in one cron cycle, draft from the parked evidence in the next (no evidence fetches in phase 2); tests; docs; V2_BUILD 2026-11-25.1 
+- Commit: `fd57c657d76e861eebd0281695bc35fddf44caa3`
+- الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	src/index.ts;M	src/services/news-article-publisher.ts;A	src/services/news-evidence-store.ts;M	src/services/search.ts;M	src/v2-bridge.ts;A	tests/news-article-publisher-two-phase.test.ts;A	tests/news-evidence-store.test.ts;A	tests/publish-from-stored-evidence.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
