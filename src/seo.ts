@@ -10,7 +10,7 @@ import {articleQuality} from "../v2/src/quality";
 export function robots(){
   // Advertise only the general sitemap. Google News sitemaps are useful only
   // while eligible, recent, full news articles exist; never advertise an empty feed.
-  return text("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nDisallow: /review\nDisallow: /saved\nSitemap: "+ORIGIN+"/sitemap.xml\n");
+  return text("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nDisallow: /review\nDisallow: /saved\nDisallow: /research\nSitemap: "+ORIGIN+"/sitemap.xml\n");
 }
 // /ads.txt is served only when the owner sets the ADS_TXT variable (the lines the ad network provides).
 // Nothing is invented: unset means 404, and only well-formed ads.txt lines, comments and variables are emitted.

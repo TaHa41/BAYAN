@@ -5,7 +5,7 @@ import type { Source } from "./evidence";
 import type { LiveStory } from "./ui";
 import { articleQuality } from "./quality";
 
-export interface Article { slug: string; section: string; lang: Lang; title: string; summary: string; body: string; imageUrl: string; imageAlt: string; sources: Source[]; updatedAt: string; archived: boolean; complete: boolean }
+export interface Article { slug: string; section: string; lang: Lang; title: string; summary: string; body: string; imageUrl: string; imageAlt: string; sources: Source[]; updatedAt: string; createdAt?: string; archived: boolean; complete: boolean }
 export interface Store {
   latest(lang: Lang, limit: number): Promise<Article[]>;
   bySection(section: string, lang: Lang, limit: number): Promise<Article[]>;
@@ -24,13 +24,13 @@ function parseSources(raw: unknown): Source[] {
 }
 function toArticle(row: any, archived: boolean): Article {
   const a: Article = { slug: String(row.slug || ""), section: String(row.section || ""), lang: row.language === "en" ? "en" : "ar", title: String(row.title || ""), summary: String(row.summary || ""),
-    body: String(row.body || row.summary || ""), imageUrl: https(row.image_url) ? String(row.image_url) : "", imageAlt: String(row.image_alt || row.title || ""), sources: parseSources(row.sources_json), updatedAt: String(row.updated_at || ""), archived, complete: false };
+    body: String(row.body || row.summary || ""), imageUrl: https(row.image_url) ? String(row.image_url) : "", imageAlt: String(row.image_alt || row.title || ""), sources: parseSources(row.sources_json), updatedAt: String(row.updated_at || ""), createdAt: row.created_at ? String(row.created_at) : undefined, archived, complete: false };
   // Archive rows are reference entries, never "complete articles"; published rows must pass the quality gate.
   return { ...a, complete: !archived && articleQuality(a).complete };
 }
 
 export function d1Store(db: D1Database): Store {
-  const cols = "slug,section,language,title,summary,body,sources_json,image_url,image_alt,updated_at";
+  const cols = "slug,section,language,title,summary,body,sources_json,image_url,image_alt,updated_at,created_at";
   return {
     // Only complete articles are listed (full body, 2+ independent sources, topic image). Stubs are filtered out in code,
     // so we read a few more rows than requested; nothing is deleted or rewritten.

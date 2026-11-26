@@ -10,7 +10,7 @@ import { topicsFor } from "./topics";
 import { STATIC_SLUGS, staticPage, type StaticSlug } from "./pages";
 import type { WikiApi } from "./wiki";
 import { adminBody } from "./admin";
-import { articleBody, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, wikiEntryBody, siteJsonLd, sectionJsonLd, sectionsHubBody, sectionsJsonLd, staticBody, searchResultsBody, researchBody, relatedStories, savedBody, askBody, contributeBody, type ResearchArticle, type ContributeValues, type SearchItem, pricesBody, weatherBody, prayerBody, tickerItems, esc, type ClassifiedStory, type LiveStory, type TickerItem } from "./ui";
+import { articleBody, articleJsonLd, homeBody, layout, newsBody, notFoundBody, plain, searchBody, SITE, sectionBody, wikiEntryBody, siteJsonLd, sectionJsonLd, sectionsHubBody, sectionsJsonLd, staticBody, searchResultsBody, researchBody, relatedStories, savedBody, askBody, contributeBody, type ResearchArticle, type ContributeValues, type SearchItem, pricesBody, weatherBody, prayerBody, tickerItems, esc, type ClassifiedStory, type LiveStory, type TickerItem } from "./ui";
 
 export interface Env extends AiEnv { DB: D1Database; ADS_TXT?: string; SITE_ORIGIN?: string; BAYAN_AI_MANAGER_TOKEN?: string }
 export interface Deps { providers: (lang: Lang) => Provider[]; store: (env: Env) => Store; liveNews?: (env: Env, lang: Lang) => Promise<LiveStory[]>; wiki?: WikiApi; live?: LiveApi; aiStatus?: (env: Env) => Promise<unknown>; search?: (env: Env, q: string, lang: Lang, request: Request) => Promise<{ items: SearchItem[]; notice?: string } | null>; research?: (env: Env, story: LiveStory, lang: Lang, request: Request) => Promise<ResearchArticle | null>; contribute?: (env: Env, data: { title: string; body: string; source: string; section: string }, lang: Lang, request: Request) => Promise<{ ok: boolean }> }
@@ -62,11 +62,11 @@ export function createHandler(deps: Deps) {
       for (const st of [...live, ...archived]) { const key = plain(st.title).toLowerCase(); if (key && !seen.has(key)) { seen.add(key); out.push({ ...st, section: classifyStory(plain(st.title), plain(st.summary)) }); } }
       return out;
     };
-    const page = (o: { title: string; description: string; body: string; path: string; active?: string; image?: string; jsonLd?: unknown; noindex?: boolean; ticker?: TickerItem[]; progress?: boolean }, status = 200, cache?: string) =>
+    const page = (o: { title: string; description: string; body: string; path: string; active?: string; image?: string; jsonLd?: unknown; noindex?: boolean; ogType?: "website" | "article"; ticker?: TickerItem[]; progress?: boolean }, status = 200, cache?: string) =>
       html(layout({ lang, origin, ...o }), status, cache);
 
     if (path === "/healthz") return json({ ok: true, service: "bayan-v2" }); // "/health" is the Health section page, so the JSON probe lives here
-    if (path === "/robots.txt") return text(`User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nSitemap: ${origin}/sitemap.xml\n`);
+    if (path === "/robots.txt") return text(`User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin\nDisallow: /research\nSitemap: ${origin}/sitemap.xml\n`);
     if (path === "/ads.txt") return adsTxt(env);
 
     if (path === "/api/admin/ai-test") {
@@ -135,8 +135,8 @@ export function createHandler(deps: Deps) {
     if (art) {
       let a = null; try { a = await store.get(decodeURIComponent(art[1]), lang); } catch (error) { a = null; }
       if (!a) return page({ title: SITE.name, description: "", body: notFoundBody(lang), path, noindex: true }, 404);
-      const ld = { "@context": "https://schema.org", "@type": "Article", headline: a.title, image: [a.imageUrl], dateModified: a.updatedAt, inLanguage: lang, publisher: { "@type": "Organization", name: "BAYAN" } };
-      return page({ title: `${a.title} | ${SITE.name}`, description: plain(a.summary), body: articleBody(lang, a), path, active: a.section, image: a.complete ? a.imageUrl : undefined, jsonLd: a.complete ? ld : undefined, noindex: !a.complete, progress: true });
+      const ld = articleJsonLd(a, lang, origin);
+      return page({ title: `${a.title} | ${SITE.name}`, description: plain(a.summary), body: articleBody(lang, a), path, active: a.section, image: a.complete ? a.imageUrl : undefined, jsonLd: a.complete ? ld : undefined, noindex: !a.complete, ogType: "article", progress: true });
     }
 
     // Live tools: server-rendered from the same services v1 used (Frankfurter/ExchangeRate, gold, Open-Meteo, AlAdhan).

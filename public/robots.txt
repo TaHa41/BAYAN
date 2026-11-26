@@ -4,4 +4,5 @@ Disallow: /api/
 Disallow: /admin
 Disallow: /review
 Disallow: /saved
+Disallow: /research
 Sitemap: https://bayan.tahaomar411.workers.dev/sitemap.xml
