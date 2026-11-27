@@ -4,7 +4,7 @@
 
 <!-- BAYAN_LIVE_STATUS_START -->
 ## الحالة الحية (تُحدَّث آليًا بعد كل نشر — لا تعدّلها يدويًا)
-- آخر تحديث: 2026-11-27T08:34:38.680Z
+- آخر تحديث: 2026-11-27T21:11:26.590Z
 - V2_BUILD في الشيفرة: `2026-11-25.3`
 - آخر نشر: failure للكوميت `6bc88f18` (https://github.com/TaHa41/BAYAN/actions/runs/45966529721)
 - نتائج الـjobs: deploy=success، verify-production=failure
@@ -30,6 +30,7 @@
   - `/news`: حالة 200، 293/35، كاش HIT، مُرسِم v2
   - `/politics`: حالة 200، 237/16، كاش HIT، مُرسِم v2
 - آخر الـcommits على main:
+  - a53b7b1 2026-11-27 docs: automatically refresh live status
   - 12a061c 2026-11-27 docs: automatically record project history
   - 149fddb 2026-11-27 SEO: full social cards with PNG brand card and logo, rich Article/NewsArticle JSON-LD (dates, author, publisher
   - c128bc7 2026-11-27 AI quota governor: meter Workers AI neurons (70% background / 92% visitors), cost-aware model order, real reset
@@ -39,7 +40,6 @@
   - 7253248 2026-11-25 docs: automatically refresh live status
   - 50343b5 2026-11-25 docs: automatically refresh live status
   - 19fdbb7 2026-11-25 docs: automatically record project history
-  - 2fcff8c 2026-11-25 docs: record first post-deploy measurement and fetchCap finding for the two-phase pipeline
 <!-- BAYAN_LIVE_STATUS_END -->
 
 ## الملخص التنفيذي الراهن (21 نوفمبر 2026) — اقرأه بعد «الحالة الحية»
