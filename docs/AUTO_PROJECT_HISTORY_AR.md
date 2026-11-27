@@ -469,3 +469,13 @@
 - Commit: `2fcff8c1ca2a7c12cfe26b4c8482fc5948f75ebd`
 - الملفات: M	docs/START_HERE_AR.md 
 - المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-27T08:30:59Z — AI quota governor: meter Workers AI neurons (70% background / 92% visitors), cost-aware model order, real reset times for breakers, Gemini per-minute vs per-day 429, skip discarded short answer, retry only when the article is not useful; health + live-status budget; tests; docs; V2_BUILD 2026-11-25.2 
+- Commit: `c128bc7005d309c1d3d6c18aeb2647d3dd8b6fa3`
+- الملفات: M	docs/START_HERE_AR.md;M	scripts/source-contract-smoke.mjs;M	scripts/update-live-status.mjs;A	src/services/ai-budget.ts;M	src/services/ai-provider-resilience.ts;M	src/services/ai.ts;M	src/services/gemini.ts;M	src/services/search.ts;M	src/types.ts;M	src/v2-bridge.ts;M	tests/ai-draft.test.ts;A	tests/ai-neuron-budget.test.ts;M	tests/gemini-fallback.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
+
+### 2026-11-27T08:30:59Z — SEO: full social cards with PNG brand card and logo, rich Article/NewsArticle JSON-LD (dates, author, publisher logo, citations), /research disallowed in robots and nofollowed, created_at in article model; tests; docs section 51; V2_BUILD 2026-11-25.3 
+- Commit: `149fddbe513727e1fb999daeeed2dbc8267da4e2`
+- الملفات: M	docs/START_HERE_AR.md;A	public/logo-512.png;A	public/og-bayan.png;M	public/robots.txt;M	scripts/source-contract-smoke.mjs;M	src/seo.ts;M	src/v2-bridge.ts;M	v2/src/store.ts;M	v2/src/ui.ts;M	v2/src/worker.ts;A	v2/tests/seo-head.test.ts 
+- المراجعة: راجع طلب الدمج/رسالة commit والاختبارات المرتبطة قبل اعتبار العمل مكتملًا.
