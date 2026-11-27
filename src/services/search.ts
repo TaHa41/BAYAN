@@ -1235,10 +1235,14 @@ async function verifyAndPublish(env:Env,q:string,language:Locale,options:SearchO
   }
   if(results.length&&exactPersonConfirmed&&options.draft!==false&&!(options.publicationContext!==undefined&&options.publish!==false&&!independentlyVerified)){
     try{
-      const drafted=await Promise.race([ask(env,q,language,results),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:"",reason:"ai_unavailable"}),7500))]);
-      if("reason" in drafted&&drafted.reason==="ai_unavailable"&&options.publish!==false){publishReason="ai_unavailable";publishReasonDetail="short_answer_ai_unavailable";}
-      if(drafted?.answer){answer=drafted.answer;answerStatus=independentlyVerified?drafted.status:"mixed";}
-      else if(options.publish!==false){publishReason="ai_unavailable";publishReasonDetail="short_answer_empty_or_ai_unavailable";}
+      // The queue publisher only uses the long article; its short answer was discarded, so that run skips the extra AI call (one paid call saved per attempt).
+      const queuePublication=options.publish===true&&options.publicationContext!==undefined;
+      if(!queuePublication){
+        const drafted=await Promise.race([ask(env,q,language,results,options.publish!==false?"background":"foreground"),new Promise<any>(resolve=>setTimeout(()=>resolve({status:"mixed",answer:"",reason:"ai_unavailable"}),7500))]);
+        if("reason" in drafted&&drafted.reason==="ai_unavailable"&&options.publish!==false){publishReason="ai_unavailable";publishReasonDetail="short_answer_ai_unavailable";}
+        if(drafted?.answer){answer=drafted.answer;answerStatus=independentlyVerified?drafted.status:"mixed";}
+        else if(options.publish!==false){publishReason="ai_unavailable";publishReasonDetail="short_answer_empty_or_ai_unavailable";}
+      }
       const articleTitle=options.publicationContext!==undefined?q:(results.find(x=>x.title&&x.summary)?.title||"");
       const articleSummary=results.find(x=>x.title&&x.summary)?.summary||q;
       if(options.publish!==false){

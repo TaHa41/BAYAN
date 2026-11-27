@@ -1,4 +1,5 @@
 import type { Env } from "../types";
+import { nextPacificMidnight, nextUtcMidnight } from "./ai-budget";
 
 export type ProviderFailure = {
   provider: "openai" | "workers_ai" | "gemini";
@@ -47,7 +48,8 @@ export function classifyOpenAIFailure(status: number, body: unknown, headers: He
 export function classifyWorkersAIFailure(error: unknown): ProviderFailure {
   const raw = safe((error as any)?.message || error || "unknown");
   const lower = raw.toLowerCase();
-  const code = /4006|quota|neurons|exceeded.*limit/.test(lower) ? "quota_exceeded"
+  const code = /workers_ai_budget/.test(lower) ? "budget_exhausted"
+    : /4006|quota|neurons|exceeded.*limit/.test(lower) ? "quota_exceeded"
     : /timeout|timed out|abort/.test(lower) ? "timeout"
     : /model.*(not found|unsupported|invalid)|unsupported.*model/.test(lower) ? "unsupported_model"
     : /json|parse/.test(lower) ? "invalid_json"
@@ -55,7 +57,7 @@ export function classifyWorkersAIFailure(error: unknown): ProviderFailure {
   return { provider: "workers_ai", code, detail: safe("code=" + code + "; " + raw) };
 }
 
-export function classifyGeminiFailure(kind: string, status?: number, detail = ""): ProviderFailure {
+export function classifyGeminiFailure(kind: string, status?: number, detail = "", retryAfterMs?: number): ProviderFailure {
   const normalized = String(kind || "provider_error").toLowerCase();
   const code = normalized === "quota" ? "quota_exceeded"
     : normalized === "rate_limited" ? "rate_limited"
@@ -66,7 +68,7 @@ export function classifyGeminiFailure(kind: string, status?: number, detail = ""
     : normalized === "http" ? "http_error"
     : normalized === "no_key" ? "not_configured"
     : "provider_error";
-  return { provider: "gemini", code, status, detail: safe(detail || code) };
+  return { provider: "gemini", code, status, ...(retryAfterMs ? { retryAfterMs } : {}), detail: safe(detail || code) };
 }
 
 export function isOpenAIQuotaFailure(code: string): boolean {
@@ -109,6 +111,12 @@ export async function getProviderBreaker(env: Pick<Env, "DB">, provider: "openai
   }
 }
 
+/** A daily quota stays exhausted until the provider's own reset, so the breaker reopens then instead of after a flat 6 hours. */
+export function quotaResetAt(provider: "openai" | "workers_ai" | "gemini", now: number): number {
+  const base = provider === "workers_ai" ? nextUtcMidnight(now) : provider === "gemini" ? nextPacificMidnight(now) : now + 6 * 60 * 60_000;
+  return Math.min(Math.max(base, now + 15 * 60_000), now + 26 * 60 * 60_000);
+}
+
 export async function updateProviderBreaker(env: Pick<Env, "DB">, provider: "openai" | "workers_ai" | "gemini", failure?: ProviderFailure, now = Date.now()): Promise<{ open: boolean; openedUntil: number; code: string }> {
   let previous: BreakerState = { openedUntil: 0, consecutive429: 0, code: "closed" };
   try {
@@ -129,7 +137,7 @@ export async function updateProviderBreaker(env: Pick<Env, "DB">, provider: "ope
       next.consecutive429 = previous.consecutive429 + 1;
       next.code = failure.code;
       const open = quota || next.consecutive429 >= 3;
-      if (open) next.openedUntil = now + (quota ? 6 * 60 * 60_000 : Math.max(15 * 60_000, failure.retryAfterMs || 0, failure.resetMs || 0));
+      if (open) next.openedUntil = quota ? quotaResetAt(provider, now) : now + Math.max(15 * 60_000, failure.retryAfterMs || 0, failure.resetMs || 0);
     }
   }
   try {

@@ -13,11 +13,11 @@ const evidenceFor = (locale: "ar" | "en") => {
   ] as any;
 };
 
-const draftJson = (locale: "ar" | "en", options: { unsupported?: boolean; invalidSource?: boolean | "all" } = {}) => {
+const draftJson = (locale: "ar" | "en", options: { unsupported?: boolean; invalidSource?: boolean | "all"; sentencesPerSection?: number } = {}) => {
   const sentence = supportedSentence(locale);
   const sections = Array.from({ length: 4 }, (_, index) => ({
     heading: locale === "ar" ? ["الخلفية", "الوقائع", "السياق", "الحدود"][index] : ["background", "documented facts", "context", "limitations"][index],
-    sentences: Array.from({ length: 4 }, (_, sentenceIndex) => ({
+    sentences: Array.from({ length: options.sentencesPerSection ?? 4 }, (_, sentenceIndex) => ({
       text: options.unsupported && index === 0 && sentenceIndex === 0
         ? (locale === "ar" ? "أعلن نادي ريال مدريد في 17 مارس 2031 قرارًا جديدًا." : "Acme Group announced the result on 17 March 2031.")
         : sentence,
@@ -38,15 +38,36 @@ function mockGeneration(responses: string[]) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe.each(["ar", "en"] as const)("evidence-grounded article drafting (%s)", locale => {
-  it("removes unsupported names, numbers and dates after at most one correction generation", async () => {
+  it("removes unsupported names, numbers and dates without paying for a second generation when the article is still useful", async () => {
     const fetchMock = mockGeneration([draftJson(locale, { unsupported: true }), draftJson(locale, { unsupported: true })]);
     const result = await draftArticle({ OPENAI_API_KEY: "test-key", OPENAI_ENABLED: "true" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect((result as any).verification?.retried).toBe(true);
+    // 15 verified sentences remain (the usefulness threshold is 12), so the rejected one is simply dropped: no extra paid call.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.status).toBe("verified");
+    expect((result as any).verification?.retried).toBe(false);
     expect((result as any).verification?.removedSentences).toBe(1);
     expect((result as any).verification?.remainingSentences).toBe(15);
     expect(result.answer).not.toContain(locale === "ar" ? "ريال مدريد" : "Acme Group");
     expect(result.answer).not.toContain(locale === "ar" ? "2031" : "2031");
+  });
+
+  it("still regenerates exactly once when removing unsupported sentences leaves the article below the usefulness thresholds", async () => {
+    // 4 sections x 3 sentences = 12; one unsupported sentence is removed, leaving 11 (< 12), so the correction generation runs.
+    const fetchMock = mockGeneration([draftJson(locale, { unsupported: true, sentencesPerSection: 3 }), draftJson(locale)]);
+    const result = await draftArticle({ OPENAI_API_KEY: "test-key", OPENAI_ENABLED: "true" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.status).toBe("verified");
+    expect((result as any).verification?.retried).toBe(true);
+    expect((result as any).verification?.remainingSentences).toBe(16);
+    expect(result.answer).not.toContain(locale === "ar" ? "ريال مدريد" : "Acme Group");
+  });
+
+  it("never publishes an article that stays below the thresholds after its one correction generation", async () => {
+    const fetchMock = mockGeneration([draftJson(locale, { unsupported: true, sentencesPerSection: 3 }), draftJson(locale, { unsupported: true, sentencesPerSection: 3 })]);
+    const result = await draftArticle({ OPENAI_API_KEY: "test-key", OPENAI_ENABLED: "true" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.status).toBe("mixed");
+    expect((result as any).reason).toBe("draft_not_verified");
   });
 
   it("accepts a well-formed supported draft", async () => {
@@ -67,10 +88,10 @@ describe.each(["ar", "en"] as const)("evidence-grounded article drafting (%s)", 
     expect((result as any).verification?.retried).toBe(true);
   });
 
-  it("salvages supported sentences while rejecting an unknown source ID", async () => {
+  it("salvages supported sentences while rejecting an unknown source ID (no second generation needed when still useful)", async () => {
     const fetchMock = mockGeneration([draftJson(locale, { invalidSource: true }), draftJson(locale, { invalidSource: true })]);
     const result = await draftArticle({ OPENAI_API_KEY: "test-key", OPENAI_ENABLED: "true" } as any, locale === "ar" ? "موضوع موثق" : "documented topic", locale, evidenceFor(locale));
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(result.status).toBe("verified");
     expect((result as any).verification?.remainingSentences).toBe(15);
     expect((result as any).verification?.removedSentences).toBe(1);

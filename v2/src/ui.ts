@@ -25,24 +25,45 @@ export const wisdomOf = (lang: Lang, now = Date.now()) => WISDOM[lang][Math.floo
 
 
 export interface TickerItem { text: string; href: string }
-export interface LayoutOpts { lang: Lang; origin: string; path: string; title: string; description: string; body: string; image?: string; jsonLd?: unknown; noindex?: boolean; active?: string; ticker?: TickerItem[]; progress?: boolean }
+export interface LayoutOpts { lang: Lang; origin: string; path: string; title: string; description: string; body: string; image?: string; jsonLd?: unknown; noindex?: boolean; ogType?: "website" | "article"; active?: string; ticker?: TickerItem[]; progress?: boolean }
+/** /research pages are noindex reference views of another publisher's story: links to them must not spend crawl budget or pass ranking. */
+export const nofollowResearchLinks = (html: string): string => html.replace(/<a\b([^>]*)>/g, (tag, attrs: string) => /\bhref="\/research[?"]/.test(attrs) && !/\brel=/.test(attrs) ? `<a${attrs} rel="nofollow">` : tag);
+const isoDate = (value: unknown): string | undefined => { const t = Date.parse(String(value || "")); return Number.isFinite(t) ? new Date(t).toISOString() : undefined; };
+/** Article / NewsArticle structured data with the fields Google recommends: dates, author, publisher logo, canonical page, cited sources. */
+export function articleJsonLd(a: Article, lang: Lang, origin: string): Record<string, unknown> {
+  const url = `${origin}/article/${encodeURIComponent(a.slug)}?lang=${lang}`;
+  const org = { "@type": "Organization", name: "BAYAN", url: `${origin}/` };
+  const citation = a.sources.filter((x) => /^https:\/\//i.test(x.url)).slice(0, 12).map((x) => ({ "@type": "CreativeWork", name: x.title || x.publisher || x.url, url: x.url, ...(x.publisher ? { publisher: { "@type": "Organization", name: x.publisher } } : {}) }));
+  const published = isoDate(a.createdAt) || isoDate(a.updatedAt), modified = isoDate(a.updatedAt);
+  return {
+    "@context": "https://schema.org", "@type": a.section === "news" ? "NewsArticle" : "Article",
+    headline: plain(a.title).slice(0, 110), description: plain(a.summary).slice(0, 300), image: [a.imageUrl],
+    ...(published ? { datePublished: published } : {}), ...(modified ? { dateModified: modified } : {}),
+    inLanguage: lang, url, mainEntityOfPage: { "@type": "WebPage", "@id": url }, isAccessibleForFree: true,
+    author: org, publisher: { ...org, logo: { "@type": "ImageObject", url: `${origin}/logo-512.png`, width: 512, height: 512 } },
+    ...(citation.length ? { citation } : {}),
+  };
+}
 export function layout(o: LayoutOpts): string {
   const { lang } = o, other: Lang = lang === "ar" ? "en" : "ar";
   // The Arabic home page is the clean root URL (same as the sitemap); every other URL carries ?lang=.
   const href = (l: Lang, p = o.path) => (p === "/" && l === "ar" ? "/" : `${p}${p.includes("?") ? "&" : "?"}lang=${l}`);
   const ribbon = [...SECTIONS, ...TOOLS].map((x) => `<a href="/${x.slug}?lang=${lang}"${o.active === x.slug ? " aria-current=page" : ""}>${icon(x.slug)}${esc(lang === "ar" ? x.ar : x.en)}</a>`).join("");
   // News ticker: the same items twice so the CSS marquee can loop without a gap; the copy is hidden from assistive tech.
-  const tick = (o.ticker || []).slice(0, 8).map((t) => `<a href="${esc(t.href)}">${esc(t.text)}</a>`).join("");
+  const tick = nofollowResearchLinks((o.ticker || []).slice(0, 8).map((t) => `<a href="${esc(t.href)}">${esc(t.text)}</a>`).join(""));
   const ticker = tick ? `<div class="ticker" aria-label="${T(lang, "آخر العناوين", "Latest headlines")}"><span class="ticker-label">${T(lang, "الآن", "Now")}</span><div class="ticker-view"><div class="ticker-track">${tick}<span aria-hidden="true" class="ticker-copy">${tick}</span></div></div></div>` : "";
+  // Social cards: every page gets a complete set (url, site name, locale, image, Twitter card); pages without their own image use the brand card.
+  const ogImage = o.image || `${o.origin}/og-bayan.png`, d200 = esc(o.description.slice(0, 200));
+  const social = `<meta property="og:title" content="${esc(o.title)}"><meta property="og:description" content="${d200}"><meta property="og:type" content="${o.ogType === "article" ? "article" : "website"}"><meta property="og:url" content="${esc(o.origin + href(lang))}"><meta property="og:site_name" content="BAYAN"><meta property="og:locale" content="${lang === "ar" ? "ar_AR" : "en_US"}"><meta property="og:locale:alternate" content="${other === "ar" ? "ar_AR" : "en_US"}"><meta property="og:image" content="${esc(ogImage)}">${o.image ? "" : '<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">'}<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${esc(o.title)}"><meta name="twitter:description" content="${d200}"><meta name="twitter:image" content="${esc(ogImage)}">`;
   const today = new Date().toLocaleDateString(lang === "ar" ? "ar-EG" : "en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   return `<!doctype html><html lang="${lang}" dir="${lang === "ar" ? "rtl" : "ltr"}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${esc(o.title)}</title><meta name="description" content="${esc(o.description.slice(0, 200))}">${o.noindex ? '<meta name="robots" content="noindex,follow">' : ""}
 <link rel="canonical" href="${esc(o.origin + href(lang))}"><link rel="alternate" hreflang="ar" href="${esc(o.origin + href("ar"))}"><link rel="alternate" hreflang="en" href="${esc(o.origin + href("en"))}"><link rel="alternate" hreflang="x-default" href="${esc(o.origin + href("ar"))}">
-<meta property="og:title" content="${esc(o.title)}"><meta property="og:description" content="${esc(o.description.slice(0, 200))}"><meta property="og:type" content="website">${o.image ? `<meta property="og:image" content="${esc(o.image)}">` : ""}<meta name="theme-color" content="#050914">
+${social}<meta name="theme-color" content="#050914">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Readex+Pro:wght@300;400;500;600&family=Noto+Naskh+Arabic:wght@500;600;700&display=swap" rel="stylesheet">
 ${o.jsonLd ? `<script type="application/ld+json">${JSON.stringify(o.jsonLd).replace(/</g, "\\u003c")}</script>` : ""}<style>${CSS}</style></head><body><div class="aurora" aria-hidden="true"></div>
 <header class="top" id="top"><div class="wrap"><div class="bar"><a class="logo" href="/?lang=${lang}">بيان<b>.</b><small>BAYAN</small></a><span class="date">${esc(today)}</span><a class="pill out" href="${esc(href(other))}">${other === "ar" ? "العربية" : "EN"}</a><a class="pill gold" href="/search?lang=${lang}">${T(lang, "ابحث", "Search")}</a></div></div><nav class="ribbon" aria-label="${T(lang, "الأقسام", "Sections")}"><div class="wrap in">${ribbon}</div></nav>${ticker}</header>${o.progress ? '<div class="progress" aria-hidden="true"></div>' : ""}
-<main class="wrap">${o.body}</main>
+<main class="wrap">${nofollowResearchLinks(o.body)}</main>
 <footer><div class="wrap"><nav>${[`<a href="/sections?lang=${lang}">${T(lang, "كل الأقسام", "All sections")}</a>`].join("")}${SECTIONS.slice(0, 8).map((s) => `<a href="/${s.slug}?lang=${lang}">${esc(lang === "ar" ? s.ar : s.en)}</a>`).join("")}</nav><p class="legal">${[["about", T(lang, "عن بيان", "About")], ["methodology", T(lang, "المنهجية", "Methodology")], ["privacy", T(lang, "الخصوصية", "Privacy")], ["terms", T(lang, "الشروط", "Terms")], ["contribute", T(lang, "ساهم بمعلومة", "Contribute")]].map(([s, n]) => `<a href="/${s}?lang=${lang}">${n}</a>`).join(" · ")}</p><p>${T(lang, "المعلومة أولًا، والدليل قبل الادعاء.", "Information first. Evidence before claims.")}</p><p><b>${SITE.credit}</b></p></div></footer></body></html>`;
 }
 
